@@ -1,6 +1,6 @@
 {
   // Worker: file tĩnh trong public/, /api chuyển Cloud Run, file >25 MiB lấy từ GCS.
-  // Vercel không đọc file này. API_UPSTREAM chỉ ở dashboard Cloudflare, không ghi URL vào đây.
+  // API_UPSTREAM chỉ ở dashboard Cloudflare, không ghi URL vào đây.
   // keep_vars: Workers Builds deploy không xóa biến runtime đã gắn trên dashboard.
   // Nếu GitHub đang nối Workers Builds, merge nhánh main sẽ deploy worker này lên workers.dev.
   "name": "qh-hue",

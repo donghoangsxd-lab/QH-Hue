@@ -23,7 +23,7 @@ JS giao diện nằm dưới `public/js/`. File lớn: `rg` tên hàm hoặc `ac
 
 ## MOD-04 State, hằng số, QCVN
 
-`state.js`: `state`, `effectiveRadius`, `getPlanScenarioList`, `PLAN_CHANGE_INFO`. `api.js`: `geeApi`, `infraListUrl`, `markDataWritten`. `storageSchema.js`. `config/constants.js`: `defaultRadius`, `standardRadius`, `GCS_BUCKET`. Fallback domain (`PROD_ORIGIN`, URL GCS) không sửa.
+`state.js`: `state`, `effectiveRadius`, `getPlanScenarioList`, `PLAN_CHANGE_INFO`. `api.js`: `geeApi`, `infraListUrl`, `markDataWritten`. `storageSchema.js`. `config/constants.js`: `defaultRadius`, `standardRadius`, `GCS_BUCKET`. `PROD_ORIGIN` là `https://qh-hue.donghoangsxd.workers.dev`. URL GCS không sửa.
 
 ## MOD-05 Bản đồ Leaflet, ranh giới
 
@@ -99,7 +99,7 @@ PR #98: trần đọc công khai, trả 429. Cloud Run và Worker đếm riêng,
 
 ## MOD-20 Worker + Cloud Run + GCS
 
-Thay Vercel. `vercel.json` để lại, không deploy bằng file đó, không xóa.
+Host công khai là Worker `https://qh-hue.donghoangsxd.workers.dev`. Không còn `vercel.json`.
 
 `worker/index.js`: `proxyApi`, `proxyGcs`, `routeKind`, `objectNameFromPath`, `normalizeByteRange`, `gcsCacheUrl` (cache Range ở mép, gắn `cf-cache-status` và `x-qh-cache`). `wrangler.jsonc`: `keep_vars`, `main` = `worker/index.js`, `run_worker_first` cho `/api/*`, `/gcs/*`, `/data/gba/buildings.pmtiles`.
 

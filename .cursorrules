@@ -7,7 +7,7 @@
 
 # 2. KIẾN TRÚC HỆ THỐNG & TECH STACK
 - Frontend: Vanilla JS thuần (chia module ES Modules), Leaflet.js, Turf.js, Chart.js.
-- Deployment: Cloudflare Worker (`worker/index.js`, `wrangler.jsonc`) phục vụ tĩnh và proxy; API trên Cloud Run (`cloudrun/`); dữ liệu GCS. `vercel.json` là legacy, không xóa, không dùng để deploy.
+- Deployment: Cloudflare Worker (`worker/index.js`, `wrangler.jsonc`) phục vụ tĩnh và proxy; API trên Cloud Run (`cloudrun/`); dữ liệu GCS. Bản công khai: `https://qh-hue.donghoangsxd.workers.dev`. Không deploy Vercel.
 - Backend/Storage: Google Cloud Storage (Bucket `hue-infra-data-us`, file `infrastructure_hue.json` dạng GeoJSON). Xử lý qua `services/gcsService.js` với cơ chế cache ETag (HEAD request kiểm tra thay đổi trước khi tải lại JSON).
 - Nguồn dữ liệu & Không gian: Google Sheets `HTXH-Hue-06.2026` đồng bộ lên GCS thông qua Apps Script (`syncSheetsToGCS` và trigger `installedOnEdit`), hoàn toàn không phải do GEE đảm nhận (GEE chỉ dùng để phân tích: raster dân số, heatmap, viễn thám). Heatmap, độ phủ và tra cứu chỉ tính điểm có `TrangThai = TRUE`; điểm `FALSE` (đề xuất) vẫn hiển thị trên bản đồ với kiểu riêng (buffer nét đứt đỏ `#f87171`).
 

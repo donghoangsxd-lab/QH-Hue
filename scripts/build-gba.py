@@ -22,8 +22,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = os.environ.get('GBA_TMP', '/tmp/gba')
 PARQUET = os.environ.get('GBA_PARQUET', os.path.join(TMP, 'e105_n20_e110_n15.parquet'))
 WARDS = os.environ.get('GBA_WARDS', os.path.join(TMP, 'wards.geojson'))
-WARD_URL = 'https://web-hatang-hue-4.vercel.app/api/gee?action=getBoundaryVector&v=2'
-INDEX_URL = 'https://web-hatang-hue-4.vercel.app/api/gee?action=getProjectIndex'
+WARD_URL = 'https://qh-hue.donghoangsxd.workers.dev/api/gee?action=getBoundaryVector&v=2'
+INDEX_URL = 'https://qh-hue.donghoangsxd.workers.dev/api/gee?action=getProjectIndex'
 OUT_DIR = os.path.join(ROOT, 'public', 'data', 'gba')
 AGG_PATH = os.path.join(OUT_DIR, 'agg.json')
 PMT_PATH = os.path.join(OUT_DIR, 'buildings.pmtiles')

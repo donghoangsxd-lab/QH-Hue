@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const OUT = path.join(root, 'public/data/imm.json');
 const CACHE = '/tmp/imm-osm';
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
-const BOUNDARY_URL = process.env.BOUNDARY_URL || 'https://web-hatang-hue-4.vercel.app/api/gee?action=getBoundaryVector&v=2';
+const BOUNDARY_URL = process.env.BOUNDARY_URL || 'https://qh-hue.donghoangsxd.workers.dev/api/gee?action=getBoundaryVector&v=2';
 const BBOX = '15.9,106.9,16.9,108.3';
 const HW = 'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street';
 

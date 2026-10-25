@@ -7,7 +7,7 @@ const constants = require('../config/constants');
 
 const root = path.join(__dirname, '..');
 const INFRA_URL = constants.GCS_URL;
-const BOUNDARY_URL = process.env.BOUNDARY_URL || 'https://web-hatang-hue-4.vercel.app/api/gee?action=getBoundaryVector&v=2';
+const BOUNDARY_URL = process.env.BOUNDARY_URL || 'https://qh-hue.donghoangsxd.workers.dev/api/gee?action=getBoundaryVector&v=2';
 const OUT = path.join(root, 'public/data/faq.json');
 
 const LAND = {

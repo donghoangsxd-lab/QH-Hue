@@ -30,7 +30,7 @@ const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS
 const MAX_LISTED = 200;
 const LAND_KEY = 'zz-land';
 const LAND_O_KEY = 'zy-land-o';
-// Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (Vercel nhận tối đa 4,5 MB/yêu cầu)
+// Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (dưới trần thân yêu cầu)
 const CHUNK_MAX_ITEMS = 250;
 const CHUNK_MAX_CHARS = 2500000;
 // Người dùng chưa đăng nhập: chỉ gửi file ≤ 2 MB vào hàng chờ duyệt trên bucket (máy chủ kiểm tra lại), không ghi Sheet

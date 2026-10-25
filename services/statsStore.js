@@ -1,4 +1,4 @@
-// Bộ đệm kết quả tính trên GEE lưu ở bucket (thư mục cache/): sống qua khởi động nguội / deploy, mọi instance Vercel dùng chung.
+// Bộ đệm kết quả tính trên GEE lưu ở bucket (thư mục cache/): sống qua khởi động nguội / deploy, mọi instance Cloud Run dùng chung.
 // Mọi mục đều khóa theo chữ ký dữ liệu (đã gồm phiên bản hiệu chỉnh dân cư) nên không cần xóa khi dữ liệu đổi: chữ ký lệch = bỏ qua.
 //   cache/v1/cov/<HT|QH|NET...>-<md5 phường>.json : 1 file / phường / kịch bản (tránh ghi dồn vào 1 object, GCS ~1 lần ghi/giây/object)
 //   cache/v1/candidates.json                       : số pixel dân cư phần còn trống của ứng viên + tổng pixel phường

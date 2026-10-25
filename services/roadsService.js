@@ -7,16 +7,16 @@
 //   roads/v2/custom.json           = { v: 2, saved, roads: [{ id, g, name, nodes, flat, len: { tên phường: km }, at }] }
 //   (tuyến đường hiện trạng Admin vẽ bổ sung; tách riêng để tải lại OSM không mất, mỗi lần lưu ghi đè cả file)
 // Máy chủ cắt đường quanh công trình từ các file này cho "phạm vi thực tế"; index chứa luôn chiều dài trục chính / kiệt.
-// Đọc: file công khai. Ghi: Apps Script (máy chủ Vercel không có quyền ghi bucket).
+// Đọc: file công khai. Ghi: Apps Script (Cloud Run không có quyền ghi bucket).
 const axios = require('axios');
 
 const ROADS_PUBLIC_BASE = 'https://storage.googleapis.com/hue-infra-data-us/roads/v2/';
 const RADIUS_STEP = 500;          // bán kính cắt làm tròn lên bậc 500 m để CDN dùng lại khi đổi bán kính buffer
 const RADIUS_MARGIN = 100;        // lấy rộng hơn bán kính phục vụ (đường nối ngay ngoài vòng)
-const ROADS_MAX_RADIUS = 3500;    // lớn hơn: phản hồi có thể vượt 4,5 MB của Vercel → trình duyệt tự tải Overpass
+const ROADS_MAX_RADIUS = 3500;    // lớn hơn: phản hồi có thể vượt trần thân yêu cầu → trình duyệt tự tải Overpass
 const INDEX_TTL_MS = 10 * 60 * 1000;
-const PART_CACHE_MAX = 16;        // số phần mạng lưới giữ trong bộ nhớ hàm Vercel (mỗi phần tối đa ~3 MB)
-const MAX_PART_CHARS = 3000000;   // dưới giới hạn 4,5 MB/yêu cầu của Vercel khi Admin gửi lên
+const PART_CACHE_MAX = 16;        // số phần mạng lưới giữ trong bộ nhớ instance (mỗi phần tối đa ~3 MB)
+const MAX_PART_CHARS = 3000000;   // dưới trần thân yêu cầu khi Admin gửi lên
 const MAX_PARTS = 20;
 const CUSTOM_MAX_ROADS = 3000;
 const CUSTOM_MAX_POINTS = 2000;   // số đỉnh tối đa của 1 tuyến vẽ bổ sung

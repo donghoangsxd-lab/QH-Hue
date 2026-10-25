@@ -274,7 +274,6 @@ function tileToLngLat(px, py, extent, tx, ty, z) {
 function directTiles() {
   const host = location.hostname;
   const port = location.port;
-  if (host === 'web-hatang-hue-4.vercel.app') return true;
   return (host === 'localhost' || host === '127.0.0.1') && (port === '5500' || port === '5501' || port === '8080' || port === '8000');
 }
 
@@ -312,7 +311,7 @@ const readyCache = new Map();
 function tileUrl(kind) {
   const gcs = kind === 'gba' ? withAssetVersion(GBA_URL) : CAD_URL;
   if (directTiles()) return gcs;
-  // workers.dev không chứa file >25 MiB. Worker đọc GCS. Vercel production vẫn đi directTiles().
+  // workers.dev không chứa file >25 MiB. Worker đọc GCS. Localhost tĩnh đọc thẳng bucket.
   if (typeof location !== 'undefined' && /\.workers\.dev$/i.test(location.hostname || '')) {
     if (kind === 'gba') return withAssetVersion(new URL('data/gba/buildings.pmtiles', document.baseURI).href);
     if (kind === 'cadastre') return '/gcs/cadastre/thuadat-2016.pmtiles';

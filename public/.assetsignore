@@ -1,4 +1,4 @@
-# Wrangler không tải các dòng này lên Workers. Vercel không đọc file này.
+# Wrangler không tải các dòng này lên Workers.
 # buildings.pmtiles ~45 MiB, vượt hạn 25 MiB/file. Bản phục vụ nằm trên GCS:
 # https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles
 data/gba/buildings.pmtiles

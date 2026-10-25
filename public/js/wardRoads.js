@@ -10,7 +10,7 @@ import { yearsText } from './newDev.js';
 const QUERY_TIMEOUT_MS = 170000; // xã miền núi rộng hàng trăm km²
 const QUERY_HEDGE_MS = 25000;    // truy vấn nặng: chờ lâu hơn mới hỏi thêm máy chủ Overpass khác
 const PAUSE_MS = 1500;
-const PART_CHARS = 2800000;      // mỗi phần gửi lên dưới giới hạn 4,5 MB/yêu cầu của Vercel (khớp MAX_PART_CHARS máy chủ)
+const PART_CHARS = 2800000;      // mỗi phần gửi lên dưới trần thân yêu cầu (khớp MAX_PART_CHARS máy chủ)
 // Khớp EXCLUDED_HIGHWAYS của serviceArea.js (phạm vi thực tế bỏ thêm cao tốc, đường cấm đi bộ / đường riêng)
 const SKIP_HIGHWAYS = 'construction|proposed|planned|abandoned|disused|razed|raceway|bus_guideway|platform|corridor|elevator|escape|via_ferrata';
 

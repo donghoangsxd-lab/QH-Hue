@@ -53,7 +53,6 @@ function startServer() {
     fs.createReadStream(file).pipe(res);
   });
   // 8792 ngoài STATIC_DEV_PORTS (api.js): trang gọi /api/gee cùng nguồn, máy tĩnh chuyển sang Worker.
-  // Vercel legacy trả 402 nên không dùng làm danh mục.
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(8792, '127.0.0.1', () => resolve(server));

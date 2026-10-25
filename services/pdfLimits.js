@@ -1,5 +1,5 @@
 // Hạn mức PDF đính kèm (quyết định, văn bản kèm, PDF hồ sơ điều chỉnh).
-// Người dùng tối đa 2 MB, gửi base64 trong thân request (dưới giới hạn ~4,5 MB của Vercel).
+// Người dùng tối đa 2 MB, gửi base64 trong thân request.
 // Admin tối đa 10 MB: phần trên 2 MB tải PUT thẳng lên bucket bằng URL ký, không đi qua thân hàm.
 const PDF_USER_MAX_BYTES = 2 * 1024 * 1024;
 const PDF_ADMIN_MAX_BYTES = 10 * 1024 * 1024;

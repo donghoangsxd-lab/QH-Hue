@@ -1,5 +1,5 @@
 // Ô năm đã chốt lấy thẳng PNG trên bucket. Ô chưa có, hoặc lớp năm đang chạy, đi qua /api/gee?action=getSatTile.
-// Giới hạn 4 ô cùng lúc và một lần thử lại: Earth Engine 429/quá hạn, và mỗi lần thử lại giữ hàm Fluid.
+// Giới hạn 4 ô cùng lúc và một lần thử lại: Earth Engine 429/quá hạn, và mỗi lần thử lại giữ instance Cloud Run.
 // Chỉ báo tileload khi có ảnh; tileerror sau khi hết lần thử — không tính ô lỗi là đã tải.
 
 export const TILE_CONCURRENCY = 4;

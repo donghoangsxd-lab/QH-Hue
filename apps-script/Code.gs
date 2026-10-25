@@ -7,12 +7,12 @@
 // Quyết định phê duyệt: projects/decisions.json + projects/<slug>/quyet-dinh.pdf.
 // File người dùng gửi chờ duyệt: projects/decision-proposals.json (không ghi đường dẫn) + cho-duyet/<32 hex>.pdf (tối đa 2 MB).
 // Văn bản kèm và quy chế của cán bộ: cho-duyet/<id>.json + cho-duyet/<id>.pdf, dòng ChoDuyet kind van-ban / quy-che.
-// PDF admin lớn hơn 2 MB không đi qua Apps Script (URL ký trên Vercel, tối đa 10 MB).
-// putBucketPdf khi Vercel chưa ghi được PDF.
+// PDF admin lớn hơn 2 MB không đi qua Apps Script (URL ký trên Cloud Run, tối đa 10 MB).
+// putBucketPdf khi Cloud Run chưa ghi được PDF.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Sheet 15-DA (dự án kêu gọi đầu tư) không phải điểm hạ tầng: đóng gói mọi cột sang invest_calls.json.
-// Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
+// Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Cloud Run chưa có quyền.
 // Admin sửa / đổi loại / xóa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow / retypeInfraRow / deleteInfraRow.
 // Gán hạ tầng hiện trạng cho thửa địa chính 2016: tab HaTangHienTrang, doPost saveHaTangHienTrang / deleteHaTangHienTrang / getHaTangHienTrang.
 // Khóa dòng là (số tờ, số thửa, xã/phường cũ). Điểm được đóng vào infrastructure_hue.json để tính độ phủ.
@@ -697,7 +697,7 @@ function syncSheetsToGCS(includeCad) {
   }
 }
 
-// TÍNH SẴN TRÊN WEBAPP SAU ĐỒNG BỘ: máy chủ Vercel đếm pixel ứng viên + độ phủ phường đổi chữ ký rồi lưu bucket (cache/v1/),
+// TÍNH SẴN TRÊN WEBAPP SAU ĐỒNG BỘ: máy chủ Cloud Run đếm pixel ứng viên + độ phủ phường đổi chữ ký rồi lưu bucket (cache/v1/),
 // người mở web đầu tiên không phải chờ GEE. Chạy bằng trigger hẹn giờ (không gọi thẳng trong syncSheetsToGCS: doPost từ
 // webapp chỉ chờ 25–55 s). Cần Script Property WEBAPP_URL (vd. https://<tên miền webapp>); thiếu thì bỏ qua.
 const WARM_HANDLER = "warmWebappCache";
@@ -2570,7 +2570,7 @@ function bucketObjectNameOk(name) {
     || name === "cad_parcels.json" || bucketProjectJson(name) || bucketProjectPart(name);
 }
 
-// Vercel dựng nội dung file đồ án; bản này chỉ đẩy lên bucket (không ghi Sheet). Dùng khi service account chưa có quyền ghi.
+// Cloud Run dựng nội dung file đồ án; bản này chỉ đẩy lên bucket (không ghi Sheet). Dùng khi service account chưa có quyền ghi.
 function putBucketObject(body) {
   var name = String(body.name || "");
   var content = String(body.content || "");

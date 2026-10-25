@@ -1,5 +1,5 @@
 // Máy chủ Cloud Run cho /api/gee, /api/osmClip, /api/pmtilesRange.
-// Bắt chước req.query / req.body và res.status().json() của Vercel. Vercel không chạy file này.
+// Bắt chước req.query / req.body và res.status().json() để handler api/* chạy trên Cloud Run.
 const http = require('http');
 const { allow } = require('../services/rateWindow');
 

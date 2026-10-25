@@ -9,7 +9,7 @@ const gcsWrite = require('./gcsWrite');
 const CACHE_V = 'v1';
 const MAP_TTL_MS = 20 * 60 * 1000;
 const GEE_TIMEOUT_MS = 15000;
-// Hai lần: thêm lần nữa nhân thời gian Fluid Active CPU khi Earth Engine 429/quá hạn.
+// Hai lần: thêm lần nữa nhân thời gian Cloud Run khi Earth Engine 429/quá hạn.
 const GEE_TRIES = 2;
 const READ_TIMEOUT_MS = 6000;
 
