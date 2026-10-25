@@ -1584,7 +1584,27 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-migrate:disabled { opacity: 0.5; cursor: wait; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .layer-subrow { margin-left: 22px; min-height: 22px; font-size: var(--fs-sm); }
-.project-layer-sub { margin-left: 22px; }
+.project-rail {
+  flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-left: auto; border-radius: 4px; color: var(--text-muted); cursor: pointer;
+}
+.project-rail input {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.project-rail .ico { width: 13px; height: 13px; margin: 0; pointer-events: none; }
+.project-rail:has(input:checked) {
+  color: var(--accent-cyan);
+  background: rgba(var(--cyan-rgb), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--cyan-rgb), 0.55);
+}
+.project-rail:has(input:not(:checked)) { color: var(--axis-color-muted); }
+.project-rail:hover, .project-rail:focus-within { color: var(--accent-cyan); background: var(--bg-hover); }
+.project-layer.is-off .project-rail { opacity: 0.55; }
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  .project-rail { width: 22px; height: 22px; }
+  .project-rail .ico { width: 14px; height: 14px; }
+}
 .rail-swatch { display: block; flex-shrink: 0; }
 .rail-status:empty { display: none; }
 .rail-status { flex-basis: 100%; color: var(--text-muted); }

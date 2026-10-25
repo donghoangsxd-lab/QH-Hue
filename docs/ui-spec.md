@@ -36,7 +36,7 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Danh sách phía dưới chỉ gồm đồ án của cấp đang bật; muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Không dòng «Phạm vi: Toàn thành phố». Không mục «Dữ liệu hiện trạng» trong danh sách cấp và đồ án. Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền.
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Danh sách phía dưới chỉ gồm đồ án của cấp đang bật; muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Không dòng «Phạm vi: Toàn thành phố». Không mục «Dữ liệu hiện trạng» trong danh sách cấp và đồ án. Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền. Dòng «QH giao thông» (toàn thành phố và trung tâm) kết thúc bằng icon «Đường sắt» cùng hàng: bật hoặc tắt lớp đường sắt. Không tách thành nút cả dòng hay dòng con.
 
 ### Hạ tầng kỹ thuật
 

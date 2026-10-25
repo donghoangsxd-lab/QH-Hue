@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="manifest.webmanifest?v=20261056">
+  <link rel="manifest" href="manifest.webmanifest?v=20261057">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20261027" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261056">
+  <link rel="stylesheet" href="css/style.css?v=20261057">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -92,6 +92,7 @@
     <symbol id="i-stream" viewBox="0 0 24 24"><path d="M6 3c0 4 5 4 5 8.5S6 16 6 21"/><path d="M14 3c0 4 5 4 5 8.5S14 16 14 21"/><path d="m8.5 18.5-2.5 2.5-2.5-2.5"/></symbol>
     <symbol id="i-basin" viewBox="0 0 24 24"><path d="M12 21C7 18 3 14 4 9s5-6 8-6 7 1 8 6-3 9-8 12z" stroke-dasharray="3 2.5"/><path d="M12 7v10"/><path d="m9.5 14.5 2.5 2.5 2.5-2.5"/></symbol>
     <symbol id="i-road" viewBox="0 0 24 24"><path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/></symbol>
+    <symbol id="i-rail" viewBox="0 0 24 24"><rect x="5.5" y="3.5" width="13" height="12.5" rx="2.5"/><path d="M5.5 9.8h13"/><path d="M8.7 12.4h1.3M14 12.4h1.3"/><path d="M8 16 6 20.5M16 16l2 4.5"/><path d="M4 20.5h16"/></symbol>
     <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
     <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
     <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
@@ -537,10 +538,10 @@
               <div class="project-layer">
                 <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến">
                   <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
-              </div>
-              <div class="project-layer project-layer-sub">
-                <label class="project-layer-name" title="Đường sắt quốc gia, tốc độ cao và đường sắt đô thị của đồ án 1/25.000. Tắt riêng đường sắt, đường bộ vẫn hiện.">
-                  <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked><span>Đường sắt</span><small class="layer-hint" id="gt25RailHint"></small></label>
+                <label class="project-rail" title="Đường sắt">
+                  <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
+                  <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                </label>
               </div>
             </div>
           </div>
@@ -562,10 +563,10 @@
               <div class="project-layer">
                 <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
                   <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
-              </div>
-              <div class="project-layer project-layer-sub">
-                <label class="project-layer-name" title="Đường sắt quốc gia, tốc độ cao và đường sắt đô thị của đồ án 1/10.000. Tắt riêng đường sắt, đường bộ vẫn hiện.">
-                  <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked><span>Đường sắt</span><small class="layer-hint" id="gt10RailHint"></small></label>
+                <label class="project-rail" title="Đường sắt">
+                  <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked aria-label="Đường sắt">
+                  <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                </label>
               </div>
             </div>
             <div class="qhc-stages" id="qhcStages" role="group" aria-label="Giai đoạn lô, tuyến giao thông và ranh mở rộng QHC 1/10.000" hidden></div>
@@ -1618,6 +1619,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261056"></script>
+  <script type="module" src="./js/app.js?v=20261057"></script>
 </body>
 </html>
