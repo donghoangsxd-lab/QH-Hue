@@ -41,7 +41,7 @@ Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000,
 
 ### Hạ tầng kỹ thuật
 
-Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoát nước thải, cấp điện, thông tin liên lạc, chất thải rắn và nghĩa trang) rồi Tổng hợp đường ống. Trong mỗi nhóm có điểm công trình, tuyến mạng và vùng. Tổng hợp đường ống chỉ hiện tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc. Lớp cột đèn không hiện. Họng cứu hỏa ở lại cấp nước. Ô giả lập bán kính giữ nguyên. Môi trường không nằm trong trục này: tab «Lớp môi trường» ghim đáy panel. Không quỹ đất. Đồ án thiếu tuyến thì ghi «dữ liệu tự tổng hợp». Cấp QHPK chưa có lớp thì để hook, không bịa tuyến.
+Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoát nước thải, cấp điện, thông tin liên lạc, chất thải rắn và nghĩa trang) rồi Tổng hợp đường ống. Trong mỗi nhóm có điểm công trình, tuyến mạng và vùng. Tổng hợp đường ống chỉ hiện tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc. Lớp cột đèn không hiện. Họng cứu hỏa ở lại cấp nước. Ô giả lập bán kính giữ nguyên. Môi trường không nằm trong trục này: tab «Lớp môi trường» ghim đáy panel. Không quỹ đất. Đồ án thiếu tuyến thì ghi «dữ liệu tự tổng hợp». Cấp QHPK chưa có lớp thì để hook, không bịa tuyến. Mở đồ án thì hiện quy mô từng ngành đã có số và kết quả đối chiếu trần cấp trên: OK, vượt (kèm mức vượt), hoặc chưa đủ dữ liệu. Ô trống không tính là đạt. Số vượt trần đã có thì không ghi.
 
 ### Hạ tầng xã hội
 

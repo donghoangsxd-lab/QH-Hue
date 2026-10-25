@@ -21,6 +21,8 @@ import {
   isCotDenLayer, qhpkLayersFromHook
 } from './htktModel.js';
 import { formatRadius, getPlanRadii, loadPlanRadii, planRadiusM } from './planRadius.js';
+import { loadCongSuat } from './congSuat.js';
+import { capacityPanelHtml, initCapacityEditor, mountCapacityHosts } from './congSuatUi.js';
 import { initXahoiList, paintXahoiList } from './xahoiList.js';
 
 const STORE_KEY = 'qh_axes_v1';
@@ -71,6 +73,7 @@ const openSchemes = new Set([
   'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c',
   'qhc-xa-thuong-long-3f2c4da4'
 ]);
+const capOpen = new Set();
 let layerQuery = '';
 let applying = false;
 let booted = false;
@@ -375,13 +378,20 @@ function schemeBlock(sector, levelId, scheme) {
   const poleNote = !shown.length && poles.length ? '<p class="cn-empty">Đã gỡ lớp cột đèn.</p>' : '';
   const badge = has ? 'Có dữ liệu' : hasSynth ? SYNTH_LABEL : 'Chưa có';
   const canOpen = has || hasSynth || poles.length > 0;
+  const capHtml = (open || capOpen.has(scheme.slug)) ? capacityPanelHtml({
+    schemeId: scheme.slug,
+    schemeName: scheme.name,
+    cap: scheme.level || levelId,
+    sector,
+    pipe: pipeOn
+  }) : '';
   return `<div class="cn-scheme${canOpen ? '' : ' is-missing'}">
     <div class="cn-scheme-row">
       <label><input type="checkbox" data-cn-scheme="${escapeHtml(scheme.slug)}" data-cn-level="${escapeHtml(levelId)}"${on ? ' checked' : ''}${canOpen ? '' : ' disabled'}${some && !on ? ' data-mixed="1"' : ''}><span>${escapeHtml(scheme.name)}</span></label>
       <b class="cn-badge ${has || hasSynth ? 'is-on' : 'is-off'}">${escapeHtml(badge)}</b>
-      ${canOpen ? `<button type="button" class="cn-fold" data-cn-fold="${escapeHtml(scheme.slug)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>` : ''}
+      ${canOpen ? `<button type="button" class="cn-fold" data-cn-fold="${escapeHtml(scheme.slug)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>` : `<button type="button" class="cn-cap-btn" data-cs-open="${escapeHtml(scheme.slug)}" aria-expanded="${capOpen.has(scheme.slug)}">Quy mô</button>`}
     </div>
-    ${open ? `<div class="cn-groups">${groups}${synthBlock(synth)}${poleNote}</div>` : ''}
+    ${open ? `<div class="cn-groups">${groups}${synthBlock(synth)}${poleNote}${capHtml}</div>` : capHtml}
   </div>`;
 }
 
@@ -963,6 +973,13 @@ export function initChuyenNganh() {
       paint();
       return;
     }
+    const capBtn = e.target.closest('[data-cs-open]');
+    if (capBtn) {
+      const slug = capBtn.dataset.csOpen;
+      if (capOpen.has(slug)) capOpen.delete(slug); else capOpen.add(slug);
+      paint();
+      return;
+    }
     const kvBtn = e.target.closest('[data-kv]');
     if (kvBtn) {
       const area = parseKv(kvBtn.dataset.kv) || { ...AREA_TP };
@@ -1105,7 +1122,8 @@ export function initChuyenNganh() {
   if (gp) new MutationObserver(() => filterGp()).observe(gp, { childList: true });
 
   loadKienTruc();
-  Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii()]).then(() => {
+  initCapacityEditor();
+  Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii(), loadCongSuat()]).then(() => {
     seedFromDom();
     if (saved) {
       applyExtra(saved);
@@ -1115,6 +1133,7 @@ export function initChuyenNganh() {
     // Bản lưu chạy sau setLevel đầu tiên. Gọi lại để cấp không bị ô QHPK kéo đi.
     if (!shareView && !openDeep) setLevel('qhc25', { keepView: true });
     ready = true;
+    mountCapacityHosts();
     paint();
   }).catch(err => {
     ready = true;
