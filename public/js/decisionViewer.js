@@ -16,6 +16,34 @@ const PROPOSE_HINT = 'Chọn PDF tối đa 2 MB. Xem trước, rồi bấm «G�
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
+function isAttachedDoc(t) {
+  return !!(t && t.body && t.body.docRole);
+}
+
+function kindLabel(t) {
+  if (isAttachedDoc(t)) return t.noun || 'Văn bản';
+  return 'Quyết định';
+}
+
+function viewTitle(t) {
+  const name = (t && t.title) || '';
+  if (t && t.body && t.body.layer) return name;
+  return [kindLabel(t), name].filter(Boolean).join(' · ');
+}
+
+function commitLabel(t) {
+  return isAttachedDoc(t) ? `Gán ${kindLabel(t)}` : `Gán vào ${t && t.noun || 'đồ án'}`;
+}
+
+function paintHeading(el, t) {
+  const title = viewTitle(t);
+  el.querySelector('[data-decision-title]').textContent = title;
+  const frame = el.querySelector('iframe');
+  if (frame) frame.title = title;
+  const close = el.querySelector('[data-decision-close]');
+  if (close) close.setAttribute('aria-label', `Đóng ${kindLabel(t).toLowerCase()}`);
+}
+
 let current = null;
 let pickTarget = null;
 let fileInput = null;
@@ -153,21 +181,26 @@ function showFrame(el, src, note) {
 
 export function openDecision(t) {
   const url = t && decisionUrl(t);
-  if (!url) { alert(`${t && t.noun === 'lớp' ? 'Lớp' : 'Đồ án'} chưa có quyết định phê duyệt.`); return; }
+  if (!url) {
+    const what = isAttachedDoc(t) ? kindLabel(t).toLowerCase() : 'quyết định phê duyệt';
+    alert(`${t && t.noun === 'lớp' ? 'Lớp' : 'Đồ án'} chưa có ${what}.`);
+    return;
+  }
   const el = ensureViewer();
   current = t;
   pendingReview = null;
   el.hidden = false;
   showMode(el, 'view');
-  el.querySelector('[data-decision-title]').textContent = t.title;
+  paintHeading(el, t);
   const d = t.decision;
-  el.querySelector('[data-decision-file]').textContent = [d.name || 'Quyết định phê duyệt', d.kind === 'link' ? 'link' : 'PDF', fmtBytes(d.bytes)].filter(Boolean).join(' · ');
+  const fallback = isAttachedDoc(t) ? kindLabel(t) : 'Quyết định phê duyệt';
+  el.querySelector('[data-decision-file]').textContent = [d.name || fallback, d.kind === 'link' ? 'link' : 'PDF', fmtBytes(d.bytes)].filter(Boolean).join(' · ');
   el.querySelector('[data-decision-admin]').hidden = !isAdmin();
   const open = el.querySelector('[data-decision-open]');
   open.hidden = false;
   open.href = url;
   const embed = d.kind !== 'link' || d.embed === true;
-  showFrame(el, embed ? url : '', embed ? '' : 'Trang này không xem được trong khung. Bấm «Mở tab mới» để đọc quyết định.');
+  showFrame(el, embed ? url : '', embed ? '' : `Trang này không xem được trong khung. Bấm «Mở tab mới» để đọc ${kindLabel(t).toLowerCase()}.`);
 }
 
 function revokePdfPreview() {
@@ -183,8 +216,8 @@ export function openAssign(t) {
   revokePdfPreview();
   el.hidden = false;
   showMode(el, 'assign');
-  el.querySelector('[data-decision-title]').textContent = t.title;
-  el.querySelector('[data-decision-file]').textContent = t.decision ? 'Thay quyết định' : 'Chưa gán';
+  paintHeading(el, t);
+  el.querySelector('[data-decision-file]').textContent = t.decision ? `Thay ${kindLabel(t).toLowerCase()}` : 'Chưa gán';
   el.querySelector('[data-decision-admin]').hidden = false;
   const assign = el.querySelector('[data-decision-assign]');
   assign.hidden = false;
@@ -192,7 +225,7 @@ export function openAssign(t) {
   assign.querySelector('[data-decision-review]').textContent = ASSIGN_HINT;
   const btn = assign.querySelector('[data-decision-commit]');
   btn.disabled = true;
-  btn.textContent = `Gán vào ${t.noun || 'đồ án'}`;
+  btn.textContent = commitLabel(t);
   el.querySelector('[data-decision-open]').hidden = !t.decision;
   el.querySelector('[data-decision-open]').href = t.decision ? decisionUrl(t) : '#';
   if (!t.decision) showFrame(el, '', '');
@@ -212,7 +245,7 @@ export function openPropose(t) {
   pendingReview = null;
   revokePdfPreview();
   el.hidden = false;
-  el.querySelector('[data-decision-title]').textContent = t.title;
+  paintHeading(el, t);
   el.querySelector('[data-decision-admin]').hidden = true;
   el.querySelector('[data-decision-open]').hidden = true;
   el.querySelector('[data-decision-open]').href = '#';
@@ -242,7 +275,7 @@ export async function openProposalReview(t) {
   revokeProposalPreview();
   el.hidden = false;
   showMode(el, 'pending');
-  el.querySelector('[data-decision-title]').textContent = t.title;
+  paintHeading(el, t);
   el.querySelector('[data-decision-file]').textContent = `Chờ duyệt · ${t.proposal.name}`;
   el.querySelector('[data-decision-admin]').hidden = true;
   el.querySelector('[data-proposal-note]').textContent = [t.proposal.name, fmtBytes(t.proposal.bytes)].filter(Boolean).join(' · ');
@@ -343,7 +376,7 @@ async function checkLink(t) {
   try {
     const data = await postJson('reviewProjectDecision', { url });
     pendingReview = { key: t.key, url: data.url };
-    review.textContent = [data.note, data.name, fmtBytes(data.bytes)].filter(Boolean).join(' · ') + `. Bấm «Gán vào ${t.noun || 'đồ án'}» nếu đây đúng quyết định.`;
+    review.textContent = [data.note, data.name, fmtBytes(data.bytes)].filter(Boolean).join(' · ') + `. Bấm «${commitLabel(t)}» nếu đây đúng ${kindLabel(t).toLowerCase()}.`;
     btn.disabled = false;
     const open = el.querySelector('[data-decision-open]');
     open.hidden = false;
@@ -393,7 +426,7 @@ async function previewFile(t, file) {
   catch (e) { review.textContent = e.message || 'Không đọc được file.'; return; }
   const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
   pendingPdf = { key: t.key, file, blobUrl };
-  review.textContent = `${file.name} · ${fmtBytes(file.size)}. Đã xem trước. Bấm «Gán vào ${t.noun || 'đồ án'}» để ghi PDF lên bucket.`;
+  review.textContent = `${file.name} · ${fmtBytes(file.size)}. Đã xem trước. Bấm «${commitLabel(t)}» để ghi PDF lên bucket.`;
   btn.disabled = false;
   const open = el.querySelector('[data-decision-open]');
   open.hidden = false;
@@ -544,7 +577,7 @@ async function uploadPdf(t, file) {
       : { slug: data.slug, kind: 'pdf', url: '', name: data.name, bytes: data.bytes, at: data.at, embed: true };
     saved(t, decision, data);
   } catch (err) {
-    alert(`Không ghi được quyết định: ${err.message}`);
+    alert(`Không ghi được ${kindLabel(t).toLowerCase()}: ${err.message}`);
   } finally {
     setBusy(t, false);
   }
@@ -561,7 +594,7 @@ async function remove(t) {
     closeDecision();
     if (t.onSaved) t.onSaved(null, data);
   } catch (err) {
-    alert(`Không gỡ được quyết định: ${err.message}`);
+    alert(`Không gỡ được ${kindLabel(t).toLowerCase()}: ${err.message}`);
   } finally {
     setBusy(t, false);
   }

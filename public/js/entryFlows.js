@@ -52,8 +52,8 @@ const TYPE_OPTIONS = `
   <option value="14-NOXH">14. Chung cư</option>`;
 
 const STEPS = [
-  { id: 'qd', label: 'Quyết định', file: 'pdf', max: 2 * MB, accept: '.pdf' },
-  { id: 'ql', label: 'Quy định quản lý', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'quy-dinh' },
+  { id: 'qd', label: 'Quyết định', hint: 'Quyết định phê duyệt đồ án.', file: 'pdf', max: 2 * MB, accept: '.pdf' },
+  { id: 'ql', label: 'Quy chế', hint: 'Quy chế theo đồ án. Khác quyết định phê duyệt.', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'quy-dinh' },
   { id: 'tm', label: 'Thuyết minh', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'thuyet-minh' },
   { id: 'ranh', label: 'Bản vẽ ranh giới quy hoạch', file: 'draw', draw: 'boundary', sector: '', phase: 'quy-hoach', role: 'ranh-hoso' },
   { id: 'dat-ht', label: 'Hiện trạng sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'hien-trang', role: 'ht-dat-hoso' },
@@ -504,7 +504,7 @@ function renderActive() {
     ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.warning ? ` — ${escapeHtml(got.warning)}` : ''}${got.error ? ` — ${escapeHtml(got.error)}` : ''}${got.features ? ` — ${got.features.length} đối tượng` : ''}</p>${clipHtml}`
     : '';
   box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}</h3>
-    <p class="entry-note">${limit}. ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ.' : ''}</p>
+    <p class="entry-note">${limit}.${step.hint ? ` ${escapeHtml(step.hint)}` : ''} ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ.' : ''}</p>
     ${crs}
     <label class="cad-drop" for="hoFile">
       <span class="cad-drop-main"><b>Chọn file</b></span>

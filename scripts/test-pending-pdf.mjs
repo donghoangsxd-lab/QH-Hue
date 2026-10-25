@@ -31,6 +31,7 @@ const vanBan = stageSpec({
   pdf: { name: 'qd.pdf', bytes: 800, role: 'quy-dinh', object }
 });
 assert.equal(vanBan.pdf.role, 'quy-dinh');
+assert.equal(vanBan.summary, 'qd.pdf');
 assert.throws(() => stageSpec({
   kind: 'van-ban',
   unit: 'xa:an-cuu',
@@ -45,11 +46,24 @@ const store = read('services/projectStore.js');
 const script = read('apps-script/Code.gs');
 const queue = read('public/js/reviewQueue.js');
 assert.match(gee, /submitChoDuyetPdf/);
+assert.match(gee, /docRoleLabel\(role\)/);
 assert.match(gee, /getChoDuyetPdf/);
 assert.match(gee, /readPendingPdf/);
 assert.match(entry, /submitChoDuyetPdf/);
 assert.match(entry, /kind: 'quy-che'/);
 assert.match(entry, /kind: 'van-ban'/);
+assert.match(entry, /label: 'Quyết định'/);
+assert.match(entry, /label: 'Quy chế'/);
+assert.match(entry, /docRole: 'quy-dinh'/);
+assert.doesNotMatch(entry, /Quy định quản lý/);
+const card = read('public/js/projectLayer.js');
+assert.match(card, /'quy-dinh': \{ short: 'QC', label: 'Quy chế' \}/);
+assert.match(card, /<option value="quy-dinh">Quy chế<\/option>/);
+assert.match(card, /<option value="phe-duyet">Quyết định phê duyệt<\/option>/);
+assert.match(card, /<option value="dinh-chinh">Quyết định đính chính<\/option>/);
+assert.match(store, /'quy-dinh': 'Quy chế'/);
+assert.match(store, /function docRoleLabel/);
+assert.doesNotMatch(store, /quy-dinh': 'Quy định quản lý'/);
 assert.doesNotMatch(entry, /cần quản trị để ghi bucket/);
 assert.match(store, /pendingDecisionObject/);
 assert.match(store, /rewriteObject/);

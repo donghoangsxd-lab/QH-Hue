@@ -5,7 +5,7 @@
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
 //   projects/<slug>/quyet-dinh.pdf — PDF quyết định đã duyệt (admin ghi thẳng, tối đa 10 MB).
-//   projects/<slug>/vb-<id>.pdf — văn bản kèm đã duyệt (đính chính, quy định quản lý, phê duyệt thêm), tối đa 8 file, cùng decisions.json.
+//   projects/<slug>/vb-<id>.pdf — văn bản kèm đã duyệt (quyết định đính chính / phê duyệt thêm, quy chế, thuyết minh), tối đa 8 file, cùng decisions.json.
 //   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
 //   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
 //   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định người dùng gửi (tối đa 2 MB). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
@@ -375,8 +375,13 @@ const DECISION_FILE = 'quyet-dinh.pdf';
 const PROPOSALS_NAME = 'projects/decision-proposals.json';
 const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
 const STAGED_RE = /^[a-f0-9]{32}$/;
-// Văn bản kèm theo quyết định phê duyệt. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
-const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý', 'thuyet-minh': 'Thuyết minh' };
+// Văn bản kèm theo đồ án. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
+// quy-dinh = quy chế theo đồ án (file cũ giữ mã này). Kind ChoDuyet quy-che là quy chế kiến trúc theo đơn vị.
+const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy chế', 'thuyet-minh': 'Thuyết minh' };
+
+function docRoleLabel(role) {
+  return DOC_ROLES[role] || '';
+}
 const DOC_MAX = 8;
 const DOC_ID_RE = /^[a-f0-9]{8}$/;
 
@@ -2905,7 +2910,7 @@ async function publishSchemeDraw({ tenQH, kind, features }) {
 module.exports = {
   setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject, publishSchemeDraw,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
-  saveProjectDoc, removeProjectDoc, saveNet, saveKienTrucPdf,
+  saveProjectDoc, removeProjectDoc, docRoleLabel, saveNet, saveKienTrucPdf,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
