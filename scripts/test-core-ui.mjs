@@ -238,6 +238,27 @@ assert.doesNotMatch(gp, /\$\{htHtml\}/);
 assert.match(css, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
 assert.match(css, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
 assert.match(css, /\.map-title-text\s*\{[^}]*white-space:\s*nowrap/);
+const titleCss = css.slice(css.indexOf('/* Hộp tiêu đề chiếm trọn'), css.indexOf('.map-title::before'));
+assert.match(titleCss, /\.map-title\s*\{[^}]*width:\s*auto/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*max-width:\s*none/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*margin:\s*0/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*transform:\s*none/);
+assert.doesNotMatch(titleCss, /width:\s*max-content|width:\s*fit-content|margin-left:\s*auto/);
+const titlePin = css.slice(css.indexOf('body.right-collapsed .map-title,'), css.indexOf('/* Ngay dưới thanh tiêu đề'));
+for (const flag of ['right-collapsed', 'bottom-collapsed', 'compare-on']) {
+  assert.match(titlePin, new RegExp(`body\\.${flag} \\.map-title`));
+}
+assert.match(titlePin, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
+assert.match(titlePin, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
+assert.match(titlePin, /width:\s*auto/);
+assert.doesNotMatch(css, /bottom-collapsed[^{}]*\{[^}]*\.map-title[^}]*left:\s*(?!calc\(12px \+ var\(--right-w\))/);
+const titleJs = read('public/js/app.js');
+const titleFn = titleJs.slice(titleJs.indexOf('const VIEW_TITLES'), titleJs.indexOf('async function loadTouchGroups'));
+assert.match(titleFn, /BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ/);
+assert.match(titleFn, /VIEW_TITLES\[key\]/);
+assert.doesNotMatch(titleFn, /VIEW_TITLES_SHORT|BẢN ĐỒ QUY HOẠCH TP HUẾ/);
+assert.doesNotMatch(titleFn, /style\.(?:left|right|width|maxWidth|fontSize)/);
+assert.doesNotMatch(titleFn, /observe\(document\.body/);
 assert.match(css, /grid-template-columns:\s*2em minmax\(0, 1fr\) 9\.2ch 8\.2ch 9ch/);
 assert.doesNotMatch(css, /3\.2ch 6\.6ch/);
 assert.match(html, /title="Hiện trạng \(QĐ 614\)"/);
@@ -410,8 +431,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261053/);
-assert.match(html, /js\/app\.js\?v=20261053/);
+assert.match(html, /css\/style\.css\?v=20261054/);
+assert.match(html, /js\/app\.js\?v=20261054/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -456,7 +477,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261053'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261054'/);
 
 const synth = JSON.parse(read('public/data/htkt/synth.json'));
 assert.equal(synth.label, 'dữ liệu tự tổng hợp');

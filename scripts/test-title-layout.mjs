@@ -84,6 +84,9 @@ async function measure(page) {
       const expand = document.getElementById('btnExpandRightPanel');
       return {
         name,
+        left: t.left,
+        right: t.right,
+        top: t.top,
         width: t.width,
         text: text.width,
         full: h1.textContent.trim(),
@@ -107,9 +110,14 @@ try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
     const rows = await measure(page);
     rows.forEach(row => {
+      const slotLeft = 12 + 340 + 16;
+      const slotRight = w - (12 + 34 + 16);
       assert.equal(row.full, 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ', `${w} ${row.name}`);
       assert.equal(row.clipped, false, `${w} ${row.name} cụt chữ`);
       assert.ok(row.text >= 240, `${w} ${row.name} tiêu đề rộng ${row.text}`);
+      assert.ok(Math.abs(row.left - slotLeft) < 1.5, `${w} ${row.name} mép trái ${row.left}`);
+      assert.ok(Math.abs(row.right - slotRight) < 1.5, `${w} ${row.name} mép phải ${row.right}`);
+      assert.ok(row.width > 480, `${w} ${row.name} hộp rộng ${row.width}`);
       assert.deepEqual(row.tools, [], `${w} ${row.name} đè nút ${row.tools}`);
       assert.equal(row.panel, false, `${w} ${row.name} đè panel trục`);
       assert.equal(row.expand, false, `${w} ${row.name} còn nút mở góc trái`);
@@ -118,7 +126,12 @@ try {
         assert.ok(Math.abs(row.summaryRight - row.toolRight) < 0.6, `${w} ${row.name} mép phải mỏ ${row.summaryRight} ≠ nút ${row.toolRight}`);
       }
     });
-    console.log(JSON.stringify({ w, states: rows.map(r => ({ name: r.name, width: Math.round(r.width), text: Math.round(r.text) })) }));
+    const spread = (key) => Math.max(...rows.map(r => r[key])) - Math.min(...rows.map(r => r[key]));
+    assert.ok(spread('left') < 1, `${w} mép trái nhảy ${spread('left')}`);
+    assert.ok(spread('right') < 1, `${w} mép phải nhảy ${spread('right')}`);
+    assert.ok(spread('width') < 1, `${w} bề rộng nhảy ${spread('width')}`);
+    assert.ok(spread('top') < 1, `${w} mép trên nhảy ${spread('top')}`);
+    console.log(JSON.stringify({ w, states: rows.map(r => ({ name: r.name, left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), text: Math.round(r.text) })) }));
     await page.close();
   }
 } finally {

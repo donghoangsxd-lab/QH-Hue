@@ -376,11 +376,6 @@ const VIEW_TITLES = {
   HT: 'BẢN ĐỒ HIỆN TRẠNG THÀNH PHỐ HUẾ',
   split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ'
 };
-const VIEW_TITLES_SHORT = {
-  QH: 'BẢN ĐỒ QUY HOẠCH TP HUẾ',
-  HT: 'BẢN ĐỒ HIỆN TRẠNG TP HUẾ',
-  split: 'SO SÁNH HT – QH TP HUẾ'
-};
 const TITLE_OFF_KEY = 'qhhue_title_off';
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
@@ -388,6 +383,8 @@ function initMapTitle() {
   const titleOff = () => {
     try { return localStorage.getItem(TITLE_OFF_KEY) === '1'; } catch { return false; }
   };
+  // CSS giữ hộp trong khoảng panel trái và cột nút phải. Không ghi left/width/maxWidth:
+  // fitTitle cũ đo cột nút như mép trái và panel như mép phải, nên co hộp và nhảy giữa màn hình.
   const syncTitleBox = () => {
     const off = titleOff();
     document.documentElement.classList.toggle('title-dismissed', off);
@@ -402,66 +399,6 @@ function initMapTitle() {
   };
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
-  let titleKey = 'QH';
-  // Hộp tiêu đề co chữ để không đè bảng thông tin bên trái, cột công cụ và panel phải.
-  const fitTitle = () => {
-    if (!text) return;
-    const vw = document.documentElement.clientWidth || window.innerWidth;
-    const toolRight = document.querySelector('.map-toolbar')?.getBoundingClientRect().right ?? 12;
-    const panel = document.getElementById('rightPanel');
-    const panelOpen = panel && !document.body.classList.contains('right-collapsed') && panel.offsetWidth > 8;
-    let rightBound = vw - 8;
-    if (panelOpen) {
-      const parked = parseFloat(getComputedStyle(panel).right) || 0;
-      rightBound = vw - parked - panel.offsetWidth - 8;
-    }
-    root.style.left = '';
-    root.style.width = 'fit-content';
-    root.style.maxWidth = 'none';
-    const titleBox = root.getBoundingClientRect();
-    let leftBound = toolRight + 8;
-    document.querySelectorAll('.leaflet-popup.dock-card, .project-brief:not([hidden]), .cad-card:not([hidden]), .urban-focus-bar:not([hidden]), .ovd-card:not([hidden]), #investCard:not([hidden])').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8 || r.bottom < titleBox.top + 4 || r.top > titleBox.bottom - 4) return;
-      leftBound = Math.max(leftBound, r.right + 8);
-    });
-    const centered = getComputedStyle(root).transform !== 'none';
-    const gap = Math.max(0, rightBound - leftBound);
-    const avail = Math.max(148, Math.floor(centered ? gap : rightBound - titleBox.left));
-    if (centered) {
-      const half = Math.min(titleBox.width, avail) / 2;
-      const natural = titleBox.left + titleBox.width / 2;
-      if (natural - half < leftBound - 0.5 || natural + half > rightBound + 0.5) {
-        root.style.left = `${(leftBound + rightBound) / 2}px`;
-      }
-    }
-    root.style.maxWidth = `${avail}px`;
-    const full = VIEW_TITLES[titleKey] || text.textContent;
-    const short = VIEW_TITLES_SHORT[titleKey] || full;
-    const apply = (label, size) => {
-      text.textContent = label;
-      text.title = full;
-      text.style.fontSize = size ? `${size}px` : '';
-    };
-    const fits = () => root.scrollWidth <= root.clientWidth + 1;
-    apply(full, 0);
-    if (!fits()) {
-      const base = parseFloat(getComputedStyle(text).fontSize) || 14;
-      let fitted = false;
-      for (const size of [base - 1, base - 2, Math.max(11, base - 3)]) {
-        apply(full, size);
-        if (fits()) { fitted = true; break; }
-      }
-      if (!fitted) {
-        apply(short, 0);
-        if (!fits()) {
-          const base2 = parseFloat(getComputedStyle(text).fontSize) || 13;
-          apply(short, Math.max(11, base2 - 1));
-        }
-      }
-    }
-    syncTitleBox();
-  };
   const setProjects = (on) => {
     const chk = document.getElementById('chk_projects');
     if (!chk || chk.checked === on || getLevel() !== 'qhpk') return;
@@ -473,12 +410,11 @@ function initMapTitle() {
     const key = split ? 'split' : view;
     root.dataset.view = key;
     const title = VIEW_TITLES[key];
-    titleKey = key;
     if (text) {
       text.textContent = title;
       text.title = title;
     }
-    fitTitle();
+    syncTitleBox();
     if (flip) {
       flip.title = split ? 'Đang so sánh hai bản đồ' : `Lật sang bản đồ ${view === 'QH' ? 'hiện trạng' : 'quy hoạch'}`;
       flip.setAttribute('aria-label', flip.title);
@@ -511,19 +447,10 @@ function initMapTitle() {
   document.addEventListener('qh-title-restore', () => {
     try { localStorage.removeItem(TITLE_OFF_KEY); } catch { /* chế độ riêng tư */ }
     syncTitleBox();
-    requestAnimationFrame(fitTitle);
   });
   syncTitleBox();
-  const refit = () => requestAnimationFrame(fitTitle);
-  window.addEventListener('resize', fitTitle);
-  new MutationObserver(fitTitle).observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  map?.on('popupopen popupclose', refit);
-  planMap?.on('popupopen popupclose', refit);
-  document.addEventListener('qh-dock-card', refit);
-  ['projectBrief', 'cadParcelCard', 'investCard'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) new MutationObserver(refit).observe(el, { attributes: true, attributeFilter: ['hidden', 'class'] });
-  });
+  window.addEventListener('resize', syncTitleBox);
+  new MutationObserver(syncTitleBox).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }
 
 async function loadTouchGroups() {
