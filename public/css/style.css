@@ -216,15 +216,15 @@ body.split-offset .swipe-handle { display: none; }
 .swipe-label-right { left: 16px; background: var(--bg-dark); color: var(--accent-orange); border: 1px solid var(--border-color); }
 .leaflet-control-zoom { display: none !important; }
 
-/* Hộp tiêu đề chiếm trọn khoảng giữa panel trục và cột nút. Hai mép cố định kể cả khi panel hay bảng thu. */
+/* Hộp tiêu đề vừa chữ. Mép trái cố định; không kéo tới cột nút. */
 .map-title {
   --tone: var(--orange-rgb);
   position: absolute;
   top: 12px;
   left: calc(12px + var(--right-w) + 16px);
-  right: calc(12px + var(--tb-btn) + 16px);
-  width: auto;
-  max-width: none;
+  right: auto;
+  width: fit-content;
+  max-width: calc(100vw - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
   margin: 0;
   transform: none;
   z-index: 1100;
@@ -302,9 +302,9 @@ body.right-collapsed .map-title,
 body.bottom-collapsed .map-title,
 body.compare-on .map-title {
   left: calc(12px + var(--right-w) + 16px);
-  right: calc(12px + var(--tb-btn) + 16px);
-  width: auto;
-  max-width: none;
+  right: auto;
+  width: fit-content;
+  max-width: calc(100vw - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
   margin: 0;
   transform: none;
 }
@@ -557,7 +557,7 @@ body:has(#investCard:not([hidden])) .project-brief {
 .map-title-mark:hover:not(:disabled) { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.24); box-shadow: 0 0 10px rgba(var(--tone), 0.4); }
 .map-title-mark:hover:not(:disabled) .ico { transform: rotateY(180deg); }
 .map-title-mark:disabled { cursor: default; opacity: 0.75; }
-.map-title-body { min-width: 0; flex: 1 1 auto; overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
+.map-title-body { min-width: 0; flex: 0 1 auto; overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
 .map-intro-kicker {
   margin: 0;
   font-size: var(--fs-xs);
@@ -576,11 +576,9 @@ body:has(#investCard:not([hidden])) .project-brief {
   font-size: var(--fs-sm);
   line-height: 1.35;
   color: var(--text-main);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .map-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .map-title-catalog, .map-title-x {
@@ -1240,9 +1238,10 @@ body.right-collapsed .right-panel {
 .xh-item { width: 100%; border: 0; background: transparent; color: var(--axis-color); text-align: left; cursor: pointer; }
 .xh-item:hover { background: var(--axis-bg-hover); }
 .xh-item:disabled { cursor: default; opacity: .7; }
-.cn-picks { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 4px; margin: 4px 6px 2px; }
-.cn-picks label { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-family: var(--axis-font); font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--axis-color-muted); }
-.cn-picks select { width: 100%; min-width: 0; height: 24px; padding: 0 2px; border: 1px solid var(--axis-chip-border); border-radius: 6px; background: var(--bg-input); color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.cn-picks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 6px 2px; align-items: end; }
+.cn-picks label { display: grid; grid-template-rows: 14px 24px; gap: 2px; min-width: 0; font-family: var(--axis-font); font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; color: var(--axis-color-muted); }
+.cn-picks label > span { display: block; height: 14px; padding-left: 4px; line-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-picks select { box-sizing: border-box; width: 100%; min-width: 0; height: 24px; margin: 0; padding: 0 16px 0 4px; border: 1px solid var(--axis-chip-border); border-radius: 6px; background: var(--bg-input); color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .cn-forms { display: flex; gap: 4px; margin: 2px 6px; }
 .cn-form { height: var(--axis-chip-h); padding: 0 8px; border: 1px solid var(--axis-chip-border); border-radius: 999px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); cursor: pointer; white-space: nowrap; }
 .cn-form.active { color: var(--axis-color); border-color: var(--accent-cyan); background: var(--axis-bg-active); }
@@ -6144,9 +6143,11 @@ body.project-review.la-page #projectReviewHost {
 .violate-pop { display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.35; }
 .violate-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
 .flood-bldg { max-height: 168px; }
-#floodGapBox { display: block; margin: 6px 0 8px; }
-#floodGapBox b { font-size: 12px; }
-#floodGapBox p { margin: 4px 0; font-size: 12px; line-height: 1.35; }
+.flood-gap-tip { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin: 0 2px 0 0; padding: 0; border: 0; background: transparent; color: var(--axis-color-muted); cursor: help; }
+.flood-gap-tip .ico { width: 14px; height: 14px; margin: 0; }
+.flood-gap-tip:hover, .flood-gap-tip:focus-visible { color: var(--accent-cyan); }
+.flood-gap-pop { display: none; position: absolute; z-index: 6; right: 0; top: 100%; width: 220px; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-dark); color: var(--axis-color); font-family: var(--axis-font); font-size: 11px; font-weight: 500; line-height: 1.35; text-align: left; white-space: normal; box-shadow: var(--panel-shadow); }
+.flood-gap-tip:hover .flood-gap-pop, .flood-gap-tip:focus-visible .flood-gap-pop { display: block; }
 .apt-pin { background: none; border: 0; }
 .apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
@@ -6173,6 +6174,11 @@ body.project-review.la-page #projectReviewHost {
 #tabLayers .layer-type-icon,
 #tabLayers .layer-status-legend,
 #tabLayers .apt-legend { display: none; }
+#rpDock .layer-type-icon,
+#layerPaneXaHoi .layer-type-icon { display: inline-block; width: 14px; height: 16px; object-fit: contain; }
+#layerPaneXaHoi .layer-status-legend,
+#layerPaneXaHoi .apt-legend,
+#rpDock .apt-legend { display: flex; }
 .cn-soon small { margin-left: 4px; font-size: var(--axis-fs-chip); }
 .cn-sectors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 4px 6px; }
 .cn-sector { display: flex; flex-direction: column; align-items: center; gap: 1px; min-height: var(--axis-chip-h); padding: 2px; border: 1px solid var(--axis-chip-border); border-radius: 8px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.15; cursor: pointer; }
@@ -6195,6 +6201,12 @@ body.project-review.la-page #projectReviewHost {
 .htkt-mark.is-point { width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: var(--accent-cyan); }
 .htkt-mark.is-line { width: 16px; height: 3px; border-radius: 2px; background: var(--accent-cyan); }
 .htkt-mark.is-polygon { width: 12px; height: 10px; margin-left: 2px; border: 1.5px solid var(--accent-cyan); border-radius: 2px; }
+.htkt-mark.is-zone { width: 12px; height: 10px; margin-left: 2px; border-radius: 2px; background: var(--cnu, var(--accent-cyan)); }
+#legendSector .cnu-legend, #legendSector .cnu-src { margin: 4px 8px; }
+#legendSector .cnu-src { color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.35; }
+#legendSector .htkt-legend-row { padding: 0 8px; }
+#legendSector .htkt-legend-row button { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#legendSector .htkt-legend-row.is-on button { font-weight: 700; color: var(--axis-color-strong); }
 #tabLegend.is-htkt .legend-display,
 #tabLegend.is-htkt .legend-find,
 #tabLegend.is-htkt #parcelLegend,
@@ -6203,6 +6215,25 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-htkt .ua-legend-pane,
 #tabLegend.is-htkt .legend-extra { display: none !important; }
 #tabLegend.is-htkt #legendSector { display: block !important; }
+#legendXh { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 2px; }
+#legendXh[hidden] { display: none !important; }
+#legendXh .layer-type-icon { flex: 0 0 14px; }
+#legendXh .legend-status { display: flex; gap: 12px; margin: 6px 0 2px; padding-top: 4px; border-top: 1px solid var(--axis-line); color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); }
+#legendXh .legend-status span { display: inline-flex; align-items: center; gap: 4px; }
+#tabLegend.is-xh .legend-display,
+#tabLegend.is-xh .legend-main,
+#tabLegend.is-xh .legend-find,
+#tabLegend.is-xh #parcelLegend,
+#tabLegend.is-xh .road-net,
+#tabLegend.is-xh .road-sections,
+#tabLegend.is-xh .ua-legend-pane,
+#tabLegend.is-xh #legendSector,
+#tabLegend.is-xh .legend-extra { display: none !important; }
+.xh-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.xh-table { margin: 0 6px 6px; }
+.xh-table td:nth-child(2), .xh-table td.is-miss { text-align: left; color: var(--axis-color-muted); }
+.xh-table td.is-miss { text-align: right; }
+.xh-pending { margin-left: 4px; }
 .cn-scheme { margin: 0 6px 2px; border-top: 1px solid var(--axis-line); padding-top: 2px; }
 .cn-scheme.is-missing { opacity: 0.72; }
 .cn-scheme-row { display: flex; align-items: center; gap: 4px; min-height: var(--axis-row-h); }

@@ -32,11 +32,11 @@ function innerById(src, id) {
 }
 
 const TITLES = [
-  ['hanhchinh', 'Quản lý phát triển đô thị'],
-  ['quyhoach', 'Hệ thống bản đồ quy hoạch'],
-  ['hatang', 'Hệ thống hạ tầng kỹ thuật'],
-  ['xahoi', 'Hệ thống hạ tầng xã hội'],
-  ['kientruc', 'Quản lý lĩnh vực kiến trúc']
+  ['hanhchinh', 'A. Quản lý phát triển đô thị'],
+  ['quyhoach', 'B. Hệ thống bản đồ quy hoạch'],
+  ['hatang', 'C. Hệ thống hạ tầng kỹ thuật'],
+  ['xahoi', 'D. Hệ thống hạ tầng xã hội'],
+  ['kientruc', 'E. Quản lý về kiến trúc']
 ];
 
 assert.match(html, /<body[^>]*\bright-collapsed\b/);
@@ -106,6 +106,10 @@ assert.ok(switchRow.indexOf('id="btnDockEnv"') < switchRow.indexOf('id="btnDockC
 assert.match(switchRow, /id="btnDockCollapse"[^>]*aria-expanded="true"/);
 assert.doesNotMatch(switchRow, /data-legend-set|QHPK 1\/2\.000/);
 assert.match(dock, /id="axisEnvFold"/);
+assert.match(dock, /id="btnFloodGap"/);
+assert.match(dock, /id="floodGapTip"/);
+assert.doesNotMatch(dock, /id="floodGapBox"/);
+assert.doesNotMatch(dock, /Số nhà trong vùng ngập/);
 assert.match(dock, /id="chk_terrain"/);
 assert.match(dock, /id="legendLevelChips"[^>]*hidden/);
 assert.match(dock, /id="basemapSelect"/);
@@ -200,7 +204,16 @@ assert.match(html, /data-cn-form="polygon"/);
 assert.match(read('public/js/chuyenNganh.js'), /data-cn-sector-pick/);
 assert.match(read('public/js/chuyenNganh.js'), /data-cn-level-pick/);
 assert.match(read('public/js/chuyenNganh.js'), /data-cn-area-pick/);
+assert.match(read('public/js/chuyenNganh.js'), />Cấp QH</);
+assert.doesNotMatch(read('public/js/chuyenNganh.js'), /data-cn-all/);
+assert.match(read('public/js/chuyenNganh.js'), /capNuocLegendHtml/);
+assert.match(read('public/js/capNuocQhc.js'), /data-cnu-zone-on/);
 assert.match(read('public/js/legendPanel.js'), /is-htkt/);
+assert.match(read('public/js/legendPanel.js'), /is-xh/);
+assert.match(html, /id="legendXh"/);
+assert.match(read('public/js/xahoiList.js'), /data-xh-type/);
+assert.match(read('public/js/xahoiList.js'), /data-xh-scope/);
+assert.match(read('docs/ui-spec.md'), /không ký hiệu chức năng sử dụng đất/);
 const legend = innerById(html, 'tabLegend');
 assert.match(legend, /id="parcelLegend"/);
 assert.doesNotMatch(legend, /id="btnLegendClose"/);
@@ -342,21 +355,21 @@ assert.match(gp, /if \(htOn\)/);
 assert.match(gp, /shortPlaceName/);
 assert.doesNotMatch(gp, /\$\{htHtml\}/);
 assert.match(css, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
-assert.match(css, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
+assert.match(css, /12px \+ var\(--tb-btn\) \+ 16px/);
 assert.match(css, /\.map-title-text\s*\{[^}]*white-space:\s*nowrap/);
-const titleCss = css.slice(css.indexOf('/* Hộp tiêu đề chiếm trọn'), css.indexOf('.map-title::before'));
-assert.match(titleCss, /\.map-title\s*\{[^}]*width:\s*auto/);
-assert.match(titleCss, /\.map-title\s*\{[^}]*max-width:\s*none/);
+const titleCss = css.slice(css.indexOf('/* Hộp tiêu đề vừa chữ'), css.indexOf('.map-title::before'));
+assert.match(titleCss, /\.map-title\s*\{[^}]*width:\s*fit-content/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*right:\s*auto/);
 assert.match(titleCss, /\.map-title\s*\{[^}]*margin:\s*0/);
 assert.match(titleCss, /\.map-title\s*\{[^}]*transform:\s*none/);
-assert.doesNotMatch(titleCss, /width:\s*max-content|width:\s*fit-content|margin-left:\s*auto/);
+assert.doesNotMatch(titleCss, /margin-left:\s*auto/);
 const titlePin = css.slice(css.indexOf('body.right-collapsed .map-title,'), css.indexOf('/* Ngay dưới thanh tiêu đề'));
 for (const flag of ['right-collapsed', 'bottom-collapsed', 'compare-on']) {
   assert.match(titlePin, new RegExp(`body\\.${flag} \\.map-title`));
 }
 assert.match(titlePin, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
-assert.match(titlePin, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
-assert.match(titlePin, /width:\s*auto/);
+assert.match(titlePin, /right:\s*auto/);
+assert.match(titlePin, /width:\s*fit-content/);
 assert.doesNotMatch(css, /bottom-collapsed[^{}]*\{[^}]*\.map-title[^}]*left:\s*(?!calc\(12px \+ var\(--right-w\))/);
 const titleJs = read('public/js/app.js');
 const titleFn = titleJs.slice(titleJs.indexOf('const VIEW_TITLES'), titleJs.indexOf('async function loadTouchGroups'));
@@ -384,7 +397,7 @@ assert.match(read('public/js/decisionViewer.js'), /d\.kind === 'pdf'/);
 assert.doesNotMatch(read('public/_headers'), /\/docs\/108-QD-TTg\.pdf/);
 assert.match(read('public/.assetsignore'), /\*\*\/\*\.pdf/);
 assert.match(read('public/js/dvhcStats.js'), /export function shortPlaceName/);
-assert.match(read('public/js/facetStore.js'), /Quản lý phát triển đô thị/);
+assert.match(read('public/js/facetStore.js'), /A\. Quản lý phát triển đô thị/);
 assert.doesNotMatch(html, /Quản lý theo đơn vị hành chính/);
 assert.match(html, />Đơn vị hành chính</);
 assert.match(html, />Đô thị</);
@@ -552,8 +565,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261074/);
-assert.match(html, /js\/app\.js\?v=20261074/);
+assert.match(html, /css\/style\.css\?v=20261080/);
+assert.match(html, /js\/app\.js\?v=20261080/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -605,7 +618,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261074'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261080'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -668,7 +681,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261074"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261080"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

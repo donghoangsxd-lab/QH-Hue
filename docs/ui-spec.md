@@ -6,7 +6,7 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 
 - Panel trục bên trái, cách mép 12px, cao gần hết màn hình, co lên khi mở bảng tổng hợp phía dưới. Khi panel thu, dải năm trục bên trái là lối mở duy nhất; không có nút «>>» góc trên trái. Nút thu nằm trên hàng tiêu đề của panel.
 - Cột nút công cụ bên phải. Nút Giới thiệu là ô vuông đầu cột, góc trên phải, nằm trong cột nút. Không nút nổi riêng. Menu chuột phải giữ nguyên.
-- Hộp tiêu đề `#mapTitle` đứng trong khoảng trống giữa panel trục và cột nút: mép trái `12px + bề rộng panel + 16px`, mép phải `12px + ô nút + 16px`, canh giữa khoảng đó. Vị trí không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút. Nút Giới thiệu là ô đầu cột trái.
+- Hộp tiêu đề `#mapTitle` đứng sát mép phải panel trục (`12px + bề rộng panel + 16px`), rộng vừa chữ, không kéo tới cột nút. Mép trái không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút. Nút Giới thiệu là ô đầu cột trái.
 - Bảng tổng hợp thu thì mỏ `#btnExpandBottomPanel` nằm góc dưới phải, dạng tab (bo phía trên), cùng màu, cùng bề rộng và cùng mép phải với cột nút công cụ.
 - Điện thoại giữ cột nút trái và panel dạng sheet. Không áp gương desktop vào media điện thoại. Bảng thông tin thửa, lô, đồ án và tra cứu điểm nằm sau cột nút trái, kể cả khi panel trục đang thu.
 - Điện thoại ngang (máy đang xoay ngang, hoặc cao tối đa 560px): panel là sheet góc phải, không trải hết chiều ngang. Panel đang thu: năm nút trục là cột dọc mép phải, cao vừa khung nhìn (chia đều năm ô), không nằm ở đáy; nhãn không cắt bằng dấu ba chấm. Panel đang mở: ẩn cột năm nút để bản đồ rộng thêm; đổi trục bằng droplist `#layerMag` trong panel. Nút công cụ tối thiểu 40px, cuộn nếu thiếu chỗ. Manifest PWA giữ `display` standalone và `orientation` landscape: Chrome Android khóa chiều ngang khi mở từ biểu tượng đã cài; sau khi deploy phải cài lại hoặc cập nhật biểu tượng thì khóa mới có hiệu lực. Safari iOS bỏ qua `orientation` của manifest. Lần mở thử khóa chiều ngang bằng Screen Orientation API khi trình duyệt cho phép, không xin toàn màn hình và không thông báo. Nếu khóa bị chặn thì bố cục theo hướng thật của máy, không xoay khung bằng CSS. Nút «Xoay màn hình» một lần chạm xin khóa chiều còn lại, không thông báo; trình duyệt không khóa thì giao diện vẫn theo hướng máy. Nút đó là mục cuối cột công cụ bên trái và luôn nằm trong khung nhìn; các nút phía trên cuộn khi thiếu chỗ. Nút «Cài ứng dụng» hiện trên điện thoại; desktop không hiện hai nút này. Trên iOS, nút mở các bước Chia sẻ → Thêm vào Màn hình chính, kèm biểu tượng ứng dụng.
@@ -17,11 +17,11 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 
 Droplist `#layerMag`: một tiêu đề 12px, chữ vàng nhạt (`--text-title`); bấm mở danh sách cùng cỡ chữ, cùng màu; nút thu cùng hàng. Thứ tự:
 
-1. Quản lý phát triển đô thị
-2. Hệ thống bản đồ quy hoạch
-3. Hệ thống hạ tầng kỹ thuật
-4. Hệ thống hạ tầng xã hội
-5. Quản lý lĩnh vực kiến trúc
+A. Quản lý phát triển đô thị
+B. Hệ thống bản đồ quy hoạch
+C. Hệ thống hạ tầng kỹ thuật
+D. Hệ thống hạ tầng xã hội
+E. Quản lý về kiến trúc
 
 Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút bật/tắt cả nhóm. Không ô tìm thứ hai. Panel ẩn khi tải trang. Lúc mở, nếu không có link chia sẻ: trục Quy hoạch, cấp QHC 1/25.000, khung vừa cả thành phố, ảnh nền Google vệ tinh. Không hàng chip «Lớp đang xem», không tab Bản đồ nền / Bản đồ môi trường trên thanh tiêu đề.
 
@@ -45,7 +45,7 @@ Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoá
 
 ### Hạ tầng xã hội
 
-Tám tab theo mã Sheet: công viên, mầm non, tiểu học, THCS, THPT, y tế, văn hóa, chợ. Mỗi tab liệt kê công trình theo phường/xã, có diện tích lô và tổng của phường/xã; thiếu số thì «—». Bấm một dòng phóng tới công trình. Nhà tang lễ ở lại panel này. Mục Quỹ đất và công trình (ranh lô, cơ sở chưa sử dụng, chung cư, dự án kêu gọi đầu tư) ở đây. Bản đồ độ phủ hạ tầng bật tại panel này. Bốn lớp điểm hạ tầng kỹ thuật bật bán kính tại đây, cùng một lớp với panel kỹ thuật: bãi đỗ xe, trạm xe buýt, trụ sở PCCC, nghĩa trang. Ô giả lập bán kính giữ nguyên.
+Tám tab theo mã Sheet: công viên, mầm non, tiểu học, THCS, THPT, y tế, văn hóa, chợ. Bảng dữ liệu phía dưới có hai droplist Loại công trình và Phạm vi, rồi một bảng Công trình / Phường, xã / Diện tích; thiếu số thì «—». Bấm một dòng phóng tới công trình. Chú giải của trục này chỉ có biểu tượng công trình và dấu tích cuối dòng; không ký hiệu chức năng sử dụng đất. Nhà tang lễ ở lại panel này. Mục Quỹ đất và công trình (ranh lô, cơ sở chưa sử dụng, chung cư, dự án kêu gọi đầu tư) ở đây. Bản đồ độ phủ hạ tầng bật tại panel này. Bốn lớp điểm hạ tầng kỹ thuật bật bán kính tại đây, cùng một lớp với panel kỹ thuật: bãi đỗ xe, trạm xe buýt, trụ sở PCCC, nghĩa trang. Ô giả lập bán kính giữ nguyên.
 
 ### Kiến trúc
 

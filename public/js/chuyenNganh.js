@@ -26,8 +26,8 @@ import { loadCongSuat } from './congSuat.js';
 import { capacityPanelHtml, initCapacityEditor, mountCapacityHosts } from './congSuatUi.js';
 import { initXahoiList, paintXahoiList } from './xahoiList.js';
 import {
-  loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocPopupExtra, capNuocPointStyle,
-  capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, toggleCapNuocZones, capNuocPlantLayer
+  loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocLegendHtml, capNuocPopupExtra, capNuocPointStyle,
+  capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, setCapNuocZones, setCapNuocZoneOn, capNuocPlantLayer
 } from './capNuocQhc.js';
 
 const STORE_KEY = 'qh_axes_v1';
@@ -267,7 +267,8 @@ function legendHtml(sector) {
   }
   const color = SECTOR_COLOR[sector] || '#94a3b8';
   const label = SECTORS.find(s => s.id === sector)?.label || '';
-  return `<div class="cn-legend" aria-label="Chú giải ${escapeHtml(label)}"><span><i style="background:${color}"></i>${escapeHtml(label)}</span>${dash}</div>`;
+  const water = sector === 'cap-nuoc' && browseState().axis === 'hatang' && !pipeOn ? capNuocLegendHtml() : '';
+  return `<div class="cn-legend" aria-label="Chú giải ${escapeHtml(label)}"><span><i style="background:${color}"></i>${escapeHtml(label)}</span>${dash}</div>${water}`;
 }
 
 function areaOptions() {
@@ -293,9 +294,9 @@ function areaOptions() {
 function pickRow(group, level) {
   const opt = (value, label, on) => `<option value="${escapeHtml(value)}"${on ? ' selected' : ''}>${escapeHtml(label)}</option>`;
   return `<div class="cn-picks">
-    <label>Loại hạ tầng<select data-cn-sector-pick aria-label="Loại hạ tầng">${HTKT_GROUPS.map(s => opt(s.id, s.label, s.id === group)).join('')}</select></label>
-    <label>Cấp quy hoạch<select data-cn-level-pick aria-label="Cấp quy hoạch">${FACET_LEVELS.map(l => opt(l.id, l.label, l.id === level)).join('')}</select></label>
-    <label>Phạm vi<select data-cn-area-pick aria-label="Phạm vi">${areaOptions()}</select></label>
+    <label><span>Loại hạ tầng</span><select data-cn-sector-pick aria-label="Loại hạ tầng">${HTKT_GROUPS.map(s => opt(s.id, s.label, s.id === group)).join('')}</select></label>
+    <label><span>Cấp QH</span><select data-cn-level-pick aria-label="Cấp quy hoạch">${FACET_LEVELS.map(l => opt(l.id, l.label, l.id === level)).join('')}</select></label>
+    <label><span>Phạm vi</span><select data-cn-area-pick aria-label="Phạm vi">${areaOptions()}</select></label>
   </div>`;
 }
 
@@ -462,12 +463,7 @@ function paintHaTang() {
   const top = scroller ? scroller.scrollTop : 0;
   const group = pipeOn ? 'tong-hop-duong-ong' : sector;
   const schemes = hatangSchemes(sector, level);
-  const listed = hatangLayers(sector, level);
-  const allOn = listed.length > 0 && listed.every(layer => isLayerOn(layer.id));
   box.innerHTML = `${pickRow(group, level)}
-    <div class="cn-tools">
-      <button type="button" class="layer-eye-btn" data-cn-all ${listed.length ? '' : 'disabled'}>${allOn ? 'Tắt tất cả' : 'Bật tất cả'}</button>
-    </div>
     ${qhpkHookHtml()}
     <div class="cn-body">
       ${sector === 'cap-nuoc' && !pipeOn ? capNuocDossierHtml() : ''}
@@ -695,6 +691,7 @@ function publishSectorLegend(open, sectorId) {
       html: legendHtml(sector)
     }
   }));
+  document.querySelectorAll('#legendSector [data-cnu-partial]').forEach(el => { el.indeterminate = true; });
 }
 
 function paintXaHoi() {
@@ -782,11 +779,13 @@ function paintViewSwitch() {
 
 function toggleAxisAll() {
   if (browseState().axis === 'hatang') {
-    const all = document.querySelector('#browseNganh [data-cn-all]');
-    if (all && !all.disabled) {
-      all.click();
-      return;
-    }
+    const { sector, level } = browseState();
+    const listed = hatangLayers(sector, level);
+    if (!listed.length) return;
+    const turnOn = listed.some(l => !isLayerOn(l.id));
+    listed.forEach(l => setLayerOn(l, turnOn));
+    publishSectorLegend(turnOn);
+    return;
   }
   const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
   if (!pane) return;
@@ -1057,17 +1056,6 @@ export function initChuyenNganh() {
       paint();
       return;
     }
-    const waterZone = e.target.closest('[data-cnu-zone]');
-    if (waterZone) {
-      pickCapNuocZone(waterZone.dataset.cnuZone);
-      paint();
-      return;
-    }
-    if (e.target.closest('[data-cnu-zones]')) {
-      toggleCapNuocZones();
-      paint();
-      return;
-    }
     const sectorBtn = e.target.closest('[data-cn-sector]');
     if (sectorBtn) {
       const id = sectorBtn.dataset.cnSector;
@@ -1109,13 +1097,6 @@ export function initChuyenNganh() {
       if (area.type === 'xa') focusWard(areaLabel(area));
       else if (area.type === 'tp') focusWard(DVHC_CITY.name);
       return;
-    }
-    if (e.target.closest('[data-cn-all]')) {
-      const { sector, level } = browseState();
-      const listed = hatangLayers(sector, level);
-      const turnOn = listed.some(l => !isLayerOn(l.id));
-      listed.forEach(l => setLayerOn(l, turnOn));
-      publishSectorLegend(turnOn);
     }
   });
   document.getElementById('layerMain')?.addEventListener('change', (e) => {
@@ -1258,7 +1239,25 @@ export function initChuyenNganh() {
       scheduleSave();
     }
   });
+  document.getElementById('rpDock')?.addEventListener('click', (e) => {
+    const waterZone = e.target.closest('[data-cnu-zone]');
+    if (!waterZone || waterZone.matches('input')) return;
+    pickCapNuocZone(waterZone.dataset.cnuZone);
+    paint();
+  });
   document.getElementById('rpDock')?.addEventListener('change', (e) => {
+    const master = e.target.closest('[data-cnu-zones]');
+    if (master) {
+      setCapNuocZones(master.checked);
+      paint();
+      return;
+    }
+    const one = e.target.closest('[data-cnu-zone-on]');
+    if (one) {
+      setCapNuocZoneOn(one.dataset.cnuZoneOn, one.checked);
+      paint();
+      return;
+    }
     const box = e.target.closest('#legendHtkt [data-cn-form]');
     if (!box) return;
     const id = box.dataset.cnForm;

@@ -17,6 +17,37 @@ const OPACITY_DELAY_MS = 80;
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 
+const SOCIAL_LEGEND = [
+  ['chk_c1', 'Park.png', 'Công viên'],
+  ['chk_c3', 'Mamnon.png', 'Mầm non'],
+  ['chk_c4', 'Tieuhoc.png', 'Tiểu học'],
+  ['chk_c5', 'THCS.png', 'THCS'],
+  ['chk_c10', 'THPT.png', 'THPT'],
+  ['chk_c6', 'Yte.png', 'Y tế'],
+  ['chk_c7', 'Vanhoa.png', 'Văn hóa'],
+  ['chk_c8', 'Cho.png', 'Chợ'],
+  ['chk_nt_funeral', 'Nghiatrang.svg', 'Nhà tang lễ'],
+  ['chk_c2', 'Parking.png', 'Bãi đỗ xe'],
+  ['chk_c11', 'Bus.svg', 'Trạm xe buýt'],
+  ['chk_c12', 'Pccc.svg', 'Trụ sở PCCC'],
+  ['chk_nt_grave', 'Nghiatrang.svg', 'Nghĩa trang'],
+  ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng'],
+  ['chk_c14', 'Noxh.svg', 'Chung cư'],
+  ['chk_invest', '', 'Dự án kêu gọi đầu tư']
+];
+
+function socialLegendHtml() {
+  const rows = SOCIAL_LEGEND.map(([id, file, label]) => {
+    const on = !!document.getElementById(id)?.checked;
+    const mark = file
+      ? `<img class="layer-type-icon" src="./icons/${file}" alt="" width="14" height="16">`
+      : `<svg class="ico" aria-hidden="true"><use href="#i-coverage"/></svg>`;
+    return `<label class="htkt-legend-row">${mark}<span>${label}</span><input type="checkbox" data-xh-mirror="${id}"${on ? ' checked' : ''} aria-label="${label}"></label>`;
+  }).join('');
+  const status = `<div class="legend-status"><span><img class="layer-type-icon" src="./icons/Park.png" alt="" width="14" height="16">Đã phê duyệt</span><span><img class="layer-type-icon" src="./icons/Park2.png" alt="" width="14" height="16">Chờ duyệt</span></div>`;
+  return rows + status;
+}
+
 export function initLegendPanel() {
   const list = document.getElementById('parcelLegend');
   if (!list) return;
@@ -197,14 +228,22 @@ export function initLegendPanel() {
     else if (!visible.has(active)) selectSet([...visible][0]);
     const symbols = visible.size > 0;
     const land = anyOn(LAND);
-    const hatang = document.getElementById('layerMain')?.dataset.active === 'hatang';
+    const axisNow = document.getElementById('layerMain')?.dataset.active || '';
+    const hatang = axisNow === 'hatang';
+    const xahoi = axisNow === 'xahoi';
     frame.classList.toggle('is-htkt', hatang);
+    frame.classList.toggle('is-xh', xahoi);
     const htktLegend = document.getElementById('legendHtkt');
     if (htktLegend) htktLegend.hidden = !hatang;
+    const xhLegend = document.getElementById('legendXh');
+    if (xhLegend) {
+      xhLegend.hidden = !xahoi;
+      if (xahoi) xhLegend.innerHTML = socialLegendHtml();
+    }
     const main = frame.querySelector('.legend-main');
-    if (main) main.hidden = hatang ? false : !symbols;
+    if (main) main.hidden = xahoi ? true : (hatang ? false : !symbols);
     const display = document.querySelector('#tabLegend .legend-display');
-    if (display) display.hidden = hatang || !land;
+    if (display) display.hidden = hatang || xahoi || !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
     const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]
@@ -224,12 +263,12 @@ export function initLegendPanel() {
         const apt = document.querySelector('#aptBox .apt-legend');
         if (apt) pointList.append(apt.cloneNode(true));
       }
-      pointHost.hidden = pointRows.length === 0;
+      pointHost.hidden = xahoi || pointRows.length === 0;
     }
     const roads = document.getElementById('legendRoads');
     if (roads) roads.hidden = !checked('chk_roads');
     const extra = document.getElementById('legendExtra');
-    const extraOn = pointRows.length > 0 || checked('chk_roads');
+    const extraOn = !xahoi && (pointRows.length > 0 || checked('chk_roads'));
     if (extra) extra.hidden = !extraOn;
     if (chip) chip.hidden = true;
   };
@@ -255,8 +294,17 @@ export function initLegendPanel() {
   });
   tabs.forEach(t => t.addEventListener('click', () => { prefer = t.dataset.legendSet; }));
   document.addEventListener('change', (e) => {
+    const mirror = e.target?.dataset?.xhMirror;
+    if (mirror) {
+      const src = document.getElementById(mirror);
+      if (src && src.checked !== e.target.checked) {
+        src.checked = e.target.checked;
+        src.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      return;
+    }
     const id = e.target?.id || '';
-    if (e.target?.checked && (/^chk_c\d+$/.test(id) || id === 'chk_invest')) delete frame?.dataset.userHide;
+    if (e.target?.checked && (/^chk_c\d+$/.test(id) || id === 'chk_invest' || id === 'chk_nt_funeral' || id === 'chk_nt_grave')) delete frame?.dataset.userHide;
     syncLegend();
   });
   document.addEventListener('qh:legend-sync', syncLegend);

@@ -15,6 +15,7 @@ let doc = null;
 let loading = null;
 let shown = false;
 let zonesOn = true;
+let zoneVis = null;
 let picked = null;
 let zoneId = null;
 let listening = false;
@@ -118,20 +119,40 @@ function rowHtml(row) {
   </tr>${note}`;
 }
 
+function zoneShown(id) {
+  if (!zonesOn) return false;
+  if (!zoneVis) return true;
+  return zoneVis.has(id);
+}
+
+export function capNuocLegendHtml() {
+  if (!doc) return '';
+  const ids = (doc.vung || []).map(v => v.id);
+  const shownCount = ids.filter(zoneShown).length;
+  const all = ids.length > 0 && shownCount === ids.length;
+  const partial = shownCount > 0 && !all;
+  const zones = (doc.vung || []).map(v => {
+    const on = zoneId === v.id;
+    return `<div class="htkt-legend-row${on ? ' is-on' : ''}"><i class="htkt-mark is-zone" style="--cnu:${v.mau}"></i><button type="button" data-cnu-zone="${escapeHtml(v.id)}">${escapeHtml(v.ten)}</button><input type="checkbox" data-cnu-zone-on="${escapeHtml(v.id)}"${zoneShown(v.id) ? ' checked' : ''} aria-label="Hiện ${escapeHtml(v.ten)}"></div>`;
+  }).join('');
+  const zoneNote = zoneId ? (doc.vung || []).find(v => v.id === zoneId) : null;
+  const note = zoneNote
+    ? `<p class="cnu-src"><b>${escapeHtml(zoneNote.ten)}</b> · 2030 ${num(zoneNote.nhuCau2030)} · 2045 ${num(zoneNote.nhuCau2045)} · ${escapeHtml(zoneNote.nguon)}. Nhà máy: ${escapeHtml(zoneNote.nhaMay.join(', '))}.${zoneNote.ghiChu ? ` ${escapeHtml(zoneNote.ghiChu)}` : ''}</p>`
+    : `<p class="cnu-src">${escapeHtml(doc.ranh)}</p>`;
+  return `<div class="cnu-legend" aria-label="Màu nhà máy"><i class="is-giu"></i>Hiện có <i class="is-moi"></i>Xây mới <i class="is-ngung"></i>Ngừng <i class="is-nho"></i>Quy mô nhỏ</div>
+    <label class="htkt-legend-row"><i class="htkt-mark is-polygon"></i><span>Phân vùng cấp nước</span><input type="checkbox" data-cnu-zones${all ? ' checked' : ''}${partial ? ' data-cnu-partial="1"' : ''} aria-label="Hiện phân vùng cấp nước"></label>
+    ${zones}${note}`;
+}
+
 export function capNuocDossierHtml() {
   if (!doc) return '<p class="cn-empty">Đang tải số liệu cấp nước.</p>';
   const nc = doc.nhuCau;
   const cs = doc.congSuat;
-  const zones = (doc.vung || []).map(v => {
-    const on = zoneId === v.id;
-    return `<button type="button" class="cnu-zone${on ? ' is-on' : ''}" data-cnu-zone="${escapeHtml(v.id)}" style="--cnu:${v.mau}">${escapeHtml(v.ten)}</button>`;
-  }).join('');
   const rows = (doc.nhaMay || []).map(rowHtml).join('');
   const small = (doc.diemNho || []).map(p => {
     const on = picked === `nho-${p.ma}`;
     return `<button type="button" class="cnu-small${on ? ' is-on' : ''}" data-cnu-plant="nho-${escapeHtml(p.ma)}">${escapeHtml(p.ten)}</button>`;
   }).join('');
-  const zoneNote = zoneId ? (doc.vung || []).find(v => v.id === zoneId) : null;
   return `<section class="cnu" aria-label="Cấp nước theo thuyết minh QHC">
     <h3>Cấp nước đến năm 2045</h3>
     <p class="cnu-src">Mục 9.3.5 thuyết minh QHC, quyết định ${escapeHtml(doc.nguon.quyetDinh)}. Đơn vị ${escapeHtml(doc.donVi)}.</p>
@@ -142,10 +163,6 @@ export function capNuocDossierHtml() {
       <div class="cnu-kpi"><span>Công suất nhà máy 2045</span><b>${num(cs.bang['2045'])}</b><small>Cộng các ô: ${num(cs.congO['2045'])}</small></div>
     </div>
     <p class="cnu-src">${escapeHtml(cs.lech2045)}</p>
-    <div class="cnu-legend" aria-hidden="true"><i class="is-giu"></i>Hiện có <i class="is-moi"></i>Xây mới <i class="is-ngung"></i>Ngừng <i class="is-nho"></i>Quy mô nhỏ</div>
-    <button type="button" class="cnu-map${zonesOn ? ' is-on' : ''}" data-cnu-zones aria-pressed="${zonesOn}">${zonesOn ? 'Đang hiện phân vùng' : 'Hiện phân vùng cấp nước'}</button>
-    <div class="cnu-zones" role="group" aria-label="Chín vùng nhu cầu">${zones}</div>
-    ${zoneNote ? `<p class="cnu-src"><b>${escapeHtml(zoneNote.ten)}</b> · 2030 ${num(zoneNote.nhuCau2030)} · 2045 ${num(zoneNote.nhuCau2045)} · ${escapeHtml(zoneNote.nguon)}. Nhà máy: ${escapeHtml(zoneNote.nhaMay.join(', '))}.${zoneNote.ghiChu ? ` ${escapeHtml(zoneNote.ghiChu)}` : ''}</p>` : `<p class="cnu-src">${escapeHtml(doc.ranh)}</p>`}
     <div class="cnu-scroll">
       <table class="cnu-table">
         <caption>Bảng 83. Nhà máy nước chính</caption>
@@ -200,6 +217,7 @@ function drawZones() {
     ensurePane(host);
     const group = L.layerGroup();
     (doc.vung || []).forEach(zone => {
+      if (!zoneShown(zone.id)) return;
       const features = (zone.xa || []).map(name => byName.get(name)).filter(Boolean).map(geometry => ({
         type: 'Feature', geometry, properties: { id: zone.id }
       }));
@@ -252,9 +270,26 @@ export function pickCapNuocPlant(id) {
   }
 }
 
+export function setCapNuocZones(on) {
+  zonesOn = !!on;
+  zoneVis = on ? null : new Set();
+}
+
+export function setCapNuocZoneOn(id, on) {
+  const ids = (doc && doc.vung || []).map(v => v.id);
+  if (!zoneVis) zoneVis = new Set(ids);
+  if (on) zoneVis.add(id);
+  else zoneVis.delete(id);
+  zonesOn = ids.some(key => zoneVis.has(key));
+}
+
 export function pickCapNuocZone(id) {
   zoneId = zoneId === id ? null : id;
   picked = null;
+  if (zoneId) {
+    if (zoneVis) zoneVis.add(zoneId);
+    zonesOn = true;
+  }
   const zone = (doc && doc.vung || []).find(v => v.id === zoneId);
   if (!zone || typeof L === 'undefined' || !map) return;
   const names = new Set(zone.xa || []);
@@ -268,7 +303,7 @@ export function pickCapNuocZone(id) {
 }
 
 export function toggleCapNuocZones() {
-  zonesOn = !zonesOn;
+  setCapNuocZones(!zonesOn);
 }
 
 export function capNuocPlantLayer(layers) {

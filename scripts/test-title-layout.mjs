@@ -1,4 +1,4 @@
-// Hộp tiêu đề không đè cột nút, nút Giới thiệu hay panel trục; bề rộng đủ cả câu tiêu đề.
+// Hộp tiêu đề không đè cột nút, nút Giới thiệu hay panel trục; rộng vừa chữ, không kéo tới cột nút.
 // Không còn nút «>>» góc trên trái. Mỏ bảng tổng hợp cùng bề rộng và cùng mép phải cột nút.
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -62,6 +62,8 @@ async function measure(page) {
   return page.evaluate(states => {
     const title = document.getElementById('mapTitle');
     const h1 = document.getElementById('mapTitleText');
+    const line = document.querySelector('.map-intro-line');
+    const actions = document.querySelector('.map-title-actions');
     const box = el => {
       const r = el.getBoundingClientRect();
       return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
@@ -71,6 +73,7 @@ async function measure(page) {
       document.body.className = cls;
       const t = box(title);
       const text = box(h1);
+      const contentRight = Math.max(text.right, box(line).right, box(actions).right);
       const tools = [...document.querySelectorAll('.map-toolbar .ui-btn-format, #btnOverview')]
         .filter(el => hit(t, box(el)) || hit(text, box(el)))
         .map(el => el.id || el.getAttribute('aria-label'));
@@ -89,6 +92,7 @@ async function measure(page) {
         top: t.top,
         width: t.width,
         text: text.width,
+        slack: t.right - contentRight,
         full: h1.textContent.trim(),
         clipped: h1.scrollWidth > h1.clientWidth + 1,
         tools,
@@ -116,8 +120,9 @@ try {
       assert.equal(row.clipped, false, `${w} ${row.name} cụt chữ`);
       assert.ok(row.text >= 240, `${w} ${row.name} tiêu đề rộng ${row.text}`);
       assert.ok(Math.abs(row.left - slotLeft) < 1.5, `${w} ${row.name} mép trái ${row.left}`);
-      assert.ok(Math.abs(row.right - slotRight) < 1.5, `${w} ${row.name} mép phải ${row.right}`);
-      assert.ok(row.width > 480, `${w} ${row.name} hộp rộng ${row.width}`);
+      assert.ok(row.right < slotRight - 8, `${w} ${row.name} mép phải ${row.right} kéo tới ${slotRight}`);
+      assert.ok(row.slack < 20, `${w} ${row.name} khoảng trống phải ${row.slack}`);
+      assert.ok(row.width > row.text, `${w} ${row.name} hộp ${row.width} hẹp hơn chữ ${row.text}`);
       assert.deepEqual(row.tools, [], `${w} ${row.name} đè nút ${row.tools}`);
       assert.equal(row.panel, false, `${w} ${row.name} đè panel trục`);
       assert.equal(row.expand, false, `${w} ${row.name} còn nút mở góc trái`);

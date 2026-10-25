@@ -10,11 +10,11 @@ import { CORE_AREAS, GENERAL_PLANS, planLevelOf, planProjectOf } from './general
 import { namesOfProject } from './projectNames.js';
 
 export const AXES = [
-  { id: 'hanhchinh', label: 'Quản lý phát triển đô thị' },
-  { id: 'quyhoach', label: 'Hệ thống bản đồ quy hoạch' },
-  { id: 'hatang', label: 'Hệ thống hạ tầng kỹ thuật' },
-  { id: 'xahoi', label: 'Hệ thống hạ tầng xã hội' },
-  { id: 'kientruc', label: 'Quản lý lĩnh vực kiến trúc' }
+  { id: 'hanhchinh', label: 'A. Quản lý phát triển đô thị' },
+  { id: 'quyhoach', label: 'B. Hệ thống bản đồ quy hoạch' },
+  { id: 'hatang', label: 'C. Hệ thống hạ tầng kỹ thuật' },
+  { id: 'xahoi', label: 'D. Hệ thống hạ tầng xã hội' },
+  { id: 'kientruc', label: 'E. Quản lý về kiến trúc' }
 ];
 const AXIS_IDS = new Set(AXES.map(a => a.id));
 
