@@ -1,4 +1,5 @@
-// Lần mở ưu tiên chiều ngang thật: toàn màn hình rồi Screen Orientation API (cần cử chỉ trên nhiều trình duyệt).
+// Lần mở ưu tiên chiều ngang thật bằng Screen Orientation API (nhiều trình duyệt cần cử chỉ).
+// Không vào chế độ toàn màn hình của trình duyệt: Chrome hiện toast thoát lúc vào và lúc máy xoay.
 // Khóa bị chặn thì theo hướng khung nhìn, không xoay html/body bằng CSS. transform: rotate làm clientX/clientY
 // và canvas MapLibre/Leaflet lệch khỏi chỗ đang thấy — chạm, kéo bản đồ và cột nút đều trượt.
 // Cài ứng dụng: Android dùng beforeinstallprompt; iOS không có prompt, hướng dẫn Chia sẻ → Thêm vào Màn hình chính.
@@ -12,7 +13,7 @@ let deferredInstall = null;
 let lockHeld = false;
 // Còn muốn xin khóa ngang sau cử chỉ đầu. Nút xoay tắt cờ này khi người dùng chọn dọc.
 let preferLandscape = true;
-let fsArmed = false;
+let lockArmed = false;
 
 function iosDevice() {
   const ua = navigator.userAgent || '';
@@ -91,10 +92,6 @@ function nudgeViewport() {
   meta.setAttribute('content', content);
 }
 
-function inFullscreen() {
-  return !!(document.fullscreenElement || document.webkitFullscreenElement);
-}
-
 async function tryLock(orient) {
   if (!screen.orientation || !screen.orientation.lock) return false;
   try {
@@ -107,23 +104,9 @@ async function tryLock(orient) {
   }
 }
 
-async function enterFullscreen() {
-  if (inFullscreen()) return true;
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) return false;
-  try {
-    await req.call(el);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-// Toàn màn hình rồi khóa chiều. Từ chối thì giữ hướng khung nhìn, không nhắc và không xoay giả.
+// Khóa chiều nếu trình duyệt cho phép mà không cần toàn màn hình. Từ chối thì giữ hướng khung nhìn.
 async function engage(orient) {
   if (!phoneNow()) return;
-  if (orient === 'landscape') await enterFullscreen();
   const ok = await tryLock(orient);
   if (!ok && screen.orientation && screen.orientation.unlock && orient === 'portrait') {
     try { screen.orientation.unlock(); } catch (e) { /* máy giữ hướng thật */ }
@@ -137,7 +120,7 @@ async function toggleLandscape() {
   if (!phoneNow()) return;
   const next = deviceLandscape() ? 'portrait' : 'landscape';
   preferLandscape = next === 'landscape';
-  fsArmed = true;
+  lockArmed = true;
   nudgeViewport();
   await engage(next);
 }
@@ -215,7 +198,6 @@ export function initMobileShell() {
     screen.orientation.addEventListener('change', kick);
   }
   if (window.visualViewport) window.visualViewport.addEventListener('resize', paint);
-  document.addEventListener('fullscreenchange', paint);
   window.addEventListener('beforeinstallprompt', (event) => {
     if (!phoneNow()) return;
     event.preventDefault();
@@ -228,11 +210,11 @@ export function initMobileShell() {
     syncInstallButton();
   });
   const onFirstGesture = (event) => {
-    if (fsArmed || !phoneNow() || !preferLandscape) return;
+    if (lockArmed || !phoneNow() || !preferLandscape) return;
     if (event.target && event.target.closest && event.target.closest('#btnRotateScreen')) return;
-    fsArmed = true;
+    lockArmed = true;
     document.removeEventListener('pointerdown', onFirstGesture, true);
-    if (inFullscreen() && lockHeld) return;
+    if (lockHeld) return;
     engage('landscape');
   };
   document.addEventListener('pointerdown', onFirstGesture, true);

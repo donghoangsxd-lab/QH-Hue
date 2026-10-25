@@ -5815,45 +5815,7 @@ body.project-review.la-page #projectReviewHost {
   .ht-form { max-height: min(46dvh, 320px); }
   .ht-form input, .ht-form select, .ht-form textarea, .ht-actions .proof-btn { min-height: 36px; height: auto; font-size: 13px; }
   .inspect-popup .leaflet-popup-content { max-height: 42dvh; }
-  .mobile-fs p { font-size: 13px; line-height: 1.4; }
-  .mobile-fs:not([hidden]) {
-    display: block;
-    position: fixed;
-    z-index: 2600;
-    left: max(8px, env(safe-area-inset-left));
-    right: calc(max(8px, var(--safe-right)) + var(--phone-axis-w) + 8px);
-    width: auto;
-    max-width: 100%;
-    box-sizing: border-box;
-    top: auto;
-    bottom: max(8px, var(--safe-bottom));
-    padding: 8px 10px;
-    background: var(--bg-dark);
-    color: var(--text-main);
-    border: 1px solid rgba(var(--cyan-rgb), 0.55);
-    border-radius: var(--r-lg);
-    box-shadow: var(--panel-shadow);
-  }
-  html.is-phone.is-portrait .mobile-fs:not([hidden]) {
-    bottom: max(8px, var(--safe-bottom));
-    right: calc(max(8px, var(--safe-right)) + var(--phone-axis-w) + 8px);
-  }
-  .mobile-fs-go[hidden] { display: none !important; }
-  .mobile-fs p { margin: 0 0 8px; }
-  .mobile-fs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .mobile-fs-go, .mobile-fs-install, .mobile-fs-later {
-    min-height: 44px;
-    padding: 0 12px;
-    border-radius: var(--r-md);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .mobile-fs-go, .mobile-fs-install { border: 0; background: var(--accent-cyan); color: var(--text-on-accent); }
-  .mobile-fs-install[hidden] { display: none !important; }
-  .mobile-fs-later { border: 1px solid var(--border-color); background: transparent; color: var(--text-main); }
 }
-.mobile-fs { display: none; }
 /* Gợi ý ESC chỉ có nghĩa với bàn phím. Cảm ứng không hiện, kể cả khi chồng lên tiêu đề. */
 @media (pointer: coarse) {
   .esc-hint { display: none !important; }
@@ -6389,8 +6351,6 @@ html.is-phone.is-landscape .axis-dock button span {
 }
 /* orient-follow-end */
 
-.mobile-fs-later[hidden],
-.mobile-fs-go[hidden] { display: none !important; }
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   .install-app:not([hidden]) {
     display: inline-flex;
