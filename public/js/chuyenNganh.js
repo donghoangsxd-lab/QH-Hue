@@ -514,7 +514,18 @@ function paintKienTruc() {
   const quy = kienTruc?.quyChe?.items || [];
   const ct = kienTruc?.congTrinh?.items || [];
   const list = (items, render) => items.length ? `<ul class="axis-arch-list">${items.map(render).join('')}</ul>` : '<p class="cn-empty">Chưa có dữ liệu</p>';
-  box.innerHTML = `<section class="axis-arch"><h3>Quy chế quản lý kiến trúc</h3>${list(quy, item => `<li><b>${escapeHtml(item.name || item.id || 'Quy chế')}</b>${item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : ''}</li>`)}</section>
+  const docHref = (url) => {
+    const href = typeof url === 'string' ? url.trim() : '';
+    if ((href.startsWith('/') && !href.startsWith('//')) || /^https?:\/\//i.test(href)) return href;
+    return '';
+  };
+  box.innerHTML = `<section class="axis-arch"><h3>Quy chế quản lý kiến trúc</h3>${list(quy, item => {
+    const name = escapeHtml(item.name || item.id || 'Quy chế');
+    const title = item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : '';
+    const body = `<b>${name}</b>${title}`;
+    const href = docHref(item.doc?.url);
+    return href ? `<li><a href="${escapeHtml(href)}" target="_blank" rel="noopener">${body}</a></li>` : `<li>${body}</li>`;
+  })}</section>
     <section class="axis-arch"><h3>Công trình kiến trúc có giá trị</h3>${list(ct, item => `<li><b>${escapeHtml(item.ten || item.id || 'Công trình')}</b>${item.phuong ? `<small>${escapeHtml(item.phuong)}</small>` : ''}</li>`)}</section>`;
 }
 
