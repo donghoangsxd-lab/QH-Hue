@@ -23,7 +23,7 @@ import { geeTileLayer } from './geeTiles.js';
 import {
   getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, onViewChange, onPlanBoundariesPainted,
-  getViewMode, setViewMode, passToolClick, shownMaps
+  getViewMode, setViewMode, passToolClick, shownMaps, alignPlanView
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
@@ -68,9 +68,14 @@ export const layers = {
 
 const CITY_NAME = "Thành phố Huế";
 const CITY_CENTER = [16.4637, 107.5905];
-const CITY_ZOOM = 13;
+// Mức phóng tạm trước khi đo khung. Mức thật tính theo kích thước màn hình (centerOnCity).
+const CITY_ZOOM = 10;
+// Bao ranh 40 phường xã (ward-boundary.json). Không thu về nội đô.
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
-const CITY_FIT_PAD = 12;
+// Khoảng trống hai bên ranh: thành phố chiếm khoảng 84% cạnh hạn chế của khung nhìn.
+// Mức phóng nguyên bỏ qua khoảng giữa 10 và 11, khung không vừa vành thành phố.
+const CITY_FRAME_SLACK = 0.16;
+const CITY_FRAME_MIN_PAD = 28;
 const WARD_GEOM_VERSION = 3;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // 10 nhóm đã có bán kính phục vụ trên panel Hạ tầng xã hội (thêm THPT và PCCC so với 8 nhóm độ phủ).
@@ -216,7 +221,8 @@ function blockPagePinch() {
 }
 
 export function initMap() {
-  map = L.map('map', { renderer: L.canvas(), maxZoom: MAP_MAX_ZOOM, touchZoom: true }).setView(CITY_CENTER, CITY_ZOOM);
+  const frame = L.latLngBounds(CITY_BOUNDS);
+  map = L.map('map', { renderer: L.canvas(), maxZoom: MAP_MAX_ZOOM, touchZoom: true }).setView(frame.getCenter(), CITY_ZOOM);
   bindNotchZoom(map);
   blockPagePinch();
 
@@ -511,14 +517,49 @@ function nudgeOffDock(targetMap, bounds) {
   if (overlapsY && left < limit - 8) targetMap.panBy([left - limit, 0], { animate: true, duration: 0.35 });
 }
 
-// Thấy trọn ranh thành phố trong phần bản đồ không bị panel phải che
+function cityFramePadding() {
+  const size = map.getSize();
+  const x = Math.max(CITY_FRAME_MIN_PAD, Math.round(size.x * CITY_FRAME_SLACK / 2));
+  const y = Math.max(CITY_FRAME_MIN_PAD, Math.round(size.y * CITY_FRAME_SLACK / 2));
+  return {
+    tl: L.point(x + getLeftObstruction(), y),
+    br: L.point(x + getRightObstruction(), y)
+  };
+}
+
+// Mức phóng lẻ để ranh vừa khung. getBoundsZoom của Leaflet chỉ trả số nguyên.
+function cityFrameZoom(bounds, padding) {
+  const size = map.getSize().subtract(padding);
+  if (size.x < 32 || size.y < 32) return null;
+  const span = map.project(bounds.getSouthEast(), 0).subtract(map.project(bounds.getNorthWest(), 0));
+  const bw = Math.abs(span.x);
+  const bh = Math.abs(span.y);
+  // Ở mức phóng 0 cả thành phố chưa đầy một pixel. Không loại theo ngưỡng 1 px.
+  if (!(bw > 0) || !(bh > 0)) return null;
+  const z = Math.min(Math.log2(size.x / bw), Math.log2(size.y / bh));
+  if (!Number.isFinite(z)) return null;
+  return Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), z));
+}
+
+// Thấy trọn ranh thành phố trong phần bản đồ không bị cột nút che. Bản đồ quy hoạch (đang hiện khi mở trang) nhận cùng khung.
 export function centerOnCity(options = { animate: false }) {
   if (!map) return;
-  map.fitBounds(CITY_BOUNDS, {
-    ...options,
-    paddingTopLeft: [CITY_FIT_PAD + getLeftObstruction(), CITY_FIT_PAD],
-    paddingBottomRight: [CITY_FIT_PAD + getRightObstruction(), CITY_FIT_PAD]
-  });
+  const bounds = L.latLngBounds(CITY_BOUNDS);
+  const { tl, br } = cityFramePadding();
+  const zoom = cityFrameZoom(bounds, tl.add(br));
+  if (zoom == null) return;
+  const offset = br.subtract(tl).divideBy(2);
+  const sw = map.project(bounds.getSouthWest(), zoom);
+  const ne = map.project(bounds.getNorthEast(), zoom);
+  const center = map.unproject(sw.add(ne).divideBy(2).add(offset), zoom);
+  const snap = map.options.zoomSnap;
+  map.options.zoomSnap = 0;
+  try {
+    map.setView(center, zoom, { animate: options.animate === true });
+  } finally {
+    map.options.zoomSnap = snap;
+  }
+  alignPlanView();
 }
 
 export function flyToVisible(latlng, zoom, options) {

@@ -51,7 +51,7 @@ import {
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js';
-import { initMapLevel, getLevel } from './mapLevel.js';
+import { initMapLevel, getLevel, setLevel, DEFAULT_LEVEL } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initChuyenNganh } from './chuyenNganh.js';
@@ -1221,6 +1221,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Liên kết ?nganh= / ?truc= chỉ chọn panel, không mở khung. Nút thu/mở là cách mở duy nhất lúc tải trang.
   document.body.classList.add('right-collapsed');
   // Sau khi gắn trục và link chia sẻ: không có camera trên URL thì vừa cả thành phố.
+  // Xoay máy hoặc khôi phục trang từ bộ nhớ trình duyệt không được cắt ranh, cũng không kéo về QHPK 1/2.000.
+  let cityFrameHeld = !hasSharedCamera();
+  const releaseCityFrame = () => { cityFrameHeld = false; };
+  const watchCityFrame = (m) => {
+    if (!m) return;
+    m.on('dragstart', releaseCityFrame);
+    // zoomstart của setView lập trình không có originalEvent. Chạm hai ngón / nháy đúp thì có.
+    m.on('zoomstart', (e) => { if (e.originalEvent) releaseCityFrame(); });
+    m.getContainer()?.addEventListener('wheel', releaseCityFrame, { passive: true });
+  };
+  watchCityFrame(map);
+  watchCityFrame(planMap);
+  let cityFrameTick = 0;
+  window.addEventListener('resize', () => {
+    if (!cityFrameHeld) return;
+    cancelAnimationFrame(cityFrameTick);
+    cityFrameTick = requestAnimationFrame(() => centerOnCity({ animate: false }));
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted || hasSharedCamera()) return;
+    setLevel(DEFAULT_LEVEL, { keepView: true });
+    cityFrameHeld = true;
+    centerOnCity({ animate: false });
+  });
   if (!hasSharedCamera()) centerOnCity({ animate: false });
 
   // ---------- Nạp dữ liệu ban đầu ----------
