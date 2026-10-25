@@ -1,5 +1,5 @@
 import {
-  state, infraLabels, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
+  state, infraLabels, WARD_BOUNDARY_OUTLINE_STYLE, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
@@ -297,8 +297,11 @@ export const WARD_BOUNDS_EVENT = 'qh:ward-bounds';
 function addWardBoundaryLines(group) {
   const pack = getWardDraw();
   if (!pack || !pack.lines.length) return;
+  const outline = L.polyline(pack.lines, WARD_BOUNDARY_OUTLINE_STYLE);
   const line = L.polyline(pack.lines, WARD_BOUNDARY_LINE_STYLE);
+  outline.options.wardRole = 'outline';
   line.options.wardRole = 'line';
+  group.addLayer(outline);
   group.addLayer(line);
 }
 
@@ -1546,7 +1549,9 @@ function paintWardGroup(group, host) {
     cityEdgeLayer.delete(host);
   }
   group.eachLayer(layer => {
-    if (layer.options && layer.options.wardRole === 'line') layer.setStyle(WARD_BOUNDARY_LINE_STYLE);
+    const role = layer.options && layer.options.wardRole;
+    if (role === 'outline') layer.setStyle(WARD_BOUNDARY_OUTLINE_STYLE);
+    else if (role === 'line') layer.setStyle(WARD_BOUNDARY_LINE_STYLE);
   });
   if (!on) { cityEdgeOwned.delete(host); return; }
   const lines = cityOutlineLines();

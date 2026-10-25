@@ -143,9 +143,11 @@ export const infraLabels = {
   "14-NOXH": "Chung cư"
 };
 
-// Một nét mảnh, đủ đục. Quầng vàng chỉ gắn vào vành ngoài thành phố.
+// Ranh phường, xã: nét vàng đọc được trên viền đậm sát mép, mỗi cạnh một lần. Không quầng, không bóng, không blur.
+// Quầng vàng chỉ gắn vào vành ngoài thành phố.
 const WARD_LINE_DRAW = { fill: false, interactive: false, smoothFactor: 0, lineJoin: 'round', lineCap: 'butt' };
-export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#334155', weight: 1.2, opacity: 1 };
+export const WARD_BOUNDARY_OUTLINE_STYLE = { ...WARD_LINE_DRAW, color: '#1e293b', weight: 3.2, opacity: 1 };
+export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#fde68a', weight: 2, opacity: 1 };
 // Hình để tô / vẽ nét. Tra phường chứa điểm vẫn dùng hình gốc. prepareWardDraw đã chạy thì lấy bản nhớ.
 export function wardDrawFC(features) {
   const pack = getWardDraw() || sealWardDraw(features);
