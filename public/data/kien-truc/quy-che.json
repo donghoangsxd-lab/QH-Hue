@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "moTa": "Quy chế quản lý kiến trúc theo khu vực. items để trống cho đến khi nhập liệu. Không ghi đè file này bằng dữ liệu thử.",
+  "moTa": "Quy chế quản lý kiến trúc theo khu vực. Mục thành phố mở PDF trên bucket qua /gcs/. Không ghi đè file này bằng dữ liệu thử.",
   "schema": {
     "items": {
       "id": "mã ổn định",
@@ -16,5 +16,15 @@
       }
     }
   },
-  "items": []
+  "items": [
+    {
+      "id": "qcqlkt-hue-2026",
+      "area": { "type": "tp", "code": "TP", "parent": null },
+      "name": "Thành phố Huế",
+      "doc": {
+        "title": "Dự thảo Quy chế quản lý kiến trúc thành phố Huế (2026)",
+        "url": "/gcs/kien-truc/tp-tp/quy-che.pdf"
+      }
+    }
+  ]
 }

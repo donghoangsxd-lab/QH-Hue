@@ -6241,6 +6241,7 @@ body.project-review.la-page #projectReviewHost {
 .axis-arch-list { margin: 2px 0 0; padding-left: 18px; font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); }
 .axis-arch-list li { min-height: var(--axis-row-h); }
 .axis-arch-list small { display: block; color: var(--axis-color-muted); font-size: var(--axis-fs-chip); }
+.axis-arch-list a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .cn-matrix-details { margin: 8px; font-size: 12px; }
 .cn-matrix-wrap { overflow: auto; max-width: 100%; }
 .cn-matrix { border-collapse: collapse; font-family: var(--axis-font); font-size: var(--axis-fs-chip); }

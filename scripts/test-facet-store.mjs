@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { cacheControlFor, INFRA_JSON } from '../config/gcsCachePolicy.mjs';
 import {
   AREA_TP, SCHEME_ALIAS, SECTORS, WARD_NAMES, applyFacetSearch, areaCodeFromName, areaLabel, baseLayers,
   browseState, canonicalSector, facetQuery, findArea, formatKv, getLayers, layerPassesFilter,
@@ -150,7 +151,20 @@ assert.equal(fs.existsSync('public/data/kien-truc/quy-che.json'), true);
 assert.equal(fs.existsSync('public/data/kien-truc/cong-trinh.json'), true);
 const quyChe = JSON.parse(fs.readFileSync('public/data/kien-truc/quy-che.json', 'utf8'));
 const congTrinh = JSON.parse(fs.readFileSync('public/data/kien-truc/cong-trinh.json', 'utf8'));
-assert.deepEqual(quyChe.items, []);
+assert.equal(quyChe.items.length, 1);
+const qcHue = quyChe.items[0];
+assert.equal(qcHue.id, 'qcqlkt-hue-2026');
+assert.deepEqual(qcHue.area, { type: 'tp', code: 'TP', parent: null });
+assert.equal(qcHue.name, 'Thành phố Huế');
+assert.equal(qcHue.doc.title, 'Dự thảo Quy chế quản lý kiến trúc thành phố Huế (2026)');
+assert.equal(qcHue.doc.url, '/gcs/kien-truc/tp-tp/quy-che.pdf');
+assert.equal(cacheControlFor('kien-truc/tp-tp/quy-che.pdf'), INFRA_JSON);
+assert.equal('rules' in qcHue, false);
+assert.equal(fs.existsSync('public/docs/du-thao-quy-che-quan-ly-kien-truc-2026.pdf'), false);
+assert.doesNotMatch(fs.readFileSync('public/_headers', 'utf8'), /du-thao-quy-che/);
+const kienTrucUi = fs.readFileSync('public/js/chuyenNganh.js', 'utf8');
+assert.match(kienTrucUi, /item\.doc\?\.url/);
+assert.match(kienTrucUi, /target="_blank" rel="noopener"/);
 assert.deepEqual(congTrinh.items, []);
 assert.ok(quyChe.schema);
 assert.ok(congTrinh.schema);
