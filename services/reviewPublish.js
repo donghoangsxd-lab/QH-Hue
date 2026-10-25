@@ -1,5 +1,7 @@
 // Duyệt một hồ sơ chờ: ghi vào chỗ công bố. Quản trị bấm Duyệt mới chạy.
 // Sử dụng đất / ranh đã có thì bỏ qua, không thêm bản sao.
+// PDF cán bộ (quy chế, văn bản kèm) nằm ở cho-duyet/<id>.pdf cho tới khi duyệt.
+const crypto = require('crypto');
 const { landsFromFeatures, boundaryFromFeatures } = require('./landDedupe');
 
 const NET_ROLES = new Set([
@@ -9,6 +11,11 @@ const NET_ROLES = new Set([
 ]);
 
 const DRAW_KINDS = new Set(['su-dung-dat', 'hien-trang', 'ranh-gioi', 'ban-ve']);
+const PDF_KINDS = new Set(['van-ban', 'quy-che']);
+const PDF_ROLES = new Set(['phe-duyet', 'dinh-chinh', 'quy-dinh', 'thuyet-minh']);
+const PDF_OBJECT_RE = /^cho-duyet\/([a-f0-9]{32})\.pdf$/;
+const UNIT_RE = /^(tp:TP|dothi:[a-z0-9]+(?:-[a-z0-9]+)*|xa:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const PDF_MAX = 2 * 1024 * 1024;
 
 function fail(status, message) {
   const err = new Error(message);
@@ -81,11 +88,29 @@ function applyLotKeep(features, lotReview, keepIds) {
   return rows;
 }
 
-function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, lotReview, clip }) {
+function stagePdf(key, unitKey, name, line, pdf) {
+  const fileName = String(pdf && pdf.name || '').replace(/[\u0000-\u001f"\\]/g, '').trim().slice(0, 120);
+  const object = String(pdf && pdf.object || '');
+  const bytes = Number(pdf && pdf.bytes) || 0;
+  if (!fileName) throw fail(400, 'Thiếu file PDF');
+  if (!PDF_OBJECT_RE.test(object)) throw fail(400, 'Đường dẫn PDF chờ duyệt không hợp lệ');
+  if (bytes < 5 || bytes > PDF_MAX) throw fail(400, 'File PDF chờ duyệt tối đa 2 MB.');
+  if (!UNIT_RE.test(unitKey)) throw fail(400, 'Đơn vị không hợp lệ');
+  if (key === 'quy-che') {
+    return { kind: key, unit: unitKey, tenQH: '', summary: line || fileName, pdf: { name: fileName, bytes, object, role: '' } };
+  }
+  const role = String(pdf && pdf.role || '');
+  if (!PDF_ROLES.has(role)) throw fail(400, 'Loại văn bản không hợp lệ');
+  if (!name) throw fail(400, 'Thiếu tên đồ án');
+  return { kind: key, unit: unitKey, tenQH: name, summary: line || fileName, pdf: { name: fileName, bytes, object, role } };
+}
+
+function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, lotReview, clip, pdf }) {
   const key = String(kind || '');
   const name = String(tenQH || '').trim().slice(0, 120);
   const unitKey = String(unit || '').trim();
   const line = String(summary || '').trim().slice(0, 180);
+  if (PDF_KINDS.has(key)) return stagePdf(key, unitKey, name, line, pdf);
   if (key === 'chi-tieu') {
     if (!fields || typeof fields !== 'object') throw fail(400, 'Thiếu chỉ tiêu');
     return { kind: key, unit: unitKey, tenQH: '', summary: line || unitKey, fields };
@@ -111,8 +136,25 @@ function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, 
   return stored;
 }
 
-async function applyPublication(obj, { projects, callAppsScript, publishKienTruc }) {
+async function applyPublication(obj, { projects, callAppsScript, publishKienTruc, readPendingPdf }) {
   const kind = obj && obj.kind;
+  if (kind === 'quy-che' || kind === 'van-ban') {
+    const object = obj.pdf && obj.pdf.object;
+    const id = PDF_OBJECT_RE.exec(String(object || ''));
+    if (!id) throw fail(400, 'Thiếu file PDF chờ duyệt');
+    if (typeof readPendingPdf !== 'function') throw fail(500, 'Thiếu bước đọc PDF chờ duyệt');
+    const buffer = await readPendingPdf(object);
+    if (kind === 'quy-che') {
+      await projects.saveKienTrucPdf({ unitKey: obj.unit, fileName: obj.pdf.name, buffer });
+      return { published: true, note: 'Đã ghi quy chế.' };
+    }
+    if (!PDF_ROLES.has(String(obj.pdf.role || ''))) throw fail(400, 'Loại văn bản không hợp lệ');
+    const fixedId = crypto.createHash('sha256').update(id[1]).digest('hex').slice(0, 8);
+    await projects.saveProjectDoc({
+      tenQH: obj.tenQH, role: obj.pdf.role, fileName: obj.pdf.name, buffer, fixedId
+    });
+    return { published: true, note: 'Đã gắn văn bản.' };
+  }
   if (kind === 'chi-tieu') {
     const fields = obj.fields || {};
     await callAppsScript({ action: 'saveUrbanInputs' }, {
@@ -156,4 +198,4 @@ async function applyPublication(obj, { projects, callAppsScript, publishKienTruc
   throw fail(400, 'Loại hồ sơ không hợp lệ');
 }
 
-module.exports = { stageSpec, applyPublication, applyLotKeep, NET_ROLES, DRAW_KINDS };
+module.exports = { stageSpec, applyPublication, applyLotKeep, NET_ROLES, DRAW_KINDS, PDF_KINDS };

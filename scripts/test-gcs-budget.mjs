@@ -22,8 +22,13 @@ assert.equal(cacheControlFor('chuyen-nganh/v1/qhc/sdd/hien-trang/a.geojson'), IM
 assert.equal(cacheControlFor('infrastructure_hue.json'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/dothi-vinh-thanh/quy-che.pdf'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/tp-tp/quy-che.pdf'), INFRA_JSON);
+assert.equal(cacheControlFor('docs/614-QD-UBND.pdf'), 'public, max-age=86400');
+assert.equal(cacheControlFor('docs/108-QD-TTg.pdf'), 'public, max-age=86400');
+assert.equal(cacheControlFor('projects/_pdf-in/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf'), 'private, no-store');
+assert.equal(cacheControlFor('projects/abc/quyet-dinh-cho.pdf'), 'private, no-store');
 assert.equal(cacheControlFor('projects/a/lots.json'), '');
 assert.equal(cacheControlFor('cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json'), 'private, no-store');
+assert.equal(cacheControlFor('cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf'), 'private, no-store');
 assert.equal(cacheControlFor('../secrets.json'), 'private, no-store');
 assert.equal(plan('gba/buildings.pmtiles', '').change, true);
 assert.equal(plan('gba/buildings.pmtiles', IMMUTABLE).change, false);

@@ -35,14 +35,7 @@
 /icons/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
-# PDF ghi đè cùng đường dẫn: cache ngắn, không immutable.
-/docs/614-QD-UBND.pdf
-  Content-Type: application/pdf
-  Cache-Control: public, max-age=86400
-
-/docs/108-QD-TTg.pdf
-  Content-Type: application/pdf
-  Cache-Control: public, max-age=86400
+# PDF quyết định phục vụ qua /gcs/docs/ trên bucket, không nằm trong asset Worker.
 
 # JSON công suất ghi đè cùng khóa khi bổ sung số từ quyết định.
 /data/htkt/cong-suat.json
