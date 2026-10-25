@@ -1295,4 +1295,7 @@ export function initQhc2045Layer() {
   bindCoreHover(map);
   bindCoreHover(planMap);
   syncStages();
+  // initMapLevel bật chk_qhc25 trước listener change của lớp này. Không vẽ theo ô đang bật
+  // thì mở lạnh báo QHC 1/25.000 đang chọn nhưng sơ đồ không có trên bản đồ.
+  syncQhc();
 }
