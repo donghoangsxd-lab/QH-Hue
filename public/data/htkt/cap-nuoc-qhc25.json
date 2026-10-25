@@ -1,0 +1,362 @@
+{
+  "nguon": {
+    "taiLieu": "Thuyết minh Quy hoạch chung đô thị Thừa Thiên Huế, mục 9.3.5 Giải pháp cấp nước",
+    "file": "01_TM_QHC_QD108-491-495.pdf",
+    "trangHoSo": "477-481",
+    "quyetDinh": "108/QĐ-TTg ngày 26/01/2024",
+    "lopDiem": "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/cap-nuoc/quy-hoach/cong-trinh-dau-moi-cap-nuoc.geojson",
+    "khoaDiem": "madoituong trên lớp Công trình đầu mối cấp nước, đồ án QHC 1/25.000"
+  },
+  "donVi": "m³/ngày đêm",
+  "nhuCau": {
+    "qd108": { "2030": 480000, "2045": 600000, "cachGhi": "khoảng" },
+    "tongVung": { "2030": 470000, "2045": 605000 }
+  },
+  "congSuat": {
+    "bang": { "2030": 520000, "2045": 775000 },
+    "congO": { "2022": 305700, "2030": 520000, "2045": 783500 },
+    "lech2045": "Dòng Tổng cộng trên bảng 83 ghi 775.000. Cộng các ô cột 2045, bỏ Quảng Tế I vì ô ghi Dự phòng, ra 783.500."
+  },
+  "luaChonNguon": "Nguồn chính là nước mặt. Ưu tiên thượng nguồn cho sinh hoạt đô thị và nông thôn. Khai thác hợp lý nước mặt hạ nguồn. Ngừng khai thác nước ngầm.",
+  "song": ["Sông Hương", "Sông Bồ", "Sông Nông", "Sông Ô Lâu", "Sông Thượng Lộ", "Sông A Sáp"],
+  "ho": [
+    { "ten": "Hồ Truồi", "so": "Lưu vực 75,3 km²; Wbt 52,2 triệu m³; Wchết 4,18 triệu m³" },
+    { "ten": "Hồ Thủy Yên", "so": "Wtb 9,44 triệu m³; Whi 8,36 triệu m³; Wchết 1,08 triệu m³; lưu vực 21,3 km²" },
+    { "ten": "Hồ Thủy Cam", "so": "Wtb 10,93 triệu m³; Whi 10,33 triệu m³; Wchết 0,6 triệu m³" },
+    { "ten": "Hồ Tả Trạch", "so": "Hồ điều tiết, cấp cho các nhà máy lấy nước sông phía hạ lưu" },
+    { "ten": "Hồ thủy điện Hồng Vân", "so": "Nguồn cho khu vực A Lưới" },
+    { "ten": "Hồ Bình Điền", "so": "Hồ điều tiết trên sông Hữu Trạch / sông Bồ" },
+    { "ten": "Hồ Hương Điền", "so": "Nlm 54 MW; xả mùa kiệt 33,1 m³/s; lưu vực 707 km²; dung tích 820 triệu m³" }
+  ],
+  "suoi": ["Khe Mệ", "Khe Baugher", "Khe A Kỳ", "Khe Tà Rê", "Khe A Nô", "Khe A Lin", "Đập Bo Ghe", "Đập Khe Su"],
+  "xayMoi": ["Phong Thu 2", "Lộc Bổn", "Nam Đông 2", "Lộc Thủy", "Hương Vân", "A Lin", "A Sáp", "Lâm Đớt"],
+  "giuNang": ["Quảng Tế", "Phong Thu 1", "Tứ Hạ", "Hòa Bình Chương", "Lộc An", "Lộc Trì", "Chân Mây", "Nam Đông", "Thượng Long", "A Lưới"],
+  "mang": "Mạng truyền tải cấp 1 và cấp 2 tính cho giờ dùng nước lớn nhất và giờ lớn nhất khi có cháy. Mạch vòng, đường kính D160 mm đến D800 mm, gồm ống hiện trạng được duy trì và ống dự kiến. Các nhà máy nối với nhau.",
+  "chuaChay": "Mạng thiết kế chữa cháy áp lực thấp, bảo đảm giờ dùng nước lớn nhất với 2 đến 3 đám cháy đồng thời. Lưu lượng một đám cháy 20 l/s đến 95 l/s tại điểm bất lợi. Họng cứu hỏa trên ống từ D100 mm, khoảng cách 150 m. Thêm điểm lấy nước mặt tại hồ, kênh, mương.",
+  "ghiChu": "Đường kính, hướng tuyến ống, vị trí, quy mô, công suất và phạm vi công trình đầu mối được chính xác hóa ở quy hoạch chuyên ngành, quy hoạch chung vùng huyện, quy hoạch phân khu, quy hoạch chi tiết và dự án đầu tư. Nhà máy công suất nhỏ, nhà máy cũ hoặc nhà máy hạ lưu có nguy cơ ô nhiễm có thể nâng cấp hoặc chuyển thành trạm bơm tăng áp.",
+  "ranh": "Thuyết minh không kèm ranh GIS. Bản đồ tô xã, phường sau sắp xếp 01/7/2025 theo đơn vị cũ trong Nghị quyết 1675/NQ-UBTVQH15. Xã mới ghép hai huyện được ghi ở từng vùng.",
+  "vung": [
+    {
+      "id": "bac-nam-huong",
+      "ten": "Quận phía bắc và nam sông Hương",
+      "mau": "#0891b2",
+      "nhuCau2030": 163000,
+      "nhuCau2045": 193000,
+      "nguon": "Sông Hương",
+      "nhaMay": ["Quảng Tế", "Vạn Niên"],
+      "xa": ["Phường Phú Xuân", "Phường Thuận Hóa", "Phường An Cựu", "Phường Vỹ Dạ", "Phường Kim Long", "Phường Thủy Xuân"],
+      "ghiChu": "Phường Thủy Xuân gồm cả xã Thủy Bằng của thị xã Hương Thủy cũ."
+    },
+    {
+      "id": "huong-thuy",
+      "ten": "Quận Hương Thủy",
+      "mau": "#7c3aed",
+      "nhuCau2030": 57000,
+      "nhuCau2045": 65000,
+      "nguon": "Sông Hương, sông Nông",
+      "nhaMay": ["Vạn Niên", "Lộc Bổn", "Lộc An", "Quảng Tế"],
+      "xa": ["Phường Thanh Thủy", "Phường Hương Thủy", "Phường Phú Bài"]
+    },
+    {
+      "id": "huong-tra",
+      "ten": "Quận Hương Trà",
+      "mau": "#0f766e",
+      "nhuCau2030": 30000,
+      "nhuCau2045": 36000,
+      "nguon": "Sông Hương, sông Bồ",
+      "nhaMay": ["Quảng Tế", "Vạn Niên", "Tứ Hạ", "Hương Vân"],
+      "xa": ["Phường Hương Trà", "Phường Kim Trà", "Phường Hương An", "Phường Hóa Châu", "Xã Bình Điền"],
+      "ghiChu": "Phường Hương An gồm phường An Hòa của thành phố Huế cũ. Phường Hóa Châu gồm xã Quảng Thành của huyện Quảng Điền cũ."
+    },
+    {
+      "id": "phong-dien",
+      "ten": "Thị xã Phong Điền",
+      "mau": "#c2410c",
+      "nhuCau2030": 42000,
+      "nhuCau2045": 50000,
+      "nguon": "Sông Ô Lâu",
+      "nhaMay": ["Phong Thu 1", "Phong Thu 2", "Hòa Bình Chương", "KCN Phong Điền"],
+      "xa": ["Phường Phong Điền", "Phường Phong Thái", "Phường Phong Dinh", "Phường Phong Phú", "Phường Phong Quảng"],
+      "ghiChu": "Phường Phong Quảng gồm xã Quảng Công và Quảng Ngạn của huyện Quảng Điền cũ."
+    },
+    {
+      "id": "chan-may",
+      "ten": "Thành phố Chân Mây",
+      "mau": "#be123c",
+      "nhuCau2030": 90000,
+      "nhuCau2045": 115000,
+      "nguon": "Hồ Truồi, hồ Thủy Yên, hồ Thủy Cam, đập khe Mệ, đập Bo Ghe",
+      "nhaMay": ["Chân Mây", "Lộc Thủy", "Lộc Trì", "Lộc An"],
+      "xa": ["Xã Chân Mây - Lăng Cô"],
+      "ghiChu": "Thuyết minh không liệt kê xã. Tô xã Chân Mây - Lăng Cô vì gồm thị trấn Lăng Cô, Lộc Tiến, Lộc Vĩnh, Lộc Thủy. Lộc Trì cũ nay nằm trong xã Phú Lộc, thuộc vùng Phú Lộc - Nam Đông."
+    },
+    {
+      "id": "quang-dien",
+      "ten": "Huyện Quảng Điền",
+      "mau": "#a16207",
+      "nhuCau2030": 20000,
+      "nhuCau2045": 41000,
+      "nguon": "Sông Hương, sông Bồ",
+      "nhaMay": ["Vạn Niên", "Quảng Tế", "Tứ Hạ", "Hương Vân"],
+      "xa": ["Xã Quảng Điền", "Xã Đan Điền"]
+    },
+    {
+      "id": "phu-vang",
+      "ten": "Huyện Phú Vang",
+      "mau": "#4f46e5",
+      "nhuCau2030": 28000,
+      "nhuCau2045": 40000,
+      "nguon": "Sông Hương, sông Nông",
+      "nhaMay": ["Vạn Niên", "Quảng Tế", "Lộc Bổn", "Lộc An"],
+      "xa": ["Xã Phú Vang", "Xã Phú Vinh", "Xã Phú Hồ", "Phường Mỹ Thượng", "Phường Dương Nỗ", "Phường Thuận An"],
+      "ghiChu": "Phường Thuận An gồm phường Thuận An của thành phố Huế cũ. Phường Mỹ Thượng gồm phường Phú Thượng của thành phố Huế cũ. Phường Dương Nỗ là Phú Dương, Phú Mậu, Phú Thanh."
+    },
+    {
+      "id": "phu-loc-nam-dong",
+      "ten": "Huyện Phú Lộc, Nam Đông",
+      "mau": "#15803d",
+      "nhuCau2030": 26000,
+      "nhuCau2045": 49000,
+      "nguon": "Sông Thượng Lộ, sông Truồi, kênh Truồi, sông Nông, hồ Thủy Yên, hồ Thủy Cam, khe A Kỳ",
+      "nhaMay": ["Lộc Bổn", "Lộc An", "Nam Đông 1", "Nam Đông 2", "Thượng Long"],
+      "xa": ["Xã Hưng Lộc", "Xã Lộc An", "Xã Phú Lộc", "Xã Vinh Lộc", "Xã Khe Tre", "Xã Nam Đông", "Xã Long Quảng"],
+      "ghiChu": "Một mục nhu cầu cho cả hai huyện. Lộc Bổn và Lộc An cấp Lộc Bổn, Lộc Sơn, Lộc An, Lộc Điền, Lộc Hòa, Xuân Lộc. Ba nhà máy Nam Đông và Thượng Long cấp 10 xã Nam Đông cũ. Xã Hưng Lộc gồm Lộc Sơn, Lộc Bổn, Xuân Lộc. Xã Lộc An gồm Lộc Hòa, Lộc Điền, Lộc An. Xã Phú Lộc gồm cả Lộc Trì."
+    },
+    {
+      "id": "a-luoi",
+      "ten": "Huyện A Lưới",
+      "mau": "#3f6212",
+      "nhuCau2030": 14000,
+      "nhuCau2045": 16000,
+      "nguon": "Suối Tà Rê, suối A Lin, hồ thủy điện Hồng Vân, sông A Sáp",
+      "nhaMay": ["A Lưới", "A Sáp", "A Lin", "Lâm Đớt"],
+      "xa": ["Xã A Lưới 1", "Xã A Lưới 2", "Xã A Lưới 3", "Xã A Lưới 4", "Xã A Lưới 5"]
+    }
+  ],
+  "nhaMay": [
+    {
+      "id": "quang-te-1", "ma": "19", "ten": "Quảng Tế I", "tenLop": "Quảng Tế 1", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 52590, "cs2022": 50000, "cs2030": 50000, "cs2045": null, "nhan2045": "Dự phòng",
+      "nguon": "Sông Hương",
+      "phamVi": "Quận phía bắc và nam sông Hương, quận Hương Trà, huyện Quảng Điền, huyện Phú Vang",
+      "vung": ["bac-nam-huong", "huong-thuy", "huong-tra", "quang-dien", "phu-vang"],
+      "lng": 107.57795312841687, "lat": 16.440415204025186,
+      "ghiChu": "Cột 2045 trên bảng 83 ghi Dự phòng, không có số."
+    },
+    {
+      "id": "quang-te-2", "ma": "20", "ten": "Quảng Tế II", "tenLop": "Quảng Tế 2", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": null, "cs2022": 82500, "cs2030": 82500, "cs2045": 82500,
+      "nguon": "Sông Hương",
+      "phamVi": "Cùng phạm vi Quảng Tế I",
+      "vung": ["bac-nam-huong", "huong-thuy", "huong-tra", "quang-dien", "phu-vang"],
+      "lng": 107.57803570999596, "lat": 16.44086599102692
+    },
+    {
+      "id": "van-nien-3", "ma": "18", "ten": "Vạn Niên 3", "tenLop": "Vạn Niên 3", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 114706, "cs2022": 60000, "cs2030": 120000, "cs2045": 240000,
+      "nguon": "Sông Hương",
+      "phamVi": "Quận phía bắc và nam sông Hương, quận Hương Thủy, quận Hương Trà, huyện Quảng Điền, huyện Phú Vang",
+      "vung": ["bac-nam-huong", "huong-thuy", "huong-tra", "quang-dien", "phu-vang"],
+      "lng": 107.56074892697524, "lat": 16.431509116915624
+    },
+    {
+      "id": "da-vien", "ma": "52", "ten": "Dã Viên", "tenLop": "Dã Viên", "nhom": "chinh", "trangThai": "ngung",
+      "dienTich": null, "cs2022": 24000, "cs2030": null, "cs2045": null, "nhan2030": "Ngừng", "nhan2045": "Ngừng",
+      "nguon": "Sông Hương",
+      "phamVi": "Ngừng cấp sau năm 2022",
+      "vung": [],
+      "lng": 107.56953608152617, "lat": 16.457812392723554,
+      "ghiChu": "Bảng 83: 24.000 m³/ngày đêm năm 2022, sau đó ngừng hoạt động."
+    },
+    {
+      "id": "tu-ha", "ma": "21", "ten": "Tứ Hạ", "tenLop": "Tứ Hạ", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 3203, "cs2022": 15000, "cs2030": 18000, "cs2045": 18000,
+      "nguon": "Sông Bồ",
+      "phamVi": "Quận Hương Trà. Mục 9.3.5.a còn ghi phục vụ huyện Quảng Điền",
+      "vung": ["huong-tra", "quang-dien"],
+      "lng": 107.47605864632992, "lat": 16.524860713922767,
+      "ghiChu": "Điểm mã 46 trên cùng lớp là vị trí mới, thuộc nhóm quy mô nhỏ, không phải nhà máy này."
+    },
+    {
+      "id": "loc-bon", "ma": "51", "ten": "Lộc Bổn", "tenLop": "Lộc Bổn", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": 48718, "cs2022": null, "cs2030": 30000, "cs2045": 60000,
+      "nguon": "Sông Nông, hồ Tả Trạch",
+      "phamVi": "Quận Hương Thủy, huyện Phú Vang, các xã Lộc Bổn, Lộc Sơn, Lộc An, Lộc Điền, Lộc Hòa, Xuân Lộc",
+      "vung": ["huong-thuy", "phu-vang", "phu-loc-nam-dong"],
+      "lng": 107.71934360747842, "lat": 16.331845165195393
+    },
+    {
+      "id": "huong-van", "ma": "2", "ten": "Hương Vân", "tenLop": "Hương Vân", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": 35829, "cs2022": null, "cs2030": 30000, "cs2045": 60000,
+      "nguon": "Sông Bồ",
+      "phamVi": "Quận Hương Trà, huyện Quảng Điền",
+      "vung": ["huong-tra", "quang-dien"],
+      "lng": 107.43750337621286, "lat": 16.487149387041807
+    },
+    {
+      "id": "phong-thu-1", "ma": "15", "ten": "Phong Thu 1", "tenLop": "Phong Thu", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 12889, "cs2022": 18000, "cs2030": 40000, "cs2045": 40000,
+      "nguon": "Sông Ô Lâu",
+      "phamVi": "Thị xã Phong Điền",
+      "vung": ["phong-dien"],
+      "lng": 107.34194785365713, "lat": 16.56797546657334
+    },
+    {
+      "id": "phong-thu-2", "ma": "50", "ten": "Phong Thu 2", "tenLop": "Phong Thu 2", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": 20000, "cs2022": null, "cs2030": null, "cs2045": 40000,
+      "nguon": "Sông Ô Lâu",
+      "phamVi": "Thị xã Phong Điền",
+      "vung": ["phong-dien"],
+      "lng": 107.34431850161803, "lat": 16.567317521742503,
+      "ghiChu": "20.000 nằm ở cột diện tích. Cột 2030 trống. Cột 2045 là 40.000."
+    },
+    {
+      "id": "hoa-binh-chuong", "ma": "26", "ten": "Hòa Bình Chương", "tenLop": "Hoà Bình Chương", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 2940, "cs2022": 2700, "cs2030": 4000, "cs2045": 4000,
+      "nguon": "Sông Ô Lâu",
+      "phamVi": "Thị xã Phong Điền",
+      "vung": ["phong-dien"],
+      "lng": 107.31544586220564, "lat": 16.648255511667685
+    },
+    {
+      "id": "kcn-phong-dien", "ma": "22", "ten": "KCN Phong Điền", "tenLop": "KCN Phong Điền", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 20000, "cs2022": 11000, "cs2030": 11000, "cs2045": 11000,
+      "nguon": "Sông Ô Lâu",
+      "phamVi": "Khu công nghiệp Phong Điền",
+      "vung": ["phong-dien"],
+      "lng": 107.38252983015407, "lat": 16.590030901578103
+    },
+    {
+      "id": "loc-an", "ma": "27", "ten": "Lộc An", "tenLop": "Lộc An", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 31612, "cs2022": 11000, "cs2030": 30000, "cs2045": 60000,
+      "nguon": "Sông Truồi, hồ Truồi, hồ Tả Trạch",
+      "phamVi": "Quận Hương Thủy, thành phố Chân Mây - Lăng Cô, huyện Phú Vang, các xã Lộc Bổn, Lộc Sơn, Lộc An, Lộc Điền, Lộc Hòa, Xuân Lộc",
+      "vung": ["huong-thuy", "chan-may", "phu-vang", "phu-loc-nam-dong"],
+      "lng": 107.764257002627, "lat": 16.298961549314825
+    },
+    {
+      "id": "loc-tri", "ma": "17", "ten": "Lộc Trì", "tenLop": "Lộc Trì", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 16334, "cs2022": 2000, "cs2030": 4000, "cs2045": 4000,
+      "nguon": "Nước đập Khe Su",
+      "phamVi": "Thành phố Chân Mây - Lăng Cô",
+      "vung": ["chan-may"],
+      "lng": 107.877878437601, "lat": 16.260266234244554
+    },
+    {
+      "id": "chan-may", "ma": "24", "ten": "Chân Mây", "tenLop": "Chân Mây", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 38214, "cs2022": 8000, "cs2030": 16000, "cs2045": 16000,
+      "nguon": "Đập khe Mệ, hồ Thủy Yên, hồ Thủy Cam, đập Bo Ghe, khe suối trong khu vực",
+      "phamVi": "Thành phố Chân Mây - Lăng Cô",
+      "vung": ["chan-may"],
+      "lng": 107.99173065929128, "lat": 16.2655570989061
+    },
+    {
+      "id": "loc-thuy", "ma": "8", "ten": "Lộc Thủy", "tenLop": "Lộc Thuỷ", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": 49000, "cs2022": null, "cs2030": 55000, "cs2045": 110000,
+      "nguon": "Hồ Thủy Yên, hồ Thủy Cam, hồ Truồi",
+      "phamVi": "Thành phố Chân Mây - Lăng Cô",
+      "vung": ["chan-may"],
+      "lng": 107.9320780380093, "lat": 16.242395117322612
+    },
+    {
+      "id": "nam-dong-1", "ma": "25", "ten": "Nam Đông 1", "tenLop": "Nam Đồng 1", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 2082, "cs2022": 4000, "cs2030": 4000, "cs2045": 4000,
+      "nguon": "Sông Thượng Lộ, hồ thủy điện Thượng Lộ, khe suối trong khu vực",
+      "phamVi": "10 xã Nam Đông cũ: Khe Tre, Thượng Quảng, Thượng Long, Hương Hữu, Thượng Nhật, Hương Xuân, Thượng Lộ, Hương Sơn, Hương Lộc, Hương Phú",
+      "vung": ["phu-loc-nam-dong"],
+      "lng": 107.72865539364061, "lat": 16.165262915674656
+    },
+    {
+      "id": "nam-dong-2", "ma": "4", "ten": "Nam Đông 2", "tenLop": "Nam Đồng 2", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": 5000, "cs2022": null, "cs2030": 2000, "cs2045": 4000,
+      "nguon": "Sông Thượng Lộ, hồ thủy điện Thượng Lộ, khe suối trong khu vực",
+      "phamVi": "Cùng 10 xã Nam Đông cũ với Nam Đông 1",
+      "vung": ["phu-loc-nam-dong"],
+      "lng": 107.73856294792691, "lat": 16.15840113613449,
+      "ghiChu": "Bảng 83 đánh số 15 cho cả Nam Đông 1 và Nam Đông 2."
+    },
+    {
+      "id": "thuong-long", "ma": "16", "ten": "Thượng Long", "tenLop": "Thượng Long", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 10079, "cs2022": 2000, "cs2030": 4000, "cs2045": 4000,
+      "nguon": "Đập khe A Kỳ, khe suối trong khu vực",
+      "phamVi": "Cùng 10 xã Nam Đông cũ",
+      "vung": ["phu-loc-nam-dong"],
+      "lng": 107.62180173555747, "lat": 16.102470496956226
+    },
+    {
+      "id": "a-luoi", "ma": "23", "ten": "A Lưới", "tenLop": "A Lưới", "nhom": "chinh", "trangThai": "giu",
+      "dienTich": 4415, "cs2022": 2000, "cs2030": 4000, "cs2045": 6000,
+      "nguon": "Suối Tà Rê, khe suối trong khu vực",
+      "phamVi": "Thị trấn A Lưới",
+      "vung": ["a-luoi"],
+      "lng": 107.22896640041529, "lat": 16.29064192367887
+    },
+    {
+      "id": "a-lin", "ma": "1", "ten": "A Lin", "tenLop": "A Lin", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": null, "cs2022": null, "cs2030": 1000, "cs2045": 4000,
+      "nguon": "Suối A Lin, hồ thủy điện Hồng Vân",
+      "phamVi": "Huyện A Lưới",
+      "vung": ["a-luoi"],
+      "lng": 107.14772053273606, "lat": 16.349777846578018,
+      "ghiChu": "Bảng 83 gộp A Sáp, A Lin, Lâm Đớt: 4.000 năm 2030 và 12.000 năm 2045, diện tích chung 30.000 m². Tách theo đúng tỷ lệ đã ghi trên điểm lớp 1/25.000."
+    },
+    {
+      "id": "a-sap", "ma": "3", "ten": "A Sáp", "tenLop": "A Sáp", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": null, "cs2022": null, "cs2030": 1000, "cs2045": 4000,
+      "nguon": "Sông A Sáp, khe suối trong khu vực",
+      "phamVi": "Huyện A Lưới",
+      "vung": ["a-luoi"],
+      "lng": 107.27187086752453, "lat": 16.220893613253615,
+      "ghiChu": "Nằm trong dòng gộp A Sáp, A Lin, Lâm Đớt của bảng 83."
+    },
+    {
+      "id": "lam-dot", "ma": "5", "ten": "Lâm Đớt", "tenLop": "Lâm Đớt", "nhom": "chinh", "trangThai": "xay-moi",
+      "dienTich": null, "cs2022": null, "cs2030": 2000, "cs2045": 4000,
+      "nguon": "Sông, suối trong khu vực",
+      "phamVi": "Huyện A Lưới",
+      "vung": ["a-luoi"],
+      "lng": 107.3520032945903, "lat": 16.091162740059367,
+      "ghiChu": "Nằm trong dòng gộp A Sáp, A Lin, Lâm Đớt của bảng 83."
+    },
+    {
+      "id": "quy-mo-nho", "ma": null, "ten": "Nhà máy quy mô nhỏ", "tenLop": "", "nhom": "gop", "trangThai": "quy-mo-nho",
+      "dienTich": null, "cs2022": 13500, "cs2030": 11500, "cs2045": 8000,
+      "nguon": "Sông, suối, khe trong khu vực",
+      "phamVi": "Gộp 30 điểm đầu mối còn lại trên lớp 1/25.000. Thuyết minh không tách công suất từng điểm.",
+      "vung": [],
+      "ghiChu": "Bảng 83, dòng 21."
+    }
+  ],
+  "diemNho": [
+    { "ma": "6", "ten": "Phú Vinh", "lng": 107.27887590064209, "lat": 16.223039486893047 },
+    { "ma": "7", "ten": "Trung Sơn", "lng": 107.18799279310066, "lat": 16.321994101212773 },
+    { "ma": "9", "ten": "Phú An", "lng": 107.62127914319466, "lat": 16.521580602529685 },
+    { "ma": "10", "ten": "Hương Phong", "lng": 107.57951689924238, "lat": 16.536120795469245 },
+    { "ma": "11", "ten": "Phú Bài", "lng": 107.68918787700132, "lat": 16.406998459288122 },
+    { "ma": "12", "ten": "Điền Môn", "lng": 107.41251432588628, "lat": 16.683625923767483 },
+    { "ma": "13", "ten": "Quảng An", "lng": 107.53961628492114, "lat": 16.560639588233318 },
+    { "ma": "14", "ten": "Quảng Tế 3", "lng": 107.57573762401705, "lat": 16.443454919583125 },
+    { "ma": "28", "ten": "Quảng Công", "lng": 107.54131651564326, "lat": 16.614653343653444 },
+    { "ma": "29", "ten": "Hương Xuân", "lng": 107.69726164302892, "lat": 16.14803258503644 },
+    { "ma": "30", "ten": "Lăng Cô", "lng": 108.04408999369376, "lat": 16.263814681547828 },
+    { "ma": "31", "ten": "Vinh Hiền", "lng": 107.90184629331844, "lat": 16.355004011755188 },
+    { "ma": "32", "ten": "Phước Tượng", "lng": 107.92207322327873, "lat": 16.287918663711814 },
+    { "ma": "33", "ten": "Châu Sơn", "lng": 107.64943351861476, "lat": 16.41856280483837 },
+    { "ma": "34", "ten": "Tân Bình", "lng": 107.93348063023873, "lat": 16.318027025701177 },
+    { "ma": "35", "ten": "Cù Dù", "lng": 107.96467249184587, "lat": 16.3169579808163 },
+    { "ma": "36", "ten": "Hương Bình", "lng": 107.47937390602007, "lat": 16.396015895702696 },
+    { "ma": "37", "ten": "Sịa", "lng": 107.51211167109402, "lat": 16.59112580907412 },
+    { "ma": "38", "ten": "Hương Phú", "lng": 107.72261656127135, "lat": 16.205598487931784 },
+    { "ma": "39", "ten": "Vinh Hưng", "lng": 107.82953302493554, "lat": 16.392153185945507 },
+    { "ma": "40", "ten": "Vinh Xuân", "lng": 107.74785246218423, "lat": 16.474815164301504 },
+    { "ma": "41", "ten": "Phú Điền", "lng": 107.72811624587389, "lat": 16.50413289957395 },
+    { "ma": "42", "ten": "Quảng Ngạn", "lng": 107.50551875006148, "lat": 16.633147256138653 },
+    { "ma": "43", "ten": "Bình Điền", "lng": 107.51648017876988, "lat": 16.3590162907456 },
+    { "ma": "44", "ten": "Phong Bình", "lng": 107.3327897372753, "lat": 16.66854906586527 },
+    { "ma": "45", "ten": "Phong Xuân", "lng": 107.38737587308792, "lat": 16.496129036065554 },
+    { "ma": "46", "ten": "Tứ Hạ", "lng": 107.48777992891947, "lat": 16.4920350433206, "ghiChu": "Vị trí mới trên lớp quy hoạch." },
+    { "ma": "47", "ten": "Thuỷ Phương", "lng": 107.62724346654018, "lat": 16.413434007303888 },
+    { "ma": "48", "ten": "Phú Mậu", "lng": 107.69479654294595, "lat": 16.18404723037205 },
+    { "ma": "49", "ten": "Hương Toàn", "lng": 107.55138595161755, "lat": 16.508539519963147 }
+  ]
+}

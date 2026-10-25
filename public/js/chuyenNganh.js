@@ -25,6 +25,10 @@ import { formatRadius, getPlanRadii, loadPlanRadii, planRadiusM } from './planRa
 import { loadCongSuat } from './congSuat.js';
 import { capacityPanelHtml, initCapacityEditor, mountCapacityHosts } from './congSuatUi.js';
 import { initXahoiList, paintXahoiList } from './xahoiList.js';
+import {
+  loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocPopupExtra, capNuocPointStyle,
+  capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, toggleCapNuocZones, capNuocPlantLayer
+} from './capNuocQhc.js';
 
 const STORE_KEY = 'qh_axes_v1';
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
@@ -137,7 +141,8 @@ function popupHtml(layer, props) {
     const scale = props.nguon_ty_le ? `1/${Number(props.nguon_ty_le).toLocaleString('vi-VN')}` : '';
     const src = [props.nguon_ten || props.nguon_do_an, props.nguon_nam, scale].filter(Boolean);
     html += `<br><small>Tạm thời. Nguồn: ${escapeHtml(src.join(' · ') || 'không rõ đồ án')}</small>`;
-  } else if (!bits.length) html += `<br>${escapeHtml(layer.name)}`;
+  } else if (!bits.length && !capNuocPlant(layer, props)) html += `<br>${escapeHtml(layer.name)}`;
+  html += capNuocPopupExtra(layer, props);
   return html;
 }
 
@@ -158,14 +163,19 @@ async function showFile(layer, frame) {
       };
     },
     pointToLayer: (f, latlng) => {
-      const color = featureColor(layer, f.properties || {});
-      return L.circleMarker(latlng, { radius: 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
+      const props = f.properties || {};
+      const styled = capNuocPointStyle(layer, props);
+      const color = styled ? styled.fill : featureColor(layer, props);
+      return L.circleMarker(latlng, { radius: styled ? styled.radius : 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
     },
     onEachFeature: (f, l) => {
       const props = f.properties || {};
+      const plant = capNuocPlant(layer, props);
       if (props.tam_thoi) {
         const src = props.nguon_ten || props.nguon_do_an || 'đồ án';
         l.bindTooltip(`Nguồn: ${src}`, { sticky: true, opacity: 0.95 });
+      } else if (plant) {
+        l.bindTooltip(plant.ten, { sticky: true, direction: 'top', opacity: 0.95 });
       }
       l.bindPopup(popupHtml(layer, props));
     }
@@ -260,9 +270,43 @@ function legendHtml(sector) {
   return `<div class="cn-legend" aria-label="Chú giải ${escapeHtml(label)}"><span><i style="background:${color}"></i>${escapeHtml(label)}</span>${dash}</div>`;
 }
 
-function scopeHtml() {
-  const area = getAreaFilter() || AREA_TP;
-  return `<p class="axis-scope">Phạm vi: ${escapeHtml(areaLabel(area))}</p>`;
+function areaOptions() {
+  const current = getAreaFilter() || AREA_TP;
+  const rows = [];
+  const push = (area) => {
+    if (!area) return;
+    const key = formatKv(area);
+    if (!key || rows.some(row => formatKv(row) === key)) return;
+    rows.push(area.name ? area : { ...area, name: areaLabel(area) });
+  };
+  push(listAreas('tp')[0] || { ...AREA_TP, name: 'Toàn thành phố' });
+  listAreas('dothi').forEach(push);
+  listAreas('xa').forEach(push);
+  push(current);
+  const now = formatKv(current);
+  return rows.map(area => {
+    const key = formatKv(area);
+    return `<option value="${escapeHtml(key)}"${key === now ? ' selected' : ''}>${escapeHtml(area.name || areaLabel(area))}</option>`;
+  }).join('');
+}
+
+function pickRow(group, level) {
+  const opt = (value, label, on) => `<option value="${escapeHtml(value)}"${on ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  return `<div class="cn-picks">
+    <label>Loại hạ tầng<select data-cn-sector-pick aria-label="Loại hạ tầng">${HTKT_GROUPS.map(s => opt(s.id, s.label, s.id === group)).join('')}</select></label>
+    <label>Cấp quy hoạch<select data-cn-level-pick aria-label="Cấp quy hoạch">${FACET_LEVELS.map(l => opt(l.id, l.label, l.id === level)).join('')}</select></label>
+    <label>Phạm vi<select data-cn-area-pick aria-label="Phạm vi">${areaOptions()}</select></label>
+  </div>`;
+}
+
+function syncGeomChecks() {
+  document.querySelectorAll('#legendHtkt [data-cn-form]').forEach(el => {
+    const id = el.dataset.cnForm;
+    el.checked = pipeOn ? id === 'line' : !!geomOn[id];
+    el.disabled = pipeOn && id !== 'line';
+  });
+  const note = document.getElementById('legendHtktNote');
+  if (note) note.hidden = !pipeOn;
 }
 
 let synthDoc = {
@@ -396,15 +440,6 @@ function schemeBlock(sector, levelId, scheme) {
   </div>`;
 }
 
-function formsHtml() {
-  const item = (id, label) => {
-    const on = pipeOn ? id === 'line' : !!geomOn[id];
-    const dis = pipeOn && id !== 'line' ? ' disabled' : '';
-    return `<button type="button" class="cn-form${on ? ' active' : ''}" data-cn-form="${id}" aria-pressed="${on}"${dis}>${escapeHtml(label)}</button>`;
-  };
-  const note = pipeOn ? '<p class="cn-empty">Tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc.</p>' : '';
-  return `<div class="cn-forms" role="group" aria-label="Dạng dữ liệu">${item('point', 'Điểm công trình')}${item('line', 'Tuyến mạng')}${item('polygon', 'Vùng')}</div>${note}`;
-}
 
 function qhpkHookHtml() {
   if (browseState().level !== 'QHPK') return '';
@@ -418,25 +453,31 @@ function qhpkHookHtml() {
 
 function paintHaTang() {
   const box = document.getElementById('browseNganh');
-  if (!box || browseState().axis !== 'hatang') return;
+  if (!box || browseState().axis !== 'hatang') {
+    syncCapNuoc(false);
+    return;
+  }
   const { sector, level } = browseState();
-  const pane = document.getElementById('layerPaneHaTang');
-  const top = pane ? pane.scrollTop : 0;
+  const scroller = box.querySelector('.cn-body');
+  const top = scroller ? scroller.scrollTop : 0;
   const group = pipeOn ? 'tong-hop-duong-ong' : sector;
   const schemes = hatangSchemes(sector, level);
   const listed = hatangLayers(sector, level);
   const allOn = listed.length > 0 && listed.every(layer => isLayerOn(layer.id));
-  box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng kỹ thuật">${HTKT_GROUPS.map(s => `<button type="button" class="cn-sector${s.id === group ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === group}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
+  box.innerHTML = `${pickRow(group, level)}
     <div class="cn-tools">
-      <div class="cn-levels" role="group" aria-label="Cấp đồ án">${FACET_LEVELS.map(l => `<button type="button" class="cn-level${l.id === level ? ' active' : ''}" data-cn-level="${l.id}">${escapeHtml(l.label)}</button>`).join('')}</div>
       <button type="button" class="layer-eye-btn" data-cn-all ${listed.length ? '' : 'disabled'}>${allOn ? 'Tắt tất cả' : 'Bật tất cả'}</button>
     </div>
-    ${formsHtml()}
     ${qhpkHookHtml()}
-    ${scopeHtml()}
-    <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, s.level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>`;
+    <div class="cn-body">
+      ${sector === 'cap-nuoc' && !pipeOn ? capNuocDossierHtml() : ''}
+      <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, s.level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>
+    </div>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
-  if (pane) pane.scrollTop = top;
+  const next = box.querySelector('.cn-body');
+  if (next) next.scrollTop = top;
+  syncGeomChecks();
+  syncCapNuoc(sector === 'cap-nuoc' && !pipeOn);
 }
 
 function paintBase(axisId, hostId, sector) {
@@ -645,7 +686,7 @@ function publishSectorLegend(open, sectorId) {
   const layersOn = listed.some(l => isLayerOn(l.id));
   if (open) sectorHold = true;
   if (!open && !layersOn && b.axis !== 'hatang') sectorHold = false;
-  const show = layersOn || sectorHold;
+  const show = layersOn || sectorHold || b.axis === 'hatang';
   document.dispatchEvent(new CustomEvent('qh:sector-legend', {
     detail: {
       on: show,
@@ -771,6 +812,7 @@ function paint() {
   const axis = browseState().axis;
   paintAdmin();
   if (axis === 'hatang') paintHaTang();
+  else syncCapNuoc(false);
   if (axis === 'kientruc') paintKienTruc();
   // Tab Quy hoạch không gắn mục «Dữ liệu hiện trạng»: thửa địa chính và công trình vi phạm chỉ ở Lớp nền.
   paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
@@ -847,9 +889,9 @@ function leaveAdminMap() {
 }
 
 function placeIsoRadius(axis) {
-  if (axis !== 'hatang' && axis !== 'xahoi') return;
+  if (axis !== 'xahoi') return;
   const field = document.getElementById('isoRadiusField');
-  const slot = document.getElementById(axis === 'hatang' ? 'isoSlotHaTang' : 'isoSlotXaHoi');
+  const slot = document.getElementById('isoSlotXaHoi');
   if (field && slot && field.parentElement !== slot) slot.append(field);
 }
 
@@ -1007,13 +1049,22 @@ export function initChuyenNganh() {
       if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
       return;
     }
-    const formBtn = e.target.closest('[data-cn-form]');
-    if (formBtn) {
-      if (formBtn.disabled || pipeOn) return;
-      const id = formBtn.dataset.cnForm;
-      const onCount = Object.values(geomOn).filter(Boolean).length;
-      if (geomOn[id] && onCount === 1) return;
-      geomOn[id] = !geomOn[id];
+    const waterPlant = e.target.closest('[data-cnu-plant]');
+    if (waterPlant) {
+      pickCapNuocPlant(waterPlant.dataset.cnuPlant);
+      const layer = capNuocPlantLayer(getLayers());
+      if (layer && !isLayerOn(layer.id)) setLayerOn(layer, true, { frame: false });
+      paint();
+      return;
+    }
+    const waterZone = e.target.closest('[data-cnu-zone]');
+    if (waterZone) {
+      pickCapNuocZone(waterZone.dataset.cnuZone);
+      paint();
+      return;
+    }
+    if (e.target.closest('[data-cnu-zones]')) {
+      toggleCapNuocZones();
       paint();
       return;
     }
@@ -1180,6 +1231,48 @@ export function initChuyenNganh() {
   else if (!shareView) showAxis('quyhoach', { url: false });
   else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
+  document.getElementById('layerMain')?.addEventListener('change', (e) => {
+    const sectorPick = e.target.closest('[data-cn-sector-pick]');
+    if (sectorPick) {
+      const id = sectorPick.value;
+      if (id === 'tong-hop-duong-ong') pipeOn = true;
+      else {
+        pipeOn = false;
+        setBrowseState({ sector: id, axis: 'hatang' });
+      }
+      paint();
+      publishSectorLegend(true);
+      scheduleSave();
+      return;
+    }
+    const levelPick = e.target.closest('[data-cn-level-pick]');
+    if (levelPick) {
+      setBrowseState({ level: levelPick.value });
+      paint();
+      scheduleSave();
+      return;
+    }
+    const areaPick = e.target.closest('[data-cn-area-pick]');
+    if (areaPick) {
+      setAreaFilter(parseKv(areaPick.value) || { ...AREA_TP }, 'user');
+      scheduleSave();
+    }
+  });
+  document.getElementById('rpDock')?.addEventListener('change', (e) => {
+    const box = e.target.closest('#legendHtkt [data-cn-form]');
+    if (!box) return;
+    const id = box.dataset.cnForm;
+    if (box.disabled || pipeOn) {
+      box.checked = pipeOn ? id === 'line' : !!geomOn[id];
+      return;
+    }
+    if (!box.checked && !['point', 'line', 'polygon'].some(key => key !== id && geomOn[key])) {
+      box.checked = true;
+      return;
+    }
+    geomOn[id] = box.checked;
+    paint();
+  });
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
     layerQuery = e.target.value || '';
     paintAdminList();
@@ -1202,7 +1295,8 @@ export function initChuyenNganh() {
 
   loadKienTruc();
   initCapacityEditor();
-  Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii(), loadCongSuat()]).then(() => {
+  initCapNuocMap();
+  Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii(), loadCongSuat(), loadCapNuocDoc()]).then(() => {
     seedFromDom();
     if (saved) {
       applyExtra(saved);

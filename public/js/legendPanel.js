@@ -126,6 +126,18 @@ export function initLegendPanel() {
     mark(baseTab, mode === 'base');
     mark(envTab, mode === 'env');
   };
+  const dock = document.getElementById('rpDock');
+  const collapseBtn = document.getElementById('btnDockCollapse');
+  const setDockCollapsed = (collapsed) => {
+    if (!dock || !collapseBtn) return;
+    dock.classList.toggle('is-collapsed', collapsed);
+    collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+    const label = collapsed ? 'Mở chú giải, lớp nền và lớp môi trường' : 'Thu gọn chú giải, lớp nền và lớp môi trường';
+    collapseBtn.title = collapsed ? 'Mở lại' : 'Thu gọn xuống cuối panel';
+    collapseBtn.setAttribute('aria-label', label);
+    collapseBtn.querySelector('use')?.setAttribute('href', collapsed ? '#i-chev-up' : '#i-chev-down');
+  };
+  collapseBtn?.addEventListener('click', () => setDockCollapsed(!dock.classList.contains('is-collapsed')));
   const chip = document.getElementById('legendChip');
   const checked = (id) => !!document.getElementById(id)?.checked;
   const anyOn = (ids) => ids.some(checked);
@@ -185,10 +197,14 @@ export function initLegendPanel() {
     else if (!visible.has(active)) selectSet([...visible][0]);
     const symbols = visible.size > 0;
     const land = anyOn(LAND);
+    const hatang = document.getElementById('layerMain')?.dataset.active === 'hatang';
+    frame.classList.toggle('is-htkt', hatang);
+    const htktLegend = document.getElementById('legendHtkt');
+    if (htktLegend) htktLegend.hidden = !hatang;
     const main = frame.querySelector('.legend-main');
-    if (main) main.hidden = !symbols;
+    if (main) main.hidden = hatang ? false : !symbols;
     const display = document.querySelector('#tabLegend .legend-display');
-    if (display) display.hidden = !land;
+    if (display) display.hidden = hatang || !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
     const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]

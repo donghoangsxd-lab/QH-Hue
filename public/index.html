@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261073">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261074">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261073">
+  <link rel="stylesheet" href="css/style.css?v=20261074">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -580,7 +580,6 @@
         </div>
           </div>
           <div class="layer-main-pane" id="layerPaneHaTang" data-main-pane="hatang" role="tabpanel" hidden>
-            <div data-iso-slot id="isoSlotHaTang"></div>
             <div id="browseNganh"></div>
             <section class="axis-base" id="baseHaTang"></section>
           </div>
@@ -725,6 +724,7 @@
         <button type="button" class="dock-tab active" id="btnDockLegend" role="tab" aria-selected="true" aria-controls="legendFold">Chú giải</button>
         <button type="button" class="dock-tab" id="btnDockBase" role="tab" aria-selected="false" aria-controls="axisBaseFold">Lớp nền</button>
         <button type="button" class="dock-tab" id="btnDockEnv" role="tab" aria-selected="false" aria-controls="axisEnvFold">Lớp môi trường</button>
+        <button type="button" class="dock-collapse" id="btnDockCollapse" aria-expanded="true" title="Thu gọn xuống cuối panel" aria-label="Thu gọn chú giải, lớp nền và lớp môi trường"><svg class="ico" aria-hidden="true"><use href="#i-chev-down"/></svg></button>
       </div>
       <div class="dock-fold" id="legendFold" role="tabpanel" aria-labelledby="btnDockLegend">
         <span class="legend-level-chips" id="legendLevelChips" hidden>
@@ -737,6 +737,12 @@
           </span>
         <div class="dock-body">
 <div class="tab-body legend-inpanel" id="tabLegend">
+          <div id="legendHtkt" hidden>
+            <label class="htkt-legend-row"><i class="htkt-mark is-point"></i><span>Điểm công trình</span><input type="checkbox" data-cn-form="point" checked aria-label="Hiện điểm công trình"></label>
+            <label class="htkt-legend-row"><i class="htkt-mark is-line"></i><span>Tuyến mạng</span><input type="checkbox" data-cn-form="line" checked aria-label="Hiện tuyến mạng"></label>
+            <label class="htkt-legend-row"><i class="htkt-mark is-polygon"></i><span>Vùng</span><input type="checkbox" data-cn-form="polygon" checked aria-label="Hiện vùng"></label>
+            <p id="legendHtktNote" class="cn-empty" hidden>Tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc.</p>
+          </div>
           <div class="layer-map legend-display">
             <div class="layer-map-tabs">
               <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
@@ -1637,6 +1643,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261073"></script>
+  <script type="module" src="./js/app.js?v=20261074"></script>
 </body>
 </html>
