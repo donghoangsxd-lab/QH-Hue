@@ -19,7 +19,7 @@ export function flash(el) {
 }
 
 const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh', infra: 'hatang' };
-const PANE_HOME = { base: { main: 'hanhchinh', fold: 'axisBaseFold' }, env: { main: 'hatang', fold: 'axisEnvFold' } };
+const PANE_HOME = { base: { fold: 'axisBaseFold' }, env: { fold: 'axisEnvFold' } };
 
 export function openLayerTab({ main, pane } = {}) {
   document.body.classList.remove('right-collapsed');
@@ -27,6 +27,7 @@ export function openLayerTab({ main, pane } = {}) {
   const tab = MAIN_TAB[main] || main || home?.main;
   if (tab) document.querySelector(`[data-main-tab="${tab}"]`)?.click();
   if (home?.fold === 'axisBaseFold') document.getElementById('btnDockBase')?.click();
+  else if (home?.fold === 'axisEnvFold') document.getElementById('btnDockEnv')?.click();
   else if (home?.fold) {
     const fold = document.getElementById(home.fold);
     if (fold) fold.open = true;

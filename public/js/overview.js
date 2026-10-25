@@ -119,7 +119,7 @@ const FLOOD_DEMO = {
         d.range('floodLevel', FLOOD_DEMO_M);
         await d.wait(800);
       },
-      text: `<p>Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
+      text: `<p>Bảng bên phải › <b>Lớp môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
         Mọi ô đất có cao độ nền thấp hơn ${FLOOD_DEMO_M} m được tô xanh theo độ sâu: xanh nhạt ngập nông, xanh đậm ngập sâu.</p>
         <p class="ovd-note">Cao độ nền FABDEM (ô 30 m, hệ EGM2008), không phải số đọc mực nước tại trạm thủy văn.</p>`
     },
@@ -153,7 +153,7 @@ const TERRAIN_DEMO = {
     {
       title: 'Phủ lớp cao độ nền',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 11); d.check('chk_terrain', { pane: 'env' }); },
-      text: '<p>Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
+      text: '<p>Bảng bên phải › <b>Lớp môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
     },
     {
       title: 'Hướng dòng chảy và lưu vực',
@@ -344,7 +344,7 @@ const SECTIONS = [
           'Nếu panel trái đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
           'Droplist: <b>Quản lý phát triển đô thị</b>, <b>Hệ thống bản đồ quy hoạch</b>, <b>Hệ thống hạ tầng kỹ thuật</b>, <b>Hệ thống hạ tầng xã hội</b>, <b>Quản lý lĩnh vực kiến trúc</b>. Trong Hành chính có tab <b>Đơn vị hành chính</b>, <b>Đô thị</b> và <b>Chấm điểm</b>. Trong Quy hoạch, bốn cấp có thể bật cùng lúc.',
           'Dòng dưới droplist có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút cả nhóm. Công trình xã hội, PCCC, điểm giao thông, lớp điểm theo đồ án và mục <b>Quỹ đất và công trình</b> ở panel <b>Hạ tầng xã hội</b>. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
-          'Mục <b>Lớp nền</b> ghim đáy mọi trục: ảnh nền, ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ. Mục <b>Môi trường</b> trong Hạ tầng kỹ thuật: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
+          'Mục <b>Lớp nền</b> ghim đáy mọi trục: ảnh nền, ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư. Tab <b>Lớp môi trường</b> cùng hàng: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
         ],
         facts: [
           'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',
@@ -366,7 +366,7 @@ const SECTIONS = [
           'QHPK 1/2.000 là bộ đang dùng cho các đồ án đã nạp. Thu nhỏ thì lô tô màu; phóng từ mức 17 thì hiện hoa văn Thông tư 16/2025/TT-BXD.',
           'Mục <b>Đô thị</b> có nút quyết định <b>QĐ 614</b> (hiện trạng) và <b>QĐ 756</b> (quy hoạch).'
         ],
-        actions: [{ label: 'Mở chú giải', icon: 'book', run: () => { delete $('tabLegend')?.dataset.userHide; document.dispatchEvent(new CustomEvent('qh:legend-sync')); flash($('tabLegend')); } }]
+        actions: [{ label: 'Mở chú giải', icon: 'book', run: () => { const frame = $('tabLegend'); delete frame?.dataset.userHide; if (frame) frame.dataset.dock = 'legend'; document.dispatchEvent(new CustomEvent('qh:legend-sync')); flash($('legendFold')); } }]
       },
       {
         id: 'compare', btn: 'guide', status: 'trial',
@@ -486,7 +486,7 @@ const SECTIONS = [
         note: 'Dữ liệu vệ tinh kích thước ô 30 m × 30 m, sai số ±1,0 m',
         lead: 'Phủ lớp cao độ nền lên bản đồ để xem xét san nền, hướng thoát nước và khu vực trũng thấp khi bố trí quy hoạch.',
         steps: [
-          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
+          'Bảng bên phải › <b>Lớp môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
           'Kéo thanh trượt để chỉnh độ trong suốt; di chuột trên bản đồ để đọc cao độ tại vị trí.',
           'Bật thêm <b>Thoát nước, khe tụ thủy</b> và <b>Lưu vực, đường phân thủy</b> để xem hướng dòng chảy.'
         ],
@@ -501,7 +501,7 @@ const SECTIONS = [
         title: 'Chồng lớp bản đồ ngập lụt và giả định kịch bản ngập',
         lead: 'Giả định mực nước để khoanh vùng có nguy cơ ngập, đối chiếu với vùng ngập thực tế qua các mùa lũ từ ảnh radar vệ tinh.',
         steps: [
-          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
+          'Bảng bên phải › <b>Lớp môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
           'Bật <b>Ngập thực tế (Sentinel-1)</b> và chọn mùa lũ để xem vùng đã ngập trong thực tế.',
           'Bật <b>Công trình chịu rủi ro ngập / nhiệt</b> để lọc công trình nằm trong vùng ngập nhiều mùa lũ.'
         ],
@@ -533,7 +533,7 @@ const SECTIONS = [
         note: 'Ước tính vệ tinh, chưa phải ranh 3 loại rừng',
         lead: 'Phủ lớp phủ thực vật năm 2021 và vùng mất rừng 2001–2025 lên bản đồ, kèm diện tích theo phường, xã, để xem xét khi bố trí quy hoạch trên đất có cây che phủ.',
         steps: [
-          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
+          'Bảng bên phải › <b>Lớp môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
           'Chọn <b>Phủ thực vật 2021</b> (ESA WorldCover 10 m) hoặc <b>Mất rừng 2001–2025</b> (Hansen, trên ô có tán cây năm 2000 từ 10%).',
           'Chú giải và bảng hectare nằm ngay dưới ô lớp. Kéo thanh trượt để chỉnh độ trong suốt.'
         ],

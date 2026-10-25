@@ -8,8 +8,8 @@
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; bấm ranh hoặc tick đồ án mới hiện lô.
 //                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường: lô cả phường
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
-// Chọn một nút trong panel: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở danh sách để so sánh: lớp đang chọn giữ nguyên;
-// lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
+// Bốn cấp quy hoạch là một nhóm radio: bật một cấp thì tắt ba cấp kia. Nền cam là cấp đang bật.
+// Muốn xem đồ án cấp khác thì chuyển cấp, rồi bật từng đồ án trong danh sách của cấp đó.
 export const LEVELS = [
   { id: 'urban', chk: 'chk_urban', label: 'HỆ THỐNG ĐÔ THỊ' },
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
@@ -24,7 +24,7 @@ export const LEVEL_EVENT = 'qh:level';
 const byId = new Map(LEVELS.map(l => [l.id, l]));
 const byChk = new Map(LEVELS.map(l => [l.chk, l]));
 const PLAN_TABS = ['qhc25', 'qhc10', 'qhpk', 'qhct'];
-// Tab quy hoạch được mở cùng lúc. Danh sách đồ án chỉ hiện các tab trong tập này.
+// Đúng một cấp quy hoạch trong tập này. Danh sách đồ án chỉ hiện cấp đó.
 const listed = new Set(['qhc25']);
 let level = DEFAULT_LEVEL;
 // Lớp đã chuyển sang lớp hiện tại (VD mở QHPK khi đang xem QHC 1/10.000 → 'qhc10') để thoát đồ án thì quay lại
@@ -59,24 +59,21 @@ export function withLevelLock(fn) {
   try { return fn(); } finally { levelLock -= 1; }
 }
 
-/** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
+/** Chọn lớp: bật lớp này, tắt các lớp còn lại.
  *  opts.origin: lớp chuyển sang. opts.keepView: chọn QHC 1/10.000 và 1/25.000 không phóng khung hình.
  *  opts.fromHold: được phép đổi lớp khi đang withLevelLock (tab kiểm tra tự chọn). */
-export function setLevel(id, { origin: from = null, keepView = false, fromHold = false, keepOthers = false } = {}) {
+export function setLevel(id, { origin: from = null, keepView = false, fromHold = false } = {}) {
   if (levelLock && !fromHold) return;
   const next = byId.get(id);
   if (!next) return;
   const prev = level;
   level = id;
   origin = from;
-  if (keepOthers) listed.add(id);
-  else {
-    listed.clear();
-    listed.add(id);
-  }
+  listed.clear();
+  listed.add(id);
   applying = true;
   try {
-    if (!keepOthers) LEVELS.forEach(l => { if (l.id !== id) setChecked(l.chk, false); });
+    LEVELS.forEach(l => { if (l.id !== id) setChecked(l.chk, false); });
     setChecked(next.chk, true);
   } finally {
     applying = false;
@@ -84,30 +81,17 @@ export function setLevel(id, { origin: from = null, keepView = false, fromHold =
   emit(prev, keepView ? { keepView: true } : {});
 }
 
-/** Bật thêm một cấp. Bấm cấp đang mở nhưng chưa phải cấp đang xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. */
+/** Bật đúng một cấp quy hoạch. Bấm cấp đang bật thì giữ nguyên. */
 export function togglePlanTab(id) {
   if (!PLAN_TABS.includes(id)) return;
-  if (listed.has(id) && level !== id) {
-    setLevel(id, { keepView: true, keepOthers: true });
-    return;
-  }
-  const open = PLAN_TABS.filter(x => listed.has(x));
-  if (listed.has(id) && open.length > 1) {
-    listed.delete(id);
-    applying = true;
-    setChecked(byId.get(id).chk, false);
-    applying = false;
-    if (level === id) setLevel(PLAN_TABS.find(x => listed.has(x)), { keepView: true, keepOthers: true });
-    else emit(level, { keepView: true, tabs: true });
-    return;
-  }
-  setLevel(id, { keepView: true, keepOthers: true });
+  setLevel(id, { keepView: true });
 }
 
-/** Mở panel Quy hoạch mà chưa có tab cấp nào thì bật QHC 1/25.000. */
+/** Mở panel Quy hoạch mà chưa có đúng một cấp thì bật QHC 1/25.000. */
 export function ensurePlanTab(id = 'qhc25') {
-  if (PLAN_TABS.some(x => listed.has(x))) return;
-  setLevel(id, { keepView: true, keepOthers: true });
+  const open = PLAN_TABS.filter(x => listed.has(x));
+  if (open.length === 1 && level === open[0]) return;
+  setLevel(PLAN_TABS.includes(level) ? level : id, { keepView: true });
 }
 
 function onLayerChange(e) {

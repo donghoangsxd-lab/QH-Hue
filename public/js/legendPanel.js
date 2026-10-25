@@ -100,24 +100,31 @@ export function initLegendPanel() {
   const frame = document.getElementById('tabLegend');
   const legendFoldEl = document.getElementById('legendFold');
   const baseFold = document.getElementById('axisBaseFold');
+  const envFold = document.getElementById('axisEnvFold');
   const legendTab = document.getElementById('btnDockLegend');
   const baseTab = document.getElementById('btnDockBase');
-  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn tab Chú giải, chỉ còn Lớp nền.
+  const envTab = document.getElementById('btnDockEnv');
+  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn tab Chú giải. Lớp nền và Lớp môi trường vẫn dùng được.
   const LEGEND_OFF = new Set(['hanhchinh', 'kientruc']);
   const legendOff = () => LEGEND_OFF.has(document.getElementById('layerMain')?.dataset.active || '');
   const applyDock = () => {
     const off = legendOff();
     if (legendTab) legendTab.hidden = off;
-    const showLegend = !off && frame?.dataset.userHide !== '1';
+    let mode = frame?.dataset.dock || 'legend';
+    if (off && mode === 'legend') mode = 'base';
+    if (frame) frame.dataset.dock = mode;
+    const showLegend = mode === 'legend' && !off;
     if (legendFoldEl) legendFoldEl.hidden = !showLegend;
-    if (baseFold) baseFold.hidden = showLegend;
+    if (baseFold) baseFold.hidden = mode !== 'base';
+    if (envFold) envFold.hidden = mode !== 'env';
     const mark = (btn, on) => {
       if (!btn) return;
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', String(on));
     };
     mark(legendTab, showLegend);
-    mark(baseTab, !showLegend);
+    mark(baseTab, mode === 'base');
+    mark(envTab, mode === 'env');
   };
   const chip = document.getElementById('legendChip');
   const checked = (id) => !!document.getElementById(id)?.checked;
@@ -180,7 +187,7 @@ export function initLegendPanel() {
     const land = anyOn(LAND);
     const main = frame.querySelector('.legend-main');
     if (main) main.hidden = !symbols;
-    const display = document.querySelector('#layerPaneBase .legend-display');
+    const display = document.querySelector('#tabLegend .legend-display');
     if (display) display.hidden = !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
@@ -212,14 +219,22 @@ export function initLegendPanel() {
   };
   legendTab?.addEventListener('click', () => {
     delete frame?.dataset.userHide;
+    if (frame) frame.dataset.dock = 'legend';
     syncLegend();
   });
   baseTab?.addEventListener('click', () => {
     if (frame && !legendOff()) frame.dataset.userHide = '1';
+    if (frame) frame.dataset.dock = 'base';
+    syncLegend();
+  });
+  envTab?.addEventListener('click', () => {
+    if (frame && !legendOff()) frame.dataset.userHide = '1';
+    if (frame) frame.dataset.dock = 'env';
     syncLegend();
   });
   chip?.addEventListener('click', () => {
     delete frame.dataset.userHide;
+    frame.dataset.dock = 'legend';
     syncLegend();
   });
   tabs.forEach(t => t.addEventListener('click', () => { prefer = t.dataset.legendSet; }));

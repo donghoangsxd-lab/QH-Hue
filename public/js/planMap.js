@@ -1,4 +1,4 @@
-import { state, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE } from './state.js';
+import { state, WARD_BOUNDARY_OUTLINE_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE } from './state.js';
 import { getWardDraw, prepareWardDraw, wardDrawGeometry } from './wardSeam.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
@@ -165,8 +165,11 @@ export function renderPlanBoundaries() {
   }
   const lines = getWardDraw()?.lines || [];
   if (lines.length) {
+    const outline = L.polyline(lines, WARD_BOUNDARY_OUTLINE_STYLE);
     const line = L.polyline(lines, WARD_BOUNDARY_LINE_STYLE);
+    outline.options.wardRole = 'outline';
     line.options.wardRole = 'line';
+    group.addLayer(outline);
     group.addLayer(line);
   }
   wards.forEach(item => {

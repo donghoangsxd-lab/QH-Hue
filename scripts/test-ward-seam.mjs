@@ -243,7 +243,11 @@ const stateSrc = fs.readFileSync(new URL('../public/js/state.js', import.meta.ur
 const mapSrc = fs.readFileSync(new URL('../public/js/mapEngine.js', import.meta.url), 'utf8');
 const planSrc = fs.readFileSync(new URL('../public/js/planMap.js', import.meta.url), 'utf8');
 const lineStyle = /WARD_BOUNDARY_LINE_STYLE = \{[^}]*weight:\s*([0-9.]+)/.exec(stateSrc);
-assert.ok(lineStyle && Number(lineStyle[1]) <= 1.5, 'nét ranh nội bộ phải mảnh');
+const outlineStyle = /WARD_BOUNDARY_OUTLINE_STYLE = \{[^}]*weight:\s*([0-9.]+)/.exec(stateSrc);
+const lineW = lineStyle ? Number(lineStyle[1]) : 0;
+const outlineW = outlineStyle ? Number(outlineStyle[1]) : 0;
+assert.ok(lineW >= 1.6 && lineW <= 2.2, 'nét vàng nội bộ đủ đọc, vẫn mảnh');
+assert.ok(outlineW > lineW && outlineW <= lineW + 1.6, 'viền đậm sát nét vàng, không thành quầng');
 assert.doesNotMatch(stateSrc, /WARD_BOUNDARY_SHADOW_STYLE/);
 assert.doesNotMatch(mapSrc, /WARD_BOUNDARY_SHADOW_STYLE/);
 assert.doesNotMatch(planSrc, /WARD_BOUNDARY_SHADOW_STYLE/);

@@ -202,7 +202,7 @@ Lọc một đồ án là lọc thuộc tính trên file đã build, không tạ
 
 ## 4. Giao diện panel HTKT
 
-Khung droplist năm panel, ô tìm, nút HT/QH, nút cả nhóm, `#axisEnvFold`, `#isoSlotHaTang` giữ nguyên. Thay dải bảy nút trong `#browseNganh` bằng tám tab: bảy nhóm, rồi **Tổng hợp đường ống**.
+Khung droplist năm panel, ô tìm, nút HT/QH, nút cả nhóm, `#isoSlotHaTang` giữ nguyên. `#axisEnvFold` là tab Lớp môi trường đáy panel. Thay dải bảy nút trong `#browseNganh` bằng tám tab: bảy nhóm, rồi **Tổng hợp đường ống**.
 
 Trong mỗi tab:
 

@@ -35,11 +35,11 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Bấm cấp chưa mở để bật thêm. Bấm cấp đang mở nhưng chưa xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. Cấp đang bật có nền cam `--accent-orange`. Cấp đang xem có viền đứt phía ngoài. Một cấp có thể vừa bật vừa đang xem (nền cam và viền đứt cùng lúc). Mỗi cấp đang bật gắn danh sách đồ án của cấp đó phía dưới. Không dòng «Phạm vi: Toàn thành phố».
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Danh sách phía dưới chỉ gồm đồ án của cấp đang bật; muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Không dòng «Phạm vi: Toàn thành phố».
 
 ### Hạ tầng kỹ thuật
 
-Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoát nước thải, cấp điện, thông tin liên lạc, chất thải rắn và nghĩa trang) rồi Tổng hợp đường ống. Trong mỗi nhóm có điểm công trình, tuyến mạng và vùng. Tổng hợp đường ống chỉ hiện tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc. Lớp cột đèn không hiện. Họng cứu hỏa ở lại cấp nước. Môi trường và ô giả lập bán kính giữ nguyên. Không quỹ đất. Đồ án thiếu tuyến thì ghi «dữ liệu tự tổng hợp». Cấp QHPK chưa có lớp thì để hook, không bịa tuyến.
+Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoát nước thải, cấp điện, thông tin liên lạc, chất thải rắn và nghĩa trang) rồi Tổng hợp đường ống. Trong mỗi nhóm có điểm công trình, tuyến mạng và vùng. Tổng hợp đường ống chỉ hiện tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc. Lớp cột đèn không hiện. Họng cứu hỏa ở lại cấp nước. Ô giả lập bán kính giữ nguyên. Môi trường không nằm trong trục này: tab «Lớp môi trường» ghim đáy panel. Không quỹ đất. Đồ án thiếu tuyến thì ghi «dữ liệu tự tổng hợp». Cấp QHPK chưa có lớp thì để hook, không bịa tuyến.
 
 ### Hạ tầng xã hội
 
@@ -55,9 +55,9 @@ Sang Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội hoặc Kiến 
 
 ## Chú giải và lớp nền
 
-Ghim đáy panel. Hai tab nhỏ cùng một hàng: Chú giải, Lớp nền. Mỗi lúc một khung, cao một phần ba panel. Bấm tab thì đổi khung. Chú giải ẩn trên Hành chính và Kiến trúc (khi đó chỉ còn Lớp nền). Tiêu đề nhóm ký hiệu sử dụng đất trong Chú giải (Phát triển đô thị, Công cộng, …) cỡ 10px.
+Ghim đáy panel. Một hàng không xuống dòng, đúng ba tab: Chú giải, Lớp nền, Lớp môi trường. Không chip cấp (ví dụ QHPK 1/2.000) trên hàng này. Mỗi lúc một khung, cao một phần ba panel. Bấm tab thì đổi khung. Chú giải ẩn trên Hành chính và Kiến trúc (khi đó còn Lớp nền và Lớp môi trường). Tiêu đề nhóm ký hiệu sử dụng đất trong Chú giải (Phát triển đô thị, Công cộng, …) cỡ 10px. Chú giải theo cấp đang bật, gồm ký hiệu, mục Hiển thị lô đất (độ trong suốt) và Viền lô theo giai đoạn.
 
-Lớp nền độc lập với trục, dùng được trên mọi trục. Khung Lớp nền cuộn được để tới lớp phía dưới. Ô chọn đứng đầu mục Lớp nền, đủ bốn lựa chọn:
+Lớp nền độc lập với trục, dùng được trên mọi trục. Không chứa Hiển thị lô đất hay Viền lô theo giai đoạn. Khung Lớp nền và Lớp môi trường cuộn được. Ô chọn đứng đầu mục Lớp nền, đủ bốn lựa chọn:
 
 - Google vệ tinh
 - Esri World Imagery
@@ -66,6 +66,8 @@ Lớp nền độc lập với trục, dùng được trên mọi trục. Khung 
 
 Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị).
 
+Lớp môi trường dùng được trên mọi trục: địa hình, thoát nước, lưu vực, mô phỏng ngập, ngập Sentinel-1, nhiệt độ bề mặt, NDVI, ưu tiên trồng cây, rừng, công trình chịu rủi ro.
+
 ## Token
 
 Một bộ biến cho mọi trục và chú giải, trong `public/css/style.css`:
@@ -73,13 +75,13 @@ Một bộ biến cho mọi trục và chú giải, trong `public/css/style.css`
 - `--axis-font`, `--axis-fs-header` 12px, `--axis-fs-row` 12px, `--axis-fs-chip` 11px
 - `--axis-row-h` 22px, `--axis-head-h` 24px, `--axis-chip-h` 22px
 - `--axis-color`, `--axis-color-strong`, `--axis-color-muted`, `--axis-bg-active`, `--axis-bg-hover`
-- Thanh cuộn panel 5px, cùng tông panel
+- Thanh cuộn danh sách trục và khung đáy 5px, cùng tông tối, sát mép phải panel
 - Tiêu đề và chip một hàng; danh sách giãn hết chiều cao phần còn lại
 
 ## Danh sách và ranh
 
 - Lưới đô thị: số, tên, dân số, km². Lưới ĐVHC thêm đúng một cột loại (Loại HT hoặc Loại 2030). Thiếu số thì «—», không bịa. Huế trong tab Đô thị có số 1; Thành phố Huế trong tab ĐVHC không số. Danh sách không hiện tiền tố «Thành phố Huế», «Phường », «Xã »; dạng rút gọn là «TP Huế», «P. », «X. ».
-- Ranh trong giữa các phường/xã: một nét mảnh `#334155`, không quầng, không bóng, không nét đôi. Mỗi cạnh chung chỉ vẽ một lần. Quầng sáng chỉ có trên vành ngoài thành phố (lớp `city-outline-glow`). Chọn một đơn vị vẫn tô nền đỏ nhạt và một viền đỏ; đổi đơn vị hoặc rời trục thì xóa tô đó.
+- Ranh trong giữa các phường/xã: nét vàng `#fde68a` đọc được trên viền đậm `#1e293b` sát mép, không quầng, không bóng, không blur. Mỗi cạnh chung chỉ vẽ một lần. Quầng sáng chỉ có trên vành ngoài thành phố (lớp `city-outline-glow`). Chọn một đơn vị vẫn tô nền đỏ nhạt và một viền đỏ; đổi đơn vị hoặc rời trục thì xóa tô đó.
 - Dòng Thành phố Huế: đậm, nền `#fef3c7`.
 
 ## Số liệu không bịa
