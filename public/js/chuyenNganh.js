@@ -25,6 +25,8 @@ import { initXahoiList, paintXahoiList } from './xahoiList.js';
 
 const STORE_KEY = 'qh_axes_v1';
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
+// Ô cấp quy hoạch do mapLevel giữ. Khôi phục chúng từ bản lưu sẽ tắt QHC 1/25.000 rồi bật QHPK.
+const LEVEL_BINDS = new Set(['chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct']);
 const SHARE_KEYS = ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'];
 const KIND_LABEL = { 'hien-trang': 'Hiện trạng khi lập đồ án', 'quy-hoach': 'Quy hoạch' };
 
@@ -823,6 +825,7 @@ function paintMatrix() {
 function applyExtra(saved) {
   const want = new Set(saved.extra || []);
   EXTRA_CHECKS.forEach(id => {
+    if (LEVEL_BINDS.has(id)) return;
     const el = document.getElementById(id);
     if (!el) return;
     const on = want.has(id);
@@ -839,6 +842,7 @@ function applySavedLayers(saved) {
   getLayers().forEach(l => {
     const on = want.has(l.id);
     if (l.bind) {
+      if (LEVEL_BINDS.has(l.bind)) return;
       setLayerFlag(l.id, on);
       reflectBind(l.bind, on);
       return;
@@ -1108,6 +1112,8 @@ export function initChuyenNganh() {
       applySavedLayers(saved);
       seedFromDom();
     }
+    // Bản lưu chạy sau setLevel đầu tiên. Gọi lại để cấp không bị ô QHPK kéo đi.
+    if (!shareView && !openDeep) setLevel('qhc25', { keepView: true });
     ready = true;
     paint();
   }).catch(err => {
