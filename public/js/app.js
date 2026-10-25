@@ -1220,6 +1220,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initViewLink();
   // Liên kết ?nganh= / ?truc= chỉ chọn panel, không mở khung. Nút thu/mở là cách mở duy nhất lúc tải trang.
   document.body.classList.add('right-collapsed');
+  // Sau khi gắn trục và link chia sẻ: không có camera trên URL thì vừa cả thành phố.
+  if (!hasSharedCamera()) centerOnCity({ animate: false });
 
   // ---------- Nạp dữ liệu ban đầu ----------
   const progressBar = document.getElementById('progressBar');

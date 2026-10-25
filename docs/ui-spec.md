@@ -5,12 +5,13 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 ## Bố cục (desktop)
 
 - Panel trục bên trái, cách mép 12px, cao gần hết màn hình, co lên khi mở bảng tổng hợp phía dưới. Khi panel thu, dải năm trục bên trái là lối mở duy nhất; không có nút «>>» góc trên trái. Nút thu nằm trên hàng tiêu đề của panel.
-- Cột nút công cụ bên phải. Nút Giới thiệu là ô vuông đầu cột, góc trên phải. Menu chuột phải giữ nguyên.
-- Hộp tiêu đề `#mapTitle` đứng trong khoảng trống giữa panel trục và cột nút: mép trái `12px + bề rộng panel + 16px`, mép phải `12px + ô nút + 16px`, canh giữa khoảng đó. Vị trí không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút.
+- Cột nút công cụ bên phải. Nút Giới thiệu là ô vuông đầu cột, góc trên phải, nằm trong cột nút. Không nút nổi riêng. Menu chuột phải giữ nguyên.
+- Hộp tiêu đề `#mapTitle` đứng trong khoảng trống giữa panel trục và cột nút: mép trái `12px + bề rộng panel + 16px`, mép phải `12px + ô nút + 16px`, canh giữa khoảng đó. Vị trí không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút. Nút Giới thiệu là ô đầu cột trái.
 - Bảng tổng hợp thu thì mỏ `#btnExpandBottomPanel` nằm góc dưới phải, dạng tab (bo phía trên), cùng màu, cùng bề rộng và cùng mép phải với cột nút công cụ.
 - Điện thoại giữ cột nút trái và panel dạng sheet. Không áp gương desktop vào media điện thoại.
-- Điện thoại ngang (máy đang xoay ngang, hoặc cao tối đa 560px): panel là sheet góc phải, không trải hết chiều ngang; thanh năm trục ở đáy, nhãn không cắt bằng dấu ba chấm; nút công cụ tối thiểu 40px, cuộn nếu thiếu chỗ. Bố cục theo hướng máy (`orientation` và lớp `is-landscape`), không phụ thuộc khóa xoay. Lời nhắc xoay ngang chỉ khi máy đang dọc; khi khóa bị chặn thì một lời nhắc đóng được, không lặp. Nút «Xoay màn hình» là mục cuối cột công cụ bên trái. Nút «Cài ứng dụng» hiện trên điện thoại; desktop không hiện hai nút này. Trên iOS, nút mở các bước Chia sẻ → Thêm vào Màn hình chính, kèm biểu tượng ứng dụng.
-- Thẻ thông tin lô và menu chuột phải không gỡ.
+- Điện thoại ngang (máy đang xoay ngang, hoặc cao tối đa 560px): panel là sheet góc phải, không trải hết chiều ngang; năm nút trục là cột dọc mép phải, cao vừa khung nhìn (chia đều năm ô), không nằm ở đáy; nhãn không cắt bằng dấu ba chấm; sheet không đè cột trục. Nút công cụ tối thiểu 40px, cuộn nếu thiếu chỗ. Bố cục theo hướng máy (`orientation` và lớp `is-landscape`), không phụ thuộc khóa xoay. Lời nhắc xoay ngang chỉ khi máy đang dọc; khi khóa bị chặn thì một lời nhắc đóng được, không lặp. Nút «Xoay màn hình» là mục cuối cột công cụ bên trái. Nút «Cài ứng dụng» hiện trên điện thoại; desktop không hiện hai nút này. Trên iOS, nút mở các bước Chia sẻ → Thêm vào Màn hình chính, kèm biểu tượng ứng dụng.
+- `viewport-fit=cover`. Thanh trạng thái và thanh điều hướng Android không che cột nút, cột trục, tiêu đề hay sheet: mép dùng `env(safe-area-inset-*)`. PWA đang cài (standalone) xin toàn màn hình khi trình duyệt cho phép.
+- Thẻ thông tin lô và menu chuột phải không gỡ. Điện thoại: chạm giữ yên 3 giây thì mở đúng menu chuột phải của máy tính; ngón tay di chuyển thì hủy, không mở menu.
 
 ## Năm trục
 
@@ -22,7 +23,7 @@ Droplist `#layerMag`: một tiêu đề 12px; bấm mở danh sách cùng cỡ c
 4. Hệ thống hạ tầng xã hội
 5. Quản lý lĩnh vực kiến trúc
 
-Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút bật/tắt cả nhóm. Không ô tìm thứ hai. Panel ẩn khi tải trang. Không hàng chip «Lớp đang xem», không tab Bản đồ nền / Bản đồ môi trường trên thanh tiêu đề.
+Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút bật/tắt cả nhóm. Không ô tìm thứ hai. Panel ẩn khi tải trang. Lúc mở, nếu không có link chia sẻ: trục Quy hoạch, cấp QHC 1/25.000, khung vừa cả thành phố, ảnh nền Google vệ tinh. Không hàng chip «Lớp đang xem», không tab Bản đồ nền / Bản đồ môi trường trên thanh tiêu đề.
 
 ### Hành chính
 

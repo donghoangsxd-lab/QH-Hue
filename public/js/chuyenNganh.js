@@ -883,17 +883,15 @@ export function initChuyenNganh() {
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));
   const facetLink = ['kv', 'nganh', 'truc', 'tt'].some(k => q.has(k));
+  const openDeep = q.has('nganh') || q.has('truc');
   const saved = !shareView && !facetLink ? readSaved() : null;
   const deep = readFacetUrl();
 
-  if (saved) {
-    if (saved.kv) setAreaFilter(parseKv(saved.kv) || AREA_TP, 'saved', { url: false });
-    setBrowseState({ axis: saved.axis || 'quyhoach', sector: saved.sector, level: saved.level }, { url: false });
-    setLevel(saved.mapLevel || 'qhc25', { keepView: true });
-    showPlanPane();
-  } else if (!shareView) {
-    if (!q.has('kv')) setAreaFilter({ ...AREA_TP }, 'startup', { url: false });
-    setBrowseState({ axis: deep.axis || 'quyhoach', sector: deep.nganh || browseState().sector, level: 'QHC25' }, { url: false });
+  // Không có link chia sẻ hay link sâu: trục Quy hoạch, QHC 1/25.000, phạm vi cả thành phố.
+  // Lớp đã bật lần trước vẫn khôi phục ở applySavedLayers; trục và cấp không bị bản lưu kéo đi.
+  if (!shareView && !openDeep) {
+    setAreaFilter({ ...AREA_TP }, 'startup', { url: false });
+    setBrowseState({ axis: 'quyhoach', sector: saved?.sector || browseState().sector, level: 'QHC25' }, { url: false });
     setLevel('qhc25', { keepView: true });
     showPlanPane();
     openQhc25Layers();
@@ -1086,8 +1084,8 @@ export function initChuyenNganh() {
     if (!e.target.closest('#layerMag')) setMagMenu(false);
   });
   window.addEventListener('resize', () => { if (!document.getElementById('layerMagMenu')?.hidden) placeMagMenu(); });
-  const openDeep = q.has('nganh') || q.has('truc');
   if (openDeep) showAxis(browseState().axis, { url: false });
+  else if (!shareView) showAxis('quyhoach', { url: false });
   else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
