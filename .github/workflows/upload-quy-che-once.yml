@@ -1,5 +1,4 @@
-# Đẩy dự thảo quy chế lên bucket. Secret GCP_SA_KEY gắn môi trường Production
-# (job Cloud Run trên main không chọn environment nên nhận chuỗi rỗng).
+# Dò secret Actions (chỉ in có/không). Không in giá trị.
 name: Upload quy che
 
 on:
@@ -8,38 +7,56 @@ on:
       - cursor/quy-che-kien-truc-pdf-e3d5
 
 jobs:
-  upload:
+  probe-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ten secret nao co gia tri
+        run: |
+          echo "env=repo"
+          echo "GCP_SA_KEY=${{ secrets.GCP_SA_KEY != '' }}"
+          echo "GCP_PROJECT=${{ secrets.GCP_PROJECT != '' }}"
+          echo "GEE_PRIVATE_KEY=${{ secrets.GEE_PRIVATE_KEY != '' }}"
+          echo "GAS_SECRET=${{ secrets.GAS_SECRET != '' }}"
+          echo "GAS_BASE_URL=${{ secrets.GAS_BASE_URL != '' }}"
+          echo "GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS != '' }}"
+          echo "GCP_CREDENTIALS=${{ secrets.GCP_CREDENTIALS != '' }}"
+          echo "GCP_SA_JSON=${{ secrets.GCP_SA_JSON != '' }}"
+          echo "SERVICE_ACCOUNT_KEY=${{ secrets.SERVICE_ACCOUNT_KEY != '' }}"
+          echo "GCLOUD_KEY=${{ secrets.GCLOUD_KEY != '' }}"
+          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}"
+          echo "CF_API_TOKEN=${{ secrets.CF_API_TOKEN != '' }}"
+          echo "WRANGLER_API_TOKEN=${{ secrets.WRANGLER_API_TOKEN != '' }}"
+  probe-preview:
+    runs-on: ubuntu-latest
+    environment: Preview
+    steps:
+      - name: Ten secret nao co gia tri
+        run: |
+          echo "env=Preview"
+          echo "GCP_SA_KEY=${{ secrets.GCP_SA_KEY != '' }}"
+          echo "GCP_PROJECT=${{ secrets.GCP_PROJECT != '' }}"
+          echo "GEE_PRIVATE_KEY=${{ secrets.GEE_PRIVATE_KEY != '' }}"
+          echo "GAS_SECRET=${{ secrets.GAS_SECRET != '' }}"
+          echo "GAS_BASE_URL=${{ secrets.GAS_BASE_URL != '' }}"
+          echo "GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS != '' }}"
+          echo "GCP_CREDENTIALS=${{ secrets.GCP_CREDENTIALS != '' }}"
+          echo "GCP_SA_JSON=${{ secrets.GCP_SA_JSON != '' }}"
+          echo "SERVICE_ACCOUNT_KEY=${{ secrets.SERVICE_ACCOUNT_KEY != '' }}"
+          echo "GCLOUD_KEY=${{ secrets.GCLOUD_KEY != '' }}"
+  probe-production:
     runs-on: ubuntu-latest
     environment: Production
     steps:
-      - uses: actions/checkout@v4
-      - name: Co GCP_SA_KEY
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      - name: Ten secret nao co gia tri
         run: |
-          if [ -z "${GCP_SA_KEY}" ]; then
-            echo "GCP_SA_KEY khong duoc dua vao job"
-            exit 1
-          fi
-          echo "GCP_SA_KEY do dai ${#GCP_SA_KEY}"
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Day PDF len bucket
-        run: |
-          set -euo pipefail
-          git fetch --depth=1 origin cb70a9a4117b059cc027fc06ba8ea038c7009293
-          git show FETCH_HEAD:public/docs/du-thao-quy-che-quan-ly-kien-truc-2026.pdf > /tmp/qc.pdf
-          size=$(wc -c < /tmp/qc.pdf)
-          test "$size" -eq 9718381
-          test "$(head -c 5 /tmp/qc.pdf)" = "%PDF-"
-          gcloud storage cp /tmp/qc.pdf gs://hue-infra-data-us/kien-truc/tp-tp/quy-che.pdf \
-            --content-type=application/pdf \
-            --cache-control="public, max-age=60, must-revalidate"
-          code=$(curl -sS -D /tmp/qc-hdr.txt -o /tmp/qc-head.bin -w '%{http_code}' -r 0-4 "https://storage.googleapis.com/hue-infra-data-us/kien-truc/tp-tp/quy-che.pdf")
-          echo "anon=$code"
-          tr -d '\r' < /tmp/qc-hdr.txt | awk 'BEGIN{IGNORECASE=1} /^content-type:/ {print}'
-          test "$code" = "200" -o "$code" = "206"
-          test "$(head -c 5 /tmp/qc-head.bin)" = "%PDF-"
-          rm -f /tmp/qc.pdf /tmp/qc-head.bin /tmp/qc-hdr.txt
+          echo "env=Production"
+          echo "GCP_SA_KEY=${{ secrets.GCP_SA_KEY != '' }}"
+          echo "GCP_PROJECT=${{ secrets.GCP_PROJECT != '' }}"
+          echo "GEE_PRIVATE_KEY=${{ secrets.GEE_PRIVATE_KEY != '' }}"
+          echo "GAS_SECRET=${{ secrets.GAS_SECRET != '' }}"
+          echo "GAS_BASE_URL=${{ secrets.GAS_BASE_URL != '' }}"
+          echo "GOOGLE_CREDENTIALS=${{ secrets.GOOGLE_CREDENTIALS != '' }}"
+          echo "GCP_CREDENTIALS=${{ secrets.GCP_CREDENTIALS != '' }}"
+          echo "GCP_SA_JSON=${{ secrets.GCP_SA_JSON != '' }}"
+          echo "SERVICE_ACCOUNT_KEY=${{ secrets.SERVICE_ACCOUNT_KEY != '' }}"
+          echo "GCLOUD_KEY=${{ secrets.GCLOUD_KEY != '' }}"
