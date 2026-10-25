@@ -880,6 +880,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 .tb-phone-pick { display: none; }
 .tb-rotate { display: none; }
+.tb-scroll { display: contents; }
 .install-app, .install-guide { display: none; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
@@ -5436,7 +5437,7 @@ body.project-review.la-page #projectReviewHost {
   .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
   .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
   .bp-expand-btn { top: auto; bottom: max(8px, var(--safe-bottom)); right: calc(var(--phone-axis-w) + 8px); }
-  /* Cột dọc sát mép trái, dưới tiêu đề, cuộn dọc nếu nút nhiều hơn khoảng trống. Không trải ngang đáy. */
+  /* Cột dọc sát mép trái, dưới tiêu đề. Không trải ngang đáy. */
   .map-toolbar {
     top: var(--phone-chrome-top);
     bottom: max(8px, env(safe-area-inset-bottom));
@@ -5449,12 +5450,8 @@ body.project-review.la-page #projectReviewHost {
     max-height: none;
     min-width: 0;
     box-sizing: border-box;
-    padding-bottom: 4px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    padding-bottom: 0;
+    overflow: hidden;
     z-index: 1300;
     gap: 6px;
   }
@@ -5464,13 +5461,29 @@ body.project-review.la-page #projectReviewHost {
   /* Điện thoại: một nút Đo và một nút Tra cứu, mỗi nút mở menu. Nút gốc giữ cho desktop và cho script bấm hộ. */
   .tb-phone-pick { display: flex; position: relative; flex: 0 0 var(--tb-btn); width: var(--tb-btn); min-height: 0; }
   .tb-phone-pick .ui-btn-format { width: 100%; height: 100%; }
+  /* phone-tool-scroll */
+  .tb-scroll {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
   .tb-rotate {
     display: inline-flex;
     position: static;
-    margin-top: auto;
     flex: 0 0 var(--tb-btn);
+    margin-top: 0;
     z-index: 2;
   }
+  /* phone-tool-scroll-end */
   #btnMeasureArea, #btnMeasureDist, #btnLocateGPS, #btnInspectMode { display: none !important; }
   .tb-chooser {
     position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 168px; padding: 4px;
@@ -5859,13 +5872,13 @@ body.project-review.la-page #projectReviewHost {
     width: var(--tb-btn);
     flex-direction: column;
     gap: 4px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     max-height: none;
     box-sizing: border-box;
-    padding-bottom: 4px;
+    padding-bottom: 0;
     z-index: 1300;
   }
+  .tb-scroll { gap: 4px; }
   /* phone-side-sheet */
   .map-toolbar .ui-btn-format,
   .map-toolbar .tb-phone-pick {
@@ -6330,6 +6343,7 @@ html.is-phone.is-landscape .map-toolbar {
   right: auto;
   width: var(--tb-btn);
   flex-direction: column;
+  overflow: hidden;
 }
 html.is-phone.is-landscape .map-toolbar .ui-btn-format,
 html.is-phone.is-landscape .map-toolbar .tb-phone-pick,
