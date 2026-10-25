@@ -1,4 +1,5 @@
-// Lần mở ưu tiên chiều ngang thật bằng Screen Orientation API (nhiều trình duyệt cần cử chỉ).
+// Manifest (display standalone, orientation landscape) khóa chiều ngang khi mở từ biểu tượng Chrome Android.
+// Lần mở trong trình duyệt ưu tiên chiều ngang thật bằng Screen Orientation API (nhiều trình duyệt cần cử chỉ).
 // Không vào chế độ toàn màn hình của trình duyệt: Chrome hiện toast thoát lúc vào và lúc máy xoay.
 // Khóa bị chặn thì theo hướng khung nhìn, không xoay html/body bằng CSS. transform: rotate làm clientX/clientY
 // và canvas MapLibre/Leaflet lệch khỏi chỗ đang thấy — chạm, kéo bản đồ và cột nút đều trượt.
