@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {
   CITY_QHC25_ID, CAPACITY_METRICS, parseCapacity, buildCapacityGraph, indexCapacityRows,
   rollupCheck, checksForScheme, combineChecks, assessCapacityWrite, gateCapacityEntries,
-  totalSentence, applyCapacityDoc, metricFor, commitCapacityResult, activeRows, clearSchemeDraft
+  totalSentence, applyCapacityDoc, capacityView, metricFor, commitCapacityResult, activeRows, clearSchemeDraft
 } from '../public/js/congSuat.js';
 
 const root = new URL('..', import.meta.url);
@@ -14,8 +14,45 @@ const doc = JSON.parse(read('public/data/htkt/cong-suat.json'));
 
 assert.equal(doc.tab, 'CongSuatDoAn');
 assert.equal(doc.linkTab, 'CongSuatLienKet');
-assert.deepEqual(doc.rows, []);
 assert.deepEqual(doc.links, []);
+assert.equal(doc.rows.length, 2);
+const byNhom = Object.fromEntries(doc.rows.map(row => [row.nhom, row]));
+assert.equal(byNhom['cap-nuoc'].maDoAn, CITY_QHC25_ID);
+assert.equal(byNhom['cap-nuoc'].cap, 'QHC25');
+assert.equal(byNhom['cap-nuoc'].chiTieu, 'cong-suat');
+assert.equal(byNhom['cap-nuoc'].giaTri, 600000);
+assert.equal(byNhom['cap-nuoc'].donVi, 'm³/ngày đêm');
+assert.equal(byNhom['cap-nuoc'].tenChiTieu, 'nhu cầu dùng nước');
+assert.equal(byNhom['cap-dien'].giaTri, 3000);
+assert.equal(byNhom['cap-dien'].donVi, 'MW');
+assert.equal(byNhom['cap-dien'].tenChiTieu, 'tổng nhu cầu cấp điện');
+for (const nhom of ['giao-thong', 'san-nen-thoat-mua', 'thoat-nuoc-thai', 'chat-thai-ran-nghia-trang', 'thong-tin-lien-lac']) {
+  assert.equal(byNhom[nhom], undefined, nhom);
+}
+const qd = JSON.parse(read('public/data/htkt/qd-108-htkt.json'));
+assert.equal(qd.quyetDinh.so, '108/QĐ-TTg');
+assert.equal(qd.quyetDinh.ngay, '2024-01-26');
+const tran = Object.fromEntries(qd.tran.map(row => [row.nhom, row]));
+assert.equal(tran['cap-nuoc'].trangThai, 'da-dien');
+assert.equal(tran['cap-nuoc'].giaTri, byNhom['cap-nuoc'].giaTri);
+assert.equal(tran['cap-dien'].giaTri, byNhom['cap-dien'].giaTri);
+for (const nhom of ['giao-thong', 'san-nen-thoat-mua', 'thoat-nuoc-thai', 'chat-thai-ran-nghia-trang', 'thong-tin-lien-lac']) {
+  assert.equal(tran[nhom].trangThai, 'chua-du-du-lieu');
+  assert.equal(tran[nhom].giaTri, null);
+}
+const nuocQd = qd.soLieu.find(row => row.id === 'cap-nuoc-nhu-cau');
+assert.equal(nuocQd.moc.find(row => row.nam === 2030).giaTri, 480000);
+assert.equal(nuocQd.moc.find(row => row.nam === 2045).giaTri, 600000);
+const thaiQd = qd.soLieu.find(row => row.id === 'thoat-nuoc-thai-luong');
+assert.equal(thaiQd.duaVaoTran, false);
+assert.equal(thaiQd.moc.find(row => row.nam === 2045).giaTri, 530000);
+assert.match(thaiQd.lyDo, /ước tính/);
+const ctrQd = qd.soLieu.find(row => row.id === 'chat-thai-ran');
+assert.equal(ctrQd.duaVaoTran, false);
+assert.equal(ctrQd.moc.find(row => row.nam === 2045).giaTri, 5300);
+const moQd = qd.soLieu.find(row => row.id === 'nghia-trang');
+assert.equal(moQd.duaVaoTran, false);
+assert.equal(moQd.moc.find(row => row.nam === 2045).giaTri, 111);
 assert.match(read('docs/templates/cong-suat-do-an.csv'), /^Ma_DoAn,Ten_DoAn,Cap,Nhom_HTKT,ChiTieu,Ten_ChiTieu,DonVi,GiaTri,Nguon,GhiChu/);
 assert.match(read('docs/templates/cong-suat-lien-ket.csv'), /^Ma_Con,Ma_Cha,GhiChu/);
 assert.equal(CAPACITY_METRICS.length, 7);
@@ -241,5 +278,18 @@ assert.equal(activeRows().some(row => row.giaTri === 99), false);
 const local = checksForScheme('qhc-xa-thuong-long-3f2c4da4', graph, indexCapacityRows([], graph.alias), water);
 assert.equal(local[0].reason, 'khong-phai-tran');
 assert.equal(combineChecks(local).label, 'chưa đủ dữ liệu');
+
+applyCapacityDoc(doc, { schemes });
+const view = capacityView(CITY_QHC25_ID, ['cap-nuoc', 'cap-dien', 'thoat-nuoc-thai'], 'QHC đô thị Thừa Thiên Huế 1/25.000');
+const waterBlock = view.blocks.find(block => block.metric.sector === 'cap-nuoc');
+assert.equal(waterBlock.value, 600000);
+assert.match(waterBlock.sentence, /600\.000 m³\/ngày đêm \(nhu cầu dùng nước\)/);
+const powerBlock = view.blocks.find(block => block.metric.sector === 'cap-dien');
+assert.equal(powerBlock.value, 3000);
+assert.match(powerBlock.sentence, /3\.000 MW \(tổng nhu cầu cấp điện\)/);
+const wasteBlock = view.blocks.find(block => block.metric.sector === 'thoat-nuoc-thai');
+assert.equal(wasteBlock.value, null);
+assert.match(wasteBlock.sentence, /chưa có số/);
+assert.equal(wasteBlock.label, 'chưa đủ dữ liệu');
 
 console.log('cong suat ok');

@@ -40,6 +40,17 @@
   Content-Type: application/pdf
   Cache-Control: public, max-age=86400
 
+/docs/108-QD-TTg.pdf
+  Content-Type: application/pdf
+  Cache-Control: public, max-age=86400
+
+# JSON công suất ghi đè cùng khóa khi bổ sung số từ quyết định.
+/data/htkt/cong-suat.json
+  Cache-Control: public, max-age=300
+
+/data/htkt/qd-108-htkt.json
+  Cache-Control: public, max-age=86400
+
 /data/ward-boundary.json
   Cache-Control: public, max-age=31536000, immutable
 
