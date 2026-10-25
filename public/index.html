@@ -853,9 +853,12 @@
 
     </div>
     <div class="rp-dock" id="rpDock">
-      <details class="dock-fold" id="legendFold">
-        <summary class="legend-sum">
-          <span class="legend-sum-title">Chú giải</span>
+      <div class="dock-switch" role="tablist" aria-label="Chú giải và lớp nền">
+        <button type="button" class="dock-tab active" id="btnDockLegend" role="tab" aria-selected="true" aria-controls="legendFold">Chú giải</button>
+        <button type="button" class="dock-tab" id="btnDockBase" role="tab" aria-selected="false" aria-controls="axisBaseFold">Lớp nền</button>
+      </div>
+      <div class="dock-fold" id="legendFold" role="tabpanel" aria-labelledby="btnDockLegend">
+        <div class="legend-sum">
           <span class="layer-main-tabs legend-level-chips" role="tablist" aria-label="Ký hiệu sử dụng đất theo cấp đồ án">
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="URBAN" aria-selected="false" title="Ký hiệu lớp Phân loại đô thị: hiện trạng theo Quyết định 614/QĐ-UBND, quy hoạch theo Quyết định 756/QĐ-UBND; xem quyết định phê duyệt"><span class="layer-main-label"><small>PHÂN LOẠI</small>Đô thị</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC25" aria-selected="false" title="Ký hiệu sơ đồ tổ chức không gian đồ án quy hoạch chung tỷ lệ 1/25.000 (sẽ bổ sung)"><span class="layer-main-label"><small>QHC</small>1/25.000</span></button>
@@ -865,7 +868,7 @@
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="SECTOR" aria-selected="false" hidden title="Ký hiệu ngành hạ tầng kỹ thuật đang bật"><span class="layer-main-label"><small>HẠ TẦNG</small><span id="legendSectorName">Ngành</span></span></button>
           </span>
           <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
-        </summary>
+        </div>
         <div class="dock-body">
 <div class="tab-body legend-inpanel" id="tabLegend">
         <div class="layer-tree">
@@ -919,34 +922,17 @@
         </div>
       </div>
         </div>
-      </details>
-<details class="axis-fold dock-fold" id="axisBaseFold">
-              <summary>Lớp nền</summary>
-              <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
+      </div>
+      <div class="dock-fold" id="axisBaseFold" role="tabpanel" aria-labelledby="btnDockBase" hidden>
+              <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base">
           <div class="sat-pick basemap-pick" id="basemapPick">
-            <label for="basemapSelect" title="Ảnh nền dùng chung mọi trục. Wayback chỉ tải danh mục mốc khi được chọn."><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
+            <label for="basemapSelect" title="Ảnh nền dùng chung mọi trục."><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
             <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
               <option value="google">Google vệ tinh</option>
               <option value="esri">Esri World Imagery</option>
-              <option value="wayback">Esri Wayback</option>
               <option value="s2">Sentinel-2 Cloudless 2025</option>
               <option value="positron" selected>Bản đồ đường phố</option>
             </select>
-          </div>
-          <div class="sat-pick basemap-pick" id="waybackPick" hidden>
-            <label for="waybackRelease">Mốc Wayback</label>
-            <select id="waybackRelease" aria-label="Mốc thời gian Esri Wayback"></select>
-          </div>
-          <div class="base-decisions">
-            <div class="legend-sub">Quyết định phê duyệt</div>
-            <div class="legend-decision">
-              <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
-              <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label-name></button>
-            </div>
-            <div class="legend-decision">
-              <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
-              <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label-name></button>
-            </div>
           </div>
           <div class="layer-map legend-display">
             <div class="layer-map-tabs">
@@ -1031,7 +1017,7 @@
             <div class="flood-stats" id="newDevStats"></div>
           </div>
           </div>
-            </details>
+      </div>
     </div>
   </aside>
 

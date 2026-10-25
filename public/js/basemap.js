@@ -24,12 +24,6 @@ const BASEMAPS = {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     opts: { maxNativeZoom: 19, attribution: 'Imagery &copy; Esri' }
   },
-  // url gắn khi đã có mã phát hành. Cấu hình Wayback chỉ tải lúc chọn lớp này.
-  wayback: {
-    label: 'Esri Wayback',
-    url: '',
-    opts: { maxNativeZoom: 19, attribution: 'Imagery &copy; Esri Wayback' }
-  },
   s2: {
     label: 'Sentinel-2 Cloudless 2025',
     url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
@@ -62,10 +56,6 @@ const ML_JS_SRI = 'sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmC
 const ML_PLUGIN = 'https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js';
 const ML_PLUGIN_SRI = 'sha384-tXYNKOHx4T02jMP7YYCtBxPIv1B5gaA5mcVPBzqMp6d7VzWzxJgI2aWF/nJLrQdS';
 const LIGHT_KEY = 'qhhue.streetBase';
-const WB_STORE = 'qhhue.waybackRelease';
-const WB_CFG = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-let waybackRelease = '';
-try { waybackRelease = localStorage.getItem(WB_STORE) || ''; } catch (e) { /* chế độ riêng tư */ }
 
 // Nhãn tên: name:vi nếu ô vector có, không thì tên gốc (name), rồi biểu thức sẵn của kiểu Liberty.
 export function preferVietnameseLabels(style) {
@@ -103,74 +93,7 @@ function defOf(id) {
   if (id === 'positron' && lightKind === 'esri') {
     return { label: BASEMAPS.positron.label, url: ESRI_LIGHT.url, opts: ESRI_LIGHT.opts, light: true };
   }
-  if (id === 'wayback') {
-    if (!waybackRelease) return BASEMAPS.esri;
-    return {
-      label: BASEMAPS.wayback.label,
-      url: `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/${waybackRelease}/{z}/{y}/{x}`,
-      opts: BASEMAPS.wayback.opts
-    };
-  }
   return BASEMAPS[id] || BASEMAPS.google;
-}
-
-function syncWaybackRow() {
-  if (typeof document === 'undefined') return;
-  const row = document.getElementById('waybackPick');
-  if (row) row.hidden = current !== 'wayback';
-}
-
-function readReleases(cfg) {
-  const rows = [];
-  if (Array.isArray(cfg)) {
-    cfg.forEach(item => {
-      const rel = item && (item.releaseNum || item.release || item.itemId);
-      const date = item && (item.releaseDate || item.itemTitle || item.date || '');
-      if (rel) rows.push({ rel: String(rel), date: String(date) });
-    });
-  } else if (cfg && typeof cfg === 'object') {
-    Object.entries(cfg).forEach(([k, v]) => {
-      if (/^\d+$/.test(k)) rows.push({ rel: k, date: String(v) });
-      else if (typeof v === 'string' && /^\d+$/.test(v)) rows.push({ rel: v, date: k });
-      else if (v && typeof v === 'object') {
-        const rel = v.releaseNum || v.release || v.itemId || (/^\d+$/.test(k) ? k : '');
-        const date = v.releaseDate || v.itemTitle || v.date || '';
-        if (rel) rows.push({ rel: String(rel), date: String(date) });
-      }
-    });
-  }
-  const seen = new Set();
-  return rows.filter(r => (seen.has(r.rel) ? false : seen.add(r.rel)))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || Number(b.rel) - Number(a.rel));
-}
-
-function fillWaybackSelect(rows) {
-  const sel = document.getElementById('waybackRelease');
-  if (!sel) return;
-  sel.innerHTML = rows.map(r => `<option value="${r.rel}">${r.date || r.rel}</option>`).join('');
-  if (waybackRelease && rows.some(r => r.rel === waybackRelease)) sel.value = waybackRelease;
-  else if (rows[0]) {
-    waybackRelease = rows[0].rel;
-    sel.value = waybackRelease;
-    try { localStorage.setItem(WB_STORE, waybackRelease); } catch (e) { /* chế độ riêng tư */ }
-  }
-}
-
-let wbPromise = null;
-function ensureWayback() {
-  if (waybackRelease && document.getElementById('waybackRelease')?.options.length) return Promise.resolve(waybackRelease);
-  if (!wbPromise) {
-    wbPromise = fetch(WB_CFG, { signal: AbortSignal.timeout(8000) })
-      .then(res => { if (!res.ok) throw new Error(`wayback ${res.status}`); return res.json(); })
-      .then(cfg => {
-        const rows = readReleases(cfg);
-        if (!rows.length) throw new Error('wayback rỗng');
-        fillWaybackSelect(rows);
-        return waybackRelease;
-      })
-      .catch(err => { wbPromise = null; throw err; });
-  }
-  return wbPromise;
 }
 
 function webglOk() {
@@ -369,10 +292,6 @@ function addBase(m, id) {
     if (lightKind === 'esri' || !webglOk()) return addTiles(m, id);
     return addLiberty(m);
   }
-  if (id === 'wayback' && !waybackRelease) {
-    ensureWayback().then(() => { if (current === 'wayback') applyBasemap(); }).catch(() => {});
-    return addTiles(m, 'esri');
-  }
   return addTiles(m, id);
 }
 
@@ -433,9 +352,8 @@ export function selectBasemap(id) {
   if (!BASEMAPS[id] || id === current) return;
   current = id;
   try { localStorage.setItem(STORE_KEY, current); } catch (e) { /* chế độ riêng tư */ }
-  syncWaybackRow();
-  const ready = id === 'wayback' ? ensureWayback().catch(() => {}) : Promise.resolve();
-  ready.then(() => { applyBasemap(); emitBasemap(); });
+  applyBasemap();
+  emitBasemap();
 }
 
 export function basemapLabel() {
@@ -503,13 +421,6 @@ export function initBasemapUi() {
       selectBasemap(sel.value);
     });
   }
-  syncWaybackRow();
-  if (current === 'wayback') ensureWayback().then(() => { applyBasemap(); syncWaybackRow(); }).catch(() => {});
-  document.getElementById('waybackRelease')?.addEventListener('change', (e) => {
-    waybackRelease = e.target.value || '';
-    try { localStorage.setItem(WB_STORE, waybackRelease); } catch (err) { /* chế độ riêng tư */ }
-    if (current === 'wayback') { applyBasemap(); emitBasemap(); }
-  });
   document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));
   let wardNames = true;
   try { wardNames = localStorage.getItem(WARD_NAMES_KEY) !== '0'; } catch (e) { /* chế độ riêng tư */ }

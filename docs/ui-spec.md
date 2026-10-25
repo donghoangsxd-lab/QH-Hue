@@ -35,7 +35,7 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Bấm cấp chưa mở để bật thêm. Bấm cấp đang mở nhưng chưa xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. Mỗi cấp đang bật gắn danh sách đồ án của cấp đó phía dưới. Không dòng «Phạm vi: Toàn thành phố».
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Bấm cấp chưa mở để bật thêm. Bấm cấp đang mở nhưng chưa xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. Cấp đang bật có nền cam `--accent-orange`. Cấp đang xem có viền đứt phía ngoài. Một cấp có thể vừa bật vừa đang xem (nền cam và viền đứt cùng lúc). Mỗi cấp đang bật gắn danh sách đồ án của cấp đó phía dưới. Không dòng «Phạm vi: Toàn thành phố».
 
 ### Hạ tầng kỹ thuật
 
@@ -55,15 +55,16 @@ Sang Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội hoặc Kiến 
 
 ## Chú giải và lớp nền
 
-Ghim đáy panel, chú giải trên lớp nền. Hai hàng tiêu đề luôn hiện. Mở một mục chiếm một phần ba chiều cao panel; mở cả hai thì hai phần ba; nở từ đáy lên. Chú giải ẩn trên Hành chính và Kiến trúc.
+Ghim đáy panel. Hai tab nhỏ cùng một hàng: Chú giải, Lớp nền. Mỗi lúc một khung, cao một phần ba panel. Bấm tab thì đổi khung. Chú giải ẩn trên Hành chính và Kiến trúc (khi đó chỉ còn Lớp nền). Tiêu đề nhóm ký hiệu sử dụng đất trong Chú giải (Phát triển đô thị, Công cộng, …) cỡ 10px.
 
-Lớp nền độc lập với trục, dùng được trên mọi trục. Đủ năm lựa chọn, ô chọn đứng đầu mục Lớp nền:
+Lớp nền độc lập với trục, dùng được trên mọi trục. Khung Lớp nền cuộn được để tới lớp phía dưới. Ô chọn đứng đầu mục Lớp nền, đủ bốn lựa chọn:
 
 - Google vệ tinh
 - Esri World Imagery
-- Esri Wayback (ô mốc chỉ tải khi chọn Wayback)
 - Sentinel-2 Cloudless 2025
 - Bản đồ đường phố
+
+Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị).
 
 ## Token
 
