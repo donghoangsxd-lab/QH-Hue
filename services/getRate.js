@@ -1,7 +1,6 @@
 'use strict';
 
-// Bộ đếm trong RAM của từng isolate Vercel. Request do CDN trả cache không vào hàm nên không bị đếm
-// và không tốn Fluid CPU. Không dùng middleware: middleware chạy cả với file tĩnh.
+// Bộ đếm trong RAM của từng instance Cloud Run. Request do cache biên trả không vào hàm nên không bị đếm.
 
 const WINDOW_MS = 60 * 1000;
 // Đọc JSON (phường, thoát nước, hồ sơ). Prefetch mũi tên z12 là khoảng 150 ô, cộng các GET lớp khác

@@ -1,5 +1,5 @@
 // Dùng chung cho các script đẩy lớp tĩnh lên bucket qua Apps Script (push-thoatnuoc.js, push-luuvuc.js).
-// Cần GAS_BASE_URL và GAS_SECRET (biến môi trường, hoặc .env.local / .env do `vercel env pull` tạo).
+// Cần GAS_BASE_URL và GAS_SECRET (biến môi trường, hoặc file .env.local / .env).
 const fs = require('fs');
 const path = require('path');
 
@@ -21,7 +21,7 @@ function loadEnv() {
 async function postAction(action, body) {
   const base = process.env.GAS_BASE_URL;
   const secret = process.env.GAS_SECRET;
-  if (!base || !secret) throw new Error('Thiếu GAS_BASE_URL / GAS_SECRET (đặt biến môi trường hoặc chạy `vercel env pull .env.local`)');
+  if (!base || !secret) throw new Error('Thiếu GAS_BASE_URL / GAS_SECRET (đặt biến môi trường hoặc ghi vào .env.local)');
   const url = `${base}?action=${action}&key=${encodeURIComponent(secret)}`;
   // Giống api/gee.js: text/plain để Apps Script nhận nguyên body; doPost trả 302 → GET theo location
   let res = await fetch(url, {

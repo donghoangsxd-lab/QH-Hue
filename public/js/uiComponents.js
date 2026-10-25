@@ -36,7 +36,7 @@ function setAuthMsg(text, color = 'var(--text-main)') {
 }
 
 function showGoogleOriginHint() {
-  setAuthMsg(`Origin ${window.location.origin} chưa được Google cho phép. Thêm origin này vào Authorized JavaScript origins của Client ID, hoặc chạy npx vercel dev (localhost) thay vì Live Server.`, 'var(--accent-orange)');
+  setAuthMsg(`Origin ${window.location.origin} chưa được Google cho phép. Thêm origin này vào Authorized JavaScript origins của Client ID. Bản đồ đang chạy tại https://qh-hue.donghoangsxd.workers.dev.`, 'var(--accent-orange)');
 }
 
 let googleSignInPending = false;

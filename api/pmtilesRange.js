@@ -1,5 +1,5 @@
 // Chuyển tiếp Range của đúng hai file PMTiles. Bucket chỉ mở CORS cho origin production và localhost,
-// nên trang xem trước trên miền Vercel khác không đọc thẳng được. Không nhận URL tự do.
+// nên trang xem trước trên origin khác không đọc thẳng được. Không nhận URL tự do.
 const { limitPublicGet, PMTILES_MAX, WINDOW_MS } = require('../services/getRate');
 
 const FILES = {

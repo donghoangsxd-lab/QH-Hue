@@ -1,7 +1,7 @@
 // Ranh 40 phường xã (đất liền TP. Huế) cho các script xử lý lớp tĩnh: tải từ webapp hoặc đọc file có sẵn.
 const fs = require('fs');
 
-const GEE_API_URL = process.env.GEE_API_URL || 'https://web-hatang-hue-4.vercel.app/api/gee';
+const GEE_API_URL = process.env.GEE_API_URL || 'https://qh-hue.donghoangsxd.workers.dev/api/gee';
 const BOUNDARY_URL = process.env.BOUNDARY_URL || `${GEE_API_URL}?action=getBoundaryVector&v=2`;
 
 async function loadBoundary(file) {

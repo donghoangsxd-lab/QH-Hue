@@ -191,7 +191,7 @@ PROFILES.forEach(profile => {
 });
 const quotaConfig = quotaByProfile.DT;
 
-const PROD_ORIGIN = "https://web-hatang-hue-4.vercel.app";
+const PROD_ORIGIN = "https://qh-hue.donghoangsxd.workers.dev";
 
 const constants = {
   WARD_STATS_CACHE_TTL: 15 * 60 * 1000, // Cache Wards 15 phút
@@ -223,7 +223,7 @@ const constants = {
   // Dấu chân Global Building Atlas: buildings.pmtiles + agg.json (scripts/build-gba.py). Cần CORS header Range.
   GBA_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/gba/",
 
-  // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
+  // Cấu hình trên Cloud Run (Variables & Secrets), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",
   GAS_SECRET: process.env.GAS_SECRET || "",
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com",

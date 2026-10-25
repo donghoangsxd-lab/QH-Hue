@@ -1,20 +1,20 @@
-# Chuyển máy chủ (chưa cắt tên miền)
+# Máy chủ: Cloudflare Worker + Cloud Run
 
-Vercel `https://web-hatang-hue-4.vercel.app` vẫn là bản đang dùng. Repo này không tự deploy Cloud Run và không gọi `wrangler deploy`. Làm lần lượt các bước dưới. Chưa xóa project Vercel.
+Bản đang dùng: `https://qh-hue.donghoangsxd.workers.dev`. API là Cloud Run `qh-hue-api`. Worker chuyển `/api/*` khi đã đặt `API_UPSTREAM`. Repo không tự deploy Cloud Run và không gọi `wrangler deploy` từ git. Worker deploy khi Cloudflare Workers Builds theo dõi nhánh `main`. Không còn file cấu hình Vercel.
 
 Project GCP đang gắn Earth Engine và bucket: `optimistic-yew-488501-s0`. Bucket: `hue-infra-data-us` (Singapore).
 
 ## Đã có trong repo
 
-- `worker/index.js` và `wrangler.jsonc` (`main` + `run_worker_first` cho `/api/*`, `/gcs/*`, `/data/gba/buildings.pmtiles`). Vercel không đọc hai file này.
+- `worker/index.js` và `wrangler.jsonc` (`main` + `run_worker_first` cho `/api/*`, `/gcs/*`, `/data/gba/buildings.pmtiles`). Header tĩnh nằm ở `public/_headers`.
 - `buildings.pmtiles` (~41 MiB sau khi gỡ NTD, bản phát hành 43.078.043 byte) vượt hạn 25 MiB/file của Workers. `public/.assetsignore` loại file đó. Worker đọc nó từ GCS.
 - `/api/*` trên Worker chuyển tới Cloud Run khi đã đặt biến runtime `API_UPSTREAM`. Chưa đặt thì `/api` trả 503. Dấu chân trên `*.workers.dev` đi đường `/data/gba/buildings.pmtiles` (cùng origin), không đi `/api/pmtilesRange`.
 - Cloud Run: `cloudrun/` (không có Dockerfile ở gốc repo), `scripts/deploy-cloudrun.sh`. Workflow **Cloud Run** chỉ chạy khi bấm tay (`workflow_dispatch`), không chạy trên mỗi push.
-- Ba hàm `api/gee`, `api/osmClip`, `api/pmtilesRange` đã giới hạn theo IP trên Vercel (PR #98). Cloud Run và Worker đếm riêng, cùng các trần, không dùng chung bộ nhớ với hàm Vercel (chung store sẽ đếm mỗi request hai lần).
+- Ba hàm `api/gee`, `api/osmClip`, `api/pmtilesRange` giới hạn theo IP (PR #98). Cloud Run và Worker đếm riêng, cùng các trần, không dùng chung bộ nhớ (chung store sẽ đếm mỗi request hai lần).
 
 Trần mỗi phút mỗi IP: đọc JSON 600, ô `getSatTile` / `getPopRasterTile` 2000, OpenStreetMap 300, Range PMTiles và proxy GCS 2000. `OPTIONS` không tính trên Worker.
 
-Nếu Cloudflare Workers Builds đang theo dõi nhánh `main`, lần merge có `wrangler.jsonc` mới sẽ tự deploy lên `https://qh-hue.donghoangsxd.workers.dev`. `API_UPSTREAM` đã gắn trên dashboard và `/api/gee` trả 200. `keep_vars: true` trong `wrangler.jsonc` để lần deploy đó không xóa biến dashboard. Không ghi URL vào file. Bản Vercel không đổi.
+Nếu Cloudflare Workers Builds đang theo dõi nhánh `main`, lần merge sẽ tự deploy lên `https://qh-hue.donghoangsxd.workers.dev`. `API_UPSTREAM` gắn trên dashboard. `keep_vars: true` trong `wrangler.jsonc` để lần deploy không xóa biến dashboard. Không ghi URL Cloud Run vào file.
 
 ## 1. GCP — bật thanh toán và chặn $1
 
@@ -86,11 +86,11 @@ Console mới không còn nút **Edit & deploy new revision**.
 
 | Tên | Giá trị |
 | --- | --- |
-| `GEE_PRIVATE_KEY` | JSON service account Earth Engine đang dùng trên Vercel |
-| `GAS_BASE_URL` | cùng giá trị Vercel |
-| `GAS_SECRET` | cùng giá trị Vercel |
-| `GOOGLE_CLIENT_ID` | cùng giá trị Vercel |
-| `ALLOWED_ORIGINS` | `https://web-hatang-hue-4.vercel.app,https://qh-hue.donghoangsxd.workers.dev` |
+| `GEE_PRIVATE_KEY` | JSON service account Earth Engine |
+| `GAS_BASE_URL` | URL `/exec` của Apps Script |
+| `GAS_SECRET` | bí mật Apps Script |
+| `GOOGLE_CLIENT_ID` | Client ID đăng nhập Google |
+| `ALLOWED_ORIGINS` | `https://qh-hue.donghoangsxd.workers.dev` (thêm origin tên miền riêng khi có, cách nhau bởi dấu phẩy) |
 
 `CRON_SECRET` không bắt buộc (cron đã tắt). `QH_GET_LIMIT` không cần đặt (mặc định 600 cho đọc JSON).
 
@@ -114,9 +114,9 @@ Màn Import GitHub, nhánh `main`, sau khi `main` đã có `worker/index.js`:
 
 Không ghi `API_UPSTREAM` vào `wrangler.jsonc`. File có `"keep_vars": true` để Workers Builds giữ biến runtime đã gắn trên dashboard.
 
-Chưa có `API_UPSTREAM` thì trang tĩnh vẫn mở, `/api/gee` báo chưa cấu hình, dấu chân trên `*.workers.dev` vẫn lấy PMTiles qua Worker (Range từ GCS). `directTiles()` trên `web-hatang-hue-4.vercel.app` vẫn đọc thẳng GCS, không đi Worker.
+Chưa có `API_UPSTREAM` thì trang tĩnh vẫn mở, `/api/gee` báo chưa cấu hình, dấu chân trên `*.workers.dev` vẫn lấy PMTiles qua Worker (Range từ GCS).
 
-Tên miền riêng (chỉ khi `https://qh-hue.donghoangsxd.workers.dev` đã đúng): Workers → **Custom domains**. Giữ domain Vercel đến lúc đó. Thêm origin mới vào `ALLOWED_ORIGINS` rồi deploy revision mới (không dùng `--set-env-vars`).
+Tên miền riêng (chỉ khi `https://qh-hue.donghoangsxd.workers.dev` đã đúng): Workers → **Custom domains**. Thêm origin mới vào `ALLOWED_ORIGINS` rồi deploy revision mới (không dùng `--set-env-vars`).
 
 ## 6. File dấu chân và Cache-Control trên bucket
 
@@ -153,13 +153,13 @@ Apps Script: dán `apps-script/Code.gs` mới rồi **Deploy → Manage deployme
 
 Khi thay `buildings.pmtiles` lần sau, tăng `GBA_V` trong `public/js/gbaVersion.js` (file mới phải đổi query; `immutable` giữ URL cũ một năm).
 
-## 7. Cắt
+## 7. Tên miền riêng
 
-Chỉ trỏ DNS khi `https://qh-hue.donghoangsxd.workers.dev` đã có điểm hạ tầng, lớp thửa và dấu chân. Vercel để nguyên đến lúc đó.
+Bản công khai là `https://qh-hue.donghoangsxd.workers.dev`. Tên miền riêng: Workers → **Custom domains**, rồi thêm origin đó vào `ALLOWED_ORIGINS` trên Cloud Run và deploy revision mới (không dùng `--set-env-vars`).
 
 ## Chi phí khi đã bật (chưa bật thì bằng không)
 
 - Cloud Run `min-instances=0`: không có request thì không tính vCPU. Trần 3 instance, 80 request đồng thời, 1 vCPU, 1 GiB, timeout 60 giây.
 - Cloud Run tính cả thời gian chờ Earth Engine. Một request chờ 20 giây ≈ 20 vCPU-giây và 20 GiB-giây. Vài trăm request như vậy mỗi ngày ở Singapore có thể ăn hết ngân sách $1. Vì vậy Worker từ chối 429 trước khi gọi Cloud Run, và các GET đã có `s-maxage` được cache ở biên Worker.
 - Workers free: 100.000 request/ngày, CPU 10 ms/request (thời gian chờ GCS không tính). File tĩnh vẫn do asset phục vụ, không vào `worker/index.js` trừ `/api/*`, `/gcs/*` và `buildings.pmtiles`.
-- Vercel: PR này không thêm middleware, cron, hay đường gọi mới trên `web-hatang-hue-4.vercel.app`.
+- Không còn máy chủ Vercel. Hạn mức Hobby không còn áp dụng.

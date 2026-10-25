@@ -4,7 +4,7 @@
 
 Trước khi sửa: chọn nhóm MOD, mở `.cursor/rules/modules.mdc`, rg trong file của nhóm, chỉ đọc đoạn cần. Không đọc GeoJSON, JSON nặng, TIF, XLSX, PDF, pmtiles. Thêm, đổi chỗ hoặc xóa file thì sửa `modules.mdc` trong cùng PR. Đổi tên nhóm thì sửa cả mục này và `.cursor/rules/modules-index.mdc`.
 
-01 khung · 02 UI chung · 03 thống kê phường · 04 state/QCVN · 05 bản đồ, ranh · 06 hiện trạng (marker, buffer, TT16) · 07 quy hoạch, đồ án · 08 heatmap, đẳng thời · 09 đo, in, 3D · 10 tra cứu, popup · 11 đề xuất điểm · 12 nhập CAD/OSM · 13 admin · 14 GCS ETag · 15 Apps Script · 16 dân số · 17 môi trường · 18 giao thông · 19 rate-limit · 20 Worker + Cloud Run + GCS (`vercel.json` legacy) · 21 hồ sơ GIS TT16 · 22 nhà, vi phạm, hành lang sông · 23 bốn trục (hành chính, quy hoạch, hạ tầng, kiến trúc)
+01 khung · 02 UI chung · 03 thống kê phường · 04 state/QCVN · 05 bản đồ, ranh · 06 hiện trạng (marker, buffer, TT16) · 07 quy hoạch, đồ án · 08 heatmap, đẳng thời · 09 đo, in, 3D · 10 tra cứu, popup · 11 đề xuất điểm · 12 nhập CAD/OSM · 13 admin · 14 GCS ETag · 15 Apps Script · 16 dân số · 17 môi trường · 18 giao thông · 19 rate-limit · 20 Worker + Cloud Run + GCS · 21 hồ sơ GIS TT16 · 22 nhà, vi phạm, hành lang sông · 23 bốn trục (hành chính, quy hoạch, hạ tầng, kiến trúc)
 
 Quy tắc nghiệp vụ (schema, QCVN, cache, ngôn ngữ) nằm ở `.cursorrules`. Mục dưới là ngân sách.
 
@@ -16,14 +16,13 @@ Kiểm soát chi phí là ràng buộc cứng. Không triển khai tính năng �
 
 Ước lượng so với hiện trạng, kể cả khi gần bằng không (ghi «không đáng kể» và vì sao):
 
-- CPU máy chủ: Vercel Fluid Active CPU (chỉ tính lúc JS chạy, không tính lúc chờ I/O) và Cloud Run (tính cả thời gian chờ, gồm Earth Engine).
+- CPU máy chủ: Cloud Run (tính cả thời gian chờ, gồm Earth Engine) và Cloudflare Workers (CPU 10 ms/request, thời gian chờ mạng không tính).
 - GCS: Class A (ghi, liệt kê, sửa metadata, copy) và Class B (GET, HEAD). Bucket `hue-infra-data-us` ở Singapore.
 - Băng thông (egress bucket, CDN, ảnh ô).
 - API bên thứ ba: Earth Engine, Overpass, OSRM, Apps Script, và mọi lệnh gọi mới.
 
 Đối chiếu hạn miễn phí:
 
-- Vercel Hobby: 4 giờ Fluid Active CPU/tháng, 360 GB-giờ bộ nhớ, 1 triệu invocation.
 - Cloud Run always-free: khoảng 180.000 vCPU-giây, 360.000 GiB-giây, 2 triệu request/tháng, chỉ `us-central1`, `us-east1`, `us-west1`. `asia-southeast1` tính tiền từ giây đầu.
 - Cloudflare Workers free: 100.000 request/ngày, CPU 10 ms/request (thời gian chờ mạng không tính). Asset tĩnh: 25 MiB/file, 20.000 file/phiên bản trên gói free.
 
@@ -37,7 +36,7 @@ Tính năng thêm việc máy chủ trên mỗi request, hoặc nhân số lần
 
 ### 4. Kiểm thử
 
-Hạn chế gọi API production. Dùng mock, fixture đã lưu, preview có giới hạn, và ít ảnh chụp. Không mở vòng lặp Playwright hoặc `curl` vào `web-hatang-hue-4.vercel.app` để «cho chắc». Trong PR, ghi usage do chính lần test gây ra (số request production, có đụng GCS/GEE hay không).
+Hạn chế gọi API production. Dùng mock, fixture đã lưu, preview có giới hạn, và ít ảnh chụp. Không mở vòng lặp Playwright hoặc `curl` vào `https://qh-hue.donghoangsxd.workers.dev` để «cho chắc». Trong PR, ghi usage do chính lần test gây ra (số request production, có đụng GCS/GEE hay không).
 
 ### 5. Endpoint máy chủ
 

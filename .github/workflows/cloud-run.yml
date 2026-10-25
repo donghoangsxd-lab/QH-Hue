@@ -1,4 +1,4 @@
-# Chỉ chạy tay (workflow_dispatch). Không chạy trên mỗi push nên không đụng deploy Vercel.
+# Chỉ chạy tay (workflow_dispatch). Không chạy trên mỗi push.
 name: Cloud Run
 
 on:

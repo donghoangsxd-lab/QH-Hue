@@ -60,5 +60,5 @@ echo "Đặt biến: Console → Cloud Run → vùng ${REGION} → ${SERVICE} �
 echo "Console mới không còn nút Edit & deploy new revision. Không ghi biến vào git."
 echo "Không dùng --set-env-vars khi deploy lại: lệnh đó xóa biến cũ."
 echo "  GEE_PRIVATE_KEY  GAS_BASE_URL  GAS_SECRET  GOOGLE_CLIENT_ID  ALLOWED_ORIGINS"
-echo "ALLOWED_ORIGINS phải có origin Vercel và origin workers.dev, cách nhau bởi dấu phẩy."
+echo "ALLOWED_ORIGINS phải có https://qh-hue.donghoangsxd.workers.dev. Thêm tên miền riêng nếu có, cách nhau bởi dấu phẩy."
 echo "Trên Cloudflare Workers đặt API_UPSTREAM=${URL}"

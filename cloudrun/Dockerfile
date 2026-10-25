@@ -1,4 +1,4 @@
-# Ảnh Cloud Run. Không đặt Dockerfile ở gốc repo để Vercel không nhầm sang build Docker.
+# Ảnh Cloud Run. Dockerfile nằm trong cloudrun/, không đặt ở gốc repo.
 FROM node:22-slim
 
 WORKDIR /app

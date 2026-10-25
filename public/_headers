@@ -1,4 +1,4 @@
-# Header tĩnh cho Cloudflare Workers. Vercel dùng vercel.json, không đọc file này.
+# Header tĩnh cho Cloudflare Workers. Wrangler đọc file này khi deploy asset.
 # _headers không bị tải lên như file công khai.
 
 /*

@@ -34,7 +34,7 @@ let cachedWardStatsPop = '';
 let cachedWardStatsPeople = false;
 let lastWardStatsFetch = 0;
 let cachedWardStatsTtl = 0;
-// Vercel cắt hàm ở 60 s (vercel.json) tính cả khởi động nguội trước khi vào handler: đếm pixel độ phủ dừng ở mốc BUDGET,
+// Cloud Run cắt request ở 60 s tính cả khởi động nguội trước khi vào handler: đếm pixel độ phủ dừng ở mốc BUDGET,
 // ước lượng dừng ở mốc DEADLINE, watchdog trả 503 sau DEADLINE + 2 s
 const WARD_STATS_BUDGET_MS = 30000;
 const WARD_STATS_DEADLINE_MS = 38000;
@@ -245,7 +245,7 @@ function applyInvestEdits(base, items) {
   return data;
 }
 
-// Thân JSON nén gzip (client gửi gz=1, Content-Type octet-stream → Vercel đưa req.body dạng Buffer); trần giải nén chặn file nén bất thường
+// Thân JSON nén gzip (client gửi gz=1, Content-Type octet-stream → req.body dạng Buffer); trần giải nén chặn file nén bất thường
 const GZIP_BODY_MAX_BYTES = 8 * 1024 * 1024;
 function readGzipJsonBody(req) {
   if (!Buffer.isBuffer(req.body)) return readJsonBody(req);
@@ -1031,7 +1031,7 @@ function parseLandEdit(f) {
 // body != null → POST JSON tới doPost (dữ liệu lớn); còn lại GET tới doGet
 async function callAppsScript(params, body = null) {
   if (!constants.GAS_BASE_URL) {
-    throw httpError(503, 'Máy chủ chưa cấu hình GAS_BASE_URL (Vercel → Settings → Environment Variables)');
+    throw httpError(503, 'Máy chủ chưa cấu hình GAS_BASE_URL (Cloud Run → Variables & Secrets)');
   }
   const query = new URLSearchParams(params);
   if (constants.GAS_SECRET) query.set('key', constants.GAS_SECRET);
@@ -1502,9 +1502,9 @@ function optsAllowsImage(rec, csv, activeImage) {
 
 function cronAuthorized(req) {
   const secret = process.env.CRON_SECRET || '';
+  if (!secret) return false;
   const header = String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '');
-  if (secret) return header === `Bearer ${secret}`;
-  return String((req.headers && (req.headers['x-vercel-cron'] || req.headers['X-Vercel-Cron'])) || '') === '1';
+  return header === `Bearer ${secret}`;
 }
 
 async function popNhaSnapshot() {
@@ -2979,7 +2979,7 @@ function parcelCap(type, area, requested) {
   return requested === 'urban' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
 }
 
-// CDN-Cache-Control là khóa biên Vercel. no-store chỉ còn cho hàng admin riêng và ?fresh= sau khi ghi.
+// CDN-Cache-Control là khóa cache biên Cloudflare. no-store chỉ còn cho hàng admin riêng và ?fresh= sau khi ghi.
 function setCdn(res, browser, edge) {
   res.setHeader('Cache-Control', browser);
   res.setHeader('CDN-Cache-Control', edge);
@@ -3075,7 +3075,7 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    // PDF quyết định. File trên 3 MB vượt thân phản hồi của Vercel nên iframe được chuyển tới URL công khai của bucket.
+    // PDF quyết định. File trên 3 MB không nhét vào thân phản hồi; iframe chuyển tới URL công khai của bucket.
     if (action === 'getProjectDecision') {
       const slug = String(req.query.slug || '');
       try {
@@ -3109,7 +3109,7 @@ module.exports = async (req, res) => {
       return res.status(200).json(ward);
     }
 
-    // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên Vercel 1 giờ
+    // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên 1 giờ
     if (action === 'getDrainage' || action === 'getBasins') {
       const isBasins = action === 'getBasins';
       const d = await (isBasins ? getBasins() : getDrainage());
@@ -3570,7 +3570,7 @@ module.exports = async (req, res) => {
         return res.status(502).json({
           error: true,
           message: asGet
-            ? 'Apps Script nhận lệnh ghi thành lệnh đọc (doGet, mất dữ liệu POST), Sheet chưa bị ghi. Kiểm tra GAS_BASE_URL trên Vercel là URL /exec của deployment đang dùng (Manage deployments → Edit → New version, không tạo deployment mới), rồi bấm Ghi lại.'
+            ? 'Apps Script nhận lệnh ghi thành lệnh đọc (doGet, mất dữ liệu POST), Sheet chưa bị ghi. Kiểm tra GAS_BASE_URL trên Cloud Run là URL /exec của deployment đang dùng (Manage deployments → Edit → New version, không tạo deployment mới), rồi bấm Ghi lại.'
             : `Apps Script chưa trả mã lô (lotIds), phản hồi chỉ có: ${Object.keys(result || {}).slice(0, 8).join(', ') || 'rỗng'}. Deploy Code.gs → New version, rồi bấm Ghi lại để ghi tiếp.`
         });
       }
@@ -4277,7 +4277,7 @@ module.exports = async (req, res) => {
 
     await initGEE();
 
-    // Cron Vercel đã tắt để khỏi đốt Fluid Active CPU. Admin vẫn nạp tay qua ingestPopNha.
+    // Lịch tự động đã tắt. Admin nạp tay qua ingestPopNha. syncPopNha chỉ chạy khi có CRON_SECRET.
     if (action === 'syncPopNha') {
       if (!cronAuthorized(req)) return res.status(401).json({ error: true, message: 'Không đúng lịch' });
       try {

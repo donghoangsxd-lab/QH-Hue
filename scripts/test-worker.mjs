@@ -51,7 +51,9 @@ assert.doesNotMatch(wrangler, /run\.app/);
 assert.match(wrangler, /"main": "worker\/index.js"/);
 assert.match(wrangler, /\/api\/\*/);
 assert.match(wrangler, /buildings\.pmtiles/);
-assert.doesNotMatch(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'), /"crons"/);
+assert.equal(fs.existsSync(new URL('../vercel.json', import.meta.url)), false);
+assert.doesNotMatch(src, /vercel\.app/);
+assert.match(fs.readFileSync(new URL('../public/js/api.js', import.meta.url), 'utf8'), /https:\/\/qh-hue\.donghoangsxd\.workers\.dev\/api\/gee/);
 
 assert.equal(normalizeByteRange('bytes=0-16383'), 'bytes=0-16383');
 assert.equal(normalizeByteRange(' BYTES=8-15 '), 'bytes=8-15');
