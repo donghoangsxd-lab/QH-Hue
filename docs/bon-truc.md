@@ -19,7 +19,7 @@ Phạm vi hẹp vẫn hiện lớp gắn thành phố. Không suy ra xã nằm t
 - `?truc=` = `hanhchinh` | `hatang` | `kientruc` (quy hoạch là mặc định, không ghi).
 - `?nganh=` khi đang ở hạ tầng.
 - `?tt=` bị xóa. Không còn công tắc trạng thái toàn cục.
-- Lần đầu: phạm vi Toàn thành phố, bản đồ khít TP Huế, 40 ranh phường nét sẵn có và nhãn bật, tab Quy hoạch, nhóm QHC 1/25.000 mở, sơ đồ phát triển không gian (`chk_qhc25`) bật, mọi lớp hiện trạng và chuyên ngành tắt, nền đường phố (positron) nếu máy chưa lưu ảnh nền. Sidebar thu, điện thoại chỉ còn bản đồ và hàng 4 icon.
+- Lần đầu: phạm vi Toàn thành phố, bản đồ khít TP Huế, 40 ranh phường nét sẵn có và nhãn bật, tab Quy hoạch, nhóm QHC 1/25.000 mở, sơ đồ phát triển không gian (`chk_qhc25`) bật, mọi lớp hiện trạng và chuyên ngành tắt, nền Google vệ tinh nếu máy chưa lưu ảnh nền. Sidebar thu, điện thoại chỉ còn bản đồ và hàng 4 icon.
 - Link chia sẻ khôi phục đúng tham số của link. Máy đã dùng khôi phục `localStorage` khóa `qh_axes_v1` khi URL không có tham số chia sẻ hay `kv` / `nganh` / `truc`. Link thắng localStorage. Ảnh nền vẫn nhớ riêng (`qhhue.basemap`); link không mang ảnh nền.
 
 ## Phục vụ file
