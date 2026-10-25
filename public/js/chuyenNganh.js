@@ -679,7 +679,7 @@ function filterGp() {
 
 function applyLayerQuery() {
   const q = foldQuery(layerQuery);
-  ['#layerPaneHaTang', '#layerPaneXaHoi', '#layerPaneKienTruc', '#baseQuyHoach'].forEach(sel => {
+  ['#layerPaneHaTang', '#layerPaneXaHoi', '#layerPaneKienTruc'].forEach(sel => {
     document.querySelectorAll(`${sel} .cn-scheme, ${sel} .layer-row, ${sel} .axis-arch li, ${sel} .cn-layer`).forEach(el => {
       el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
     });
@@ -740,7 +740,7 @@ function paint() {
   paintAdmin();
   if (axis === 'hatang') paintHaTang();
   if (axis === 'kientruc') paintKienTruc();
-  paintBase('quyhoach', 'baseQuyHoach');
+  // Tab Quy hoạch không gắn mục «Dữ liệu hiện trạng»: thửa địa chính và công trình vi phạm chỉ ở Lớp nền.
   paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
   paintBase('kientruc', 'baseKienTruc');
   paintXaHoi();
