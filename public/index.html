@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261058">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261059">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261058">
+  <link rel="stylesheet" href="css/style.css?v=20261059">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -171,11 +171,9 @@
       <p class="esc-hint" id="escHint" hidden>Bấm ESC để thoát</p>
     </header>
 
-    <!-- GIỚI THIỆU TỔNG QUAN (overview.js): giới thiệu webapp + mục lục tính năng, góc trên trái -->
-    <button type="button" class="ov-launch" id="btnOverview" title="Giới thiệu tổng quan: mục đích trang web, các nhóm tính năng chính và hướng dẫn sử dụng" aria-haspopup="dialog" aria-expanded="false"><svg class="ico"><use href="#i-overview"/></svg><span class="ov-launch-text">Giới thiệu tổng quan</span></button>
-
-    <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
+    <!-- THANH CÔNG CỤ: desktop cột phải, điện thoại cột trái. Giới thiệu là ô đầu, không nút nổi riêng. -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
+      <button type="button" class="ui-btn-format ov-launch" id="btnOverview" title="Giới thiệu tổng quan: mục đích trang web, các nhóm tính năng chính và hướng dẫn sử dụng" aria-label="Giới thiệu" aria-haspopup="dialog" aria-expanded="false"><svg class="ico"><use href="#i-overview"/></svg><span class="ov-launch-text">Giới thiệu</span></button>
       <button type="button" class="ui-btn-format review-launch" id="btnReviewOpen" title="Thẩm định đồ án: cân đối đất theo QCVN, hoặc kiểm tra hồ sơ GIS theo Phụ lục II Thông tư 16/2025" aria-label="Thẩm định đồ án quy hoạch" aria-pressed="false" aria-controls="reviewPanel"><svg class="ico"><use href="#i-table"/></svg></button>
       <div class="review-panel" id="reviewPanel" role="dialog" aria-labelledby="reviewPanelTitle" hidden>
         <div class="tab-header review-panel-head">
@@ -814,10 +812,10 @@
           <div class="sat-pick basemap-pick" id="basemapPick">
             <label for="basemapSelect" title="Ảnh nền dùng chung mọi trục."><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
             <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
-              <option value="google">Google vệ tinh</option>
+              <option value="google" selected>Google vệ tinh</option>
               <option value="esri">Esri World Imagery</option>
               <option value="s2">Sentinel-2 Cloudless 2025</option>
-              <option value="positron" selected>Bản đồ đường phố</option>
+              <option value="positron">Bản đồ đường phố</option>
             </select>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
@@ -1645,6 +1643,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261058"></script>
+  <script type="module" src="./js/app.js?v=20261059"></script>
 </body>
 </html>

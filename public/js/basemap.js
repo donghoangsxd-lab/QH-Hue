@@ -77,7 +77,7 @@ const LABELS_PANE = 'labelsPane';
 const maps = new Map();   // bản đồ → { layer, pinned }
 const labelLayers = new Map();   // bản đồ → lớp tem đang gắn
 let labelsOn = false;
-let current = 'positron';
+let current = 'google';
 try {
   const saved = localStorage.getItem(STORE_KEY);
   if (BASEMAPS[saved]) current = saved;

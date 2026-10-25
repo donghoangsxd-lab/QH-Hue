@@ -191,6 +191,17 @@ async function enterFullscreen() {
   }
 }
 
+// PWA đã cài (standalone): xin toàn màn hình để thanh trạng thái và thanh điều hướng không che giao diện.
+// Lần gọi lúc tải thường thiếu cử chỉ; lần chạm đầu tiên thử lại. Từ chối thì thôi, không nhắc.
+let standaloneFsDone = false;
+function requestStandaloneFullscreen() {
+  if (standaloneFsDone || !installedApp() || inFullscreen()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  Promise.resolve(req.call(el)).then(() => { standaloneFsDone = true; }).catch(() => {});
+}
+
 async function toggleLandscape() {
   const land = deviceLandscape();
   if (land && lockHeld && screen.orientation && screen.orientation.unlock) {
@@ -327,5 +338,14 @@ export function initMobileShell() {
     hideInstallGuide();
     syncInstallButton();
   });
+  const onStandaloneGesture = () => {
+    if (standaloneFsDone || inFullscreen()) {
+      document.removeEventListener('pointerdown', onStandaloneGesture, true);
+      return;
+    }
+    requestStandaloneFullscreen();
+  };
+  document.addEventListener('pointerdown', onStandaloneGesture, true);
+  requestStandaloneFullscreen();
   paint();
 }

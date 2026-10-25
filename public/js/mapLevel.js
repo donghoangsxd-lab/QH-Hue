@@ -17,7 +17,7 @@ export const LEVELS = [
   { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
   { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', scope: 'QHCT' }
 ];
-export const DEFAULT_LEVEL = 'urban';
+export const DEFAULT_LEVEL = 'qhc25';
 /** detail: { level, prev, origin } */
 export const LEVEL_EVENT = 'qh:level';
 
@@ -144,9 +144,10 @@ export function initMapLevel() {
     setLevel(id, { keepView: id === 'qhc10' || id === 'qhc25' });
   });
   document.addEventListener('change', onLayerChange);
-  // Mở trang luôn về Hệ thống đô thị. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
+  // Mở trang luôn về QHC 1/25.000. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
+  // keepView: khung do centerOnCity (vừa cả thành phố) không bị lớp mặc định kéo đi.
   // Link chia sẻ (có lv hoặc ly) do viewLink áp sau bước này.
   const shared = new URLSearchParams(location.search);
-  if (!shared.has('lv') && !shared.has('ly')) setLevel(DEFAULT_LEVEL);
+  if (!shared.has('lv') && !shared.has('ly')) setLevel(DEFAULT_LEVEL, { keepView: true });
   else paint();
 }

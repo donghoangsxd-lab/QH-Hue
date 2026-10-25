@@ -9,7 +9,7 @@ import { streetViewUrl } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 
 const NOTE_KEY = 'qhhue_map_notes';
-const LONG_MS = 600;
+const LONG_MS = 3000;
 const LONG_SLOP = 12;
 
 let menuEl = null;
@@ -267,8 +267,11 @@ function onSketchDom(target) {
 }
 
 function onContext(e, m) {
-  e.originalEvent?.preventDefault();
-  const t = e.originalEvent?.target;
+  const raw = e.originalEvent;
+  raw?.preventDefault();
+  // Chạm ngắn trên điện thoại cũng phát contextmenu. Chỉ nhận cú máy tính hoặc cú giữ yên 3 giây.
+  if (raw && !raw._qhLong && (raw.pointerType === 'touch' || raw.pointerType === 'pen' || raw._qhTouch)) return;
+  const t = raw?.target;
   if (t?.closest?.('.leaflet-popup, .cad-card, .map-ctx-menu, .place-card, .note-editor, .sv-panel')) return;
   if (onSketchDom(t)) return;
   if (e.originalEvent?._sketchHandled || e.originalEvent?._measureHandled) return;
@@ -283,34 +286,81 @@ function bindLongPress(m) {
   let x = 0;
   let y = 0;
   let pid = null;
+  let armed = false;
   let opened = false;
-  const cancel = () => { clearTimeout(timer); timer = 0; pid = null; };
+  let touchGesture = false;
+  let touchClear = 0;
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = 0;
+    pid = null;
+    armed = false;
+    window.removeEventListener('pointermove', onMove, true);
+  };
+  const onMove = (ev) => {
+    if (!armed || ev.pointerId !== pid) return;
+    if (Math.hypot(ev.clientX - x, ev.clientY - y) > LONG_SLOP) cancel();
+  };
   box.addEventListener('pointerdown', (ev) => {
     if (ev.pointerType === 'mouse' || ev.button !== 0) return;
     if (ev.target?.closest?.('.leaflet-popup, .sketch-handle, .sketch-menu, .sketch-popup')) return;
     cancel();
     opened = false;
+    armed = true;
+    touchGesture = true;
+    clearTimeout(touchClear);
     x = ev.clientX;
     y = ev.clientY;
     pid = ev.pointerId;
+    window.addEventListener('pointermove', onMove, true);
     timer = setTimeout(() => {
       timer = 0;
-      if (state.adminDrawMode || state.lotShapeEdit || state.activeMeasureType) return;
+      if (!armed) return;
+      if (state.adminDrawMode || state.lotShapeEdit || state.activeMeasureType) { cancel(); return; }
       opened = true;
-      const latlng = m.mouseEventToLatLng({ clientX: x, clientY: y });
-      openMenu({ clientX: x, clientY: y, preventDefault() {} }, latlng, m);
+      armed = false;
+      const target = document.elementFromPoint(x, y) || box;
+      const raw = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window
+      });
+      raw._qhLong = true;
+      target.dispatchEvent(raw);
     }, LONG_MS);
-  });
-  box.addEventListener('pointermove', (ev) => {
-    if (ev.pointerId !== pid) return;
-    if (Math.hypot(ev.clientX - x, ev.clientY - y) > LONG_SLOP) cancel();
   });
   box.addEventListener('pointerup', (ev) => {
     if (ev.pointerId !== pid) return;
-    if (opened) ev.preventDefault();
+    if (opened) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const stopClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        box.removeEventListener('click', stopClick, true);
+      };
+      box.addEventListener('click', stopClick, true);
+      setTimeout(() => box.removeEventListener('click', stopClick, true), 400);
+    }
     cancel();
+    clearTimeout(touchClear);
+    touchClear = setTimeout(() => { touchGesture = false; }, 800);
   });
-  box.addEventListener('pointercancel', cancel);
+  box.addEventListener('pointercancel', () => {
+    cancel();
+    clearTimeout(touchClear);
+    touchClear = setTimeout(() => { touchGesture = false; }, 800);
+  });
+  box.addEventListener('contextmenu', (ev) => {
+    if (ev._qhLong) return;
+    if (!touchGesture && ev.pointerType !== 'touch' && ev.pointerType !== 'pen') return;
+    ev._qhTouch = true;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);
+  m.on('movestart', cancel);
 }
 
 export function initMapContext(list) {
