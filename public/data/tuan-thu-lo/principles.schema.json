@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "principles.schema.json",
+  "title": "Bộ nguyên tắc tuân thủ lô đất",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "title", "updated", "outcomes", "hierarchy", "categories", "rules"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "updated": { "type": "string" },
+    "outcomes": {
+      "type": "array",
+      "items": { "enum": ["phu-hop", "chua-phu-hop", "chua-du-du-lieu"] }
+    },
+    "principle": { "type": "string" },
+    "hierarchy": { "type": "array" },
+    "categories": { "type": "object" },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "anchor", "steps"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "anchor": { "type": "object" },
+          "steps": { "type": "array", "minItems": 1 },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -4108,6 +4108,11 @@ table.ward-table th {
 .pls-lot-head span { flex-shrink: 0; font-weight: 600; color: var(--accent-cyan); }
 .pls-lot-sub { font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; }
 .pls-lot-plan { font-size: var(--fs-sm); color: var(--text-main); }
+.pls-comp { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
+.pls-comp .pp-row > b { overflow-wrap: anywhere; }
+.pls-comp-ok { color: var(--accent-green); }
+.pls-comp-bad { color: var(--accent-red); }
+.pls-comp-gap { color: var(--accent-yellow); }
 
 /* Thông báo ngắn */
 .app-toast {

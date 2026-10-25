@@ -266,8 +266,10 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
       if (c.file) files.add(c.file);
       pushGeom(byLabel, c.label, part.geom);
       return {
-        lot: { file: c.file || '', plan: null }, name: c.name || c.label, label: c.label,
-        color: c.color, key: c.key || '', sub: c.sub || '', desc: c.desc || '', area: a, pct: (a / area) * 100
+        lot: { file: c.file || '', plan: null, layer: c.label || '', name: c.name || '' },
+        name: c.name || c.label, label: c.label,
+        color: c.color, key: c.key || '', sub: c.sub || '', desc: c.desc || '', area: a, pct: (a / area) * 100,
+        geom: part.geom, sourceGeom: c.geometry || null
       };
     }
     const { lot } = part;
@@ -278,7 +280,10 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
     pushGeom(byLabel, c.label, part.geom);
     if (lot.file) files.add(lot.file);
     const item = lot.kind !== 'DXF' ? byId.get(lot.id) : null;
-    return { lot, name: item ? item.name : landCode(lot), ...c, sub: '', area: a, pct: (a / area) * 100 };
+    return {
+      lot, name: item ? item.name : landCode(lot), ...c, sub: '', area: a, pct: (a / area) * 100,
+      geom: part.geom, sourceGeom: lot.geometry || null
+    };
   });
   const covered = parts.reduce((s, p) => s + p.area, 0);
   const none = Math.max(0, area - covered);
@@ -501,6 +506,7 @@ function lotBlock(p, scheme) {
       ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
       ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
       ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
+      ${p.complianceHtml || ''}
     </div>`;
 }
 

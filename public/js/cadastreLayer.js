@@ -18,6 +18,7 @@ import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
+import { annotateCompliance } from './planCompliance.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { mountParcelAssign } from './parcelInfra.js';
@@ -624,16 +625,19 @@ function planPage(id, geometry, recorded, place) {
   const note = place === 'measure'
     ? `Cắt hình học ${w.cut} với lô các đồ án QHPK 1/2.000 đã nạp, kể cả khi lớp QHPK hoặc đồ án đang tắt. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn.`
     : QHPK_NOTE;
-  return analyzeParcelPlan(geometry, { level: 'QHPK', includeHidden: true }).then(res => ({
-    html: parcelPlanHtml(res, recorded, {
-      title: `QHPK 1/2.000 ${w.on}`,
-      noneLabel: 'Đất khác',
-      empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
-      place,
-      note
-    }),
-    shapes: res.shapes
-  }));
+  return analyzeParcelPlan(geometry, { level: 'QHPK', includeHidden: true }).then(async res => {
+    await annotateCompliance('QHPK', geometry, res.parts);
+    return {
+      html: parcelPlanHtml(res, recorded, {
+        title: `QHPK 1/2.000 ${w.on}`,
+        noneLabel: 'Đất khác',
+        empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
+        place,
+        note
+      }),
+      shapes: res.shapes
+    };
+  });
 }
 
 function paintLand(geoms, color) {
