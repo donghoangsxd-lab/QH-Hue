@@ -134,6 +134,47 @@ try {
     console.log(JSON.stringify({ w, states: rows.map(r => ({ name: r.name, left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), text: Math.round(r.text) })) }));
     await page.close();
   }
+
+  const phone = await browser.newContext({
+    viewport: { width: 844, height: 390 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2
+  });
+  const phonePage = await phone.newPage();
+  await phonePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
+  const coarse = await phonePage.evaluate(() => window.matchMedia('(pointer: coarse) and (max-height: 560px)').matches);
+  assert.equal(coarse, true, 'khung điện thoại ngang không vào media pointer coarse');
+  for (const withClass of [false, true]) {
+    const boxes = await phonePage.evaluate((useClass) => {
+      document.documentElement.classList.toggle('is-phone', useClass);
+      document.documentElement.classList.toggle('is-landscape', useClass);
+      document.body.className = 'right-collapsed bottom-collapsed';
+      const host = document.getElementById('mapArea');
+      const made = ['cad-card', 'leaflet-popup dock-card', 'project-brief'].map(cls => {
+        const el = document.createElement('div');
+        el.className = cls;
+        el.textContent = 'Thửa 160 · Tờ 14';
+        host.appendChild(el);
+        return el;
+      });
+      const box = (el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, width: r.width };
+      };
+      const tool = document.querySelector('.map-toolbar');
+      const out = { tool: box(tool), panels: made.map(el => ({ cls: el.className, ...box(el) })) };
+      made.forEach(el => el.remove());
+      return out;
+    }, withClass);
+    boxes.panels.forEach(panel => {
+      assert.ok(panel.width > 80, `${withClass} ${panel.cls} rộng ${panel.width}`);
+      assert.ok(panel.left >= boxes.tool.right + 6, `${withClass} ${panel.cls} left ${panel.left} đè cột nút ${boxes.tool.right}`);
+    });
+    console.log(JSON.stringify({ phone: withClass ? 'class' : 'media', toolRight: Math.round(boxes.tool.right), panels: boxes.panels.map(p => ({ cls: p.cls, left: Math.round(p.left) })) }));
+  }
+  await phonePage.close();
+  await phone.close();
 } finally {
   await browser.close();
   server.close();

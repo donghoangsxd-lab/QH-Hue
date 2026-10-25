@@ -5361,6 +5361,8 @@ body.project-review.la-page #projectReviewHost {
     --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
     --phone-title-fit: 1;
   }
+  /* Desktop thu panel trục thì --info-left = 12px trên body, đè :root. Cột nút trái điện thoại vẫn nằm đó. */
+  body.right-collapsed { --info-left: var(--phone-tool-left); }
   @media (pointer: fine) {
     html:has(#escHint:not([hidden])) {
       --info-top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 26px);
