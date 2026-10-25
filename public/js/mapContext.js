@@ -9,7 +9,7 @@ import { streetViewUrl } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 
 const NOTE_KEY = 'qhhue_map_notes';
-const LONG_MS = 3000;
+const LONG_MS = 1500;
 const LONG_SLOP = 12;
 
 let menuEl = null;
@@ -269,7 +269,7 @@ function onSketchDom(target) {
 function onContext(e, m) {
   const raw = e.originalEvent;
   raw?.preventDefault();
-  // Chạm ngắn trên điện thoại cũng phát contextmenu. Chỉ nhận cú máy tính hoặc cú giữ yên 3 giây.
+  // Chạm ngắn trên điện thoại cũng phát contextmenu. Chỉ nhận cú máy tính hoặc cú giữ yên 1,5 giây.
   if (raw && !raw._qhLong && (raw.pointerType === 'touch' || raw.pointerType === 'pen' || raw._qhTouch)) return;
   const t = raw?.target;
   if (t?.closest?.('.leaflet-popup, .cad-card, .map-ctx-menu, .place-card, .note-editor, .sv-panel')) return;

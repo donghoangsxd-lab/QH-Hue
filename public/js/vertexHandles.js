@@ -157,7 +157,7 @@ export function createVertexHandles(opt) {
         timer = setTimeout(() => {
           timer = 0;
           if (mk._role === 'vertex') openVertexMenu(mk, { latlng: mk.getLatLng() });
-        }, 3000);
+        }, 1500);
       });
       node.addEventListener('pointermove', (ev) => {
         if (ev.pointerId !== pid) return;
