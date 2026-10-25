@@ -1,16 +1,17 @@
-// Bố cục ngang theo hướng máy: matchMedia (orientation) và, trên cảm ứng, screen.orientation.
-// orientation.lock thường bị chặn ngoài toàn màn hình và trên iOS — khóa chỉ là tùy chọn, không giữ chrome dọc.
+// Điện thoại mở sẵn bố cục ngang. Khóa chiều bằng Screen Orientation API khi trình duyệt cho phép
+// (thường cần toàn màn hình và một cử chỉ). Bị chặn thì vẫn xoay khung bằng CSS, không hiện lời nhắc.
 // Cài ứng dụng: Android dùng beforeinstallprompt; iOS không có prompt, hướng dẫn Chia sẻ → Thêm vào Màn hình chính.
 const PHONE = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
 const VIEW_LAND = window.matchMedia('(orientation: landscape)');
 const COARSE = window.matchMedia('(pointer: coarse)');
-const DISMISS = 'qh_mobile_orient_dismiss';
-const FS_OFFER = 'qh_mobile_fs_offer';
 
 const $ = (id) => document.getElementById(id);
 
 let deferredInstall = null;
 let lockHeld = false;
+// 'landscape' | 'portrait' trên điện thoại. null = máy tính, theo hướng cửa sổ.
+let presented = null;
+let fsArmed = false;
 
 function iosDevice() {
   const ua = navigator.userAgent || '';
@@ -21,22 +22,6 @@ function installedApp() {
   return window.matchMedia('(display-mode: fullscreen)').matches
     || window.matchMedia('(display-mode: standalone)').matches
     || navigator.standalone === true;
-}
-
-function dismissed() {
-  try { return sessionStorage.getItem(DISMISS) === '1'; } catch (e) { return false; }
-}
-
-function rememberDismiss() {
-  try { sessionStorage.setItem(DISMISS, '1'); } catch (e) { /* chế độ riêng tư */ }
-}
-
-function fsAlreadyOffered() {
-  try { return sessionStorage.getItem(FS_OFFER) === '1'; } catch (e) { return false; }
-}
-
-function rememberFsOffer() {
-  try { sessionStorage.setItem(FS_OFFER, '1'); } catch (e) { /* chế độ riêng tư */ }
 }
 
 function screenLandscape() {
@@ -68,14 +53,21 @@ function phoneNow() {
   return Math.min(w, h) <= 560 && Math.max(w, h) <= 1400;
 }
 
+function wantLandscape() {
+  if (!phoneNow()) return deviceLandscape();
+  if (presented === 'portrait') return false;
+  return true;
+}
+
 function applyFrame() {
   const phone = phoneNow();
-  const land = deviceLandscape();
+  const land = wantLandscape();
   const root = document.documentElement;
   root.classList.toggle('is-phone', phone);
   root.classList.toggle('is-landscape', phone && land);
   root.classList.toggle('is-portrait', phone && !land);
   if (!phone) {
+    root.classList.remove('is-turned');
     root.style.removeProperty('--vv-w');
     root.style.removeProperty('--vv-h');
     return;
@@ -83,7 +75,10 @@ function applyFrame() {
   const vv = window.visualViewport;
   let w = Math.round((vv && vv.width) || window.innerWidth || 0);
   let h = Math.round((vv && vv.height) || window.innerHeight || 0);
-  if (land && h > w && w > 0) {
+  const viewLand = w > h;
+  const turned = w > 0 && h > 0 && land !== viewLand;
+  root.classList.toggle('is-turned', turned);
+  if (turned) {
     const swap = w;
     w = h;
     h = swap;
@@ -95,7 +90,7 @@ function applyFrame() {
     if (root.style.getPropertyValue('--vv-h') !== nextH) root.style.setProperty('--vv-h', nextH);
   }
   const btn = $('btnRotateScreen');
-  if (btn) btn.setAttribute('aria-pressed', phone && land && lockHeld ? 'true' : 'false');
+  if (btn) btn.setAttribute('aria-pressed', phone && land ? 'true' : 'false');
 }
 
 function nudgeViewport() {
@@ -112,68 +107,14 @@ function inFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
-function showToast(mode) {
-  const box = $('mobileFs');
-  const text = $('mobileFsText');
-  const go = $('btnMobileFs');
-  const later = $('btnMobileFsLater');
-  if (!box || !text || !go) return;
-  box.hidden = false;
-  box.dataset.mode = mode;
-  if (mode === 'fullscreen') {
-    text.textContent = 'Mở toàn màn hình để khóa chiều ngang. Nếu trình duyệt không cho phép, bố cục vẫn theo hướng máy.';
-    go.hidden = false;
-    go.textContent = 'Toàn màn hình';
-    if (later) later.hidden = false;
-  } else if (mode === 'lock-blocked') {
-    text.textContent = 'Trình duyệt không khóa được chiều xoay. Bố cục vẫn theo hướng máy.';
-    go.hidden = false;
-    go.textContent = 'Đóng';
-    if (later) later.hidden = true;
-  } else {
-    text.textContent = 'Xoay máy ngang để xem bản đồ. Bố cục đổi theo hướng máy.';
-    go.hidden = false;
-    go.textContent = 'Đóng';
-    if (later) later.hidden = false;
-  }
-}
-
-function hideToast() {
-  const box = $('mobileFs');
-  if (box) box.hidden = true;
-}
-
-function syncToast() {
-  const root = document.documentElement;
-  const phone = root.classList.contains('is-phone');
-  const land = root.classList.contains('is-landscape');
-  const box = $('mobileFs');
-  const mode = box && box.dataset.mode;
-  if (!phone) {
-    hideToast();
-    return;
-  }
-  if (box && !box.hidden && (mode === 'fullscreen' || mode === 'lock-blocked')) return;
-  if (land || dismissed() || installedApp()) {
-    hideToast();
-    return;
-  }
-  if (box && !box.hidden && mode === 'hint') return;
-  showToast('hint');
-}
-
-async function tryLockLandscape() {
+async function tryLock(orient) {
   if (!screen.orientation || !screen.orientation.lock) return false;
   try {
-    await screen.orientation.lock('landscape');
+    await screen.orientation.lock(orient);
     lockHeld = true;
-    const btn = $('btnRotateScreen');
-    if (btn) btn.setAttribute('aria-pressed', 'true');
     return true;
   } catch (e) {
     lockHeld = false;
-    const btn = $('btnRotateScreen');
-    if (btn) btn.setAttribute('aria-pressed', 'false');
     return false;
   }
 }
@@ -191,55 +132,25 @@ async function enterFullscreen() {
   }
 }
 
-// PWA đã cài (standalone): xin toàn màn hình để thanh trạng thái và thanh điều hướng không che giao diện.
-// Lần gọi lúc tải thường thiếu cử chỉ; lần chạm đầu tiên thử lại. Từ chối thì thôi, không nhắc.
-let standaloneFsDone = false;
-function requestStandaloneFullscreen() {
-  if (standaloneFsDone || !installedApp() || inFullscreen()) return;
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) return;
-  Promise.resolve(req.call(el)).then(() => { standaloneFsDone = true; }).catch(() => {});
+// Toàn màn hình rồi khóa chiều. Từ chối thì bố cục CSS đã áp, không nhắc.
+async function engage(orient) {
+  if (orient === 'landscape') await enterFullscreen();
+  const ok = await tryLock(orient);
+  if (!ok && screen.orientation && screen.orientation.unlock && orient === 'portrait') {
+    try { screen.orientation.unlock(); } catch (e) { /* giữ bố cục CSS */ }
+    lockHeld = false;
+  }
+  applyFrame();
+  window.dispatchEvent(new Event('resize'));
 }
 
 async function toggleLandscape() {
-  const land = deviceLandscape();
-  if (land && lockHeld && screen.orientation && screen.orientation.unlock) {
-    try {
-      screen.orientation.unlock();
-      lockHeld = false;
-      const btn = $('btnRotateScreen');
-      if (btn) btn.setAttribute('aria-pressed', 'false');
-      return;
-    } catch (e) { /* thử khóa lại */ }
-  }
-  if (land) {
-    const ok = await tryLockLandscape();
-    if (!ok) showToast('lock-blocked');
-    else hideToast();
-    applyFrame();
-    return;
-  }
-  const el = document.documentElement;
-  const canFs = !!(el.requestFullscreen || el.webkitRequestFullscreen);
-  if (!inFullscreen() && canFs && !fsAlreadyOffered()) {
-    rememberFsOffer();
-    showToast('fullscreen');
-    return;
-  }
-  if (canFs && !inFullscreen()) await enterFullscreen();
-  const ok = await tryLockLandscape();
-  if (!ok) showToast('lock-blocked');
-  else hideToast();
+  if (!phoneNow()) return;
+  presented = wantLandscape() ? 'portrait' : 'landscape';
   applyFrame();
-}
-
-async function onFullscreenAccept() {
-  await enterFullscreen();
-  const ok = await tryLockLandscape();
-  if (!ok) showToast('lock-blocked');
-  else hideToast();
-  applyFrame();
+  nudgeViewport();
+  window.dispatchEvent(new Event('resize'));
+  await engage(presented);
 }
 
 function syncInstallButton() {
@@ -292,7 +203,6 @@ async function installApp() {
 
 function paint() {
   applyFrame();
-  syncToast();
   syncInstallButton();
 }
 
@@ -305,19 +215,10 @@ function kick() {
 }
 
 export function initMobileShell() {
+  if (phoneNow()) presented = 'landscape';
   $('btnRotateScreen')?.addEventListener('click', () => { toggleLandscape(); });
   $('btnInstallApp')?.addEventListener('click', () => { installApp(); });
   $('btnInstallGuideClose')?.addEventListener('click', hideInstallGuide);
-  $('btnMobileFs')?.addEventListener('click', () => {
-    const mode = $('mobileFs')?.dataset.mode;
-    if (mode === 'fullscreen') onFullscreenAccept();
-    else if (mode === 'lock-blocked') hideToast();
-    else { rememberDismiss(); hideToast(); }
-  });
-  $('btnMobileFsLater')?.addEventListener('click', () => {
-    rememberDismiss();
-    hideToast();
-  });
   PHONE.addEventListener('change', kick);
   VIEW_LAND.addEventListener('change', kick);
   window.addEventListener('orientationchange', kick);
@@ -338,14 +239,15 @@ export function initMobileShell() {
     hideInstallGuide();
     syncInstallButton();
   });
-  const onStandaloneGesture = () => {
-    if (standaloneFsDone || inFullscreen()) {
-      document.removeEventListener('pointerdown', onStandaloneGesture, true);
-      return;
-    }
-    requestStandaloneFullscreen();
+  const onFirstGesture = (event) => {
+    if (fsArmed || !phoneNow() || presented !== 'landscape') return;
+    if (event.target && event.target.closest && event.target.closest('#btnRotateScreen')) return;
+    fsArmed = true;
+    document.removeEventListener('pointerdown', onFirstGesture, true);
+    if (inFullscreen() && lockHeld) return;
+    engage('landscape');
   };
-  document.addEventListener('pointerdown', onStandaloneGesture, true);
-  requestStandaloneFullscreen();
+  document.addEventListener('pointerdown', onFirstGesture, true);
+  if (phoneNow()) engage('landscape');
   paint();
 }
