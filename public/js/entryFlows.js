@@ -12,6 +12,8 @@ import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from '.
 import { putSignedPdf, PDF_INLINE_MAX_BYTES } from './pdfLimits.js';
 import { loadCongSuat } from './congSuat.js';
 import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
+import { pdfProblem, sendAdjustment } from './adjustLayer.js';
+import { focusAdjustSupplement } from './adjustImport.js';
 
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
@@ -433,6 +435,11 @@ function renderHoSo() {
   const allow = allowedKeys();
   const locked = Array.isArray(allow) && allow.length === 1;
   const scheme = $('hoScheme')?.value || '';
+  const adjSummary = $('hoAdjSummary')?.value || '';
+  const adjNote = $('hoAdjNote')?.value || '';
+  const adjId = $('hoAdjId')?.value || '';
+  const adjPdfName = held.adjPdf ? held.adjPdf.name : '';
+  const adjOpen = !!$('hoAdjust')?.open;
   const level = $('hoLevel')?.value || 'QHPK';
   const scope = locked ? scopeOfKey(allow[0]) : ($('hoScope')?.value || 'xa');
   const unit = locked ? allow[0] : ($('hoUnit')?.value || optionsFirst(scope));
@@ -461,7 +468,28 @@ function renderHoSo() {
     <div id="hoActive"></div>
     <button type="button" class="btn-submit" id="hoSave">Lưu hồ sơ</button>
     <button type="button" class="btn-submit btn-secondary" id="hoDownload">Tải GeoJSON đã gắn trục</button>
-    <div id="hoStatus" class="rp-status" role="status"></div>`;
+    <div id="hoStatus" class="rp-status" role="status"></div>
+    <details class="entry-legacy" id="hoAdjust"${adjOpen ? ' open' : ''}>
+      <summary>Ghi bổ sung hồ sơ điều chỉnh cục bộ</summary>
+      <p class="entry-note">Gửi trước PDF quyết định và tóm tắt. Bản vẽ scan và DXF gắn sau, không bắt buộc lúc này. Quản trị ghi thẳng. Cán bộ vào hàng chờ.</p>
+      <div class="form-grid">
+        <label for="hoAdjSummary">Tóm tắt</label>
+        <input id="hoAdjSummary" maxlength="300" placeholder="Ví dụ: Điều chỉnh chiều cao vị trí A" value="${escapeHtml(adjSummary)}">
+        <label for="hoAdjNote">Ghi chú</label>
+        <input id="hoAdjNote" maxlength="300" placeholder="Số quyết định, nguồn (không bắt buộc)" value="${escapeHtml(adjNote)}">
+        <label for="hoAdjId">Mã hồ sơ</label>
+        <input id="hoAdjId" maxlength="16" placeholder="Hiện sau khi gửi, dùng khi gắn bản vẽ" value="${escapeHtml(adjId)}">
+      </div>
+      <label class="cad-drop" for="hoAdjPdf">
+        <span class="cad-drop-main"><b>Quyết định (PDF)</b></span>
+        <span class="cad-drop-sub">${adjPdfName ? escapeHtml(adjPdfName) : 'Chỉ file PDF. Bản vẽ thêm sau.'}</span>
+        <input type="file" id="hoAdjPdf" accept=".pdf" hidden>
+      </label>
+      <div id="hoAdjPdfNote" class="entry-note"></div>
+      <button type="button" class="btn-submit" id="hoAdjSave">Gửi quyết định điều chỉnh</button>
+      <button type="button" class="btn-submit btn-secondary" id="hoAdjDraw">Bổ sung bản vẽ</button>
+      <div id="hoAdjStatus" class="rp-status" role="status"></div>
+    </details>`;
   $('hoScope')?.addEventListener('change', () => { if ($('hoUnit')) $('hoUnit').innerHTML = optionsHtml($('hoScope').value, ''); renderActive(); });
   $('hoNav')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-step]');
@@ -471,7 +499,76 @@ function renderHoSo() {
   });
   $('hoSave')?.addEventListener('click', saveHoSo);
   $('hoDownload')?.addEventListener('click', downloadHoSo);
+  $('hoAdjPdf')?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    const note = $('hoAdjPdfNote');
+    if (!file) return;
+    const bad = pdfProblem(file, isAdmin());
+    if (bad) {
+      held.adjPdf = null;
+      if (note) note.textContent = bad;
+      return;
+    }
+    held.adjPdf = file;
+    if (note) note.textContent = `${file.name} — bản vẽ scan và DXF không bắt buộc lúc này.`;
+  });
+  $('hoAdjSave')?.addEventListener('click', saveLocalAdjust);
+  $('hoAdjDraw')?.addEventListener('click', () => {
+    const tenQH = $('hoScheme')?.value.trim() || '';
+    const id = ($('hoAdjId')?.value || '').trim().toLowerCase();
+    const status = $('hoAdjStatus');
+    if (!tenQH || !/^[a-f0-9]{16}$/.test(id)) {
+      if (status) status.textContent = 'Gửi quyết định trước, hoặc dán mã hồ sơ 16 ký tự.';
+      return;
+    }
+    focusAdjustSupplement(tenQH, id);
+  });
   renderActive();
+}
+
+async function saveLocalAdjust() {
+  const status = $('hoAdjStatus');
+  const tenQH = $('hoScheme')?.value.trim() || '';
+  const title = $('hoAdjSummary')?.value.trim() || '';
+  const note = $('hoAdjNote')?.value.trim() || '';
+  if (!signedIn()) {
+    if (status) status.textContent = 'Đăng nhập cán bộ hoặc quản trị để gửi hồ sơ.';
+    return;
+  }
+  if (!tenQH) {
+    if (status) status.textContent = 'Nhập tên đồ án ở ô Đồ án phía trên.';
+    return;
+  }
+  if (!title) {
+    if (status) status.textContent = 'Nhập tóm tắt điều chỉnh cục bộ.';
+    return;
+  }
+  if (!held.adjPdf) {
+    if (status) status.textContent = 'Chọn PDF quyết định. Bản vẽ scan và DXF gắn sau.';
+    return;
+  }
+  try {
+    if (status) status.textContent = 'Đang gửi quyết định…';
+    const out = await sendAdjustment({
+      tenQH,
+      title,
+      note,
+      pdfOnly: true,
+      sender: (state.authUser && (state.authUser.name || state.authUser.email)) || ''
+    }, held.adjPdf, null);
+    held.adjPdf = null;
+    const id = out.item && out.item.id || '';
+    if ($('hoAdjId')) $('hoAdjId').value = id;
+    const pdfNote = $('hoAdjPdfNote');
+    if (pdfNote) pdfNote.textContent = '';
+    if (status) {
+      status.textContent = out.approved
+        ? `Đã ghi quyết định. Mã ${id}. Bấm «Bổ sung bản vẽ» khi có DXF hoặc ảnh scan.`
+        : `Đã gửi, chờ quản trị duyệt. Mã ${id}. Có thể bổ sung bản vẽ trước khi duyệt.`;
+    }
+  } catch (err) {
+    if (status) status.textContent = err.message;
+  }
 }
 
 function renderActive() {

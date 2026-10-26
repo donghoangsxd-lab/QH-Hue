@@ -473,6 +473,11 @@ async function adminOrNull(req) {
   try { return await requireAdmin(req); } catch (err) { return null; }
 }
 
+async function signedActor(req) {
+  if (!req.headers.authorization) return null;
+  try { return await verifyGoogleIdToken(readBearerToken(req)); } catch (err) { return null; }
+}
+
 function looksLikeCadFile(ext, content) {
   if (ext === 'dxf') return content.slice(0, 4000).includes('SECTION') && content.includes('ENTITIES');
   if (ext === 'kml') return /<kml[\s>]/i.test(content.slice(0, 5000));
@@ -4124,16 +4129,58 @@ module.exports = async (req, res) => {
     // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ. PDF người dùng 2 MB, admin 10 MB; ảnh scan ≤ 2 MB ----
     if (action === 'submitAdjust') {
       requirePostFromApp(req);
-      const admin = await adminOrNull(req);
+      const actor = await signedActor(req);
+      const admin = actor && isAdminEmail(actor.email) ? actor : null;
       if (!admin) checkAdjustRate(req);
       const body = readJsonBody(req);
       const tenQH = sanitizeSheetText(body.tenQH, 120);
       if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const pdfOnly = body.pdfOnly === true;
+      if (pdfOnly) {
+        const staged = stagedTokenOf(body);
+        let buffer = null;
+        if (!staged) {
+          try { buffer = pdfLimits.inlineBuffer(body.pdf, !!admin); }
+          catch (err) { return sendInlinePdfError(res, err); }
+        }
+        const saved = await projects.saveAdjustment({
+          tenQH, title: body.title, sender: body.sender, note: body.note, pdfOnly: true,
+          approved: !!admin, by: admin ? admin.email : '', owner: actor ? actor.email : ''
+        });
+        try {
+          const pdf = await projects.attachAdjustPdf({
+            id: saved.id, fileName: body.name, buffer, stagedToken: staged, admin: !!admin
+          });
+          return res.status(200).json({ success: true, item: { ...saved, pdf } });
+        } catch (err) {
+          try { await projects.removeAdjustment(saved.id); } catch (e) { /* hồ sơ không còn file nếu xóa chỉ mục lỗi */ }
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gắn được PDF quyết định' });
+        }
+      }
       const saved = await projects.saveAdjustment({
         tenQH, boundary: body.boundary, lots: body.lots, codes: body.codes, title: body.title,
-        sender: body.sender, note: body.note, verdict: body.verdict, approved: !!admin, by: admin ? admin.email : ''
+        sender: body.sender, note: body.note, verdict: body.verdict, approved: !!admin, by: admin ? admin.email : '',
+        owner: actor ? actor.email : ''
       });
       return res.status(200).json({ success: true, item: saved });
+    }
+
+    if (action === 'putAdjustDraw') {
+      requirePostFromApp(req);
+      const admin = await adminOrNull(req);
+      if (!admin) checkAdjustRate(req);
+      const body = readJsonBody(req);
+      const saved = await projects.attachAdjustDraw({
+        id: String(body.id || ''), boundary: body.boundary, lots: body.lots, codes: body.codes, admin: !!admin
+      });
+      return res.status(200).json({ success: true, item: saved });
+    }
+
+    if (action === 'listOwnAdjustments') {
+      requirePostFromApp(req);
+      const actor = await verifyGoogleIdToken(readBearerToken(req));
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).json({ v: 1, items: await projects.listOwnAdjustments(actor.email) });
     }
 
     if (action === 'putAdjustPdf') {

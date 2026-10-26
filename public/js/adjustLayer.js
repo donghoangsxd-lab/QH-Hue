@@ -61,7 +61,7 @@ const scanUrls = new Map();    // id → { at, url, blob } ảnh hồ sơ chờ 
 
 function headers(admin) {
   const h = { 'Content-Type': 'application/json' };
-  if (admin) h.Authorization = `Bearer ${state.authToken}`;
+  if (admin || state.authToken) h.Authorization = `Bearer ${state.authToken}`;
   return h;
 }
 
@@ -105,34 +105,65 @@ export async function putScan(id, scan) {
  * Gửi hồ sơ (Admin ghi thẳng, người dùng vào hàng chờ), rồi gắn PDF và ảnh scan ở các yêu cầu sau.
  * scan: { blob, name, georef } từ prepareScan + openGeoref, không bắt buộc.
  */
+async function attachPdfBody(id, pdfFile) {
+  const admin = isAdmin();
+  const body = { id, name: pdfFile.name };
+  if (admin && pdfFile.size > pdfMaxBytes(false)) {
+    const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
+      method: 'POST', headers: headers(true),
+      body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name, id })
+    }));
+    await putSignedPdf(sign, pdfFile);
+    body.staged = sign.token;
+    body.bytes = pdfFile.size;
+  } else body.pdf = await fileBase64(pdfFile);
+  const out = await readJsonResponse(await fetch(geeApi('action=putAdjustPdf'), {
+    method: 'POST', headers: headers(admin), body: JSON.stringify(body)
+  }));
+  return out.pdf;
+}
+
+/** Gắn PDF vào hồ sơ đã có (bổ sung sau, hoặc hồ sơ DXF gửi thiếu file). */
+export async function attachAdjustPdfFile(id, pdfFile) {
+  const bad = pdfProblem(pdfFile, isAdmin());
+  if (bad) throw new Error(bad);
+  const pdf = await attachPdfBody(id, pdfFile);
+  if (isAdmin()) await reloadAdjustments();
+  return pdf;
+}
+
+/**
+ * Gửi hồ sơ (Admin ghi thẳng, người dùng vào hàng chờ), rồi gắn PDF và ảnh scan ở các yêu cầu sau.
+ * payload.pdfOnly: chỉ quyết định + tóm tắt (title). PDF đi cùng yêu cầu, không cần DXF.
+ * scan: { blob, name, georef } từ prepareScan + openGeoref, không bắt buộc.
+ */
 export async function sendAdjustment(payload, pdfFile, scan) {
   const admin = isAdmin();
+  const body = { ...(payload || {}) };
+  if (body.pdfOnly) {
+    if (!pdfFile) throw new Error('Chọn PDF quyết định điều chỉnh');
+    if (!String(body.title || '').trim()) throw new Error('Nhập tóm tắt điều chỉnh cục bộ');
+    const bad = pdfProblem(pdfFile, admin);
+    if (bad) throw new Error(bad);
+    body.name = pdfFile.name;
+    if (admin && pdfFile.size > pdfMaxBytes(false)) {
+      const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
+        method: 'POST', headers: headers(true),
+        body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name })
+      }));
+      await putSignedPdf(sign, pdfFile);
+      body.staged = sign.token;
+      body.bytes = pdfFile.size;
+    } else body.pdf = await fileBase64(pdfFile);
+  }
   const data = await readJsonResponse(await fetch(geeApi('action=submitAdjust'), {
-    method: 'POST', headers: headers(admin), body: JSON.stringify(payload)
+    method: 'POST', headers: headers(admin), body: JSON.stringify(body)
   }));
   let pdfError = '';
   let scanError = '';
-  if (pdfFile) {
-    try {
-      const body = { id: data.item.id, name: pdfFile.name };
-      if (admin && pdfFile.size > pdfMaxBytes(false)) {
-        const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
-          method: 'POST', headers: headers(true),
-          body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name, id: data.item.id })
-        }));
-        await putSignedPdf(sign, pdfFile);
-        body.staged = sign.token;
-        body.bytes = pdfFile.size;
-      } else {
-        body.pdf = await fileBase64(pdfFile);
-      }
-      const out = await readJsonResponse(await fetch(geeApi('action=putAdjustPdf'), {
-        method: 'POST', headers: headers(admin), body: JSON.stringify(body)
-      }));
-      data.item.pdf = out.pdf;
-    } catch (err) {
-      pdfError = err.message || 'Chưa gắn được PDF';
-    }
+  if (pdfFile && !body.pdfOnly) {
+    try { data.item.pdf = await attachPdfBody(data.item.id, pdfFile); }
+    catch (err) { pdfError = err.message || 'Chưa gắn được PDF'; }
   }
   if (scan && scan.blob && scan.georef) {
     try {
@@ -141,8 +172,59 @@ export async function sendAdjustment(payload, pdfFile, scan) {
       scanError = err.message || 'Chưa gắn được ảnh scan';
     }
   }
-  if (admin) await reloadAdjustments();
+  if (admin) {
+    await reloadAdjustments();
+    await loadAdjustPending();
+  }
   return { item: data.item, approved: data.item.status === 'approved', pdfError, scanError };
+}
+
+/** Gắn DXF (và ảnh scan nếu có) vào hồ sơ điều chỉnh đã tạo. */
+export async function sendAdjustDraw(id, payload, scan) {
+  const admin = isAdmin();
+  const data = await readJsonResponse(await fetch(geeApi('action=putAdjustDraw'), {
+    method: 'POST', headers: headers(admin),
+    body: JSON.stringify({
+      id, boundary: payload && payload.boundary, lots: payload && payload.lots, codes: payload && payload.codes
+    })
+  }));
+  let scanError = '';
+  if (scan && scan.blob && scan.georef) {
+    try { data.item.scan = await putScan(id, scan); }
+    catch (err) { scanError = err.message || 'Chưa gắn được ảnh scan'; }
+  }
+  if (admin) {
+    await reloadAdjustments();
+    await loadAdjustPending();
+  }
+  return { item: data.item, scanError };
+}
+
+/** Hồ sơ của một đồ án để gắn bản vẽ sau: admin thấy mọi trạng thái, cán bộ thấy hồ sơ chờ của mình và hồ sơ đã duyệt. */
+export async function schemeAdjustments(tenQH) {
+  const name = String(tenQH || '');
+  const rows = [];
+  const push = (list) => (list || []).forEach(it => {
+    if (!it || it.tenQH !== name || rows.some(x => x.id === it.id)) return;
+    rows.push(it);
+  });
+  if (isAdmin()) {
+    const data = await readJsonResponse(await fetch(geeApi('action=getAdjustments'), {
+      method: 'POST', headers: headers(true), body: '{}'
+    }));
+    push(data.items);
+    return rows.sort((a, b) => (b.at || 0) - (a.at || 0));
+  }
+  if (state.authToken) {
+    try {
+      const data = await readJsonResponse(await fetch(geeApi('action=listOwnAdjustments'), {
+        method: 'POST', headers: headers(false), body: '{}'
+      }));
+      push(data.items);
+    } catch (err) { /* phiên không đọc được hàng của mình */ }
+  }
+  push(items.filter(x => x.status === 'approved'));
+  return rows.sort((a, b) => (b.at || 0) - (a.at || 0));
 }
 
 // ============================ VẼ LÊN BẢN ĐỒ ============================
@@ -321,11 +403,23 @@ export function adjustmentsOf(tenQH) {
   return items.filter(x => x.status === 'approved' && x.tenQH === tenQH).sort((a, b) => (b.at || 0) - (a.at || 0));
 }
 
+/** Danh sách trong tab hồ sơ: đã duyệt theo thời gian, admin thêm hàng chờ. */
+export function dossierAdjustments(tenQH, includePending) {
+  const rows = items.filter(x => x.status === 'approved' && x.tenQH === tenQH);
+  if (includePending) {
+    pendingItems.forEach(x => {
+      if (x && x.tenQH === tenQH && x.status === 'pending' && !rows.some(r => r.id === x.id)) rows.push(x);
+    });
+  }
+  return rows.sort((a, b) => (a.at || 0) - (b.at || 0) || String(a.id).localeCompare(String(b.id)));
+}
+
 /** Ranh + lô của các hồ sơ đã duyệt, cũ trước mới sau, để bảng đất tính cột ĐC cục bộ */
 export async function adjustmentPacks(tenQH) {
   if (!items.length) await reloadAdjustments();
   const packs = [];
   for (const it of adjustmentsOf(tenQH).slice().reverse()) {
+    if (!it.boundary) continue;
     try {
       const d = await detailOf(it);
       packs.push({ boundary: d.boundary || it.boundary, lots: Array.isArray(d.lots) ? d.lots : [], at: it.at || 0 });
@@ -736,7 +830,7 @@ function detailOf(it) {
 
 async function toggle(id) {
   const it = items.find(x => x.id === id);
-  if (!it) return;
+  if (!it || !it.boundary) return;
   if (active.has(id)) {
     active.delete(id);
     reverted.add(id);
@@ -777,9 +871,13 @@ export async function reloadAdjustments() {
 
 /** Phóng tới ranh hồ sơ và mở popup (danh sách hồ sơ trong thư mục đồ án) */
 function locate(id) {
-  const it = items.find(x => x.id === id);
+  const it = items.find(x => x.id === id) || pendingItems.find(x => x.id === id);
   const m = isCompareOn() && planMap ? planMap : map;
   if (!it || !it.boundary || !m) return;
+  if (!items.some(x => x.id === id)) {
+    items.push(it);
+    refreshAdjustLayer();
+  }
   const bounds = L.geoJSON(it.boundary).getBounds();
   if (!bounds.isValid()) return;
   // Đổi zoom không hoạt ảnh thì moveend phát ngay trong fitBounds: gắn trước
@@ -871,11 +969,16 @@ export async function loadAdjustPending() {
   } catch (err) {
     box.innerHTML = `<div class="adj-pending-head">Hồ sơ điều chỉnh chờ duyệt</div><div class="adj-pending-note">Không tải được: ${escapeHtml(err.message)}</div>`;
   }
+  document.dispatchEvent(new CustomEvent(ADJUST_CHANGE_EVENT));
 }
 
 async function preview(id) {
   const it = pendingItems.find(x => x.id === id) || items.find(x => x.id === id);
   if (!it) return;
+  if (!it.boundary) {
+    showToast('Hồ sơ mới có quyết định, chưa có ranh bản vẽ', 'info');
+    return;
+  }
   if (!items.some(x => x.id === id)) items.push(it);
   try {
     await detailOf(it);

@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261086">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261087">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261086">
+  <link rel="stylesheet" href="css/style.css?v=20261087">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -1107,7 +1107,7 @@
           <div class="cad-pending" id="cadPendingBox" hidden></div>
           <div class="add-mode-switch bulk-kind" role="radiogroup" aria-label="Loại hồ sơ nhập">
             <label class="bulk-kind-btn"><input type="radio" name="bulkKind" value="plan" checked>Đồ án / hiện trạng</label>
-            <label class="bulk-kind-btn" title="Một hồ sơ điều chỉnh cục bộ đã có Quyết định: DXF + ảnh bản vẽ scan + PDF Quyết định"><input type="radio" name="bulkKind" value="adjust">Điều chỉnh cục bộ</label>
+            <label class="bulk-kind-btn" title="Điều chỉnh cục bộ: gửi trước PDF quyết định và tóm tắt. DXF và ảnh scan gắn sau."><input type="radio" name="bulkKind" value="adjust">Điều chỉnh cục bộ</label>
           </div>
           <div id="adjImportBox" class="adj-import">
             <label class="cad-pair" for="adjProjectSearch">Đồ án được điều chỉnh
@@ -1121,13 +1121,17 @@
                 <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
                 <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
               </select>
-              <label for="adjTitle">Tên hồ sơ</label>
-              <input type="text" id="adjTitle" maxlength="300" placeholder="Để trống: tự đặt theo ký hiệu lô" />
+              <label for="adjTitle">Tóm tắt</label>
+              <input type="text" id="adjTitle" maxlength="300" placeholder="Tóm tắt nội dung điều chỉnh, dùng để tìm lại" />
+              <label for="adjExisting">Hồ sơ đã gửi</label>
+              <select id="adjExisting"><option value="">Hồ sơ mới</option></select>
+              <label for="adjExistingId">Mã hồ sơ</label>
+              <input type="text" id="adjExistingId" maxlength="16" placeholder="16 ký tự, nếu không thấy trong danh sách" autocomplete="off" />
             </div>
             <label class="cad-drop" id="adjDrop" for="adjFiles">
               <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
               <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
-              <span class="cad-drop-sub">DXF bắt buộc: ranh trên lớp có chữ RANH và mẫu tô đất theo Thông tư 16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF quyết định phê duyệt tối đa 2 MB; quản trị viên tối đa 10 MB (không bắt buộc). Không chấm QCVN. Lô gốc của đồ án giữ nguyên.</span>
+              <span class="cad-drop-sub">Lần đầu chỉ cần PDF quyết định và tóm tắt. DXF (ranh lớp có chữ RANH, mẫu tô Thông tư 16) và ảnh scan gắn sau vào cùng hồ sơ. Có thể kèm <b>KH - ….dxf</b>. PDF tối đa 2 MB; quản trị viên tối đa 10 MB. Không chấm QCVN. Lô gốc của đồ án giữ nguyên.</span>
               <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
             </label>
             <div id="adjFileList" class="adj-files"></div>
@@ -1639,6 +1643,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261086"></script>
+  <script type="module" src="./js/app.js?v=20261087"></script>
 </body>
 </html>
