@@ -8,7 +8,7 @@
 // Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; QHPK/QHCT mở đồ án chứa thửa.
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
-import { map, WARD_BOUNDS_EVENT, landCode } from './mapEngine.js';
+import { map, WARD_BOUNDS_EVENT, landCode as planningLotCode } from './mapEngine.js';
 import { state } from './state.js';
 import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
 import { watchTiles } from './loadProgress.js';
@@ -837,7 +837,7 @@ async function planningLotAt(latlng) {
 
 function planLotCardHtml(tab, lot) {
   const label = landLabel(lot.layer);
-  const code = landCode(lot);
+  const code = planningLotCode(lot);
   const title = (code && code !== label ? code : '') || label || 'Lô đất quy hoạch';
   const sub = [label && label !== title ? label : '', schemeTitle(lot.file)].filter(Boolean).join(' · ');
   return `${tabsBar(tab, 'Lô đất quy hoạch', 'Đóng bảng lô đất quy hoạch')}
