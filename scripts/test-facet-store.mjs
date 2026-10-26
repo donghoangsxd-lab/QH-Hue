@@ -183,6 +183,7 @@ assert.match(kienTrucUi, /data-arch-photo/);
 assert.match(kienTrucUi, /archPhotoStrip\(item\)\}\$\{open \? archDossier/);
 assert.match(kienTrucUi, /cache: 'no-store'/);
 assert.doesNotMatch(kienTrucUi, /putSignedPdf/);
+assert.match(kienTrucUi, /geeApi\(`action=\$\{encodeURIComponent\(body\.action/);
 assert.match(kienTrucUi, /class="arch-pin/);
 assert.doesNotMatch(kienTrucUi, /data-arch-qd/);
 assert.doesNotMatch(kienTrucUi, /archPopup|marker\.bindPopup|marker\.bindTooltip/);

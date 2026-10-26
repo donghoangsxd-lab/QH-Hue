@@ -825,7 +825,7 @@ function fileBase64(file) {
 }
 
 async function postArch(body) {
-  const res = await fetch(geeApi(''), {
+  const res = await fetch(geeApi(`action=${encodeURIComponent(body.action || '')}`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
     body: JSON.stringify(body)
