@@ -519,6 +519,7 @@ const CITY_SCHEMES = new Set(['qhc-hue-2045', 'qhc-trung-tam']);
 
 // Đồ án QHC địa phương (Phú Lộc, Khe Tre, Vinh Hưng, KCN, Chân Mây) hiện ở cả hai tab QHC,
 // không chỉ khi đang chọn đúng mức 1/10.000. Phạm vi hành chính vẫn lọc lớp.
+// homeLevel (QHC xã): đồ án gốc đã gắn một cấp, không nhân sang tab QHC còn lại.
 export function schemesForSector(sector, level, catalog = []) {
   const rows = schemesAt(level, catalog).map(s => ({ ...s }));
   if (level !== 'QHC25' && level !== 'QHC10') return rows;
@@ -527,6 +528,8 @@ export function schemesForSector(sector, level, catalog = []) {
   ['QHC25', 'QHC10'].forEach(lv => {
     schemesAt(lv, catalog).forEach(s => {
       if (seen.has(s.slug) || CITY_SCHEMES.has(s.slug)) return;
+      const meta = schemeMeta(s.slug);
+      if (meta && meta.homeLevel && meta.homeLevel !== level) return;
       if (!layersFor(sector, lv, s.slug, { filter: false }).length) return;
       seen.add(s.slug);
       extras.push({ ...s, level: lv, local: true });

@@ -2,6 +2,7 @@
 // khi tick đồ án QHC / QHPK / QHCT, hoặc khi bật «Đồ án đã lưu» (showLand) trong thẩm định.
 // Đang xem QHC / QHPK / QHCT thì không tải theo ngưỡng zoom hay ô «Ranh lô»: có ranh không đủ để mở nội.
 // Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
+// Đồ án linked (QHC xã) đọc GeoJSON đã có qua linkedLots, ghép từ data/qhc-xa/catalog.json.
 // Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
@@ -12,6 +13,8 @@ import { schemeDetailOpen } from './schemeVisibility.js';
 import { getLevel } from './mapLevel.js';
 import { isLevelPair, sideOf } from './splitPair.js';
 import { planMap } from './planMap.js';
+import { SHELL_V } from './gbaVersion.js';
+import { linkedAssetHref, mergeLinkedProjects, parcelsFromCollection } from './linkedLots.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -398,12 +401,30 @@ function isFresh(entry) {
 const inflight = new Map();
 function loadEntry(entry) {
   if (isFresh(entry)) return Promise.resolve(cache.get(entry.tenQH));
-  const key = `${entry.tenQH}|${entry.saved || 0}|${!!entry.legacy}`;
+  const key = `${entry.tenQH}|${entry.saved || 0}|${!!entry.legacy}|${entry.linked ? 'link' : ''}`;
   if (!inflight.has(key)) inflight.set(key, fetchEntry(entry).finally(() => inflight.delete(key)));
   return inflight.get(key);
 }
 
+async function parcelsFromLinked(entry) {
+  const lots = entry.linkedLots || {};
+  const jobs = [['hien-trang', 'HT'], ['su-dung-dat', 'QH']];
+  const parts = await Promise.all(jobs.map(async ([key, phase]) => {
+    const file = lots[key];
+    if (!file) return [];
+    const res = await fetch(linkedAssetHref(file, SHELL_V));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return parcelsFromCollection(await res.json(), phase);
+  }));
+  return parts.flat();
+}
+
 async function fetchEntry(entry) {
+  if (entry.linked && entry.linkedLots) {
+    const row = { saved: entry.saved || 0, legacy: false, parcels: await parcelsFromLinked(entry) };
+    cache.set(entry.tenQH, row);
+    return row;
+  }
   if (!entry.legacy && entry.slug && base && entry.dir) {
     try {
       const row = { saved: entry.saved || 0, legacy: false, ...(await loadDir(entry)) };
@@ -802,13 +823,27 @@ function trimMinorWards(p) {
   return wards.length && wards.length < p.wards.length ? { ...p, wards, wardsAll: p.wards } : p;
 }
 
+async function fetchLinkedCatalog() {
+  try {
+    const res = await fetch(linkedAssetHref('data/qhc-xa/catalog.json', SHELL_V));
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.projects) ? data.projects : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 export async function loadCatalog() {
-  const res = await fetch(geeApi('action=getProjectIndex'));
+  const [res, linked] = await Promise.all([
+    fetch(geeApi('action=getProjectIndex')),
+    fetchLinkedCatalog()
+  ]);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   base = data.base || '';
   state.projectBase = base;
-  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : [])
+  state.projectCatalog = dropLegacyDuplicates(mergeLinkedProjects(Array.isArray(data.projects) ? data.projects : [], linked))
     .filter(p => !(p && SCHEME_ALIAS[p.slug]))
     .map(trimMinorWards);
   state.projectAreas = state.projectCatalog.filter(p => p && p.boundary).map(p => ({
