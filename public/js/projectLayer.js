@@ -5,11 +5,11 @@
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link).
-// Mở đồ án: hồ sơ văn bản thêm được nhiều PDF (quyết định phê duyệt / đính chính, quy chế, thuyết minh).
+// Mở đồ án: bốn dòng hồ sơ — quyết định phê duyệt, quy định quản lý (role quy-dinh), hệ thống bản vẽ, điều chỉnh cục bộ.
 // Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
-// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng (giao thông, cấp nước, thoát nước, cấp điện).
+// Mũi tên cuối tên đồ án mở bốn dòng hồ sơ. Dòng bản vẽ mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng.
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
-// Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
+// Điều chỉnh cục bộ: tóm tắt làm nhãn, xem quyết định và bản vẽ scan. Ranh bật trong danh sách con.
 // Mỗi đồ án một màu viền, nhãn tên ở giữa ranh. Nền polygon ranh trong suốt: nội (lô) chỉ khi tick hoặc đang mở đúng đồ án.
 // QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
 // bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn.
@@ -37,10 +37,11 @@ import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
-import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
+import { dossierAdjustments, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
+import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
 import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
-import { getAreaFilter, onFacet } from './facetStore.js';
+import { getAreaFilter, onFacet, schemeRecords as catalogSchemeRecords } from './facetStore.js';
 import {
   STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
 } from './storageSchema.js';
@@ -98,6 +99,7 @@ const expanded = new Set();
 const layerInfo = new Map();
 let layerBusy = null;
 const adjOpen = new Set();
+const drawOpen = new Set();
 
 // ============================ RANH TỔNG ĐỒ ÁN ============================
 
@@ -787,6 +789,24 @@ function scrollWithin(el) {
 
 const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
+function decisionLine(p) {
+  const rows = catalogSchemeRecords();
+  const hit = rows.find(r => r && (
+    r.slug === p.slug || r.catalogScheme === p.slug || r.name === p.name || r.name === p.short || r.name === p.full
+  ));
+  return pickDecisionCite({
+    fileName: (p.decision && p.decision.name) || '',
+    schemeDecision: (hit && hit.decision) || '',
+    schemeDate: (hit && hit.decisionDate) || ''
+  });
+}
+
+function dossierSearchText(p) {
+  const docs = (p.docs || []).map(d => `${d.name || ''} ${d.role || ''}`).join(' ');
+  const adj = dossierAdjustments(p.name, isAdmin()).map(it => `${it.title || ''} ${it.summary || ''} ${it.note || ''}`).join(' ');
+  return foldText(`${p.name} ${p.short} ${p.full} ${decisionLine(p)} ${docs} ${adj}`);
+}
+
 function renderHead() {
   const shownN = projects.filter(p => projectShown(p.name)).length;
   const count = $('planTabCount');
@@ -898,7 +918,7 @@ function renderList() {
   if (!box) return;
   parkStatic();
   const q = foldText(query.trim());
-  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || foldText(`${p.name} ${p.short} ${p.full}`).includes(q));
+  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || dossierSearchText(p).includes(q));
   const admin = isAdmin();
   const legacyN = projects.filter(p => p.legacy).length;
   const migrating = busy === '__migrate__';
@@ -1015,7 +1035,7 @@ function rowHtml(p, idx, admin, labelNo = null) {
       schemeName: p.short || p.name,
       cap: p.level === 'QHPK' ? 'QHPK' : p.level === 'QHCT' ? 'QHCT' : p.level === 'QHC' ? 'QHC10' : '',
       sector: null
-    }) + decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
+    }) + dossierHtml(p, idx, admin, on) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -1045,7 +1065,7 @@ function revealInList(p) {
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: false } }));
   document.querySelector('[data-main-tab="quyhoach"]')?.click();
   const q = foldText(query.trim());
-  if (q && !foldText(`${p.name} ${p.short} ${p.full}`).includes(q)) {
+  if (q && !dossierSearchText(p).includes(q)) {
     query = '';
     const search = $('projectSearch');
     if (search) search.value = '';
@@ -1070,16 +1090,35 @@ const DOC_ROLE = {
   'thuyet-minh': { short: 'TM', label: 'Thuyết minh' }
 };
 
-function decisionNote(p, idx) {
-  if (!p.decision) return '';
-  return `<button type="button" class="project-decision" data-decision="${idx}" title="Xem quyết định phê duyệt">${ico('file')}<span>${escapeHtml(p.decision.name)}</span></button>`;
+function latestDoc(p, role) {
+  return (p.docs || []).filter(d => d && d.role === role && d.id).sort((a, b) => (b.at || 0) - (a.at || 0))[0] || null;
 }
 
-function docsHtml(p, idx, admin) {
-  const rows = (p.docs || []).map((d, i) => {
-    const role = DOC_ROLE[d.role] || { short: 'VB', label: 'Văn bản' };
-    return `<button type="button" class="project-decision" data-doc="${idx}:${i}" title="${escapeHtml(role.label)}">${ico('file')}<b class="project-phase qh">${role.short}</b><span>${escapeHtml(d.name)}</span></button>`;
+function dossierBtn(label, attrs, on, title) {
+  return `<button type="button" class="project-dossier-btn" ${attrs}${on ? '' : ' disabled'} title="${escapeHtml(title || label)}">${escapeHtml(label)}</button>`;
+}
+
+function extraRoleButtons(p, idx, role) {
+  return (p.docs || []).map((d, i) => {
+    if (!d || d.role !== role) return '';
+    const meta = DOC_ROLE[role] || { short: 'VB' };
+    return dossierBtn(meta.short, `data-doc="${idx}:${i}"`, true, d.name || meta.label);
   }).join('');
+}
+
+function dossierHtml(p, idx, admin, projectOn) {
+  const cite = decisionLine(p);
+  const reg = latestDoc(p, 'quy-dinh');
+  const info = layerInfo.get(p.name);
+  const drawN = !info || info.loading ? null : (info.list || []).filter(g => g.present).length;
+  const drawLabel = drawN == null ? 'đang tải' : `${fmtNum(drawN)} bản vẽ`;
+  const drawingsOpen = drawOpen.has(p.name);
+  const adjusts = dossierAdjustments(p.name, admin);
+  const times = adjusts.filter(it => it.status !== 'pending').length;
+  const adjustsOpen = adjOpen.has(p.name);
+  const wait = p.proposal
+    ? dossierBtn('Chờ duyệt', `data-propose="${idx}"`, true, p.proposal.name || 'Quyết định đang chờ')
+    : '';
   const add = admin && !p.legacy ? `<div class="project-doc-add">
       <select data-doc-role="${idx}" aria-label="Loại văn bản kèm theo">
         <optgroup label="Quyết định">
@@ -1091,14 +1130,58 @@ function docsHtml(p, idx, admin) {
       </select>
       <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>
     </div>` : '';
-  if (!rows && !add) return '';
-  return `<div class="project-docs">${rows}${add}</div>`;
+  const drawNest = drawingsOpen ? `<div class="project-dossier-nest">${layersHtml(p, idx, projectOn, admin)}</div>` : '';
+  const adjNest = adjustsOpen ? `<div class="project-dossier-nest">${adjustNestHtml(p, idx, projectOn, adjusts)}</div>` : '';
+  return `<div class="project-dossier">
+    <div class="project-dossier-row">
+      <span class="project-dossier-label">Quyết định phê duyệt</span>
+      <span class="project-dossier-meta">${escapeHtml(cite || 'chưa gắn')}</span>
+      ${extraRoleButtons(p, idx, 'phe-duyet')}
+      ${extraRoleButtons(p, idx, 'dinh-chinh')}
+      ${wait}
+      ${dossierBtn('Xem PDF', `data-decision="${idx}"`, !!p.decision, p.decision ? 'Xem quyết định phê duyệt' : 'Chưa có PDF')}
+    </div>
+    <div class="project-dossier-row">
+      <span class="project-dossier-label">Quy định quản lý</span>
+      <span class="project-dossier-meta">${reg ? '' : 'chưa gắn'}</span>
+      ${extraRoleButtons(p, idx, 'thuyet-minh')}
+      ${dossierBtn('Xem PDF', `data-dossier-doc="quy-dinh" data-dossier-idx="${idx}"`, !!reg, reg ? (reg.name || 'Xem quy định quản lý') : 'Chưa có PDF')}
+    </div>
+    <div class="project-dossier-row">
+      <span class="project-dossier-label">Hệ thống bản vẽ</span>
+      <span class="project-dossier-meta">${escapeHtml(drawLabel)}</span>
+      <button type="button" class="project-btn project-expand${drawingsOpen ? ' open' : ''}" data-draw-open="${idx}" title="${drawingsOpen ? 'Ẩn' : 'Mở'} danh sách bản vẽ" aria-expanded="${drawingsOpen}">${ico('chev-down')}</button>
+    </div>
+    ${drawNest}
+    <div class="project-dossier-row">
+      <span class="project-dossier-label">Điều chỉnh cục bộ</span>
+      <span class="project-dossier-meta">${fmtNum(times)} lần</span>
+      <button type="button" class="project-btn project-expand${adjustsOpen ? ' open' : ''}" data-adj-open="${idx}" title="${adjustsOpen ? 'Ẩn' : 'Mở'} danh sách điều chỉnh cục bộ" aria-expanded="${adjustsOpen}">${ico('chev-down')}</button>
+    </div>
+    ${adjNest}
+    ${add}
+  </div>`;
 }
 
-function proposalNote(p, idx) {
-  if (!p.proposal) return '';
-  const label = `Chờ duyệt: ${p.proposal.name}`;
-  return `<button type="button" class="project-decision is-wait" data-propose="${idx}" title="${escapeHtml(label)}">${ico('clock')}<span>${escapeHtml(label)}</span></button>`;
+function adjustNestHtml(p, idx, projectOn, list) {
+  const on = !isLayerHidden(p.name, ADJUST_LAYER_KEY);
+  const anyBound = list.some(it => it.boundary);
+  const rows = list.map((it, i) => {
+    const title = it.title || it.summary || 'Điều chỉnh cục bộ';
+    const wait = it.status === 'pending' ? ' (chờ duyệt)' : '';
+    const label = `${i + 1}. ${title}${wait}`;
+    const name = it.boundary
+      ? `<button type="button" class="project-lot-hit" data-adj-act="locate" data-adj-id="${escapeHtml(it.id)}" data-adj-project="${idx}" title="Phóng tới ranh điều chỉnh"><span>${escapeHtml(label)}</span></button>`
+      : `<span class="project-dossier-item">${escapeHtml(label)}</span>`;
+    return `<div class="project-adj-item">${name}
+      ${dossierBtn('Xem QĐ', `data-adj-act="pdf" data-adj-id="${escapeHtml(it.id)}"`, !!it.pdf, it.pdf ? 'Xem quyết định điều chỉnh' : 'Chưa có PDF')}
+      ${dossierBtn('Bản vẽ scan', `data-adj-act="scan" data-adj-id="${escapeHtml(it.id)}"`, !!it.scan, it.scan ? 'Hiện bản vẽ scan' : 'Chưa có bản vẽ scan')}
+    </div>`;
+  }).join('');
+  const empty = list.length ? '' : '<div class="project-empty">Chưa có lần điều chỉnh cục bộ.</div>';
+  return `<label class="project-dossier-check" title="Hiện ranh điều chỉnh cục bộ trên bản đồ">
+      <input type="checkbox" data-adj-layer="${idx}"${on && projectOn ? ' checked' : ''}${anyBound ? '' : ' disabled'}>Hiện ranh trên bản đồ</label>
+    ${rows}${empty}`;
 }
 
 // ============================ LỚP DỮ LIỆU TRONG ĐỒ ÁN ============================
@@ -1151,7 +1234,7 @@ function layersHtml(p, idx, projectOn, admin) {
       ${addNet}
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>${kmlBtn}`;
-  }).join('') + adjustRowHtml(p, idx, projectOn);
+  }).join('');
   const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
       <input type="search" class="project-search" data-lot-search="${idx}" value="${escapeHtml(lotQuery.get(p.name) || '')}"
@@ -1159,26 +1242,6 @@ function layersHtml(p, idx, projectOn, admin) {
       <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
     </div>` : '';
   return `<div class="project-layers">${rows}${search}</div>`;
-}
-
-function adjustRowHtml(p, idx, projectOn) {
-  const list = adjustmentsOf(p.name);
-  if (!list.length) return '';
-  const on = !isLayerHidden(p.name, ADJUST_LAYER_KEY);
-  const open = adjOpen.has(p.name);
-  const docs = open ? `<div class="project-adj-list">${list.map(it => {
-    const meta = [it.stamp, `${fmtNum(it.lots || 0)} lô mới`, it.scan ? 'có bản vẽ scan' : '', it.pdf ? 'có QĐ' : ''].filter(Boolean).join(' · ');
-    return `<button type="button" class="project-lot-hit" data-adj-act="locate" data-adj-id="${escapeHtml(it.id)}" data-adj-project="${idx}" title="${escapeHtml(it.title || 'Điều chỉnh cục bộ')} — bấm để phóng tới ranh điều chỉnh">
-      <span>${escapeHtml(it.title || 'Điều chỉnh cục bộ')}</span><small>${escapeHtml(meta)}</small></button>`;
-  }).join('')}</div>` : '';
-  return `<div class="project-layer${on && projectOn ? '' : ' is-off'}">
-      <label class="project-layer-name" title="Điều chỉnh cục bộ đã duyệt — ${list.length} hồ sơ">
-        <input type="checkbox" data-adj-layer="${idx}"${on ? ' checked' : ''}>
-        <i class="project-layer-dot adjust"></i>
-        <b class="project-phase qh">QH</b>
-        <span>Điều chỉnh cục bộ</span><small>${fmtNum(list.length)}</small></label>
-      <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-adj-open="${idx}" title="${open ? 'Ẩn' : 'Xem'} danh sách hồ sơ điều chỉnh" aria-expanded="${open}">${ico('chev-down')}</button>
-    </div>${docs}`;
 }
 
 function setAdjustOn(p, on) {
@@ -2770,6 +2833,22 @@ export function initProjectLayer(opts = {}) {
     }
     const expand = e.target.closest('[data-expand]');
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
+    const drawToggle = e.target.closest('[data-draw-open]');
+    if (drawToggle) {
+      const p = projects[Number(drawToggle.dataset.drawOpen)];
+      if (!p) return;
+      if (drawOpen.has(p.name)) drawOpen.delete(p.name);
+      else drawOpen.add(p.name);
+      renderList();
+      return;
+    }
+    const dossierDoc = e.target.closest('[data-dossier-doc]');
+    if (dossierDoc) {
+      const p = projects[Number(dossierDoc.dataset.dossierIdx)];
+      const doc = p && latestDoc(p, dossierDoc.dataset.dossierDoc);
+      if (p && doc) openDecision(docTarget(p, doc, doc.role));
+      return;
+    }
     const adjToggle = e.target.closest('[data-adj-open]');
     if (adjToggle) {
       const p = projects[Number(adjToggle.dataset.adjOpen)];

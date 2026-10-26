@@ -10,7 +10,7 @@
 //   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
 //   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định người dùng gửi (tối đa 2 MB). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
 //   projects/<slug>/quyet-dinh-cho.pdf — đường cũ, chỉ đọc khi duyệt nốt rồi xóa.
-//   projects/<slug>/adjust/<id>.json|.pdf — hồ sơ điều chỉnh cục bộ, chỉ mục ở projects/adjustments.json
+//   projects/<slug>/adjust/<id>.json|.pdf|.scan — điều chỉnh cục bộ. Chỉ quyết định: chưa có json cho đến khi gắn bản vẽ. Chỉ mục projects/adjustments.json (title = tóm tắt).
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
 // Đồ án chưa chuyển (legacy) vẫn nằm trong cad_parcels.json cho tới khi migrate xong.
@@ -22,6 +22,7 @@ const constants = require('../config/constants');
 const pdfLimits = require('./pdfLimits');
 const gcsWrite = require('./gcsWrite');
 const { pendingDecisionObject } = require('./pdfPaths');
+const { adjustSubmitMode } = require('./adjustDraft');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
 
 const INDEX_NAME = 'projects/index.json';
@@ -2552,22 +2553,32 @@ function mergeAdjustLot(lot, fields) {
 }
 
 function adjustView(it) {
+  const title = it.title || '';
   return {
-    id: it.id, tenQH: it.tenQH, slug: it.slug, status: it.status, title: it.title || '', codes: it.codes || [],
-    boundary: it.boundary, bbox: it.bbox, lots: it.lots || 0, at: it.at || 0, stamp: it.stamp || '',
+    id: it.id, tenQH: it.tenQH, slug: it.slug, status: it.status, title, summary: title, codes: it.codes || [],
+    boundary: it.boundary || null, bbox: it.bbox || null, lots: it.lots || 0, at: it.at || 0, stamp: it.stamp || '',
     sender: it.sender || '', note: it.note || '', verdict: it.verdict || '', pdf: it.pdf || null,
     scan: it.scan || null, approvedAt: it.approvedAt || 0
   };
 }
 
-/** Hồ sơ điều chỉnh cục bộ mới: Admin ghi thẳng (approved), người dùng vào hàng chờ (pending) */
-async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, note, verdict, approved, by }) {
-  const bound = cleanPolygonGeometry(boundary);
-  if (!bound) throw adjustError('Ranh điều chỉnh không hợp lệ hoặc nằm ngoài TP. Huế', 400);
-  if (!Array.isArray(lots) || !lots.length) throw adjustError('Hồ sơ chưa có lô đất trong ranh điều chỉnh', 400);
-  if (lots.length > ADJUST_LOTS_MAX) throw adjustError(`Tối đa ${ADJUST_LOTS_MAX} lô đất mỗi hồ sơ`, 413);
-  const clean = lots.map(cleanAdjustLot);
-  if (clean.some(l => !l)) throw adjustError('Có lô đất sai hình học hoặc nằm ngoài TP. Huế', 400);
+/** Hồ sơ mới: đủ ranh + lô, hoặc pdfOnly (chỉ quyết định + tóm tắt, bản vẽ gắn sau). Admin ghi thẳng, người khác vào hàng chờ. */
+async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, note, verdict, approved, by, pdfOnly, owner }) {
+  const summary = cleanText(title, 300);
+  const bound = pdfOnly ? null : cleanPolygonGeometry(boundary);
+  const mode = adjustSubmitMode({
+    pdfOnly: !!pdfOnly,
+    hasBoundary: !!bound,
+    lotCount: pdfOnly ? 0 : (Array.isArray(lots) ? lots.length : 0),
+    title: summary
+  });
+  if (!mode.ok) throw adjustError(mode.message, mode.status);
+  let clean = [];
+  if (mode.mode === 'draw') {
+    if (lots.length > ADJUST_LOTS_MAX) throw adjustError(`Tối đa ${ADJUST_LOTS_MAX} lô đất mỗi hồ sơ`, 413);
+    clean = lots.map(cleanAdjustLot);
+    if (clean.some(l => !l)) throw adjustError('Có lô đất sai hình học hoặc nằm ngoài TP. Huế', 400);
+  }
   const { name, slug } = await listedProject(tenQH);
   if (!approved) {
     const cur = await readAdjustIndex();
@@ -2576,20 +2587,55 @@ async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, not
     }
   }
   const id = crypto.randomBytes(8).toString('hex');
-  const text = JSON.stringify({ v: 1, id, tenQH: name, boundary: bound, lots: clean });
-  if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hình ranh và lô đất lớn hơn 1,5 MB, hãy giản lược đỉnh trong CAD', 413);
-  await writeText(adjustObject(slug, id, 'json'), text);
+  if (mode.mode === 'draw') {
+    const text = JSON.stringify({ v: 1, id, tenQH: name, boundary: bound, lots: clean });
+    if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hình ranh và lô đất lớn hơn 1,5 MB, hãy giản lược đỉnh trong CAD', 413);
+    await writeText(adjustObject(slug, id, 'json'), text);
+  }
   const at = Date.now();
   const meta = {
     id, tenQH: name, slug, status: approved ? 'approved' : 'pending',
-    title: cleanText(title, 300),
-    codes: (Array.isArray(codes) ? codes : []).slice(0, 60).map(c => cleanText(c, 30)).filter(Boolean),
-    boundary: bound, bbox: bboxOf(bound), lots: clean.length, at, stamp: vnStamp(at),
+    title: summary,
+    codes: mode.mode === 'draw'
+      ? (Array.isArray(codes) ? codes : []).slice(0, 60).map(c => cleanText(c, 30)).filter(Boolean)
+      : [],
+    boundary: bound, bbox: bound ? bboxOf(bound) : null, lots: clean.length, at, stamp: vnStamp(at),
     sender: cleanText(sender, 80), note: cleanText(note, 300), verdict: cleanText(verdict, 40), pdf: null
   };
   if (approved) { meta.approvedAt = at; meta.by = cleanText(by, 120); }
+  const who = cleanText(owner, 120).toLowerCase();
+  if (who) meta.owner = who;
   const saved = await updateAdjustIndex(cur => ({ ...cur, items: [...cur.items, meta] }));
   return { ...adjustView(meta), via: saved.via };
+}
+
+/** Gắn ranh + lô vào hồ sơ đã có (thường là hồ sơ mới chỉ có quyết định). Người gửi chỉ gắn khi còn chờ duyệt và chưa có lô. */
+async function attachAdjustDraw({ id, boundary, lots, codes, admin }) {
+  if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+  const bound = cleanPolygonGeometry(boundary);
+  if (!bound) throw adjustError('Ranh điều chỉnh không hợp lệ hoặc nằm ngoài TP. Huế', 400);
+  if (!Array.isArray(lots) || !lots.length) throw adjustError('Hồ sơ chưa có lô đất trong ranh điều chỉnh', 400);
+  if (lots.length > ADJUST_LOTS_MAX) throw adjustError(`Tối đa ${ADJUST_LOTS_MAX} lô đất mỗi hồ sơ`, 413);
+  const clean = lots.map(cleanAdjustLot);
+  if (clean.some(l => !l)) throw adjustError('Có lô đất sai hình học hoặc nằm ngoài TP. Huế', 400);
+  const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
+  if (!it) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
+  if (!admin && it.status !== 'pending') throw adjustError('Chỉ gắn bản vẽ cho hồ sơ đang chờ duyệt', 403);
+  if (!admin && it.lots) throw adjustError('Hồ sơ đã có bản vẽ', 403);
+  const text = JSON.stringify({ v: 1, id, tenQH: it.tenQH, boundary: bound, lots: clean });
+  if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hình ranh và lô đất lớn hơn 1,5 MB, hãy giản lược đỉnh trong CAD', 413);
+  await writeText(adjustObject(it.slug, id, 'json'), text);
+  const at = Date.now();
+  const patch = {
+    boundary: bound,
+    bbox: bboxOf(bound),
+    lots: clean.length,
+    at,
+    stamp: vnStamp(at),
+    codes: (Array.isArray(codes) ? codes : []).slice(0, 60).map(c => cleanText(c, 30)).filter(Boolean)
+  };
+  await updateAdjustIndex(cur => ({ ...cur, items: cur.items.map(x => (x.id === id ? { ...x, ...patch } : x)) }));
+  return adjustView({ ...it, ...patch });
 }
 
 async function attachAdjustPdf({ id, fileName, buffer, stagedToken, admin }) {
@@ -2657,7 +2703,7 @@ function cleanGeoref(g) {
 
 /**
  * Gắn ảnh tờ bản vẽ scan + thông số định vị. Không kèm ảnh: Admin chỉ cập nhật định vị cho ảnh đã có (ghép lại).
- * Người gửi chưa đăng nhập chỉ gắn một lần cho hồ sơ vừa tạo, như PDF.
+ * Người gửi gắn được khi hồ sơ còn chờ duyệt và chưa có ảnh (bản vẽ thêm sau quyết định). Admin thay được ảnh đã có.
  */
 async function attachAdjustScan({ id, fileName, buffer, georef, admin }) {
   if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
@@ -2665,9 +2711,8 @@ async function attachAdjustScan({ id, fileName, buffer, georef, admin }) {
   if (!geo) throw adjustError('Thông số định vị ảnh không hợp lệ', 400);
   const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
   if (!it) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
-  if (!admin && (it.status !== 'pending' || it.scan || Date.now() - (it.at || 0) > ADJUST_PDF_WINDOW_MS)) {
-    throw adjustError('Chỉ gắn ảnh scan ngay sau khi gửi hồ sơ', 403);
-  }
+  if (!admin && it.status !== 'pending') throw adjustError('Chỉ gắn ảnh scan cho hồ sơ đang chờ duyệt', 403);
+  if (!admin && it.scan && buffer) throw adjustError('Hồ sơ đã có ảnh scan', 403);
   let file;
   if (buffer) {
     const type = scanType(buffer);
@@ -2715,9 +2760,19 @@ async function findAdjustment(id, admin) {
 
 async function readAdjustment(id, { admin }) {
   const it = await findAdjustment(id, admin);
+  if (!it.boundary) return { ...adjustView(it), lots: [] };
   const got = await readJson(adjustObject(it.slug, it.id, 'json'));
   if (got.missing || !got.data || !Array.isArray(got.data.lots)) throw adjustError('File hồ sơ không còn trên bucket', 404);
   return { ...adjustView(it), lots: got.data.lots };
+}
+
+async function listOwnAdjustments(email) {
+  const want = cleanText(email, 120).toLowerCase();
+  if (!want || !want.includes('@')) return [];
+  const items = (await readAdjustIndex()).data.items || [];
+  return items
+    .filter(x => x && x.status === 'pending' && String(x.owner || '').toLowerCase() === want && ADJUST_ID_RE.test(String(x.id)))
+    .map(adjustView);
 }
 
 async function readAdjustPdf(id, { admin }) {
@@ -2913,6 +2968,6 @@ module.exports = {
   saveProjectDoc, removeProjectDoc, docRoleLabel, saveNet, saveKienTrucPdf,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
-  saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
+  saveAdjustment, attachAdjustDraw, attachAdjustPdf, attachAdjustScan, listAdjustments, listOwnAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
   patchAdjustLot, approveAdjustment, removeAdjustment
 };

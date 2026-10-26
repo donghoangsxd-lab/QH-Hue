@@ -8,7 +8,7 @@ import { map } from './mapEngine.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 import { adjustRecordFromDxf } from './localAdjust.js';
-import { sendAdjustment, pdfProblem, adjustLotStyle, setSatelliteClip } from './adjustLayer.js';
+import { sendAdjustment, sendAdjustDraw, attachAdjustPdfFile, schemeAdjustments, putScan, pdfProblem, adjustLotStyle, setSatelliteClip } from './adjustLayer.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
 import { TT16_LAND_KEYS, TT16_STYLES, TT16_PATTERN_ZOOM, tt16SwatchCss } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
@@ -322,9 +322,23 @@ function imageExtra() {
   return `<div class="adj-file-act">${btn}${op}</div>`;
 }
 
+function existingId() {
+  const picked = $('adjExisting')?.value || '';
+  const typed = ($('adjExistingId')?.value || '').trim().toLowerCase();
+  if (/^[a-f0-9]{16}$/.test(picked)) return picked;
+  if (/^[a-f0-9]{16}$/.test(typed)) return typed;
+  return '';
+}
+
 function canSubmit() {
+  if (reading || preparing || submitting) return false;
   const stampWait = (khMatch && khMatch.pending.length) || 0;
-  return !!record && !reading && !preparing && !submitting && !stampWait && (!files.image || !!(scan && scan.georef));
+  if (stampWait) return false;
+  if (files.image && !(scan && scan.georef)) return false;
+  if (existingId()) return !!(record || (scan && scan.georef) || files.pdf);
+  const project = $('adjProject')?.value || '';
+  if (record && project) return true;
+  return !!(files.pdf && project && $('adjTitle')?.value.trim());
 }
 
 function khExtra() {
@@ -368,15 +382,43 @@ function render() {
       : admin ? `${ico('save')}GHI HỒ SƠ ĐIỀU CHỈNH (ADMIN)` : `${ico('send')}GỬI HỒ SƠ CHỜ DUYỆT`;
   }
   const title = $('adjTitle');
-  if (title) title.placeholder = record ? record.payload.title : 'Để trống: tự đặt theo ký hiệu lô';
+  if (title && !title.value) title.placeholder = record ? record.payload.title : 'Tóm tắt nội dung điều chỉnh, dùng để tìm lại';
   const status = $('adjStatus');
-  if (status) {
+  if (status && !submitting) {
     let msg = '';
-    if (!files.dxf) msg = 'Thêm file DXF của hồ sơ điều chỉnh.';
+    const id = existingId();
+    if (id && !record && !files.pdf && !(scan && scan.georef)) msg = 'Chọn DXF, ảnh scan đã định vị hoặc PDF để gắn thêm vào hồ sơ.';
+    else if (!id && !files.dxf && !files.pdf) msg = 'Chọn PDF quyết định và nhập tóm tắt, hoặc thêm DXF.';
+    else if (!id && files.pdf && !$('adjTitle')?.value.trim()) msg = 'Nhập tóm tắt điều chỉnh cục bộ.';
+    else if (!id && !$('adjProject')?.value) msg = 'Chọn đồ án được điều chỉnh.';
     else if (files.image && scan && !scan.georef && record) msg = 'Bấm «Đặt ảnh vào ranh» rồi kéo, xoay ảnh cho khung bản vẽ đã phê duyệt trùng ranh điều chỉnh, hoặc bỏ ảnh.';
     else if (khMatch && khMatch.pending.length) msg = `Còn ${fmtNum(khMatch.pending.length)} tem đất chưa gán. Chọn từng tem rồi bấm lô trên bản đồ.`;
     status.textContent = msg;
   }
+}
+
+let existingSeq = 0;
+
+async function fillExisting(preferId = '') {
+  const sel = $('adjExisting');
+  if (!sel) return;
+  const seq = ++existingSeq;
+  const name = $('adjProject')?.value || '';
+  const keep = preferId || sel.value || '';
+  if (!name) {
+    sel.innerHTML = '<option value="">Hồ sơ mới</option>';
+    return;
+  }
+  let rows = [];
+  try { rows = await schemeAdjustments(name); }
+  catch (err) { rows = []; }
+  if (seq !== existingSeq) return;
+  const opts = ['<option value="">Hồ sơ mới</option>'].concat(rows.map(it => {
+    const label = `${it.summary || it.title || 'Điều chỉnh cục bộ'}${it.status === 'pending' ? ' · chờ duyệt' : ''}`;
+    return `<option value="${escapeHtml(it.id)}">${escapeHtml(label)}</option>`;
+  }));
+  sel.innerHTML = opts.join('');
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
 // ============================ XỬ LÝ FILE ============================
@@ -507,39 +549,90 @@ async function submit() {
   if (!canSubmit()) return;
   const admin = isAdmin();
   const sender = $('adjSender')?.value.trim() || '';
-  if (!admin && !sender) { showToast('Nhập tên người gửi / đơn vị', 'error'); $('adjSender')?.focus(); return; }
+  if (!admin && !sender && !existingId()) { showToast('Nhập tên người gửi / đơn vị', 'error'); $('adjSender')?.focus(); return; }
   submitting = true;
   render();
-  showToast(admin ? '⏳ Đang ghi hồ sơ điều chỉnh...' : '⏳ Đang gửi hồ sơ điều chỉnh...');
+  const id = existingId();
+  const hadRecord = !!record;
+  let doneNote = '';
+  showToast(id ? '⏳ Đang gắn bản vẽ vào hồ sơ…' : (admin ? '⏳ Đang ghi hồ sơ điều chỉnh...' : '⏳ Đang gửi hồ sơ điều chỉnh...'));
   try {
-    const title = $('adjTitle')?.value.trim();
-    const payload = { ...record.payload, ...(title ? { title } : {}), sender, note: $('adjNote')?.value.trim() || '' };
     const scanPart = scan && scan.georef ? { blob: scan.blob, name: scan.name, georef: scan.georef } : null;
-    const out = await sendAdjustment(payload, files.pdf, scanPart);
-    showToast(out.approved ? '✓ Đã ghi hồ sơ điều chỉnh lên bản đồ quy hoạch' : '✓ Đã gửi hồ sơ, chờ Admin duyệt', 'success');
+    if (id) {
+      let scanError = '';
+      if (record) {
+        const out = await sendAdjustDraw(id, record.payload, scanPart);
+        scanError = out.scanError || '';
+      } else if (scanPart) await putScan(id, scanPart);
+      if (files.pdf) {
+        try { await attachAdjustPdfFile(id, files.pdf); }
+        catch (err) { showToast(`Chưa gắn được PDF: ${err.message}`, 'error'); }
+      }
+      if (scanError) showToast(`Hồ sơ đã lưu nhưng chưa gắn được ảnh scan: ${scanError}`, 'error');
+      showToast('✓ Đã bổ sung bản vẽ vào hồ sơ điều chỉnh', 'success');
+      submitting = false;
+      reset();
+      fillExisting(id);
+      return;
+    }
+    const title = $('adjTitle')?.value.trim();
+    const note = $('adjNote')?.value.trim() || '';
+    const name = $('adjProject')?.value || '';
+    let out;
+    if (!record) {
+      out = await sendAdjustment({ tenQH: name, title, note, sender, pdfOnly: true }, files.pdf, null);
+    } else {
+      const payload = { ...record.payload, ...(title ? { title } : {}), sender, note };
+      out = await sendAdjustment(payload, files.pdf, scanPart);
+    }
+    const savedId = out.item && out.item.id;
+    showToast(out.approved ? '✓ Đã ghi hồ sơ điều chỉnh' : '✓ Đã gửi hồ sơ, chờ Admin duyệt', 'success');
     if (out.pdfError) showToast(`Hồ sơ đã lưu nhưng chưa gắn được PDF: ${out.pdfError}`, 'error');
     if (out.scanError) showToast(`Hồ sơ đã lưu nhưng chưa gắn được ảnh scan: ${out.scanError}`, 'error');
     submitting = false;
     reset();
+    if (savedId && $('adjExistingId')) $('adjExistingId').value = savedId;
+    if (!hadRecord && savedId) doneNote = `Đã lưu quyết định. Mã ${savedId}. Thêm DXF hoặc ảnh scan rồi gửi lại để gắn bản vẽ.`;
+    fillExisting(savedId);
   } catch (err) {
     showToast(`Không nhập được hồ sơ: ${err.message}`, 'error');
   } finally {
     submitting = false;
     render();
+    if (doneNote && $('adjStatus')) $('adjStatus').textContent = doneNote;
   }
+}
+
+/** Mở Nhập hàng loạt › Điều chỉnh cục bộ để gắn bản vẽ vào hồ sơ đã có mã. */
+export function focusAdjustSupplement(tenQH, id) {
+  $('entryLegacy')?.setAttribute('open', '');
+  document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
+  const radio = document.querySelector('input[name="bulkKind"][value="adjust"]');
+  if (radio) {
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const search = $('adjProjectSearch');
+  if (search) search.value = '';
+  fillProjects();
+  const sel = $('adjProject');
+  if (sel && tenQH) sel.value = tenQH;
+  if ($('adjExistingId') && id) $('adjExistingId').value = id;
+  fillExisting(id);
+  $('adjDrop')?.scrollIntoView({ block: 'nearest' });
 }
 
 function syncKind() {
   const on = kindOn();
   $('addBulk')?.classList.toggle('bulk-adjust', on);
-  if (on) { fillProjects(); drawPreview(); } else clearPreview();
+  if (on) { fillProjects(); fillExisting(); drawPreview(); } else clearPreview();
   render();
 }
 
 export function initAdjustImport() {
   document.querySelectorAll('input[name="bulkKind"]').forEach(r => r.addEventListener('change', syncKind));
   $('adjProject')?.addEventListener('focus', fillProjects);
-  $('adjProject')?.addEventListener('change', readRecord);
+  $('adjProject')?.addEventListener('change', () => { readRecord(); fillExisting(); });
   $('adjProjectSearch')?.addEventListener('input', fillProjects);
   $('adjProjectSearch')?.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowDown') return;
