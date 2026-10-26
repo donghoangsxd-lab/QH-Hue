@@ -301,6 +301,14 @@ function clearMaps() {
   clearLines();
 }
 
+function publishCounts(data) {
+  const byName = new Map((data.wards || []).map((w) => [w.name, w]));
+  setRiverCounts((name) => {
+    const w = byName.get(name);
+    return w ? { corridor: w.corridor || 0, forest: w.forest || 0 } : { corridor: 0, forest: 0 };
+  });
+}
+
 function setOn(next) {
   on = !!next;
   const box = $('violateBox');
@@ -308,15 +316,16 @@ function setOn(next) {
   clearMaps();
   if (!on || !map) return;
   if (box) box.innerHTML = '<p class="flood-muted">Đang tải số liệu…</p>';
-  Promise.all([loadPack(), loadLines()]).then(([, geo]) => {
+  Promise.all([loadPack(), loadLines()]).then(([data, geo]) => {
     if (!on) return;
+    try { publishCounts(data); } catch (err) { console.warn('Hành lang sông:', err); }
     try { paintBox(); } catch (err) { console.warn('Hành lang sông:', err); }
     try {
       drawLines(map, geo);
       if (planMap) drawLines(planMap, geo);
+      bind(map);
+      if (planMap) bind(planMap);
     } catch (err) { console.warn('Nét hành lang:', err); }
-    bind(map);
-    if (planMap) bind(planMap);
   }).catch((err) => {
     console.warn('Hành lang sông:', err);
     if (box) box.innerHTML = '<p>Chưa có tệp số liệu hành lang và đất rừng.</p>';
@@ -338,12 +347,8 @@ function wardHtml(name) {
 export function initViolateLayer() {
   if (!map) return;
   setWardRiverHtml(wardHtml);
-  $('chk_violate')?.addEventListener('change', (e) => setOn(e.target.checked));
-  loadPack().then((data) => {
-    const byName = new Map((data.wards || []).map((w) => [w.name, w]));
-    setRiverCounts((name) => {
-      const w = byName.get(name);
-      return w ? { corridor: w.corridor || 0, forest: w.forest || 0 } : { corridor: 0, forest: 0 };
-    });
-  }).catch((err) => console.warn('Hành lang sông:', err));
+  const chk = $('chk_violate');
+  // Ô không lấy trạng thái phiên trước. Tải bank-forest.json và nét hành lang chỉ khi người dùng bật.
+  if (chk) chk.checked = false;
+  chk?.addEventListener('change', (e) => setOn(e.target.checked));
 }

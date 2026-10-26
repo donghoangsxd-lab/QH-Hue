@@ -31,6 +31,8 @@ import {
 } from './capNuocQhc.js';
 
 const STORE_KEY = 'qh_axes_v1';
+// Không ghi, không khôi phục. Bản lưu cũ có id này bị gỡ khi đọc, để mở trang không tự bật lớp.
+const NO_PERSIST = new Set(['base-violate']);
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
 // Ô cấp quy hoạch do mapLevel giữ. Khôi phục chúng từ bản lưu sẽ tắt QHC 1/25.000 rồi bật QHPK.
 const LEVEL_BINDS = new Set(['chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct']);
@@ -224,6 +226,10 @@ function readSaved() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (!raw || raw.v !== 1 || typeof raw !== 'object') return null;
+    if (Array.isArray(raw.on) && raw.on.some((id) => NO_PERSIST.has(id))) {
+      raw.on = raw.on.filter((id) => !NO_PERSIST.has(id));
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(raw)); } catch (e) { /* chế độ riêng tư */ }
+    }
     return raw;
   } catch (e) {
     return null;
@@ -238,7 +244,7 @@ function scheduleSave() {
 
 function saveNow() {
   if (!ready) return;
-  const on = getLayers().filter(l => isLayerOn(l.id)).map(l => l.id);
+  const on = getLayers().filter(l => isLayerOn(l.id) && !NO_PERSIST.has(l.id)).map(l => l.id);
   const extra = EXTRA_CHECKS.filter(id => document.getElementById(id)?.checked);
   const b = browseState();
   const area = getAreaFilter();
@@ -954,6 +960,7 @@ function applyExtra(saved) {
 function applySavedLayers(saved) {
   const want = new Set(saved.on || []);
   getLayers().forEach(l => {
+    if (NO_PERSIST.has(l.id)) return;
     const on = want.has(l.id);
     if (l.bind) {
       if (LEVEL_BINDS.has(l.bind)) return;
@@ -1006,7 +1013,7 @@ export function initChuyenNganh() {
   const deep = readFacetUrl();
 
   // Không có link chia sẻ hay link sâu: trục Quy hoạch, QHC 1/25.000, phạm vi cả thành phố.
-  // Lớp đã bật lần trước vẫn khôi phục ở applySavedLayers; trục và cấp không bị bản lưu kéo đi.
+  // Lớp đã bật lần trước vẫn khôi phục ở applySavedLayers, trừ base-violate. Trục và cấp không bị bản lưu kéo đi.
   if (!shareView && !openDeep) {
     setAreaFilter({ ...AREA_TP }, 'startup', { url: false });
     setBrowseState({ axis: 'quyhoach', sector: saved?.sector || browseState().sector, level: 'QHC25' }, { url: false });
