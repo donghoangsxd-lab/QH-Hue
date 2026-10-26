@@ -8,7 +8,7 @@ import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
 import { POP_METHOD_EVENT, popQuery } from './popMethod.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, startTaskProgress, announceTool, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, startTaskProgress, announceTool, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
 import { createSketchEditSession } from './sketchEdit.js';
 import { createVertexHandles, vertexMenuButton } from './vertexHandles.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
@@ -244,6 +244,9 @@ export function initMap() {
   });
   document.addEventListener('keydown', onMeasureKeyDown);
   document.addEventListener('keydown', onMeasureEditKey, true);
+  document.addEventListener(DRAW_SELECT_EVENT, (e) => {
+    if (e.detail === 'sketch') releaseMeasureSelection();
+  });
   map.on('contextmenu', onMeasureContextMenu);
   map.on('dblclick', onMeasureDblClick);
   map.on('mousemove', onMeasureMouseMove);
@@ -1120,6 +1123,7 @@ function finishMeasureDraft() {
 
 function selectMeasure(item, host) {
   if (!item) return;
+  document.dispatchEvent(new CustomEvent(DRAW_SELECT_EVENT, { detail: 'measure' }));
   if (measureLive?.item === item) {
     measureLive.session.select();
     if (host) measureLive.host = host;
@@ -1184,6 +1188,24 @@ function deleteMeasure(item) {
   drawMeasure();
 }
 
+function releaseMeasureSelection() {
+  if (!measureLive) return;
+  if (measureLive.session.isEditing()) finishMeasureEdit();
+  const host = measureLive.host || map;
+  measureLive = null;
+  host?.closePopup();
+  drawMeasure();
+}
+
+/** Gỡ phép đo đang chọn. false khi chưa chọn hoặc đang chấm nét mới (Backspace vẫn xóa đỉnh vừa chấm). */
+export function deleteSelectedMeasure() {
+  const item = measureLive?.item;
+  if (!item || state.measurePoints.length) return false;
+  (measureLive.host || map)?.closePopup();
+  deleteMeasure(item);
+  return true;
+}
+
 function openMeasureMenu(item, latlng, hostMap) {
   if (measureLive?.session.isEditing() && measureLive.item !== item) finishMeasureEdit();
   selectMeasure(item, hostMap);
@@ -1203,10 +1225,6 @@ function openMeasureMenu(item, latlng, hostMap) {
       finishMeasureEdit();
     });
   }
-  vertexMenuButton(box, 'Xóa phép đo', 'sketch-del', 'trash', () => {
-    m.closePopup();
-    deleteMeasure(item);
-  });
   L.popup({ className: 'sketch-popup', closeButton: false, autoPan: false })
     .setLatLng(latlng)
     .setContent(box)
@@ -1316,6 +1334,11 @@ function paintMeasureShape(groups, pts, type, opt) {
     latlngs.forEach(ll => L.circleMarker(ll, {
       radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false
     }).addTo(group));
+    if (selected) {
+      const halo = { color: '#ffffff', weight: isArea ? 8 : 10, opacity: 0.95, interactive: false, fill: false };
+      if (!isArea && latlngs.length >= 2) L.polyline(latlngs, halo).addTo(group);
+      if (isArea && latlngs.length >= 3) L.polygon(latlngs, halo).addTo(group);
+    }
     if (!isArea && latlngs.length >= 2) {
       const lineOpt = { color, weight: selected ? 5 : 3, interactive: false };
       if (!isProfile) lineOpt.dashArray = '4,4';
@@ -1323,7 +1346,7 @@ function paintMeasureShape(groups, pts, type, opt) {
     }
     if (isArea && latlngs.length >= 3) {
       L.polygon(latlngs, {
-        color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: 0.2, interactive: false
+        color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: selected ? 0.28 : 0.2, interactive: false
       }).addTo(group);
     }
     if (canPick) {

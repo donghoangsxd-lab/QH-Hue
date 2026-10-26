@@ -272,6 +272,8 @@ export function detailDisclosure(html, label = 'Xem chi tiết') {
 // Công cụ thao tác trên bản đồ dùng chung click nên chỉ bật 1 cái: công cụ vừa bật phát sự kiện, công cụ khác đang chạy tự hủy.
 // tool: 'measure' | 'inspect' | 'sketch' | 'pick' | 'road' | 'pop'
 export const TOOL_START_EVENT = 'qh:tool-start';
+// Chọn một hình người dùng vẽ. detail: 'sketch' | 'measure'. Lớp còn lại bỏ chọn để phím Delete chỉ xóa một đối tượng.
+export const DRAW_SELECT_EVENT = 'qh:draw-select';
 
 // Chuyển tab panel phải từ module khác (app.js giữ logic panel): detail { tab, open } — open false thì panel đang ẩn vẫn ẩn
 export const RIGHT_TAB_EVENT = 'qh:right-tab';

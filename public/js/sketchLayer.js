@@ -3,9 +3,9 @@
 // đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML hoặc DXF (sketchExport.js).
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
-import { map } from './mapEngine.js';
+import { map, deleteSelectedMeasure } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
-import { escapeHtml, fmtNum, announceTool, showToast, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, fmtNum, announceTool, showToast, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
 import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
@@ -176,7 +176,7 @@ function shapeMeasure(tool, lls) {
 
 function shapeTip(tool, text, m) {
   const label = TOOLS[tool]?.label || 'Hình';
-  return `${label} · ${text} · ${stateName(m)} · chuột phải để chỉnh`;
+  return `${label} · ${text} · ${stateName(m)} · chuột phải để chỉnh · Delete để xóa`;
 }
 
 function shapeLayers(tool, lls, c, preview) {
@@ -362,6 +362,7 @@ const asLatLngs = (pts) => pts.map(p => L.latLng(p.lat, p.lng));
 
 function selectShape(fg) {
   if (!fg?.sketch) return;
+  document.dispatchEvent(new CustomEvent(DRAW_SELECT_EVENT, { detail: 'sketch' }));
   if (live?.fg === fg) {
     live.session.select();
     setPick(fg);
@@ -566,6 +567,29 @@ function finish() {
   renderDraft();
 }
 
+function releaseSketchSelection() {
+  if (!live && !pickFg) return;
+  const host = live?.fg?.sketchHost || pickFg?.sketchHost || map;
+  if (live?.session.isEditing()) finishAdjust();
+  setPick(null);
+  live = null;
+  host?.closePopup();
+}
+
+function onSketchDeleteKey(e) {
+  if (e.key !== 'Delete' || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+  const tag = e.target && e.target.tagName;
+  if ((tag && /^(INPUT|SELECT|TEXTAREA)$/.test(tag)) || e.target?.isContentEditable) return;
+  if (editor || pts.length) return;
+  if (pickFg) {
+    e.preventDefault();
+    (pickFg.sketchHost || map).closePopup();
+    removeShape(pickFg);
+    return;
+  }
+  if (deleteSelectedMeasure()) e.preventDefault();
+}
+
 function removeShape(fg) {
   if (live?.fg === fg) dropAdjust();
   if (hoverFg === fg) hoverFg = null;
@@ -585,7 +609,7 @@ function textShape(latlng, text, c, sizePx, m) {
     keyboard: false
   });
   const fg = L.featureGroup([marker]);
-  fg.bindTooltip('Chữ · chuột phải để sửa hoặc xóa', { sticky: true, className: 'sketch-tip' });
+  fg.bindTooltip('Chữ · chuột phải để sửa · Delete để xóa', { sticky: true, className: 'sketch-tip' });
   // Chiều cao chữ ngoài thực địa theo mức phóng lúc ghi (để DXF ra đúng cỡ như đang thấy)
   fg.sketch = { tool: 'text', pts: [L.latLng(latlng)], color: c, text, sizePx, heightM: sizePx * metersPerPixel(latlng.lat, m) };
   return fg;
@@ -897,6 +921,10 @@ export function initSketchLayer() {
   });
   // Bật đo đạc, tra cứu, ghim, vẽ tuyến…: bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'sketch') stopSketchTool(); });
+  document.addEventListener(DRAW_SELECT_EVENT, (e) => {
+    if (e.detail === 'measure') releaseSketchSelection();
+  });
+  document.addEventListener('keydown', onSketchDeleteKey);
   $('sketchTextSize')?.addEventListener('change', () => {
     if (editor) { editor.sizePx = textSize(); refocusEditor(); }
   });
