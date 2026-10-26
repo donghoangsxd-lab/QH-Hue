@@ -2,13 +2,14 @@
 // Tile vector PMTiles (lớp "thuadat", zoom 15–16) đọc thẳng từ bucket bằng HTTP Range; zoom > 16 phóng to từ tile 16.
 // Chọn một phường/xã trên droplist: chỉ vẽ phần nền thửa nằm trong ranh phường hiện nay (sau sáp nhập), không theo mã xã cũ.
 // Bấm vào thửa khi không bật công cụ nào: tra trong tile z16 đã tải, không gọi máy chủ. Tìm tờ/thửa qua chỉ mục từng xã.
-// Popup lô neo giữa khung nhìn nên điểm bấm lấy từ preclick, không lấy tọa độ popup.
-// Menu «Xem thông tin lô đất quy hoạch» mở cả ô đất đồ án (kind DXF, giai đoạn QH), không lấy thửa địa chính.
+// Menu «Xem thông tin lô đất quy hoạch»: các cấp có lô tại điểm bấm; bấm thẳng mục mở cấp chi tiết nhất.
+// Thẻ lô cùng lối bấm trái trên bản đồ, không mở bảng đồ án.
+// Tra lô trước khi đóng bảng thửa: đóng bảng trả lớp đang xem lúc trước và có thể gỡ đúng lô dưới điểm bấm.
 // Droplist đang ở lớp quy hoạch: bảng thửa đặt góc trái (4 trang QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500).
 // Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; QHPK/QHCT mở đồ án chứa thửa.
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
-import { map, WARD_BOUNDS_EVENT, landCode as planningLotCode } from './mapEngine.js';
+import { map, WARD_BOUNDS_EVENT, openLotPopup } from './mapEngine.js';
 import { state } from './state.js';
 import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
 import { watchTiles } from './loadProgress.js';
@@ -17,16 +18,14 @@ import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
-import { parcelQhcHtml } from './qhc2045Layer.js';
-import { parcelQhctHtml } from './qhctLayer.js';
+import { parcelQhcHtml, qhcFeatureAt, showQhcFeature } from './qhc2045Layer.js';
+import { parcelQhctHtml, qhctFeatureAt, showQhctLot } from './qhctLayer.js';
 import { annotateCompliance } from './planCompliance.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { mountParcelAssign } from './parcelInfra.js';
 import { restoreInspectFocus } from './projectLayer.js';
 import { planLotsIn } from './projectFiles.js';
-import { landLabel } from './tt16Symbols.js';
-import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
 import { pickPlanningLot } from './qhpkOverlap.js';
 
@@ -40,18 +39,18 @@ const MIN_ZOOM = 15;
 const DATA_ZOOM = 16;
 const LABEL_ZOOM = 18;
 const PANE = 'cadastrePane';
-// Trên lô đồ án (overlayPane 400), dưới viền rê chuột lô (444) và marker công trình (600)
-const PANE_Z = 410;
+// Dưới lô đồ án (overlayPane 400) để nền thửa không che màu ô đất quy hoạch. Pane không bắt chuột.
+const PANE_Z = 390;
 const TILE_CACHE = 96;
 const INDEX_CACHE = 8;
 const FILL_ALPHA = 0.35;
 const STROKE = 'rgba(124, 45, 18, 0.75)';
 const STROKE_PLAN = 'rgba(17, 24, 39, 0.8)';
-// Thửa đang chọn: trên mọi lớp dữ liệu và marker (600–620), dưới tooltip (650) và popup (700)
+// Thửa đang chọn: chỉ viền, không tô, để màu lô quy hoạch vẫn thấy. Trên lớp dữ liệu, dưới tooltip (650) và popup (700).
 const HL_PANE = 'cadastreHighlightPane';
 const HL_PANE_Z = 630;
 const HIGHLIGHT_HALO = { color: '#111827', weight: 7, opacity: 0.55, fill: false };
-const HIGHLIGHT = { color: '#fde047', weight: 3.5, opacity: 1, fillColor: '#facc15', fillOpacity: 0.22 };
+const HIGHLIGHT = { color: '#fde047', weight: 3.5, opacity: 1, fill: false };
 
 // Nhóm loại đất (mã theo Thông tư 28/2014/TT-BTNMT, Phụ lục 01) cho dòng phụ popup; thửa nhiều mục đích lấy mã đầu
 const GROUPS = [
@@ -115,7 +114,7 @@ const xaByCode = new Map();
 const tiles = new Map();        // "z/x/y" → Promise<[{ rings, props, bbox, extent }]>
 const indexes = new Map();      // maxa → Promise<{ rows }>
 let popup = null, highlight = null, landFill = null, clickSeq = 0;
-let foreignAt = 0, preclickAt = 0, clickAt = null;
+let foreignAt = 0;
 let cardState = null;
 let wardClip = null;
 let wardClipSig = '';
@@ -341,11 +340,10 @@ const CadastreGrid = L.GridLayer.extend({
 });
 
 function makeLayer(m, fill) {
-  if (!m.getPane(PANE)) {
-    const pane = m.createPane(PANE);
-    pane.style.zIndex = PANE_Z;
-    pane.style.pointerEvents = 'none';
-  }
+  if (!m.getPane(PANE)) m.createPane(PANE);
+  const pane = m.getPane(PANE);
+  pane.style.zIndex = PANE_Z;
+  pane.style.pointerEvents = 'none';
   const opacity = Number($('cadastreOpacity')?.value ?? 100) / 100;
   return watchTiles(new CadastreGrid({ pane: PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, opacity, fill, updateWhenZooming: false, keepBuffer: 1 }), 'Thửa đất địa chính').addTo(m);
 }
@@ -533,6 +531,7 @@ function ensureCard() {
   el.setAttribute('aria-label', 'Thông tin thửa đất');
   (document.getElementById('mapArea') || document.body).appendChild(el);
   el.addEventListener('click', (e) => {
+    if (e.target.closest('.pls-comp-fold')) return;
     const land = e.target.closest('[data-land]');
     if (land) { toggleLand(land.dataset.land, land.dataset.color); return; }
     const tab = e.target.closest('[data-cad-tab]');
@@ -778,7 +777,7 @@ export function openMeasurePlan(ring, targetMap) {
 
 /** Cùng lối với bấm thửa: mở bảng thửa (hoặc popup) tại điểm, kể cả khi lớp đang tắt. */
 export function openParcelAt(latlng, targetMap) {
-  return openParcel(latlng, targetMap, null);
+  return openParcel(latlng, targetMap);
 }
 
 /** Địa chỉ và xã cũ trên thửa chứa điểm. null nếu không có thửa. Không gọi dịch vụ trả phí. */
@@ -794,9 +793,13 @@ export async function parcelFactsAt(latlng) {
   };
 }
 
-const PLAN_FINEST = ['qhct', 'qhpk', 'qhc10', 'qhc25'];
-const pageHasLots = (page) => String(page?.html || '').includes('pls-lot');
-const VIEW_LEVEL = { qhc25: 'QHC', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+const PLAN_CHOICES = [
+  { id: 'qhc25', label: 'QHC 1/25.000' },
+  { id: 'qhc10', label: 'QHC 1/10.000' },
+  { id: 'qhpk', label: 'QHPK 1/2.000' },
+  { id: 'qhct', label: 'QHCT 1/500' }
+];
+let levelTask = null;
 
 function setPlanAxisHold(on) {
   document.body?.classList.toggle('plan-info-open', !!on);
@@ -813,98 +816,93 @@ function lotM2(lot) {
   try { return turf.area(turf.feature(lot.geometry)); } catch { return Number.POSITIVE_INFINITY; }
 }
 
-function schemeTitle(file) {
-  const name = String(file || '').trim();
-  if (!name) return '';
-  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === name);
-  const full = entry ? (namesOfProject(entry).tenDayDu || name) : name;
-  return `${planLevelOf(name)} · ${full}`;
+const lotDeps = () => ({ contains: lotContains, area: lotM2, levelOf: planLevelOf });
+
+function dxfAt(lots, lng, lat, level) {
+  const pool = (lots || []).filter(lot => lot && lot.geometry && lot.kind === 'DXF' && lot.file
+    && (!lot.phase || lot.phase === 'QH') && planLevelOf(lot.file) === level);
+  return pickPlanningLot(pool, lng, lat, level, lotDeps());
 }
 
-async function planningLotAt(latlng) {
-  const level = VIEW_LEVEL[getLevel()] || '';
-  const deps = { contains: lotContains, area: lotM2, levelOf: planLevelOf };
-  const drawn = pickPlanningLot(state.landParcels, latlng.lng, latlng.lat, level, deps);
-  if (drawn) return drawn;
+function pushLot(lots, seen, lot) {
+  if (!lot || !lot.geometry) return;
+  const key = `${lot.file || ''}|${lot.phase || ''}|${lot.id || ''}`;
+  if (lot.id && seen.has(key)) return;
+  if (lot.id) seen.add(key);
+  lots.push(lot);
+}
+
+async function collectPlanLevels(latlng) {
+  const lng = latlng.lng;
+  const lat = latlng.lat;
   const pad = 0.0008;
-  const bbox = [latlng.lng - pad, latlng.lat - pad, latlng.lng + pad, latlng.lat + pad];
-  const { projects, wardLots } = await planLotsIn(bbox, { level: level || null, includeHidden: true });
+  const bbox = [lng - pad, lat - pad, lng + pad, lat + pad];
+  const [vision, land, qhct, pack] = await Promise.all([
+    qhcFeatureAt('25', latlng).catch(err => { console.warn('QHC 1/25.000:', err); return null; }),
+    qhcFeatureAt('10', latlng).catch(err => { console.warn('QHC 1/10.000:', err); return null; }),
+    qhctFeatureAt(latlng).catch(err => { console.warn('QHCT 1/500:', err); return null; }),
+    planLotsIn(bbox, { includeHidden: true }).catch(err => { console.warn('Lô đồ án:', err); return null; })
+  ]);
   const lots = [];
-  (projects || []).forEach(p => (p.lots || []).forEach(lot => lots.push(lot)));
-  (wardLots || []).forEach(lot => lots.push(lot));
-  return pickPlanningLot(lots, latlng.lng, latlng.lat, level, deps);
+  const seen = new Set();
+  (state.landParcels || []).forEach(lot => pushLot(lots, seen, lot));
+  (pack?.projects || []).forEach(p => (p.lots || []).forEach(lot => pushLot(lots, seen, lot)));
+  (pack?.wardLots || []).forEach(lot => pushLot(lots, seen, lot));
+  const qhcDxf = dxfAt(lots, lng, lat, 'QHC');
+  const qhpk = dxfAt(lots, lng, lat, 'QHPK');
+  const qhctDxf = dxfAt(lots, lng, lat, 'QHCT');
+  const rows = [];
+  if (vision) rows.push({ id: 'qhc25', label: PLAN_CHOICES[0].label, kind: 'vision', feature: vision });
+  if (qhcDxf) rows.push({ id: 'qhc10', label: PLAN_CHOICES[1].label, kind: 'dxf', lot: qhcDxf });
+  else if (land) rows.push({ id: 'qhc10', label: PLAN_CHOICES[1].label, kind: 'land', feature: land });
+  if (qhpk) rows.push({ id: 'qhpk', label: PLAN_CHOICES[2].label, kind: 'dxf', lot: qhpk });
+  if (qhctDxf) rows.push({ id: 'qhct', label: PLAN_CHOICES[3].label, kind: 'dxf', lot: qhctDxf });
+  else if (qhct) rows.push({ id: 'qhct', label: PLAN_CHOICES[3].label, kind: 'static', feature: qhct });
+  return rows;
 }
 
-function planLotCardHtml(tab, lot) {
-  const label = landLabel(lot.layer);
-  const code = planningLotCode(lot);
-  const title = (code && code !== label ? code : '') || label || 'Lô đất quy hoạch';
-  const sub = [label && label !== title ? label : '', schemeTitle(lot.file)].filter(Boolean).join(' · ');
-  return `${tabsBar(tab, 'Lô đất quy hoạch', 'Đóng bảng lô đất quy hoạch')}
-    <div class="cad-id"><div class="lp-head"><div class="lp-head-main">
-      <div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span><span class="lp-phase lp-phase-qh">Lô đất quy hoạch</span></div>
-      <div class="lp-sub">${escapeHtml(sub || 'Cả ô đất quy hoạch, không phải thửa địa chính')}</div>
-    </div></div></div>
-    <div class="cad-page" role="tabpanel"><div class="cad-busy">Đang chọn cấp chi tiết nhất trên lô này…</div></div>`;
+/** Các cấp có lô tại điểm, từ QHC 1/25.000 tới QHCT 1/500. Cấp không có lô bị bỏ. */
+export function planLevelsAt(latlng) {
+  if (!latlng) return Promise.resolve([]);
+  const key = `${latlng.lat.toFixed(5)},${latlng.lng.toFixed(5)}`;
+  if (!levelTask || levelTask.key !== key) {
+    const task = collectPlanLevels(latlng).catch(err => {
+      if (levelTask && levelTask.task === task) levelTask = null;
+      throw err;
+    });
+    levelTask = { key, task };
+  }
+  return levelTask.task;
+}
+
+function showPlanRow(row, latlng, targetMap) {
+  const opts = { hideProject: true };
+  if (row.kind === 'dxf') openLotPopup(row.lot, targetMap, latlng, opts);
+  else if (row.kind === 'static') showQhctLot(targetMap, row.feature, latlng, opts);
+  else showQhcFeature(row.id === 'qhc25' ? '25' : '10', row.feature, latlng, targetMap, opts);
 }
 
 /**
- * Bảng 4 cấp trên cả ô đất quy hoạch chứa điểm (không phải thửa địa chính).
- * Mặc định cấp có lô, chi tiết nhất trước: QHCT, QHPK, QHC 1/10.000, QHC 1/25.000.
+ * Mở thẻ lô tại điểm. levelId bỏ trống thì lấy cấp chi tiết nhất còn lô.
+ * Thẻ cùng lối bấm trái; không mở bảng đồ án.
  */
-export async function openPlanAt(latlng, targetMap) {
+export async function openPlanAt(latlng, targetMap, levelId) {
   if (!targetMap || !latlng) return false;
-  document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
-  closeDocked();
-  closeParcel();
-  const mySeq = clickSeq;
-  let lot = null;
-  try {
-    lot = await planningLotAt(latlng);
-  } catch (err) {
+  let list = [];
+  try { list = await planLevelsAt(latlng); }
+  catch (err) {
     console.warn('Không lấy được lô đất quy hoạch:', err);
   }
-  if (mySeq !== clickSeq) return false;
-  if (!lot || !lot.geometry) {
+  const row = levelId ? list.find(x => x.id === levelId) : list[list.length - 1];
+  if (!row) {
     showToast('Không có lô đất quy hoạch tại vị trí này.', 'info');
     return false;
   }
-  const geom = lot.geometry;
-  const el = ensureCard();
-  cardState = {
-    kind: 'plan', place: 'lot', tab: 'qhct', cache: new Map(),
-    recorded: 0, geom, map: targetMap, bounds: null, landKey: null
-  };
-  el.innerHTML = planLotCardHtml('qhct', lot);
-  el.hidden = false;
-  el.setAttribute('aria-label', 'Thông tin lô đất quy hoạch');
-  setPlanAxisHold(true);
-  drawHighlight({ type: 'Feature', properties: {}, geometry: geom }, targetMap);
-  const mine = cardState;
-  const dropped = () => {
-    if (clickSeq === mySeq && cardState === mine) return false;
-    if (cardState === mine) closeParcel();
-    return true;
-  };
-  let chosen = 'qhc25';
-  for (const id of PLAN_FINEST) {
-    if (dropped()) return false;
-    try {
-      const page = await planPage(id, geom, 0, 'lot');
-      if (dropped()) return false;
-      mine.cache.set(id, page);
-      if (pageHasLots(page)) { chosen = id; break; }
-    } catch (err) {
-      console.warn('Đối chiếu lô đất quy hoạch', id, err);
-    }
-  }
-  if (dropped()) return false;
-  showTab(chosen);
+  showPlanRow(row, latlng, targetMap);
   return true;
 }
 
-// replaced: popup lô đồ án mở cùng cú bấm, chỉ đóng khi tìm thấy thửa (không thấy thì giữ popup lô)
-async function openParcel(latlng, targetMap, replaced) {
+async function openParcel(latlng, targetMap) {
   const seq = ++clickSeq;
   let found;
   try {
@@ -920,7 +918,6 @@ async function openParcel(latlng, targetMap, replaced) {
   }
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
   closeDocked();
-  if (replaced) targetMap.closePopup(replaced);
   const props = found.hit.props;
   const planning = isPlanLevel(getLevel());
   closeParcel();
@@ -997,20 +994,15 @@ function showParcelPlan(own, content, btn, shapeP, props) {
 export function cadastreClick(e, targetMap) {
   if (!visible || !targetMap || targetMap.getZoom() < MIN_ZOOM) return false;
   if (performance.now() - foreignAt < 300) return true;
-  openParcel(e.latlng, targetMap, null);
+  openParcel(e.latlng, targetMap);
   return true;
 }
 
-// Lớp thửa không bắt chuột (vẽ đè lô). Bấm trúng lô thì lô mở popup và chặn click bản đồ.
-// Popup lô neo giữa khung nhìn, không phải điểm bấm: lấy latlng của preclick. Công trình, marker vẫn giữ popup của nó
-function onPopupOpen(e, m) {
+// Lớp thửa không bắt chuột và nằm dưới ô đất. Popup lô, công trình, marker giữ nguyên; click nền mới mở thửa.
+function onPopupOpen(e) {
   const cls = e.popup.options.className || '';
   if (e.popup === popup || /\bcadastre-popup\b/.test(cls)) return;
-  const now = performance.now();
-  foreignAt = now;
-  const isLot = /\bland-lot-popup\b/.test(cls);
-  if (!visible || !isLot || now - preclickAt > 300 || m.getZoom() < MIN_ZOOM) return;
-  openParcel(clickAt || e.popup.getLatLng(), m, e.popup);
+  foreignAt = performance.now();
 }
 
 function loadXaList() {
@@ -1140,8 +1132,7 @@ export function initCadastreLayer() {
     closeParcel();
   });
   [map, planMap].forEach((m) => {
-    m?.on('preclick', (e) => { preclickAt = performance.now(); clickAt = e.latlng || clickAt; });
-    m?.on('popupopen', (e) => onPopupOpen(e, m));
+    m?.on('popupopen', onPopupOpen);
   });
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'cadastre' && cardState) closeParcel(); });
   $('chk_cadastre')?.addEventListener('change', (e) => setCadastreVisible(e.target.checked));

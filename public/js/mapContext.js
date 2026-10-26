@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { map, wardNameAt, toggleMeasure, handleMeasureClick, inspectAccessAt, consumeMeasureContext } from './mapEngine.js';
 import { planMap } from './planMap.js';
-import { openParcelAt, openPlanAt, parcelFactsAt } from './cadastreLayer.js';
+import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastreLayer.js';
 import { streetViewUrl } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 
@@ -34,6 +34,7 @@ function saveNotes() {
 }
 
 function closeMenu() {
+  menuEl?._fly?.remove();
   menuEl?.remove();
   menuEl = null;
 }
@@ -206,6 +207,67 @@ function item(act, icon, label) {
   return `<button type="button" class="map-ctx-item" role="menuitem" data-act="${act}">${ico(icon)}<span>${label}</span></button>`;
 }
 
+function planItem() {
+  return `<div class="map-ctx-plan"><button type="button" class="map-ctx-item" role="menuitem" data-act="plan">${ico('layers')}<span>Xem thông tin lô đất quy hoạch</span><span class="map-ctx-caret" aria-hidden="true">›</span></button></div>`;
+}
+
+function placeFly(anchor, fly) {
+  const pad = 8;
+  const r = anchor.getBoundingClientRect();
+  fly.hidden = false;
+  fly.style.left = `${r.right - 4}px`;
+  fly.style.top = `${r.top}px`;
+  const box = fly.getBoundingClientRect();
+  let left = r.right - 4;
+  let top = r.top;
+  if (left + box.width > window.innerWidth - pad) left = Math.max(pad, r.left - box.width + 4);
+  if (top + box.height > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - pad - box.height);
+  fly.style.left = `${left}px`;
+  fly.style.top = `${top}px`;
+}
+
+function armPlanFly(menu, latlng, targetMap) {
+  const row = menu.querySelector('.map-ctx-plan');
+  if (!row) return;
+  const fly = document.createElement('div');
+  fly.className = 'map-ctx-fly';
+  fly.hidden = true;
+  fly.setAttribute('role', 'menu');
+  fly.innerHTML = '<div class="map-ctx-note">Đang kiểm tra cấp quy hoạch…</div>';
+  fly.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.body.appendChild(fly);
+  menu._fly = fly;
+  let hot = false;
+  const show = () => { hot = true; placeFly(row, fly); };
+  const hide = () => {
+    hot = false;
+    setTimeout(() => { if (!hot) fly.hidden = true; }, 160);
+  };
+  row.addEventListener('pointerenter', show);
+  row.addEventListener('pointerleave', hide);
+  fly.addEventListener('pointerenter', show);
+  fly.addEventListener('pointerleave', hide);
+  fly.addEventListener('click', (e) => {
+    const id = e.target.closest('[data-level]')?.dataset.level;
+    if (!id) return;
+    closeMenu();
+    openPlanAt(latlng, targetMap, id);
+  });
+  planLevelsAt(latlng).then(list => {
+    if (menuEl !== menu) return;
+    if (!list.length) {
+      fly.innerHTML = '<div class="map-ctx-note">Không có lô đất quy hoạch tại vị trí này</div>';
+    } else {
+      fly.innerHTML = list.map(choice =>
+        `<button type="button" class="map-ctx-item" role="menuitem" data-level="${choice.id}">${escapeHtml(choice.label)}</button>`).join('');
+    }
+    if (!fly.hidden) placeFly(row, fly);
+  }).catch(() => {
+    if (menuEl !== menu) return;
+    fly.innerHTML = '<div class="map-ctx-note">Không kiểm tra được cấp quy hoạch</div>';
+  });
+}
+
 function openMenu(ev, latlng, targetMap) {
   closeMenu();
   closeNoteEditor(false);
@@ -214,7 +276,7 @@ function openMenu(ev, latlng, targetMap) {
   el.setAttribute('role', 'menu');
   el.innerHTML = [
     item('parcel', 'parcel', 'Xem thông tin thửa đất'),
-    item('plan', 'layers', 'Xem thông tin lô đất quy hoạch'),
+    planItem(),
     item('access', 'inspect', 'Xem khả năng tiếp cận hạ tầng'),
     item('place', 'locate', 'Xem thông tin địa điểm'),
     '<div class="map-ctx-sep"></div>',
@@ -233,6 +295,7 @@ function openMenu(ev, latlng, targetMap) {
   menuEl = el;
   clampBox(el, ev.clientX, ev.clientY);
   el.style.visibility = '';
+  armPlanFly(el, latlng, targetMap);
   el.addEventListener('click', (e) => {
     const act = e.target.closest('button')?.dataset.act;
     if (!act) return;
@@ -369,7 +432,7 @@ export function initMapContext(list) {
   });
   drawNotes();
   document.addEventListener('pointerdown', (e) => {
-    if (menuEl && !menuEl.contains(e.target)) closeMenu();
+    if (menuEl && !menuEl.contains(e.target) && !menuEl._fly?.contains(e.target)) closeMenu();
     if (placeEl && !placeEl.contains(e.target)) closePlace();
   }, true);
   document.addEventListener('keydown', (e) => {

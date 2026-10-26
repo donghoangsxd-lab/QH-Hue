@@ -169,13 +169,13 @@ export async function parcelQhctHtml(geometry, recorded, place) {
   };
 }
 
-function popupHtml(p) {
+function popupHtml(p, opts) {
   const rows = [
-    ['Đồ án', p.tenQH],
+    opts?.hideProject ? null : ['Đồ án', p.tenQH],
     ['Ký hiệu lô', p.kyHieu],
     ['Chức năng', p.chucNang],
     ['Diện tích', p.dienTich ? `${fmtNum(Math.round(p.dienTich))} m²` : '']
-  ].filter(([, v]) => v);
+  ].filter(pair => pair && pair[1]);
   return `<div class="qhc-pop"><div class="qhc-pop-head"><b>${escapeHtml(p.chucNang || 'Lô đất QHCT 1/500')}</b></div>
     <table class="qhc-pop-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>
     ${lotBuildupSlotHtml()}
@@ -203,9 +203,43 @@ function restyleLots() {
   qhctMaps().forEach(m => drawn.get(m)?.layer?.setStyle(lotFill));
 }
 
-function openQhctPopup(m, f, latlng) {
+function pointInFeature(f, lng, lat) {
+  if (!f?.geometry) return false;
+  let box = f._qhBox;
+  if (!box) {
+    try { box = turf.bbox(f); } catch { box = null; }
+    f._qhBox = box;
+  }
+  if (!box || lng < box[0] || lng > box[2] || lat < box[1] || lat > box[3]) return false;
+  try { return turf.booleanPointInPolygon([lng, lat], f); } catch { return false; }
+}
+
+/** Lô tĩnh QHCT 1/500 nhỏ nhất chứa điểm. null nếu không có. */
+export async function qhctFeatureAt(latlng) {
+  if (!latlng) return null;
+  const fc = await load();
+  let best = null;
+  let bestA = Infinity;
+  for (const f of fc.features || []) {
+    if (!pointInFeature(f, latlng.lng, latlng.lat)) continue;
+    const a = Number(f.properties?.dienTich) || 0;
+    let area = a;
+    if (!area) {
+      try { area = turf.area(f); } catch { area = Infinity; }
+    }
+    if (area < bestA) { best = f; bestA = area; }
+  }
+  return best;
+}
+
+/** Cùng popup bấm trái lên lô tĩnh. hideProject: không hiện dòng đồ án. */
+export function showQhctLot(m, f, latlng, opts) {
+  openQhctPopup(m, f, latlng, opts);
+}
+
+function openQhctPopup(m, f, latlng, opts) {
   if (qhctLotPop && qhctLotPop.f === f && qhctLotPop.map === m && expandCollapsedPopup(qhctLotPop.popup)) return;
-  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setLatLng(latlng).setContent(popupHtml(f.properties || {}));
+  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setLatLng(latlng).setContent(popupHtml(f.properties || {}, opts));
   qhctLotPop = { popup, f, map: m };
   popup.openOn(m);
   attachLotBuildup(popup, {

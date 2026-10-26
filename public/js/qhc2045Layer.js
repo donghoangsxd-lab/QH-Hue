@@ -773,7 +773,7 @@ function swatchHtml(land) {
 
 let qhcLotPop = null;
 
-function openLotPopup(f, latlng) {
+function openLotPopup(f, latlng, opts) {
   const host = active?.m || target();
   if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
   const p = f.properties;
@@ -782,11 +782,13 @@ function openLotPopup(f, latlng) {
   const ward = wardNameAt(latlng.lat, latlng.lng);
   const tv = tvAt(latlng.lng, latlng.lat);
   const note = p.n != null ? data.land.notes[p.n] : '';
-  const projects = qhpkAt(latlng.lng, latlng.lat);
+  const projects = opts?.hideProject ? [] : qhpkAt(latlng.lng, latlng.lat);
   const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   const projectHtml = projects.length
     ? projects.map(x => `<button type="button" class="qhc-pop-link" data-qhc-open="${escapeHtml(x.tenQH)}">${ico('file')}${escapeHtml(x.tenQH)}</button>`).join('')
     : '<span class="ua-tip-muted">Chưa có đồ án QHPK 1/2.000 tại vị trí này</span>';
+  const projectBlock = opts?.hideProject ? '' : `<div class="qhc-pop-sec">QHPK 1/2.000 tại vị trí</div>
+      <div class="qhc-pop-projects">${projectHtml}</div>`;
   const html = `<div class="qhc-pop">
       <div class="qhc-pop-head">${swatchHtml(land)}<b>${escapeHtml(land.label)}</b></div>
       <table class="qhc-pop-table">
@@ -797,8 +799,7 @@ function openLotPopup(f, latlng) {
         ${tv ? row('Tiểu vùng', `${escapeHtml(tv.tv)} · ${escapeHtml(tv.ten)}`) : ''}
         ${ward ? row('Phường, xã', escapeHtml(ward)) : ''}
       </table>
-      <div class="qhc-pop-sec">QHPK 1/2.000 tại vị trí</div>
-      <div class="qhc-pop-projects">${projectHtml}</div>
+      ${projectBlock}
       ${ward ? `<button type="button" class="bp-btn qhc-pop-ward" data-qhc-ward="${escapeHtml(ward)}">${ico('map')}Xem ${escapeHtml(ward)}</button>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
@@ -937,6 +938,24 @@ function featureHits(f, box) {
     if (b) bboxes.set(f, b);
   }
   return !!b && b[0] <= box[2] && b[2] >= box[0] && b[1] <= box[3] && b[3] >= box[1];
+}
+
+/** Lô hoặc vùng QHC chứa điểm. scale: '25' sơ đồ 1/25.000, '10' sử dụng đất 1/10.000. */
+export async function qhcFeatureAt(scale, latlng) {
+  if (!latlng) return null;
+  const pack = await load(scale === '25' ? 'vision' : 'land');
+  const features = scale === '25'
+    ? (pack.features || []).filter(f => f.properties && f.properties.L === 'v')
+    : (pack.features || []);
+  return featureAt(features, latlng.lng, latlng.lat);
+}
+
+/** Cùng popup bấm trái trên lớp QHC. hideProject: bỏ khối đồ án QHPK trong thẻ 1/10.000. */
+export function showQhcFeature(scale, feature, latlng, map, opts) {
+  if (!feature || !latlng || !map) return;
+  use(map);
+  if (scale === '25') openVisionPopup(feature, latlng);
+  else openLotPopup(feature, latlng, opts);
 }
 
 /** Đối tượng vẽ sau (nằm trên) chứa điểm [lng, lat] */

@@ -5,7 +5,7 @@ import { planLotsIn } from './projectFiles.js';
 import { landOf, QHC2045 } from './qhc2045.js';
 import { schemeRecords, setSchemeCatalog, SCHEME_ALIAS } from './facetStore.js';
 import { landPatternKey } from './tt16Symbols.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, ico } from './utils.js';
 import { SHELL_V } from './gbaVersion.js';
 import {
   assessCompliance, classify, compilePrinciples, turfOps, bboxOf, bboxHits, CONCLUSION, parentLinkMap
@@ -215,7 +215,8 @@ function complianceHtml(row) {
   const status = row && CONCLUSION[row.status] ? row.status : 'chua-du-du-lieu';
   const cls = status === 'phu-hop' ? 'pls-comp-ok' : status === 'chua-phu-hop' ? 'pls-comp-bad' : 'pls-comp-gap';
   const line = (label, value, klass) => `<div class="pp-row"><span>${label}</span><b${klass ? ` class="${klass}"` : ''}>${escapeHtml(value)}</b></div>`;
-  return `<div class="pls-comp">${line('Chức năng cấp trên', (row && row.parentText) || 'Chưa xác định')}${line('Chỉ tiêu so sánh', (row && row.compareText) || 'Chưa đủ dữ liệu')}${line('Kết luận', CONCLUSION[status], cls)}</div>`;
+  const body = `${line('Chức năng cấp trên', (row && row.parentText) || 'Chưa xác định')}${line('Chỉ tiêu so sánh', (row && row.compareText) || 'Chưa đủ dữ liệu')}${line('Kết luận', CONCLUSION[status], cls)}`;
+  return `<details class="pls-comp-fold"><summary class="pls-comp-btn" title="Đánh giá sự phù hợp quy hoạch cấp trên" aria-label="Đánh giá sự phù hợp quy hoạch cấp trên">${ico('compare')}</summary><div class="pls-comp">${body}</div></details>`;
 }
 
 const gapRow = () => ({

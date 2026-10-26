@@ -656,6 +656,7 @@ function ensureCard() {
   el.setAttribute('aria-label', 'Dự án kêu gọi đầu tư');
   (document.getElementById('mapArea') || document.body).appendChild(el);
   el.addEventListener('click', (e) => {
+    if (e.target.closest('.pls-comp-fold')) return;
     const land = e.target.closest('[data-land]');
     if (land) { toggleLand(land.dataset.land, land.dataset.color); return; }
     const info = e.target.closest('[data-info-tab]');

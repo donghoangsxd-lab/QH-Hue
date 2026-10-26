@@ -714,8 +714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (await gbaFloorEditClick(e, targetMap)) return;
-    // Thứ tự ưu tiên khi bấm: tem công trình > thửa hiện trạng (lớp thửa bật) > lô quy hoạch > phường (cuối cùng).
-    // Lô tự bắt click (không nổi lên bản đồ); lớp thửa giành popup lô trong cadastreLayer.onPopupOpen
+    // Thứ tự ưu tiên khi bấm: tem công trình > lô quy hoạch (lô tự bắt click) > thửa hiện trạng khi lớp thửa bật > phường.
     const detailLocked = detailClickLocked(targetMap);
     if (!detailLocked && infraClickAt(e, targetMap)) return;
     if (state.isInspectMode) {

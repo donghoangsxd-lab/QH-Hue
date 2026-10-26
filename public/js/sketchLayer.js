@@ -3,7 +3,7 @@
 // đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML hoặc DXF (sketchExport.js).
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
-import { map, deleteSelectedMeasure } from './mapEngine.js';
+import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_EVENT, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
 import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
@@ -179,29 +179,30 @@ function shapeTip(tool, text, m) {
   return `${label} · ${text} · ${stateName(m)} · chuột phải để chỉnh · Delete để xóa`;
 }
 
-function shapeLayers(tool, lls, c, preview) {
-  const line = { color: c, weight: 3, opacity: 0.95, interactive: !preview, className: preview ? undefined : 'sketch-shape' };
-  const halo = { color: '#020617', weight: 6, opacity: 0.45, interactive: false };
+function shapeLayers(tool, lls, c, preview, hostMap) {
+  const draw = { renderer: drawToolRenderer(hostMap), pane: DRAW_TOOL_PANE };
+  const line = { color: c, weight: 3, opacity: 0.95, interactive: !preview, className: preview ? undefined : 'sketch-shape', ...draw };
+  const halo = { color: '#020617', weight: 6, opacity: 0.45, interactive: false, ...draw };
   const out = [];
   if (tool === 'circle') {
     const r = distM(lls[0], lls[1]);
-    if (!preview) out.push(L.circle(lls[0], { color: '#ffffff', radius: r, weight: 8, opacity: 0, fill: false, interactive: false }));
+    if (!preview) out.push(L.circle(lls[0], { color: '#ffffff', radius: r, weight: 8, opacity: 0, fill: false, interactive: false, ...draw }));
     out.push(L.circle(lls[0], { ...line, radius: r, fillColor: c, fillOpacity: 0.12 }));
-    if (preview) out.push(L.polyline(lls, { color: c, weight: 1.5, dashArray: '4,5', interactive: false }));
+    if (preview) out.push(L.polyline(lls, { color: c, weight: 1.5, dashArray: '4,5', interactive: false, ...draw }));
     return { layers: out, text: shapeMeasure(tool, lls) };
   }
   if (tool === 'polygon' && lls.length >= 3) {
-    if (!preview) out.push(L.polygon(lls, { color: '#ffffff', weight: 8, opacity: 0, fill: false, interactive: false }));
+    if (!preview) out.push(L.polygon(lls, { color: '#ffffff', weight: 8, opacity: 0, fill: false, interactive: false, ...draw }));
     out.push(L.polygon(lls, { ...line, fillColor: c, fillOpacity: 0.15 }));
     return { layers: out, text: shapeMeasure(tool, lls) };
   }
   out.push(L.polyline(lls, halo), L.polyline(lls, { ...line, dashArray: preview ? '6,6' : null }));
-  // Nét trong suốt, rộng hơn nét thấy được, để rê chuột và chuột phải trúng đường mảnh (canvas không có phần tử DOM riêng)
-  if (!preview) out.push(L.polyline(lls, { color: c, weight: 18, opacity: 0, className: 'sketch-hit sketch-shape' }));
+  // Nét trong suốt, rộng hơn nét thấy được, để rê chuột và chuột phải trúng đường mảnh
+  if (!preview) out.push(L.polyline(lls, { color: c, weight: 18, opacity: 0, interactive: true, className: 'sketch-hit sketch-shape', ...draw }));
   if (tool === 'arrow' && lls.length === 2) {
     const head = arrowHead(lls[0], lls[1]);
     if (head) {
-      if (!preview) out.push(L.polygon(head, { color: '#ffffff', weight: 6, opacity: 0, fill: false, interactive: false }));
+      if (!preview) out.push(L.polygon(head, { color: '#ffffff', weight: 6, opacity: 0, fill: false, interactive: false, ...draw }));
       out.push(L.polygon(head, { ...line, weight: 1, fillColor: c, fillOpacity: 1 }));
     }
   }
@@ -293,13 +294,14 @@ function renderDraft() {
   if (!tool || !pts.length) return setHint(tool ? toolHint(state.sketchTool) : '');
   const lls = cursor ? [...pts, cursor] : pts.slice();
   if (lls.length >= 2) {
-    const { layers, text } = shapeLayers(state.sketchTool, lls, color, true);
+    const { layers, text } = shapeLayers(state.sketchTool, lls, color, true, drawMap);
     layers.forEach(l => l.addTo(draft));
     setHint(`${tool.label}: ${text} · ${stateName(drawMap)} · đỉnh sáng: chuột phải để xóa`);
   }
+  const draw = { renderer: drawToolRenderer(drawMap), pane: DRAW_TOOL_PANE };
   pts.forEach((p, i) => L.circleMarker(p, {
     radius: i === 0 && state.sketchTool === 'polygon' && pts.length >= 3 ? 6 : 4,
-    color, weight: 2, fillColor: '#0f172a', fillOpacity: 1, interactive: false
+    color, weight: 2, fillColor: '#0f172a', fillOpacity: 1, interactive: false, ...draw
   }).addTo(draft));
 }
 
@@ -441,7 +443,7 @@ function showEditHint() {
 function paintShape(fg) {
   const s = fg.sketch;
   const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
-  const { layers, text } = shapeLayers(s.tool, lls, s.color, false);
+  const { layers, text } = shapeLayers(s.tool, lls, s.color, false, fg.sketchHost || map);
   fg.clearLayers();
   layers.forEach(l => fg.addLayer(l));
   armHit(fg);
@@ -556,7 +558,7 @@ function finish() {
   const need = tool.points || tool.min;
   if (pts.length < need) { pts = []; clearSnap(); renderDraft(); return; }
   const m = drawMap || map;
-  const { layers, text } = shapeLayers(t, pts, color, false);
+  const { layers, text } = shapeLayers(t, pts, color, false, m);
   const fg = L.featureGroup(layers);
   fg.bindTooltip(shapeTip(t, text, m), { sticky: true, className: 'sketch-tip' });
   fg.sketch = { tool: t, pts: pts.map(p => L.latLng(p)), color };
@@ -893,7 +895,7 @@ async function importKmlFile(file) {
       continue;
     }
     const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
-    const { layers, text } = shapeLayers(s.tool, lls, color, false);
+    const { layers, text } = shapeLayers(s.tool, lls, color, false, host);
     const fg = L.featureGroup(layers);
     fg.sketch = { tool: s.tool, pts: lls, color };
     fg.bindTooltip(shapeTip(s.tool, text, host), { sticky: true, className: 'sketch-tip' });

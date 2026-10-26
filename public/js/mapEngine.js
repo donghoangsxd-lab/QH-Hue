@@ -1296,6 +1296,27 @@ export function consumeMeasureMapClick(e) {
   return true;
 }
 
+// Trên ảnh và ranh điều chỉnh cục bộ (z 449) cùng các lớp phủ phía trên overlayPane.
+// Dưới markerPane (600): nhãn số đo, chữ phác thảo và núm đỉnh vẫn nằm trên nét và vẫn bấm được.
+// SVG chứ không dùng canvas chung của bản đồ: vùng trống không chặn chuột xuống lớp bên dưới.
+export const DRAW_TOOL_PANE = 'drawToolPane';
+const DRAW_TOOL_Z = 595;
+const drawRenderers = new WeakMap();
+
+export function drawToolRenderer(m) {
+  if (!m) return null;
+  let renderer = drawRenderers.get(m);
+  if (renderer) return renderer;
+  if (!m.getPane(DRAW_TOOL_PANE)) {
+    const pane = m.createPane(DRAW_TOOL_PANE);
+    pane.style.zIndex = String(DRAW_TOOL_Z);
+    pane.style.pointerEvents = 'none';
+  }
+  renderer = L.svg({ pane: DRAW_TOOL_PANE });
+  drawRenderers.set(m, renderer);
+  return renderer;
+}
+
 function addMeasureLabel(group, hostMap, latlng, color, label, ringLngLat, editing) {
   const btn = ringLngLat
     ? `<button type="button" class="measure-plan-btn" title="Quy hoạch sử dụng đất trong vùng đo, chuyển 4 cấp như bảng thửa">${ico('area')}Phân tích QH</button>`
@@ -1332,27 +1353,29 @@ function paintMeasureShape(groups, pts, type, opt) {
   const min = isArea ? 3 : 2;
   const canPick = !isProfile && lnglats.length >= min;
   groups.forEach(({ group, map: hostMap }) => {
+    const draw = { renderer: drawToolRenderer(hostMap), pane: DRAW_TOOL_PANE };
     latlngs.forEach(ll => L.circleMarker(ll, {
-      radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false
+      radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false, ...draw
     }).addTo(group));
     if (selected) {
-      const halo = { color: '#ffffff', weight: isArea ? 8 : 10, opacity: 0.95, interactive: false, fill: false };
+      const halo = { color: '#ffffff', weight: isArea ? 8 : 10, opacity: 0.95, interactive: false, fill: false, ...draw };
       if (!isArea && latlngs.length >= 2) L.polyline(latlngs, halo).addTo(group);
       if (isArea && latlngs.length >= 3) L.polygon(latlngs, halo).addTo(group);
     }
     if (!isArea && latlngs.length >= 2) {
-      const lineOpt = { color, weight: selected ? 5 : 3, interactive: false };
+      const lineOpt = { color, weight: selected ? 5 : 3, interactive: false, ...draw };
       if (!isProfile) lineOpt.dashArray = '4,4';
       L.polyline(latlngs, lineOpt).addTo(group);
     }
     if (isArea && latlngs.length >= 3) {
       L.polygon(latlngs, {
-        color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: selected ? 0.28 : 0.2, interactive: false
+        color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: selected ? 0.28 : 0.2, interactive: false, ...draw
       }).addTo(group);
     }
     if (canPick) {
       const hitOpt = {
-        color, weight: 18, opacity: 0, interactive: true, bubblingMouseEvents: false, className: 'measure-hit'
+        color, weight: 18, opacity: 0, interactive: true, bubblingMouseEvents: false,
+        className: isArea ? 'measure-hit measure-hit-area' : 'measure-hit', ...draw
       };
       if (isArea) { hitOpt.fillColor = color; hitOpt.fillOpacity = 0; }
       const hit = (isArea ? L.polygon(latlngs, hitOpt) : L.polyline(latlngs, hitOpt)).addTo(group);
@@ -2198,9 +2221,9 @@ function tallyInside(list, feature, bbox) {
 
 const foldWard = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
-function axisCardHtml(p) {
+function axisCardHtml(p, opts) {
   const ward = p.ward || 'Chưa rõ';
-  const planBits = [p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng', p.file, landLabel(p.layer)].filter(Boolean);
+  const planBits = [p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng', opts?.hideProject ? '' : p.file, landLabel(p.layer)].filter(Boolean);
   let infra = 'Không có điểm đã tải trong ranh lô.';
   try {
     const feature = turf.feature(p.geometry);
@@ -2233,7 +2256,7 @@ function axisCardHtml(p) {
   </section>`;
 }
 
-function landPopupHtml(p) {
+function landPopupHtml(p, opts) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
   const type = expandPlanWords(nhom === 'Đất khác' && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom);
@@ -2244,7 +2267,7 @@ function landPopupHtml(p) {
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
   const title = lotHeading(p.name || p.layer || type, code, type) || type;
   const place = placeField(p.ward);
-  const project = projectValueHtml(p.file, catalogEntry(p.file));
+  const project = opts?.hideProject ? '' : projectValueHtml(p.file, catalogEntry(p.file));
   const stamp = p.stampArea && p.area && Math.abs(p.stampArea - p.area) / p.area > 0.1
     ? `<div class="lp-spec"><span class="lp-spec-k">Diện tích trên tem</span><b>${fmtNum(Math.round(p.stampArea))} m²</b></div>` : '';
   const rows = [
@@ -2264,7 +2287,7 @@ function landPopupHtml(p) {
     </div>
     <div class="lp-specs">${areaSpecHtml(p.area ? `${fmtNum(Math.round(p.area))} m²` : '', '', '')}${stamp}${lotStatsHtml(p.plan)}</div>
     ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
-    ${axisCardHtml(p)}
+    ${axisCardHtml(p, opts)}
     ${lotActionsHtml('', view3d)}
     ${landPopupExtra(p)}
     ${lotBuildupSlotHtml()}
@@ -2352,17 +2375,17 @@ export function openOutlinedPopup(m, geometry, popup, latlng) {
 
 let openLandInfo = null;
 
-function landInfoKey(p) {
-  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || ''].join('|');
+function landInfoKey(p, opts) {
+  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || '', opts?.hideProject ? 'lot' : ''].join('|');
 }
 
-function trackLandInfo(popup, p, m) {
-  openLandInfo = { popup, key: landInfoKey(p), map: m };
+function trackLandInfo(popup, p, m, opts) {
+  openLandInfo = { popup, key: landInfoKey(p, opts), map: m };
   popup.on('remove', () => { if (openLandInfo?.popup === popup) openLandInfo = null; });
 }
 
-function reuseLandInfo(p, m) {
-  return !!(openLandInfo && openLandInfo.key === landInfoKey(p) && openLandInfo.map === m
+function reuseLandInfo(p, m, opts) {
+  return !!(openLandInfo && openLandInfo.key === landInfoKey(p, opts) && openLandInfo.map === m
     && expandCollapsedPopup(openLandInfo.popup));
 }
 
@@ -2502,9 +2525,9 @@ function bindDossier(popup, projectName) {
   });
 }
 
-function openLandPopup(p, m) {
-  if (reuseLandInfo(p, m)) return;
-  const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p));
+function openLandPopup(p, m, opts) {
+  if (reuseLandInfo(p, m, opts)) return;
+  const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
   attachSelectionOutline(m, p.geometry, popup);
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   const center = geometryCenter(p.geometry);
@@ -2516,21 +2539,21 @@ function openLandPopup(p, m) {
       title: lotHeading(p.name || '', p.lotCode || landCode(p), '')
     });
   }
-  bindDossier(popup, p.file);
+  if (!opts?.hideProject) bindDossier(popup, p.file);
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
-  trackLandInfo(popup, p, m);
+  trackLandInfo(popup, p, m, opts);
   fillLotBuildup(popup, p);
 }
 
 /** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */
-export function openLotPopup(p, m, latlng) {
+export function openLotPopup(p, m, latlng, opts) {
   if (!p || !m || !latlng) return;
   const facilityId = touchPrimary(p.id) || p.id;
   const item = p.kind === 'DXF' ? null
     : (m === planMap && getPlanScenarioList().find(it => it.id === facilityId))
       || state.rawDataList.find(it => it.id === facilityId) || state.planDataList.find(it => it.id === facilityId);
   if (item) onPointClick(item, m, p.geometry);
-  else openLandPopup(p, m);
+  else openLandPopup(p, m, opts);
 }
 
 // Thứ tự vẽ (vẽ sau nằm trên): đồ án diện tích lớn trước để đồ án nhỏ lồng bên trong không bị che và bấm được;
