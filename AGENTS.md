@@ -41,3 +41,11 @@ Hạn chế gọi API production. Dùng mock, fixture đã lưu, preview có gi�
 ### 5. Endpoint máy chủ
 
 Mọi endpoint mới cần giới hạn tần suất và cache. GET công khai phải có `Cache-Control` với `s-maxage` khi dữ liệu cho phép; `no-store` chỉ cho vỏ HTML/JS/CSS, hàng admin và tham số `fresh`. Retry có trần (không nhân ba vòng khi 429 hoặc quá hạn). Không thêm cron trừ khi owner đã duyệt chi phí.
+
+## Cursor Cloud specific instructions
+
+- Node 22 và Python 3 có sẵn. `npm ci` cài dependency khóa trong `package-lock.json`. `npm test` còn cần module Python `duckdb` (đã thử 1.4.2): `scripts/test-pop-filter.py` import `scripts/gba-residential.py`, file đó import `duckdb` ngay từ đầu. Cài bằng `python3 -m pip install --user 'duckdb==1.4.2'`.
+- `npm run build` chỉ ghi `public/version.json` (đã gitignore).
+- Chạy app local bằng Wrangler 4, cổng 8787, `--local --ip 0.0.0.0`. Bỏ khối `build` trong `wrangler.jsonc` lúc dev. Khối đó chạy `node scripts/stage-chuyen-nganh.mjs --materialize` và thay symlink git trong `public/data/chuyen-nganh` bằng bản sao khoảng 144MB. Máy dev đọc được symlink; đừng materialize nếu không deploy.
+- Chưa đặt `API_UPSTREAM` thì `GET /api/gee` trả 503, thông báo chưa có URL Cloud Run. File tĩnh và bản đồ vẫn mở. Không gọi `https://qh-hue.donghoangsxd.workers.dev` để bù API.
+- Cổng tĩnh 5500, 5501, 8080, 8000, 8766, 8791 khiến `geeApi()` trong `public/js/api.js` trỏ API production. Dev bằng Wrangler cổng 8787 thì `/api` ở máy local.
