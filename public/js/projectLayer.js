@@ -47,6 +47,7 @@ import {
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 import { capacityPanelHtml } from './congSuatUi.js';
 import { schemeSlug } from './congSuat.js';
+import { sameLevelOverlaps } from './qhpkOverlap.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -1820,10 +1821,15 @@ function hookHover(m) {
     if (raf) return;
     raf = requestAnimationFrame(() => {
       raf = 0;
-      if (m.getZoom() >= PARCEL_MIN_ZOOM && last) setHover(m, projectAt(m, last));
+      if (!last) return;
+      if (m.getZoom() >= PARCEL_MIN_ZOOM) setHover(m, projectAt(m, last));
+      syncOverlapTip(m, last);
     });
   });
-  m.getContainer().addEventListener('mouseleave', () => setHover(m, null));
+  m.getContainer().addEventListener('mouseleave', () => {
+    setHover(m, null);
+    if (overlapTipMap === m) clearOverlapTip();
+  });
 }
 
 // Đang chọn phường: ranh đồ án vắt sang phường bên cạnh chỉ vẽ phần trong phường (cắt 1 lần, nhớ theo hình ranh)
@@ -1850,7 +1856,231 @@ function shownOutline(p) {
   return ward && p.name !== state.focusedProject ? outlineInWard(full, ward) : full;
 }
 
+// Sọc 45° vẽ trên canvas theo pixel màn hình. Pattern SVG bị kéo theo hệ tọa độ lớp nên không còn sọc đều.
+const OVERLAP_PANE = 'qhpkOverlapPane';
+const HATCH_STEP = 8;
+const overlapByMap = new Map();
+const hatchLayers = new Map();
+const overlapGen = new Map();
+const intersectMemo = new WeakMap();
+let overlapTip = null;
+let overlapTipMap = null;
+
+const HatchCanvas = L.Layer.extend({
+  initialize() { this._rows = []; },
+  setRows(rows) {
+    this._rows = rows || [];
+    this._paint();
+  },
+  onAdd(map) {
+    if (!map.getPane(OVERLAP_PANE)) {
+      const pane = map.createPane(OVERLAP_PANE);
+      pane.style.zIndex = '430';
+      pane.style.pointerEvents = 'none';
+    }
+    this._canvas = document.createElement('canvas');
+    this._canvas.className = 'qhpk-hatch-canvas';
+    this._canvas.style.pointerEvents = 'none';
+    map.getPane(OVERLAP_PANE).appendChild(this._canvas);
+    this._ctx = this._canvas.getContext('2d');
+    map.on('move zoom viewreset resize zoomend moveend', this._paint, this);
+    this._paint();
+  },
+  onRemove(map) {
+    map.off('move zoom viewreset resize zoomend moveend', this._paint, this);
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = 0;
+    this._canvas?.remove();
+    this._canvas = null;
+    this._ctx = null;
+  },
+  _paint() {
+    if (!this._map || !this._canvas) return;
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => {
+      this._raf = 0;
+      this._draw();
+    });
+  },
+  _draw() {
+    const map = this._map;
+    const canvas = this._canvas;
+    if (!map || !canvas) return;
+    const size = map.getSize();
+    const origin = map.containerPointToLayerPoint([0, 0]);
+    L.DomUtil.setPosition(canvas, origin);
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(size.x));
+    const h = Math.max(1, Math.round(size.y));
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    const ctx = this._ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const rows = this._rows || [];
+    if (!rows.length) return;
+    const toPx = (coord) => {
+      const p = map.latLngToLayerPoint([coord[1], coord[0]]);
+      return { x: p.x - origin.x, y: p.y - origin.y };
+    };
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.75;
+    ctx.lineCap = 'square';
+    rows.forEach(row => {
+      const polys = row.geom?.type === 'Polygon' ? [row.geom.coordinates]
+        : row.geom?.type === 'MultiPolygon' ? row.geom.coordinates : [];
+      if (!polys.length) return;
+      ctx.save();
+      ctx.beginPath();
+      polys.forEach(poly => {
+        poly.forEach(ring => {
+          ring.forEach((coord, i) => {
+            const p = toPx(coord);
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+          });
+          ctx.closePath();
+        });
+      });
+      ctx.clip('evenodd');
+      for (let x = -h; x < w + h; x += HATCH_STEP) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x - h, h);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+});
+
+function clearOverlapTip() {
+  if (overlapTipMap && overlapTip) {
+    overlapTipMap.removeLayer(overlapTip);
+  }
+  overlapTip = null;
+  overlapTipMap = null;
+}
+
+function clearOverlaps(m) {
+  overlapGen.set(m, (overlapGen.get(m) || 0) + 1);
+  overlapByMap.delete(m);
+  hatchLayers.get(m)?.setRows([]);
+  if (overlapTipMap === m) clearOverlapTip();
+}
+
+function polyOf(hit) {
+  const g = hit && hit.type === 'Feature' ? hit.geometry : hit;
+  if (!g) return null;
+  if (g.type === 'Polygon' || g.type === 'MultiPolygon') return g;
+  if (g.type !== 'GeometryCollection') return null;
+  const parts = (g.geometries || []).filter(x => x && (x.type === 'Polygon' || x.type === 'MultiPolygon'));
+  if (!parts.length) return null;
+  if (parts.length === 1) return parts[0];
+  return {
+    type: 'MultiPolygon',
+    coordinates: parts.flatMap(p => (p.type === 'Polygon' ? [p.coordinates] : p.coordinates))
+  };
+}
+
+function intersectGeoms(ga, gb) {
+  if (typeof turf === 'undefined') return null;
+  const run = (a, b) => polyOf(turf.intersect(a, b));
+  const fa = turf.feature(ga);
+  const fb = turf.feature(gb);
+  try {
+    return run(fa, fb);
+  } catch {
+    try {
+      const opt = { tolerance: 0.00003, highQuality: false };
+      return run(turf.simplify(fa, opt), turf.simplify(fb, opt));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function memoIntersect(ga, gb) {
+  let inner = intersectMemo.get(ga);
+  if (!inner) {
+    inner = new WeakMap();
+    intersectMemo.set(ga, inner);
+  }
+  if (inner.has(gb)) return inner.get(gb);
+  const geom = intersectGeoms(ga, gb);
+  inner.set(gb, geom || null);
+  return geom || null;
+}
+
+function ensureHatch(m) {
+  let hatch = hatchLayers.get(m);
+  if (hatch) return hatch;
+  hatch = new HatchCanvas();
+  hatch.addTo(m);
+  hatchLayers.set(m, hatch);
+  return hatch;
+}
+
+function syncOverlapTip(m, latlng) {
+  const rows = overlapByMap.get(m);
+  if (!rows || !rows.length || typeof turf === 'undefined') {
+    if (overlapTipMap === m) clearOverlapTip();
+    return;
+  }
+  const pt = [latlng.lng, latlng.lat];
+  let hit = null;
+  for (let i = 0; i < rows.length; i += 1) {
+    try {
+      if (turf.booleanPointInPolygon(pt, turf.feature(rows[i].geom))) { hit = rows[i]; break; }
+    } catch { /* ranh lỗi */ }
+  }
+  if (!hit) {
+    if (overlapTipMap === m) clearOverlapTip();
+    return;
+  }
+  const html = escapeHtml(hit.tip);
+  if (!overlapTip || overlapTipMap !== m) {
+    clearOverlapTip();
+    overlapTip = L.tooltip({ className: 'dot-tip', opacity: 1, sticky: true, direction: 'top' })
+      .setLatLng(latlng)
+      .setContent(html)
+      .addTo(m);
+    overlapTipMap = m;
+    return;
+  }
+  overlapTip.setLatLng(latlng);
+  if (overlapTip.getContent() !== html) overlapTip.setContent(html);
+}
+
+function paintQhpkOverlaps(m, list) {
+  const schemes = [];
+  (list || []).forEach(p => {
+    if (!p || p.level !== 'QHPK') return;
+    const geom = shownOutline(p);
+    if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+    schemes.push({ name: p.name, label: p.full || p.short || p.name, level: 'QHPK', geom });
+  });
+  if (schemes.length < 2 || typeof turf === 'undefined') return;
+  let rows = [];
+  try {
+    rows = sameLevelOverlaps(schemes, {
+      intersect: memoIntersect,
+      area: geomArea,
+      focusedName: state.focusedProject || ''
+    });
+  } catch (err) {
+    console.warn('Không vẽ được giao QHPK:', err);
+    return;
+  }
+  if (!rows.length) return;
+  overlapByMap.set(m, rows);
+  ensureHatch(m).setRows(rows);
+}
+
 function drawOutlinesOn(m, list, below) {
+  clearOverlaps(m);
   const old = outlineGroups.get(m);
   if (old) {
     old.clearLayers();
@@ -1910,6 +2140,13 @@ function drawOutlinesOn(m, list, below) {
   shapes.reverse().forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
   updateGlow(m);
+  const gen = (overlapGen.get(m) || 0) + 1;
+  overlapGen.set(m, gen);
+  const snapshot = list;
+  setTimeout(() => {
+    if (overlapGen.get(m) !== gen) return;
+    paintQhpkOverlaps(m, snapshot);
+  }, 0);
 }
 
 // QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được.

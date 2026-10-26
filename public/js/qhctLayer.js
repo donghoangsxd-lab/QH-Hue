@@ -156,7 +156,7 @@ export async function parcelQhctHtml(geometry, recorded, place) {
   });
   const res = await analyzeParcelPlan(geometry, { level: 'QHCT', includeHidden: true, extras });
   await annotateCompliance('QHCT', geometry, res.parts);
-  const slip = place === 'measure' || place === 'invest' ? '' : ' Sai số ranh khoảng 0,5 m.';
+  const slip = place === 'measure' || place === 'invest' || place === 'lot' ? '' : ' Sai số ranh khoảng 0,5 m.';
   return {
     html: parcelPlanHtml(res, recorded, {
       title: `QHCT 1/500 ${w.on}`,

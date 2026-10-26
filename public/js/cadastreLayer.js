@@ -3,11 +3,12 @@
 // Chọn một phường/xã trên droplist: chỉ vẽ phần nền thửa nằm trong ranh phường hiện nay (sau sáp nhập), không theo mã xã cũ.
 // Bấm vào thửa khi không bật công cụ nào: tra trong tile z16 đã tải, không gọi máy chủ. Tìm tờ/thửa qua chỉ mục từng xã.
 // Popup lô neo giữa khung nhìn nên điểm bấm lấy từ preclick, không lấy tọa độ popup.
+// Menu «Xem thông tin lô đất quy hoạch» mở cả ô đất đồ án (kind DXF, giai đoạn QH), không lấy thửa địa chính.
 // Droplist đang ở lớp quy hoạch: bảng thửa đặt góc trái (4 trang QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500).
 // Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; QHPK/QHCT mở đồ án chứa thửa.
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
-import { map, WARD_BOUNDS_EVENT } from './mapEngine.js';
+import { map, WARD_BOUNDS_EVENT, landCode as planningLotCode } from './mapEngine.js';
 import { state } from './state.js';
 import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
 import { watchTiles } from './loadProgress.js';
@@ -23,6 +24,11 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { mountParcelAssign } from './parcelInfra.js';
 import { restoreInspectFocus } from './projectLayer.js';
+import { planLotsIn } from './projectFiles.js';
+import { landLabel } from './tt16Symbols.js';
+import { namesOfProject } from './projectNames.js';
+import { planLevelOf } from './generalPlan.js';
+import { pickPlanningLot } from './qhpkOverlap.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -501,6 +507,7 @@ function clearLandFill() {
 
 function closeParcel() {
   clickSeq++;
+  setPlanAxisHold(false);
   cardState = null;
   clearHighlight();
   clearLandFill();
@@ -622,7 +629,9 @@ function planPage(id, geometry, recorded, place) {
   const w = planPlace(place);
   if (id === 'qhc25' || id === 'qhc10') return parcelQhcHtml(geometry, id, recorded, place);
   if (id === 'qhct') return parcelQhctHtml(geometry, recorded, place);
-  const note = place === 'measure'
+  const note = place === 'lot'
+    ? 'Phạm vi là cả ô đất quy hoạch đang chọn, không cắt theo thửa địa chính. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn.'
+    : place === 'measure'
     ? `Cắt hình học ${w.cut} với lô các đồ án QHPK 1/2.000 đã nạp, kể cả khi lớp QHPK hoặc đồ án đang tắt. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn.`
     : QHPK_NOTE;
   return analyzeParcelPlan(geometry, { level: 'QHPK', includeHidden: true }).then(async res => {
@@ -787,30 +796,61 @@ export async function parcelFactsAt(latlng) {
 
 const PLAN_FINEST = ['qhct', 'qhpk', 'qhc10', 'qhc25'];
 const pageHasLots = (page) => String(page?.html || '').includes('pls-lot');
+const VIEW_LEVEL = { qhc25: 'QHC', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
-function pointSquare(latlng) {
-  const dLat = 0.00003;
-  const dLng = 0.00003 / Math.max(0.2, Math.cos(latlng.lat * Math.PI / 180));
-  const { lat, lng } = latlng;
-  return {
-    type: 'Polygon',
-    coordinates: [[[lng - dLng, lat - dLat], [lng + dLng, lat - dLat], [lng + dLng, lat + dLat], [lng - dLng, lat + dLat], [lng - dLng, lat - dLat]]]
-  };
+function setPlanAxisHold(on) {
+  document.body?.classList.toggle('plan-info-open', !!on);
 }
 
-function planPointCardHtml(tab, place) {
-  const sub = place === 'point' ? 'Điểm bấm, không có thửa' : 'Theo ranh thửa tại điểm bấm';
-  return `${tabsBar(tab, 'Lớp quy hoạch tại vị trí', 'Đóng bảng quy hoạch')}
+function lotContains(geom, lng, lat) {
+  try { return turf.booleanPointInPolygon(turf.point([lng, lat]), turf.feature(geom)); }
+  catch { return false; }
+}
+
+function lotM2(lot) {
+  const n = Number(lot && lot.area);
+  if (n > 0) return n;
+  try { return turf.area(turf.feature(lot.geometry)); } catch { return Number.POSITIVE_INFINITY; }
+}
+
+function schemeTitle(file) {
+  const name = String(file || '').trim();
+  if (!name) return '';
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === name);
+  const full = entry ? (namesOfProject(entry).tenDayDu || name) : name;
+  return `${planLevelOf(name)} · ${full}`;
+}
+
+async function planningLotAt(latlng) {
+  const level = VIEW_LEVEL[getLevel()] || '';
+  const deps = { contains: lotContains, area: lotM2, levelOf: planLevelOf };
+  const drawn = pickPlanningLot(state.landParcels, latlng.lng, latlng.lat, level, deps);
+  if (drawn) return drawn;
+  const pad = 0.0008;
+  const bbox = [latlng.lng - pad, latlng.lat - pad, latlng.lng + pad, latlng.lat + pad];
+  const { projects, wardLots } = await planLotsIn(bbox, { level: level || null, includeHidden: true });
+  const lots = [];
+  (projects || []).forEach(p => (p.lots || []).forEach(lot => lots.push(lot)));
+  (wardLots || []).forEach(lot => lots.push(lot));
+  return pickPlanningLot(lots, latlng.lng, latlng.lat, level, deps);
+}
+
+function planLotCardHtml(tab, lot) {
+  const label = landLabel(lot.layer);
+  const code = planningLotCode(lot);
+  const title = (code && code !== label ? code : '') || label || 'Lô đất quy hoạch';
+  const sub = [label && label !== title ? label : '', schemeTitle(lot.file)].filter(Boolean).join(' · ');
+  return `${tabsBar(tab, 'Lô đất quy hoạch', 'Đóng bảng lô đất quy hoạch')}
     <div class="cad-id"><div class="lp-head"><div class="lp-head-main">
-      <div class="lp-title-row"><span class="lp-title">Quy hoạch tại vị trí</span></div>
-      <div class="lp-sub">${sub}</div>
+      <div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span><span class="lp-phase lp-phase-qh">Lô đất quy hoạch</span></div>
+      <div class="lp-sub">${escapeHtml(sub || 'Cả ô đất quy hoạch, không phải thửa địa chính')}</div>
     </div></div></div>
-    <div class="cad-page" role="tabpanel"><div class="cad-busy">Đang chọn cấp chi tiết nhất tại điểm này…</div></div>`;
+    <div class="cad-page" role="tabpanel"><div class="cad-busy">Đang chọn cấp chi tiết nhất trên lô này…</div></div>`;
 }
 
 /**
- * Bảng 4 cấp như bảng thửa. Mặc định cấp có lô tại điểm, chi tiết nhất trước:
- * QHCT 1/500, QHPK 1/2.000, QHC 1/10.000, QHC 1/25.000. Bấm tab để đổi cấp.
+ * Bảng 4 cấp trên cả ô đất quy hoạch chứa điểm (không phải thửa địa chính).
+ * Mặc định cấp có lô, chi tiết nhất trước: QHCT, QHPK, QHC 1/10.000, QHC 1/25.000.
  */
 export async function openPlanAt(latlng, targetMap) {
   if (!targetMap || !latlng) return false;
@@ -818,34 +858,28 @@ export async function openPlanAt(latlng, targetMap) {
   closeDocked();
   closeParcel();
   const mySeq = clickSeq;
-  let geom = null;
-  let recorded = 0;
-  let place = 'point';
+  let lot = null;
   try {
-    const found = await parcelAt(latlng);
-    if (mySeq !== clickSeq) return false;
-    if (found) {
-      const shape = await parcelShape(found.hit, DATA_ZOOM, found.x, found.y);
-      if (mySeq !== clickSeq) return false;
-      geom = shape?.geometry || null;
-      recorded = Number(found.hit.props.a) || 0;
-      place = 'parcel';
-    }
+    lot = await planningLotAt(latlng);
   } catch (err) {
-    console.warn('Không lấy được thửa để đối chiếu quy hoạch:', err);
+    console.warn('Không lấy được lô đất quy hoạch:', err);
   }
   if (mySeq !== clickSeq) return false;
-  if (!geom) geom = pointSquare(latlng);
+  if (!lot || !lot.geometry) {
+    showToast('Không có lô đất quy hoạch tại vị trí này.', 'info');
+    return false;
+  }
+  const geom = lot.geometry;
   const el = ensureCard();
   cardState = {
-    kind: 'plan', place, tab: 'qhct', cache: new Map(),
-    recorded, geom, map: targetMap, bounds: null, landKey: null
+    kind: 'plan', place: 'lot', tab: 'qhct', cache: new Map(),
+    recorded: 0, geom, map: targetMap, bounds: null, landKey: null
   };
-  el.innerHTML = planPointCardHtml('qhct', place);
+  el.innerHTML = planLotCardHtml('qhct', lot);
   el.hidden = false;
-  el.setAttribute('aria-label', 'Thông tin quy hoạch tại vị trí');
-  const feature = { type: 'Feature', properties: {}, geometry: geom };
-  drawHighlight(feature, targetMap);
+  el.setAttribute('aria-label', 'Thông tin lô đất quy hoạch');
+  setPlanAxisHold(true);
+  drawHighlight({ type: 'Feature', properties: {}, geometry: geom }, targetMap);
   const mine = cardState;
   const dropped = () => {
     if (clickSeq === mySeq && cardState === mine) return false;
@@ -856,12 +890,12 @@ export async function openPlanAt(latlng, targetMap) {
   for (const id of PLAN_FINEST) {
     if (dropped()) return false;
     try {
-      const page = await planPage(id, geom, recorded, place === 'parcel' ? undefined : place);
+      const page = await planPage(id, geom, 0, 'lot');
       if (dropped()) return false;
       mine.cache.set(id, page);
       if (pageHasLots(page)) { chosen = id; break; }
     } catch (err) {
-      console.warn('Đối chiếu quy hoạch', id, err);
+      console.warn('Đối chiếu lô đất quy hoạch', id, err);
     }
   }
   if (dropped()) return false;
