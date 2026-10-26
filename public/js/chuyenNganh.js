@@ -717,13 +717,18 @@ function revealArch(id) {
   if (!item) return;
   archPicked = id;
   archTab = 'congtrinh';
+  archOpen.add(id);
   if (item.nhom) archClosed.delete(item.nhom);
-  const box = document.getElementById('axisKienTruc');
-  const top = box?.scrollTop || 0;
+  document.body.classList.remove('right-collapsed');
   paintKienTruc();
-  if (box) box.scrollTop = top;
-  const row = box?.querySelector(`[data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
-  row?.scrollIntoView({ block: 'nearest' });
+  const showInfo = () => {
+    const row = document.querySelector(`#axisKienTruc [data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
+    const next = row?.nextElementSibling;
+    const dossier = next?.classList.contains('project-dossier') ? next : row;
+    dossier?.scrollIntoView({ block: 'nearest' });
+  };
+  showInfo();
+  requestAnimationFrame(showInfo);
   restyleArchMarkers();
 }
 
