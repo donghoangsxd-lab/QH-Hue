@@ -5374,7 +5374,7 @@ body.project-review.la-page #projectReviewHost {
 }
 .view3d-close:hover { color: var(--accent-red); }
 .view3d-max:hover { color: var(--accent-cyan); }
-.view3d-frame { flex: 1; width: 100%; border: 0; background: #e8eef3; }
+.view3d-frame { flex: 1; width: 100%; border: 0; background: #2e2432; }
 .view3d-panel.is-dragging .view3d-frame { pointer-events: none; }
 .view3d-panel.is-max {
   inset: 10px; width: auto; height: auto; max-width: none; max-height: none; resize: none; border-radius: var(--r-md);
