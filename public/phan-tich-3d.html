@@ -25,10 +25,19 @@
       <h1>Phân tích điểm</h1>
       <p id="place" class="place">Đang xác định vị trí…</p>
       <div class="switch" role="group" aria-label="Cách xem khối">
-        <button type="button" id="btnTach" aria-pressed="true">Tách lớp</button>
-        <button type="button" id="btnGop" aria-pressed="false">Gộp khối</button>
+        <button type="button" id="btnTach" aria-pressed="false">Tách lớp</button>
+        <button type="button" id="btnGop" aria-pressed="true">Gộp khối</button>
       </div>
-      <label id="gapRow" class="gap">
+      <div class="switch" role="group" aria-label="Ánh sáng">
+        <button type="button" id="btnSang" data-light="sang" aria-pressed="false">Sáng</button>
+        <button type="button" id="btnHoangHon" data-light="hoanghon" aria-pressed="true">Hoàng hôn</button>
+        <button type="button" id="btnDem" data-light="dem" aria-pressed="false">Đêm</button>
+      </div>
+      <label class="tick">
+        <input id="floorColors" type="checkbox">
+        <span>Màu theo tầng</span>
+      </label>
+      <label id="gapRow" class="gap" hidden>
         <span>Khoảng cách lớp</span>
         <input id="gap" type="range" min="0.4" max="2" step="0.05" value="1">
       </label>
@@ -51,7 +60,7 @@
     <p id="src" class="src"></p>
   </aside>
   <div id="map" role="region" aria-label="Khối ba chiều">
-    <p id="modeChip">Tách bốn lớp</p>
+    <p id="modeChip">Gộp một khối</p>
   </div>
   <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
   <script type="module" src="js/phanTich3d.js"></script>

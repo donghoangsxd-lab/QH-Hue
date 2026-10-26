@@ -2,7 +2,7 @@
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 4).
 // Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw).
 // parts: khối đế và tháp, min_height / height là mét thật, số tầng là số công bố, không trần.
-// Màu khối tích theo số tầng (làm tròn mét / 4): 1-2, 3-5, 6-10, 11-50. Trên 50 tầng vẫn nhóm trên.
+// Khối mặc định: tường be, mái đậm hơn. Màu theo số tầng (1-2, 3-5, 6-10, 11-50, trên 50 vẫn nhóm trên) chỉ khi Tách lớp hoặc bật «Màu theo tầng».
 // Dân phường không nhân theo diện tích ô.
 
 import { withAssetVersion } from './gbaVersion.js';
@@ -27,6 +27,43 @@ const OVERPASS = [
 ];
 const CLASS_NAME = ['1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng'];
 const VOLUME_FILL = [[255, 237, 213, 235], [253, 186, 116, 240], [234, 88, 12, 242], [154, 52, 18, 248]];
+const VOLUME_ROOF = [[214, 176, 140, 248], [196, 124, 62, 250], [160, 52, 8, 250], [98, 32, 12, 252]];
+export const WALL = [214, 204, 188, 240];
+export const ROOF = [128, 114, 98, 252];
+const EDGE = [72, 60, 50, 230];
+const EDGE_FLOOR = [78, 32, 16, 220];
+export const OPEN_CAMERA = { rotationX: 42, rotationOrbit: -50 };
+export const DEFAULT_LIGHT = 'hoanghon';
+// Ba preset giả lập giờ trong ngày: chỉ DirectionalLight + ambient, không API thời tiết.
+export const LIGHT_PRESETS = {
+  sang: {
+    ambient: { color: [255, 250, 242], intensity: 0.46 },
+    sun: { color: [255, 246, 230], intensity: 0.7, direction: [-0.45, -0.55, -1.15] },
+    css: { canvas: '#b8c3c7', top: '#d7e0e4', deep: '#8b9ea6', vignette: 'rgba(36, 44, 50, 0.30)', wash: 'rgba(255, 255, 255, 0.08)' },
+    ground: {
+      links: [142, 136, 126, 255], uses: [158, 152, 142, 255], voids: [136, 154, 132, 255],
+      volumes: [174, 166, 156, 255], rim: [90, 82, 72, 230]
+    }
+  },
+  hoanghon: {
+    ambient: { color: [255, 204, 168], intensity: 0.58 },
+    sun: { color: [255, 150, 86], intensity: 1.15, direction: [-0.95, -0.38, -0.72] },
+    css: { canvas: '#2e2432', top: '#5a3c50', deep: '#120e16', vignette: 'rgba(8, 4, 10, 0.48)', wash: 'rgba(255, 186, 140, 0.16)' },
+    ground: {
+      links: [58, 52, 46, 255], uses: [76, 66, 58, 255], voids: [48, 66, 56, 255],
+      volumes: [84, 70, 62, 255], rim: [212, 162, 118, 215]
+    }
+  },
+  dem: {
+    ambient: { color: [166, 186, 220], intensity: 0.24 },
+    sun: { color: [188, 206, 240], intensity: 0.4, direction: [-0.22, -0.4, -0.92] },
+    css: { canvas: '#0c1018', top: '#18263c', deep: '#06080e', vignette: 'rgba(0, 0, 4, 0.62)', wash: 'rgba(90, 130, 190, 0.14)' },
+    ground: {
+      links: [20, 24, 30, 255], uses: [28, 32, 40, 255], voids: [16, 34, 32, 255],
+      volumes: [34, 32, 40, 255], rim: [118, 144, 174, 185]
+    }
+  }
+};
 const USE_FILL = {
   'Đất ở': [214, 150, 230, 240],
   'Cơ quan, công cộng': [126, 160, 236, 240],
@@ -42,6 +79,8 @@ const PLATE = 3;
 const LIFT = { links: 0, uses: 1100, voids: 2200, volumes: 3300 };
 const FOV_Y = 36;
 const WHITE_BLOCK = [248, 250, 252, 232];
+const ROOF_MAT = { ambient: 0.28, diffuse: 0.42, shininess: 4, specularColor: [30, 24, 18] };
+let floorTint = false;
 const FACILITY = {
   school: { label: 'Trường học', color: [217, 119, 6, 248], glow: [245, 158, 11], walk: 500, rank: 1 },
   health: { label: 'Y tế', color: [220, 38, 38, 248], glow: [248, 113, 113], walk: 700, rank: 2 },
@@ -51,12 +90,6 @@ const FACILITY = {
   bus: { label: 'Xe buýt', color: [3, 105, 161, 248], glow: [56, 189, 248], walk: 400, rank: 6 }
 };
 const AMENITY_RE = 'school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking';
-const PLATE_FILL = {
-  links: [214, 222, 230, 255],
-  uses: [244, 244, 246, 255],
-  voids: [236, 242, 236, 255],
-  volumes: [248, 240, 238, 255]
-};
 const SOFT = { ambient: 0.52, diffuse: 0.74, shininess: 12, specularColor: [255, 250, 248] };
 const SEARCH_M = 2000;
 const HEIGHT_LIM = 160;
@@ -106,7 +139,41 @@ export function parseCenter(search) {
   let lng = Number(q.get('lng'));
   if (!Number.isFinite(lat) || lat < 15.5 || lat > 17.2) lat = 16.4637;
   if (!Number.isFinite(lng) || lng < 106.8 || lng > 108.4) lng = 107.5952;
-  return { lat, lng, r: clampRadius(q.get('r')), view: q.get('view') === 'gop' ? 'gop' : 'tach' };
+  return { lat, lng, r: clampRadius(q.get('r')), view: q.get('view') === 'tach' ? 'tach' : 'gop' };
+}
+
+export function hexToClear(hex) {
+  const n = Number.parseInt(String(hex).slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+}
+
+export function volumeColors(bin, tint) {
+  const i = bin == null || bin < 0 ? 0 : Math.min(3, bin);
+  if (tint) return { wall: VOLUME_FILL[i], roof: VOLUME_ROOF[i], edge: EDGE_FLOOR };
+  return { wall: WALL, roof: ROOF, edge: EDGE };
+}
+
+export function volumeEdgePaths(volumes) {
+  const paths = [];
+  for (const d of volumes || []) {
+    const ring = d.rings && d.rings[0];
+    if (!ring || ring.length < 2) continue;
+    const z0 = d.z0 || 0;
+    const z1 = z0 + d.h;
+    let n = ring.length;
+    if (n > 1 && ring[0][0] === ring[n - 1][0] && ring[0][1] === ring[n - 1][1]) n -= 1;
+    if (n < 3) continue;
+    const roof = new Array(n + 1);
+    for (let i = 0; i < n; i++) roof[i] = [ring[i][0], ring[i][1], z1];
+    roof[n] = [roof[0][0], roof[0][1], roof[0][2]];
+    paths.push(roof);
+    if (n > 16) continue;
+    for (let i = 0; i < n; i++) {
+      const p = ring[i];
+      paths.push([[p[0], p[1], z0], [p[0], p[1], z1]]);
+    }
+  }
+  return paths;
 }
 
 export function floorsFromHeight(h) {
@@ -879,6 +946,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
             rings: cut.rings,
             h: extrusion,
             z0: minH,
+            bin: floorBin(f),
             fill: VOLUME_FILL[floorBin(f)],
             partLabel
           });
@@ -905,7 +973,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
         }
         const drawH = h == null ? 4 : h;
         buildings.push(cut);
-        volumes.push({ rings: cut.rings, h: drawH, z0: 0, fill: VOLUME_FILL[floorBin(f)] });
+        volumes.push({ rings: cut.rings, h: drawH, z0: 0, bin: floorBin(f), fill: VOLUME_FILL[floorBin(f)] });
       }
     }
     for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
@@ -956,20 +1024,20 @@ function buildModel(raw, origin, r, heights, floorPack) {
             const wound = wind([cut]);
             const area = ringArea(cut);
             if (kind === 'water') {
-              waters.push({ rings: wound, h: 2.4, fill: [14, 165, 233, 235] });
+              waters.push({ rings: wound, h: 2.4, fill: [64, 186, 220, 250] });
               waterRings.push(cut);
               pushHalo(halos, cut, clip, [56, 189, 248]);
               const c = centroid(cut);
               openBloom.push(...glowSteps(c[0], c[1], Math.min(260, Math.max(46, Math.sqrt(area) * 1.15)), [56, 189, 248], 10));
             } else if (kind === 'square') {
-              squares.push({ rings: wound, h: 1.4, fill: [226, 232, 220, 210] });
+              squares.push({ rings: wound, h: 1.4, fill: [188, 180, 164, 235] });
               squareRings.push(cut);
             } else if (kind === 'pitch') {
-              greens.push({ rings: wound, h: 1.6, fill: [74, 222, 128, 220] });
+              greens.push({ rings: wound, h: 1.6, fill: [132, 210, 146, 240] });
               greenRings.push(cut);
               pushHalo(halos, cut, clip, [34, 197, 94]);
             } else {
-              greens.push({ rings: wound, h: 2.2, fill: [22, 163, 74, 235] });
+              greens.push({ rings: wound, h: 2.2, fill: [46, 178, 96, 250] });
               greenRings.push(cut);
               pushHalo(halos, cut, clip, [34, 197, 94]);
               const c = centroid(cut);
@@ -1226,29 +1294,40 @@ function nearestText(row, r, osmError) {
   return `${name}${fmt0(row.dist)} m, ${where}`;
 }
 
-function paintPanel(model, place) {
+function paintKeys(showFloors) {
+  const keys = $('keys');
+  if (!keys) return;
+  const rows = showFloors
+    ? [['#ffedd5', '1-2 tầng'], ['#fdba74', '3-5 tầng'], ['#ea580c', '6-10 tầng'], ['#9a3412', '11-50 tầng']]
+    : [['#d6ccbc', 'Tường'], ['#807262', 'Mái']];
+  rows.push(
+    ['#d97706', 'Trường'],
+    ['#dc2626', 'Y tế'],
+    ['#ca8a04', 'Chợ'],
+    ['#7e22ce', 'Văn hóa'],
+    ['#1d4ed8', 'Bãi đỗ'],
+    ['#0369a1', 'Xe buýt']
+  );
+  keys.replaceChildren(...rows.map(([color, label]) => swatch(color, label)));
+}
+
+function paintLegend(showFloors) {
   const legend = $('legend');
+  if (!legend) return;
   legend.replaceChildren(
-    legendCard(1, '#ea580c', 'Khối tích', 'Màu theo bốn nhóm số tầng.'),
+    legendCard(1, showFloors ? '#ea580c' : '#c4b8a4', 'Khối tích',
+      showFloors
+        ? 'Màu theo bốn nhóm số tầng.'
+        : 'Tường be, mái đậm hơn. Bật «Màu theo tầng» khi cần đối chiếu.'),
     legendCard(2, '#16a34a', 'Không gian mở', 'Công viên loang lục, mặt nước loang lam.'),
     legendCard(3, '#0284c7', 'Tiếp cận hạ tầng', 'Công trình hạ tầng theo loại. Vầng màu nhạt theo khoảng đi bộ.'),
     legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp và hướng ra mép vòng.')
   );
-  const keys = $('keys');
-  if (keys) {
-    keys.replaceChildren(
-      swatch('#ffedd5', '1-2 tầng'),
-      swatch('#fdba74', '3-5 tầng'),
-      swatch('#ea580c', '6-10 tầng'),
-      swatch('#9a3412', '11-50 tầng'),
-      swatch('#d97706', 'Trường'),
-      swatch('#dc2626', 'Y tế'),
-      swatch('#ca8a04', 'Chợ'),
-      swatch('#7e22ce', 'Văn hóa'),
-      swatch('#1d4ed8', 'Bãi đỗ'),
-      swatch('#0369a1', 'Xe buýt')
-    );
-  }
+  paintKeys(showFloors);
+}
+
+function paintPanel(model, place) {
+  paintLegend(floorTint);
   const areaHa = model.area / 10000;
   const counts = model.counts || {};
   const countLine = ['school', 'health', 'market', 'culture', 'parking', 'bus']
@@ -1282,18 +1361,41 @@ function bootMap(place, model) {
   const CART = deck.COORDINATE_SYSTEM.CARTESIAN;
   let sphere = null;
   try { sphere = new deck.SphereGeometry({ radius: 1, nlat: 5, nlong: 8 }); } catch (err) { sphere = null; }
+  let moodName = DEFAULT_LIGHT;
   let lights = null;
-  try {
-    lights = new deck.LightingEffect({
-      ambient: new deck.AmbientLight({ color: [255, 255, 255], intensity: 0.55 }),
-      sun: new deck.DirectionalLight({ color: [255, 244, 236], intensity: 1.35, direction: [-0.45, -0.7, -1] })
+  let deckgl = null;
+  let edgeMemo = null;
+  function syncMood(name) {
+    moodName = LIGHT_PRESETS[name] ? name : DEFAULT_LIGHT;
+    const preset = LIGHT_PRESETS[moodName];
+    const root = document.documentElement;
+    root.dataset.light = moodName;
+    root.style.setProperty('--canvas', preset.css.canvas);
+    root.style.setProperty('--canvas-top', preset.css.top);
+    root.style.setProperty('--canvas-deep', preset.css.deep);
+    root.style.setProperty('--vignette', preset.css.vignette);
+    root.style.setProperty('--sky-wash', preset.css.wash);
+    document.querySelectorAll('[data-light]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', btn.dataset.light === moodName ? 'true' : 'false');
     });
-  } catch (err) { lights = null; }
+    try {
+      lights = new deck.LightingEffect({
+        ambient: new deck.AmbientLight(preset.ambient),
+        sun: new deck.DirectionalLight(preset.sun)
+      });
+    } catch (err) { lights = null; }
+    if (deckgl) {
+      deckgl.setProps({
+        effects: lights ? [lights] : [],
+        parameters: { clearColor: hexToClear(preset.css.canvas) }
+      });
+    }
+  }
+  syncMood(DEFAULT_LIGHT);
   const dash = new deck.PathStyleExtension({ dash: true });
   const view = { k: place.view === 'gop' ? 0 : 1 };
   const coarse = window.matchMedia('(pointer: coarse)').matches;
   let camera = null;
-  let deckgl = null;
 
   let maskExt = null;
   try { maskExt = new deck.MaskExtension(); } catch (err) { maskExt = null; }
@@ -1312,16 +1414,18 @@ function bootMap(place, model) {
   function fitState(k) {
     const w = Math.max(parent.clientWidth || 900, 320);
     const hgt = Math.max(parent.clientHeight || 700, 240);
-    const pad = 28;
+    const merged = k < 0.15;
+    const pad = merged ? 20 : 28;
     const top = LIFT.volumes * k * gapValue() + 48;
-    const target = [0, 0, top * 0.32];
-    const rotationX = camera ? camera.rotationX : 50;
-    const rotationOrbit = camera ? camera.rotationOrbit : -32;
+    const crown = merged ? 48 : 0;
+    const target = [0, 0, merged ? 26 : top * 0.32];
+    const rotationX = camera ? camera.rotationX : OPEN_CAMERA.rotationX;
+    const rotationOrbit = camera ? camera.rotationOrbit : OPEN_CAMERA.rotationOrbit;
     const pts = [];
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
       pts.push([Math.cos(a) * place.r, Math.sin(a) * place.r, 0]);
-      pts.push([Math.cos(a) * place.r, Math.sin(a) * place.r, top]);
+      pts.push([Math.cos(a) * place.r, Math.sin(a) * place.r, top + crown]);
     }
     let lo = -8;
     let hi = 4;
@@ -1350,7 +1454,7 @@ function bootMap(place, model) {
     return LIFT[name] * view.k * gapValue();
   }
 
-  function polys(id, data, z) {
+  function polys(id, data, z, colorOf) {
     return new deck.PolygonLayer(withMask({
       id,
       data,
@@ -1363,8 +1467,31 @@ function bootMap(place, model) {
       pickable: false,
       getPolygon: (d) => d.rings,
       getElevation: (d) => d.h,
-      getFillColor: (d) => d.fill,
+      getFillColor: colorOf || ((d) => d.fill),
       material: SOFT
+    }));
+  }
+
+  // Mái là mặt ngang (_full3d) để đậm hơn tường. Nét cạnh đi PathLayer, không wireframe (wireframe kéo đường chéo tam giác).
+  function roofCaps(id, data, z) {
+    if (!data || !data.length) return null;
+    return new deck.PolygonLayer(withMask({
+      id,
+      data,
+      coordinateSystem: CART,
+      modelMatrix: lift(z + 0.22),
+      _full3d: true,
+      positionFormat: 'XYZ',
+      extruded: false,
+      filled: true,
+      stroked: false,
+      pickable: false,
+      getPolygon: (d) => {
+        const zz = (d.z0 || 0) + d.h;
+        return d.rings.map((ring) => ring.map((pt) => [pt[0], pt[1], zz]));
+      },
+      getFillColor: (d) => volumeColors(d.bin, floorTint).roof,
+      material: ROOF_MAT
     }));
   }
 
@@ -1392,6 +1519,7 @@ function bootMap(place, model) {
     const zVolumes = planeZ('volumes');
     const showStack = k > 0.08;
     const disc = plateRing(place.r);
+    const ground = LIGHT_PRESETS[moodName].ground;
     const layers = [
       new deck.PolygonLayer({
         id: 'disc-mask',
@@ -1401,23 +1529,23 @@ function bootMap(place, model) {
         getPolygon: (d) => d,
         getFillColor: [255, 255, 255, 255]
       }),
-      polys('plate-links', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.links }], zLinks),
+      polys('plate-links', [{ rings: [disc], h: PLATE, fill: ground.links }], zLinks),
       new deck.PathLayer({
         id: 'rim',
         data: [{ path: disc.concat([disc[0]]) }],
         coordinateSystem: CART,
         modelMatrix: lift(zLinks + PLATE + 0.2),
         getPath: (d) => d.path,
-        getColor: [51, 65, 85, 230],
+        getColor: ground.rim,
         getWidth: 2,
         widthUnits: 'pixels',
         widthMinPixels: 1.5
       })
     ];
     if (showStack) {
-      layers.push(polys('plate-uses', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.uses }], zUses));
-      layers.push(polys('plate-voids', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.voids }], zVoids));
-      layers.push(polys('plate-vol', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.volumes }], zVolumes));
+      layers.push(polys('plate-uses', [{ rings: [disc], h: PLATE, fill: ground.uses }], zUses));
+      layers.push(polys('plate-voids', [{ rings: [disc], h: PLATE, fill: ground.voids }], zVoids));
+      layers.push(polys('plate-vol', [{ rings: [disc], h: PLATE, fill: ground.volumes }], zVolumes));
     }
     layers.push(polys('halos', model.halos, zVoids + PLATE + 0.15));
     layers.push(polys('greens', model.greens, zVoids + PLATE));
@@ -1458,19 +1586,23 @@ function bootMap(place, model) {
       byBase.get(key).push(v);
     });
     let volI = 0;
+    const wallOf = (d) => volumeColors(d.bin, floorTint).wall;
     byBase.forEach((data, z0) => {
-      layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0));
+      layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0, wallOf));
       volI += 1;
     });
     if (!coarse || model.volumes.length < 3500) {
+      const caps = roofCaps('roof-caps', model.volumes, zVolumes + PLATE);
+      if (caps) layers.push(caps);
+      if (!edgeMemo || edgeMemo.src !== model.volumes) edgeMemo = { src: model.volumes, paths: volumeEdgePaths(model.volumes) };
       layers.push(new deck.PathLayer(withMask({
-        id: 'roofs',
-        data: model.volumes,
+        id: 'volume-edge',
+        data: edgeMemo.paths,
         coordinateSystem: CART,
-        modelMatrix: lift(zVolumes + PLATE + 0.35),
-        getPath: (d) => d.rings[0].map((pt) => [pt[0], pt[1], (d.z0 || 0) + d.h]),
-        getColor: [67, 20, 7, 220],
-        getWidth: 1.2,
+        modelMatrix: lift(zVolumes + PLATE + 0.45),
+        getPath: (d) => d,
+        getColor: volumeColors(0, floorTint).edge,
+        getWidth: 1,
         widthUnits: 'pixels',
         widthMinPixels: 1
       })));
@@ -1624,7 +1756,7 @@ function bootMap(place, model) {
       deckgl.setProps({ viewState: camera });
     },
     effects: lights ? [lights] : [],
-    parameters: { clearColor: [0.91, 0.933, 0.953, 1] },
+    parameters: { clearColor: hexToClear(LIGHT_PRESETS[moodName].css.canvas) },
     useDevicePixels: coarse ? 1 : Math.min(window.devicePixelRatio || 1, 1.75)
   });
 
@@ -1645,6 +1777,12 @@ function bootMap(place, model) {
     };
     requestAnimationFrame(step);
   }
+  function applyFloorTint(on) {
+    floorTint = !!on;
+    const box = $('floorColors');
+    if (box) box.checked = floorTint;
+    paintLegend(floorTint);
+  }
   function setMode(mode, animate) {
     const exploded = mode !== 'gop';
     $('btnTach').setAttribute('aria-pressed', exploded ? 'true' : 'false');
@@ -1652,6 +1790,7 @@ function bootMap(place, model) {
     $('modeChip').textContent = exploded ? 'Tách bốn lớp' : 'Gộp một khối';
     const gapRow = $('gapRow');
     if (gapRow) gapRow.hidden = !exploded;
+    applyFloorTint(exploded);
     const url = new URL(location.href);
     url.searchParams.set('view', exploded ? 'tach' : 'gop');
     history.replaceState(null, '', url);
@@ -1665,6 +1804,16 @@ function bootMap(place, model) {
   }
   $('btnTach').addEventListener('click', () => setMode('tach', true));
   $('btnGop').addEventListener('click', () => setMode('gop', true));
+  $('floorColors')?.addEventListener('change', () => {
+    applyFloorTint($('floorColors').checked);
+    draw();
+  });
+  document.querySelectorAll('[data-light]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      syncMood(btn.dataset.light);
+      draw();
+    });
+  });
   $('gap')?.addEventListener('input', () => {
     if (view.k < 0.5) return;
     camera = fitState(view.k);

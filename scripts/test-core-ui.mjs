@@ -583,8 +583,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261087/);
-assert.match(html, /js\/app\.js\?v=20261087/);
+assert.match(html, /css\/style\.css\?v=20261088/);
+assert.match(html, /js\/app\.js\?v=20261088/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -636,7 +636,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261087'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261088'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -699,7 +699,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261087"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261088"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

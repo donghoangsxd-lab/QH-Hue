@@ -1,7 +1,8 @@
 import fs from 'fs';
 import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
-  floorsFromHeight, floorBin, parseHeightIndex
+  floorsFromHeight, floorBin, parseHeightIndex,
+  hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -31,6 +32,30 @@ if (clampRadius('x') !== 500 || clampRadius(10) !== 150 || clampRadius(5000) !==
 const p = parseCenter('?lat=16.4637&lng=107.5952&r=500&view=gop');
 if (p.lat !== 16.4637 || p.lng !== 107.5952 || p.r !== 500 || p.view !== 'gop') throw new Error('tham số');
 if (parseCenter('?lat=1&lng=1').lat !== 16.4637) throw new Error('tâm mặc định');
+if (parseCenter('').view !== 'gop' || parseCenter('?view=tach').view !== 'tach' || parseCenter('?view=nope').view !== 'gop') {
+  throw new Error('mặc định phải là gộp khối');
+}
+const neutral = volumeColors(2, false);
+const tinted = volumeColors(2, true);
+if (neutral.wall[0] !== WALL[0] || neutral.roof[0] !== ROOF[0]) throw new Error('palette gộp');
+if (neutral.roof[0] >= neutral.wall[0] || neutral.roof[1] >= neutral.wall[1] || neutral.roof[2] >= neutral.wall[2]) {
+  throw new Error('mái chưa đậm hơn tường');
+}
+if (tinted.wall[0] < 200 || tinted.roof[0] >= tinted.wall[0]) throw new Error('màu tầng');
+const edges = volumeEdgePaths([{ rings: [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]], h: 8, z0: 2 }]);
+if (edges.length !== 5 || edges[0][0][2] !== 10 || edges[1][0][2] !== 2 || edges[1][1][2] !== 10) {
+  throw new Error(`cạnh khối ${edges.length}`);
+}
+if (OPEN_CAMERA.rotationX !== 42 || OPEN_CAMERA.rotationOrbit !== -50) throw new Error('camera mở');
+if (DEFAULT_LIGHT !== 'hoanghon' || !LIGHT_PRESETS.sang || !LIGHT_PRESETS.dem) throw new Error('ánh sáng mặc định');
+for (const name of ['sang', 'hoanghon', 'dem']) {
+  const preset = LIGHT_PRESETS[name];
+  if (!preset.ambient.intensity || preset.sun.direction.length !== 3) throw new Error(`preset ${name}`);
+  const clear = hexToClear(preset.css.canvas);
+  if (Math.abs(clear[0] - 0.91) < 0.01 && Math.abs(clear[1] - 0.933) < 0.01) throw new Error('nền lạnh cũ');
+}
+const dusk = hexToClear(LIGHT_PRESETS.hoanghon.css.canvas);
+if ((dusk[0] + dusk[1] + dusk[2]) / 3 > 0.35) throw new Error('hoàng hôn còn sáng');
 const tiles = tilesFor(16.4637, 107.5952, 500);
 if (tiles.length < 4 || tiles.length > 12) throw new Error(`số tile ${tiles.length}`);
 const seg = clipSegment([-1000, 0], [1000, 0], 500);
@@ -91,5 +116,19 @@ if (!panel.includes('openView3d') || !css.includes('.view3d-panel') || !css.incl
 if (!js.includes('orthographic: false') || !js.includes('WHITE_BLOCK') || !js.includes('openBloom')) {
   throw new Error('thiếu phối cảnh, khối trắng hoặc vầng không gian mở');
 }
+if (js.includes('0.91, 0.933, 0.953') || js.includes('#e8eef3') || !js.includes('_full3d: true') || !js.includes('volume-edge')) {
+  throw new Error('thiếu nền hoàng hôn, mái hoặc cạnh khối');
+}
+if (!html.includes('id="btnGop" aria-pressed="true"') || html.includes('aria-pressed="true">Tách lớp')) {
+  throw new Error('nút gộp chưa là mặc định');
+}
+for (const s of ['Hoàng hôn', 'data-light="dem"', 'Màu theo tầng', '>Gộp một khối<', 'id="gapRow" class="gap" hidden']) {
+  if (!html.includes(s)) throw new Error(`html thiếu ${s}`);
+}
+const css3 = fs.readFileSync(new URL('../public/css/phan-tich-3d.css', import.meta.url), 'utf8');
+if (css3.includes('#e8eef3') || !css3.includes('--vignette') || !css3.includes('--sky-wash')) {
+  throw new Error('nền trang 3D');
+}
+if (css.includes('background: #e8eef3')) throw new Error('khung 3D còn nền lạnh');
 
 console.log('ok');

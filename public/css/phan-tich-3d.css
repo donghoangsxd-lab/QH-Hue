@@ -7,7 +7,11 @@
   --text-main: #cbd5e1;
   --text-muted: #94a3b8;
   --accent-cyan: #38bdf8;
-  --canvas: #e8eef3;
+  --canvas: #2e2432;
+  --canvas-top: #5a3c50;
+  --canvas-deep: #120e16;
+  --vignette: rgba(8, 4, 10, 0.48);
+  --sky-wash: rgba(255, 186, 140, 0.16);
 }
 html, body {
   margin: 0;
@@ -42,8 +46,10 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; color: var(
   background: transparent;
   color: var(--text-main);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 6px 4px;
   font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .switch button[aria-pressed="true"] {
@@ -51,6 +57,15 @@ h1 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; color: var(
   border-color: rgba(56, 189, 248, 0.7);
   color: var(--text-strong);
 }
+.tick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.tick input { accent-color: var(--accent-cyan); }
 .gap { display: grid; gap: 4px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
 .gap[hidden] { display: none; }
 .gap input { width: 100%; accent-color: var(--accent-cyan); }
@@ -110,7 +125,30 @@ table.massing th:nth-child(1), table.massing td:nth-child(1) { width: 46%; }
 table.massing a { color: var(--accent-cyan); }
 table.massing .off { color: #facc15; }
 table.massing .mass-note { display: block; margin-top: 2px; color: var(--text-muted); font-size: 10.5px; }
-#map { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--canvas); }
+#map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background:
+    radial-gradient(ellipse 90% 48% at 50% 0%, var(--canvas-top) 0%, transparent 62%),
+    linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas) 42%, var(--canvas-deep) 100%);
+}
+#map::before,
+#map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+#map canvas { z-index: 0; }
+#map::before {
+  background: linear-gradient(180deg, var(--sky-wash) 0%, transparent 26%, transparent 72%, rgba(0, 0, 0, 0.28) 100%);
+}
+#map::after {
+  background: radial-gradient(ellipse at 50% 46%, transparent 54%, var(--vignette) 100%);
+}
 #modeChip {
   position: absolute;
   z-index: 2;
