@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261080">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261081">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261080">
+  <link rel="stylesheet" href="css/style.css?v=20261081">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -299,8 +299,8 @@
       <button type="button" class="ui-btn-format" id="btnPropose" title="Đề xuất điểm mới hoặc nhập dữ liệu" aria-label="Đề xuất" aria-pressed="false" aria-controls="tabAdd"><svg class="ico"><use href="#i-plus"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnPrintA3" title="Xuất bản đồ PDF (A3, A2, A1, A0). Mở khung xem trước để kéo bản đồ vào đúng vùng in" aria-label="Xuất bản đồ" aria-pressed="false"><svg class="ico"><use href="#i-printer"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnShareView" title="Chép link khung nhìn hiện tại (vị trí, mức phóng, lớp đang bật, đồ án đang mở) để gửi người khác. Link tự mang trạng thái, không lưu trên máy chủ" aria-label="Chép link khung nhìn"><svg class="ico"><use href="#i-link"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích. Nháy đúp hoặc Enter để kết thúc. Bấm phép đo, chuột phải: Điều chỉnh. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên: chuột phải để xóa khi đang chấm" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo khoảng cách. Nháy đúp hoặc Enter để kết thúc. Bấm phép đo, chuột phải: Điều chỉnh. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên: chuột phải để xóa khi đang chấm" aria-label="Đo khoảng cách"><svg class="ico"><use href="#i-ruler"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích. Nháy đúp hoặc Enter để kết thúc. Bấm phép đo, chuột phải: Điều chỉnh. Phím Delete xóa phép đo đang chọn. Bấm lại nút để xóa mọi kết quả. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên: chuột phải để xóa khi đang chấm" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo khoảng cách. Nháy đúp hoặc Enter để kết thúc. Bấm phép đo, chuột phải: Điều chỉnh. Phím Delete xóa phép đo đang chọn. Bấm lại nút để xóa mọi kết quả. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên: chuột phải để xóa khi đang chấm" aria-label="Đo khoảng cách"><svg class="ico"><use href="#i-ruler"/></svg></button>
       <div class="tb-phone-pick" id="tbMeasurePick">
         <button type="button" class="ui-btn-format" id="btnMeasurePick" title="Đo trên bản đồ: chiều dài hoặc diện tích" aria-label="Đo trên bản đồ" aria-haspopup="menu" aria-expanded="false" aria-controls="measureChooser"><svg class="ico"><use href="#i-ruler"/></svg></button>
         <div class="tb-chooser" id="measureChooser" role="menu" hidden>
@@ -1639,6 +1639,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261080"></script>
+  <script type="module" src="./js/app.js?v=20261081"></script>
 </body>
 </html>

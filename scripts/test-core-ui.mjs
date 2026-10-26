@@ -258,12 +258,12 @@ for (const label of [
   'Đánh dấu và ghi chú',
   'Đo khoảng cách',
   'Đo diện tích',
-  'Xóa kết quả đo',
   'Xem Street View'
 ]) {
   assert.ok(ctx.includes(label), `menu chuột phải thiếu ${label}`);
 }
 assert.match(ctx, /map-ctx-menu/);
+assert.doesNotMatch(ctx, /Xóa kết quả đo|Xóa phép đo/);
 
 const engine = read('public/js/mapEngine.js');
 assert.match(engine, /function landPopupHtml/);
@@ -424,8 +424,9 @@ assert.match(spec, /## Phác thảo/);
 assert.match(spec, /## Đo khoảng cách và diện tích/);
 assert.match(spec, /Điều chỉnh/);
 assert.match(spec, /Xóa đỉnh/);
-assert.match(spec, /Xóa phép đo/);
-assert.match(spec, /Xóa kết quả đo/);
+assert.match(spec, /Phím Delete xóa hình đó/);
+assert.match(spec, /Phím Delete xóa phép đo đang chọn/);
+assert.doesNotMatch(spec, /Xóa phép đo|Xóa kết quả đo/);
 assert.match(spec, /Esc hủy/);
 
 const handles = read('public/js/vertexHandles.js');
@@ -447,6 +448,10 @@ assert.doesNotMatch(sketch, /dragging\.disable\(\)/);
 assert.match(sketch, /cancelAdjust\(\)/);
 assert.match(sketch, /consumeSketchMapClick/);
 assert.match(sketch, /createSketchEditSession/);
+assert.match(sketch, /e\.key !== 'Delete'/);
+assert.match(sketch, /removeShape\(pickFg\)/);
+assert.match(sketch, /deleteSelectedMeasure/);
+assert.match(sketch, /e\.key === 'Backspace' && pts\.length/);
 assert.match(read('public/js/mapContext.js'), /sketch-handle/);
 assert.match(read('public/js/app.js'), /consumeSketchMapClick\(e\)/);
 
@@ -456,7 +461,8 @@ assert.match(measureJs, /createSketchEditSession/);
 assert.doesNotMatch(measureJs, /dragging\.disable\(\)/);
 assert.doesNotMatch(measureJs, /function moveVertex|function insertVertex|function segmentMidpoints/);
 assert.match(measureJs, /Điều chỉnh/);
-assert.match(measureJs, /Xóa phép đo/);
+assert.doesNotMatch(measureJs, /Xóa phép đo/);
+assert.match(measureJs, /export function deleteSelectedMeasure/);
 assert.match(measureJs, /Xong/);
 assert.match(measureJs, /cancelMeasureEdit/);
 assert.match(measureJs, /finishMeasureEdit/);
@@ -470,7 +476,7 @@ const ctxNow = read('public/js/mapContext.js');
 const onContext = ctxNow.slice(ctxNow.indexOf('function onContext'), ctxNow.indexOf('function bindLongPress'));
 assert.match(onContext, /_measureHandled/);
 assert.doesNotMatch(onContext, /activeMeasureType/);
-assert.match(ctxNow, /Xóa kết quả đo/);
+assert.doesNotMatch(ctxNow, /Xóa kết quả đo|Xóa phép đo/);
 assert.match(read('public/index.html'), /id="btnMeasureDist"[^>]*Điều chỉnh/);
 assert.match(read('public/index.html'), /id="btnMeasureArea"[^>]*Điều chỉnh/);
 
@@ -565,8 +571,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261080/);
-assert.match(html, /js\/app\.js\?v=20261080/);
+assert.match(html, /css\/style\.css\?v=20261081/);
+assert.match(html, /js\/app\.js\?v=20261081/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -618,7 +624,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261080'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261081'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -681,7 +687,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261080"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261081"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

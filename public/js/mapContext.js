@@ -2,7 +2,7 @@
 // Mọi mục gọi lại công cụ đã có: thửa, bảng quy hoạch 4 cấp, tra cứu bán kính, đo, Street View.
 // Ghi chú nằm trên máy (localStorage), không gửi máy chủ.
 import { state } from './state.js';
-import { map, wardNameAt, toggleMeasure, clearMeasure, handleMeasureClick, inspectAccessAt, consumeMeasureContext } from './mapEngine.js';
+import { map, wardNameAt, toggleMeasure, handleMeasureClick, inspectAccessAt, consumeMeasureContext } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { openParcelAt, openPlanAt, parcelFactsAt } from './cadastreLayer.js';
 import { streetViewUrl } from './streetView.js';
@@ -222,7 +222,6 @@ function openMenu(ev, latlng, targetMap) {
     '<div class="map-ctx-sep"></div>',
     item('dist', 'ruler', 'Đo khoảng cách'),
     item('area', 'area', 'Đo diện tích'),
-    item('clear', 'trash', 'Xóa kết quả đo'),
     '<div class="map-ctx-sep"></div>',
     item('sv', 'camera', 'Xem Street View')
   ].join('');
@@ -254,8 +253,6 @@ function openMenu(ev, latlng, targetMap) {
       startMeasure('distance', latlng, targetMap);
     } else if (act === 'area') {
       startMeasure('area', latlng, targetMap);
-    } else if (act === 'clear') {
-      clearMeasure();
     } else if (act === 'sv') {
       window.open(streetViewUrl(latlng), '_blank', 'noopener');
     }
