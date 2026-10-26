@@ -214,7 +214,7 @@ function openMenu(ev, latlng, targetMap) {
   el.setAttribute('role', 'menu');
   el.innerHTML = [
     item('parcel', 'parcel', 'Xem thông tin thửa đất'),
-    item('plan', 'layers', 'Xem thông tin quy hoạch'),
+    item('plan', 'layers', 'Xem thông tin lô đất quy hoạch'),
     item('access', 'inspect', 'Xem khả năng tiếp cận hạ tầng'),
     item('place', 'locate', 'Xem thông tin địa điểm'),
     '<div class="map-ctx-sep"></div>',

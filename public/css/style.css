@@ -80,6 +80,7 @@
   --info-top: calc(12px + var(--title-h) + 8px); /* thẻ thông tin dưới hộp tiêu đề, không đè chữ */
   --info-bottom: 12px;
   --info-left: calc(12px + var(--right-w) + 16px); /* sát phải panel trục bên trái */
+  --info-card-w: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
 }
 /* Lần tải đầu: một dòng vàng dưới tiêu đề. Mọi vị trí bám --title-h dịch xuống theo. */
 html.show-boot-notice { --title-h: calc(108px * var(--k)); }
@@ -338,7 +339,7 @@ body.compare-on .map-title {
   top: var(--info-top);
   bottom: auto;
   left: var(--info-left);
-  width: min(300px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
+  width: var(--info-card-w);
   max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
   overflow: auto;
   box-sizing: border-box;
@@ -1100,6 +1101,19 @@ body.right-collapsed .right-panel {
   opacity: 0;
   pointer-events: none;
 }
+/* Bảng lô đất quy hoạch đang mở: panel trục và dải năm trục không che bản đồ. */
+body.plan-info-open .right-panel,
+body.plan-info-open .axis-dock {
+  display: none !important;
+}
+@media (min-width: 841px) {
+  body.plan-info-open {
+    --info-left: 12px;
+    --info-card-w: min(320px, calc(100% - var(--tb-btn) - 48px));
+  }
+}
+.leaflet-qhpkOverlap-pane,
+.leaflet-qhpkOverlap-pane canvas { pointer-events: none; }
 .rp-sheet-handle { display: none; }
 
 .rp-collapse-btn {
@@ -3805,7 +3819,7 @@ table.ward-table th {
   top: calc(var(--info-top) + var(--brief-stack, 0px));
   bottom: auto;
   left: var(--info-left);
-  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
+  width: var(--info-card-w);
   max-height: calc(100% - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   display: flex;
   flex-direction: column;

@@ -359,6 +359,15 @@ export function planPlace(place) {
   if (place === 'point') {
     return { on: 'tại vị trí', it: 'Vị trí', cut: 'vị trí', shape: 'Vị trí', pie: 'tại vị trí' };
   }
+  if (place === 'lot') {
+    return {
+      on: 'trên lô đất quy hoạch',
+      it: 'Lô đất quy hoạch',
+      cut: 'lô đất quy hoạch',
+      shape: 'Lô đất quy hoạch',
+      pie: 'trên lô đất quy hoạch'
+    };
+  }
   return { on: 'trên thửa đất', it: 'Thửa', cut: 'thửa', shape: 'Hình thửa', pie: 'trên thửa' };
 }
 
