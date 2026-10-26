@@ -231,7 +231,7 @@ export async function proxyGcs(request, ctx, objectName, now = Date.now()) {
   const contentRange = res.headers.get('content-range');
   if (contentRange) outHeaders.set('content-range', contentRange);
   outHeaders.set('accept-ranges', 'bytes');
-  outHeaders.set('cache-control', policy);
+  outHeaders.set('cache-control', (res.status === 200 || res.status === 206) ? policy : 'no-store');
   stampCache(outHeaders, cache ? 'MISS' : 'BYPASS');
   cors(outHeaders);
   const out = new Response(request.method === 'HEAD' ? null : res.body, { status: res.status, headers: outHeaders });

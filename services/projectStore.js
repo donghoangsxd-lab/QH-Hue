@@ -2978,15 +2978,27 @@ async function writeCtPhapImage(name, buffer, contentType) {
   }
 }
 
-async function saveCtPhapPdf({ fileName, buffer, stagedToken }) {
+function ctPhapPdfBuffer(raw) {
+  const clean = String(raw || '').replace(/\s+/g, '');
+  const max = pdfLimits.PDF_ADMIN_MAX_BYTES;
+  if (!clean) throw ctFail('File PDF rỗng.', 400);
+  if (clean.length > Math.ceil(max * 4 / 3) + 4) throw ctFail('File PDF tối đa 10 MB.', 413);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) throw ctFail('File PDF không hợp lệ.', 400);
+  const buffer = Buffer.from(clean, 'base64');
+  if (!buffer.length || buffer.length > max) throw ctFail('File PDF tối đa 10 MB.', 413);
+  return buffer;
+}
+
+async function saveCtPhapPdf({ fileName, pdf, buffer, stagedToken }) {
   return ctPhapLocked(async () => {
     let bytes = 0;
+    const body = stagedToken ? null : (buffer || ctPhapPdfBuffer(pdf));
     if (stagedToken) {
       bytes = await takeStagedPdf(stagedToken, CT_PHAP_PDF, pdfLimits.PDF_ADMIN_MAX_BYTES);
     } else {
-      if (!pdfOk(buffer, pdfLimits.PDF_INLINE_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_INLINE_MAX_BYTES);
-      await writeBytes(CT_PHAP_PDF, buffer, 'application/pdf');
-      bytes = buffer.length;
+      if (!pdfOk(body, pdfLimits.PDF_ADMIN_MAX_BYTES)) rejectPdf(body, pdfLimits.PDF_ADMIN_MAX_BYTES);
+      await writeBytes(CT_PHAP_PDF, body, 'application/pdf');
+      bytes = body.length;
     }
     await stampShortCache(CT_PHAP_PDF);
     const doc = await readCtPhap();

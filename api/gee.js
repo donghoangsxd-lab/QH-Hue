@@ -4791,13 +4791,11 @@ module.exports = async (req, res) => {
       try {
         let tep;
         if (kind === 'pdf') {
-          const staged = stagedTokenOf(body);
-          let buffer = null;
-          if (!staged) {
-            try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
-            catch (err) { return sendInlinePdfError(res, err); }
-          }
-          tep = await projects.saveCtPhapPdf({ fileName: body.name, buffer, stagedToken: staged });
+          tep = await projects.saveCtPhapPdf({
+            fileName: body.name,
+            pdf: body.pdf,
+            stagedToken: stagedTokenOf(body)
+          });
         } else if (kind === 'anh') {
           tep = await projects.saveCtPhapAnh({ id: body.id, slot: body.slot, fileName: body.name, image: body.image });
         } else if (kind === 'xoa') {

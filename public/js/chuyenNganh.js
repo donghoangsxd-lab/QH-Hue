@@ -7,7 +7,7 @@ import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { geeApi } from './api.js';
-import { putSignedPdf, PDF_INLINE_MAX_BYTES, PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
+import { PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { toFeatureCollection } from './geoDoc.js';
 import { GP_SCOPE_EVENT, URBAN_FOCUS_EVENT } from './generalPlan.js';
@@ -595,7 +595,7 @@ function archAdmin() {
 
 function ensureArchTep() {
   if (archTep || archTepTask) return;
-  archTepTask = fetch('/gcs/kien-truc/ct-phap/tep.json')
+  archTepTask = fetch('/gcs/kien-truc/ct-phap/tep.json', { cache: 'no-store' })
     .then(res => (res.ok ? res.json() : null))
     .catch(() => null)
     .then(doc => {
@@ -671,6 +671,19 @@ function syncArchMarkers() {
   });
 }
 
+function archPhotoStrip(item) {
+  const photos = archPhotos(item.id);
+  if (!photos.length) return '';
+  const cells = photos.map(photo => {
+    const url = archPhotoUrl(item.id, photo);
+    const del = archAdmin()
+      ? `<button type="button" class="arch-photo-del" data-arch-photo-del="${escapeHtml(item.id)}:${photo.n}" title="Gỡ ảnh" aria-label="Gỡ ảnh">${ico('close')}</button>`
+      : '';
+    return `<span class="arch-photo"><a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(item.ten || '')}"></a>${del}</span>`;
+  }).join('');
+  return `<div class="arch-photos">${cells}</div>`;
+}
+
 function archDossier(item) {
   const rows = [
     ['Địa điểm', item.diaChi],
@@ -681,16 +694,8 @@ function archDossier(item) {
     ['Xếp hạng di tích', item.xepHang],
     ['Ghi chú', item.ghiChu]
   ].filter(([, value]) => value);
-  const photos = archPhotos(item.id).map(photo => {
-    const url = archPhotoUrl(item.id, photo);
-    const del = archAdmin()
-      ? `<button type="button" class="arch-photo-del" data-arch-photo-del="${escapeHtml(item.id)}:${photo.n}" title="Gỡ ảnh" aria-label="Gỡ ảnh">${ico('close')}</button>`
-      : '';
-    return `<span class="arch-photo"><a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt=""></a>${del}</span>`;
-  }).join('');
-  const gallery = photos ? `<div class="arch-photos">${photos}</div>` : '';
   const body = rows.map(([label, value]) => `<div class="project-dossier-row"><span class="project-dossier-label">${escapeHtml(label)}</span><span class="project-dossier-meta">${escapeHtml(value)}</span></div>`).join('');
-  return `<div class="project-dossier">${gallery}${body}</div>`;
+  return `<div class="project-dossier">${body}</div>`;
 }
 
 function archRow(item) {
@@ -709,7 +714,7 @@ function archRow(item) {
         ${photoBtn}
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-arch-expand="${escapeHtml(item.id)}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
       </span>
-    </div>${open ? archDossier(item) : ''}`;
+    </div>${archPhotoStrip(item)}${open ? archDossier(item) : ''}`;
 }
 
 function revealArch(id) {
@@ -724,8 +729,8 @@ function revealArch(id) {
   const showInfo = () => {
     const row = document.querySelector(`#axisKienTruc [data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
     const next = row?.nextElementSibling;
-    const dossier = next?.classList.contains('project-dossier') ? next : row;
-    dossier?.scrollIntoView({ block: 'nearest' });
+    const target = next && (next.classList.contains('arch-photos') || next.classList.contains('project-dossier')) ? next : row;
+    target?.scrollIntoView({ block: 'nearest' });
   };
   showInfo();
   requestAnimationFrame(showInfo);
@@ -788,7 +793,7 @@ function paintKienTruc() {
   const pdfUrl = archPdfUrl();
   const pdfBtn = pdfUrl
     ? `<a class="project-btn has-decision" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" title="Mở PDF quyết định" aria-label="Mở PDF quyết định">${ico('file')}</a>`
-    : `<button type="button" class="project-btn" disabled title="Chưa có file PDF" aria-label="Chưa có file PDF">${ico('file')}</button>`;
+    : `<span class="project-btn is-empty" title="Chưa có file PDF" aria-label="Chưa có file PDF">${ico('file')}</span>`;
   const uploadBtn = archAdmin()
     ? `<label class="project-btn" title="Quản trị tải PDF quyết định, tối đa 10 MB">${ico('save')}<input class="arch-file" type="file" accept="application/pdf,.pdf" data-arch-pdf-file></label>`
     : '';
@@ -827,6 +832,7 @@ async function postArch(body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) throw new Error(data.message || 'Không lưu được');
+  if (body.action === 'putCtPhapTep' && !data.tep) throw new Error('Máy chủ chưa ghi được tệp.');
   return data;
 }
 
@@ -837,14 +843,12 @@ async function uploadArchPdf(file) {
     return;
   }
   try {
-    const body = { action: 'putCtPhapTep', kind: 'pdf', name: file.name };
-    if (file.size > PDF_INLINE_MAX_BYTES) {
-      const sign = await postArch({ action: 'signProjectPdf', purpose: 'doc', bytes: file.size, name: file.name });
-      await putSignedPdf(sign, file);
-      body.staged = sign.token;
-      body.bytes = file.size;
-    } else body.pdf = await fileBase64(file);
-    const saved = await postArch(body);
+    const saved = await postArch({
+      action: 'putCtPhapTep',
+      kind: 'pdf',
+      name: file.name,
+      pdf: await fileBase64(file)
+    });
     if (saved.tep) archTep = saved.tep;
     paintKienTruc();
     showToast('Đã ghi PDF quyết định.');
@@ -1101,8 +1105,11 @@ function applyLayerQuery() {
     const blob = el.getAttribute('data-arch-text') || el.textContent;
     const hide = !!q && !foldQuery(blob).includes(q);
     el.classList.toggle('is-filter-hide', hide);
-    const next = el.nextElementSibling;
-    if (next?.classList.contains('project-dossier')) next.classList.toggle('is-filter-hide', hide);
+    let next = el.nextElementSibling;
+    while (next && (next.classList.contains('arch-photos') || next.classList.contains('project-dossier'))) {
+      next.classList.toggle('is-filter-hide', hide);
+      next = next.nextElementSibling;
+    }
   });
   document.querySelectorAll('#layerPaneKienTruc .pl-group').forEach(group => {
     const rows = [...group.querySelectorAll('.project-row')];
