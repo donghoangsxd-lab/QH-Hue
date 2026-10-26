@@ -130,6 +130,7 @@ table { font-variant-numeric: tabular-nums; }
 /* Khai báo trên body (không phải :root) để nhận --bottom-h theo màn hình / thẩm định.
    --bottom-gap: phần đáy dành cho panel dưới; --side-gap: đáy panel phải (thu gọn panel dưới thì chừa nút mở lại) */
 body { --bottom-gap: var(--bottom-h); --side-gap: var(--bottom-h); }
+body:has(#printPreview:not([hidden])) { --info-bottom: 248px; }
 body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0px; --side-gap: calc(var(--tb-btn) + 12px); }
 #mapArea {
   position: absolute;
@@ -330,13 +331,12 @@ body.compare-on .map-title {
 #mapArea.print-staging .esc-hint,
 #mapArea.print-staging .print-preview { display: none; }
 
-/* Bảng đồ án: đầu cột trái, sát phải thanh công cụ. Cao theo nội dung.
-   --brief-stack (projectBrief.js) đẩy bảng lô / công trình xuống dưới bảng này. */
+/* Bảng đồ án: đầu cột trái, dưới ghi chú đô thị và thẻ trình diễn. --brief-stack đẩy bảng lô xuống dưới. */
 .project-brief {
   --brief: var(--cyan-rgb);
   position: absolute;
   z-index: 1100;
-  top: var(--info-top);
+  top: calc(var(--info-top) + var(--stack-brief, 0px));
   bottom: auto;
   left: var(--info-left);
   width: var(--info-card-w);
@@ -533,13 +533,14 @@ body:not(.bottom-collapsed) .cad-card,
 body:not(.bottom-collapsed) .leaflet-popup.dock-card {
   display: none !important;
 }
-/* Bảng dự án kêu gọi đầu tư chiếm cột trái: thẻ đồ án sang phải bảng đó. */
-body:has(#investCard:not([hidden])) .project-brief {
+/* Bảng dự án kêu gọi đầu tư chiếm cột trái: các bảng thông tin sang phải bảng đó. */
+body:has(#investCard:not([hidden])) .project-brief,
+body:has(#investCard:not([hidden])) .urban-focus-bar,
+body:has(#investCard:not([hidden])) .ovd-card,
+body:has(#investCard:not([hidden])) .cad-card:not(.invest-card),
+body:has(#investCard:not([hidden])) .leaflet-popup.dock-card {
   left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px)) + 8px);
-  top: var(--info-top);
-  bottom: auto;
-  width: min(276px, calc(100% - var(--tb-btn) - var(--right-w) - 380px - 56px));
-  max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
+  width: min(276px, calc(100vw - var(--info-left) - var(--tb-btn) - 380px - 56px));
 }
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
 .map-title-mark {
@@ -885,8 +886,9 @@ body.compare-on .map-title-split { display: inline-flex; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
 .faq-panel {
-  position: absolute; left: auto; right: calc(var(--tb-btn) + 20px); top: 72px; z-index: 1000;
-  width: min(380px, calc(100vw - 84px)); max-height: min(72vh, 640px); overflow: auto;
+  position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); top: calc(var(--info-top) - 12px); z-index: 2;
+  width: min(380px, calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 48px));
+  max-height: calc(100vh - var(--info-top) - var(--bottom-gap) - 16px); overflow: auto;
   padding: 8px 10px 10px; background: var(--bg-dark); color: var(--text-main);
   backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--border-color); border-radius: var(--r-lg); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
@@ -963,6 +965,10 @@ body.compare-on .map-title-split { display: inline-flex; }
   position: absolute;
   left: auto;
   right: calc(var(--tb-btn) + 8px);
+  top: calc(var(--info-top) - 12px);
+  z-index: 2;
+  max-width: calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 36px);
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1835,9 +1841,9 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 #btnGbaFloors[hidden], #btnGbaDraw[hidden], #bldgDrawBox[hidden] { display: none; }
 .leaflet-container.gba-floor-edit, .leaflet-container.bldg-draw { cursor: crosshair; }
 .bldg-draw-bar {
-  position: absolute; z-index: 800; left: 64px; bottom: 56px;
+  position: absolute; z-index: 800; left: var(--info-left); bottom: calc(var(--bottom-gap) + 14px);
   display: flex; flex-direction: column; gap: 6px;
-  width: min(320px, calc(100% - 88px)); padding: 8px 10px; box-sizing: border-box;
+  width: min(320px, calc(100vw - var(--info-left) - var(--tb-btn) - 36px)); padding: 8px 10px; box-sizing: border-box;
   background: var(--bg-panel); color: var(--text-strong);
   border: 1px solid var(--border-color); border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -3184,8 +3190,10 @@ table.ward-table th {
 .print-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
 .print-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
 .print-dock {
-  position: absolute; z-index: 2; left: 50%; bottom: 12px; transform: translateX(-50%);
-  width: min(520px, calc(100% - 80px));
+  position: absolute; z-index: 2;
+  left: var(--info-left); right: calc(var(--tb-btn) + 24px); bottom: 12px;
+  width: min(520px, calc(100% - var(--info-left) - var(--tb-btn) - 36px));
+  margin-inline: auto; transform: none;
   display: flex; flex-direction: column; gap: 8px;
   padding: 10px 12px; pointer-events: auto; box-sizing: border-box;
   background: var(--bg-dark);
@@ -4197,11 +4205,14 @@ table.ward-table th {
 /* Nhắc Admin: tên phường trong Sheet khác phường theo tọa độ */
 .ward-check {
   position: fixed;
-  top: calc(20px + var(--title-h));
-  left: 50%;
-  transform: translateX(-50%);
+  top: var(--info-top);
+  left: var(--info-left);
+  right: calc(12px + var(--tb-btn) + 16px);
+  transform: none;
   z-index: 1300;
-  width: min(92vw, 520px);
+  width: min(520px, calc(100vw - var(--info-left) - var(--tb-btn) - 36px));
+  margin-left: auto;
+  margin-right: auto;
   padding: 7px 9px;
   border-radius: var(--r-md);
   background: rgba(15, 23, 42, 0.95);
@@ -4482,8 +4493,8 @@ table.ward-table th {
 
 /* Thẻ thuyết minh trình diễn (overviewDemo.js): đầu cột trái */
 .ovd-card {
-  position: fixed; top: var(--info-top); bottom: auto; left: var(--info-left); z-index: 5000;
-  width: min(400px, calc(100vw - var(--info-left) - 16px)); max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
+  position: fixed; top: calc(var(--info-top) + var(--stack-demo, 0px)); bottom: auto; left: var(--info-left); z-index: 5000;
+  width: min(400px, calc(100vw - var(--info-left) - var(--tb-btn) - 28px)); max-height: min(42%, calc(100dvh - var(--info-top) - var(--info-bottom) - var(--stack-demo, 0px)));
   display: flex; flex-direction: column; gap: 8px;
   padding: 12px 14px; box-sizing: border-box; overflow: auto;
   color: var(--text-main); background: var(--bg-card);
@@ -4516,9 +4527,9 @@ table.ward-table th {
 .ovd-btns button:disabled { opacity: 0.45; cursor: default; filter: none; box-shadow: none; }
 @media (max-width: 700px) {
   .ovd-card {
-    top: var(--info-top); bottom: auto; left: var(--info-left);
-    width: min(400px, calc(100vw - var(--info-left) - 8px));
-    max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
+    top: calc(var(--info-top) + var(--stack-demo, 0px)); bottom: auto; left: var(--info-left);
+    width: min(400px, calc(100vw - var(--info-left) - var(--tb-btn) - 28px));
+    max-height: min(42%, calc(100dvh - var(--info-top) - var(--info-bottom) - var(--stack-demo, 0px)));
   }
 }
 
@@ -4716,11 +4727,11 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 /* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): đầu cột trái */
 .urban-focus-bar {
   position: fixed; z-index: 950;
-  top: var(--info-top);
+  top: calc(var(--info-top) + var(--stack-urban, 0px));
   bottom: auto;
   left: var(--info-left);
-  max-width: min(440px, calc(100vw - var(--info-left) - var(--right-w) - 24px));
-  max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
+  max-width: min(440px, calc(100vw - var(--info-left) - var(--tb-btn) - 28px));
+  max-height: min(42%, calc(100dvh - var(--info-top) - var(--info-bottom) - var(--stack-urban, 0px)));
   overflow: auto;
   display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 8px 10px;
   background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
@@ -4762,10 +4773,12 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 /* Panel thẩm định: cùng khung, tiêu đề, ô nhập và nút với panel phải */
 .review-panel {
   position: absolute;
-  top: 0;
-  left: calc(var(--tb-btn) + 8px);
-  width: var(--right-w);
-  max-height: calc(100vh - var(--bottom-h) - 32px - var(--tb-btn));
+  top: calc(var(--info-top) - 12px);
+  right: calc(var(--tb-btn) + 8px);
+  left: auto;
+  width: min(var(--right-w), calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 48px));
+  max-height: calc(100vh - var(--info-top) - var(--bottom-gap) - 16px);
+  z-index: 2;
   display: flex;
   flex-direction: column;
   background: var(--bg-dark);
@@ -5317,8 +5330,9 @@ body.project-review.la-page #projectReviewHost {
   transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 .sv-panel {
-  position: fixed; z-index: 1250; left: 60px; bottom: calc(var(--bottom-gap) + 14px);
-  width: min(520px, calc(100vw - 80px)); height: min(340px, 50vh); min-width: 260px; min-height: 180px;
+  position: fixed; z-index: 1250; left: auto; right: calc(12px + var(--tb-btn) + 12px); bottom: calc(var(--bottom-gap) + 14px);
+  width: min(520px, calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 48px));
+  height: min(340px, calc(100vh - var(--info-top) - var(--bottom-gap) - 24px)); min-width: 0; min-height: 180px;
   display: flex; flex-direction: column; overflow: hidden; resize: both;
   background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow);
 }
@@ -5757,7 +5771,7 @@ body.project-review.la-page #projectReviewHost {
   #pieLegendDetails > .pie-legend-row { flex: 0 0 auto; max-height: none; min-height: 18px; }
   .pie-legend-row { grid-template-columns: minmax(88px, 1fr) 46px 42px; }
   .bp-legend { font-size: 11.5px; }
-  .review-panel, .sketch-palette {
+  .faq-panel, .review-panel, .sketch-palette {
     position: fixed;
     left: var(--phone-tool-left);
     right: calc(var(--phone-axis-w) + 8px);
@@ -5769,18 +5783,36 @@ body.project-review.la-page #projectReviewHost {
     overflow: auto;
     z-index: 1400;
   }
+  body:not(.right-collapsed) .faq-panel,
+  body:not(.right-collapsed) .review-panel,
+  body:not(.right-collapsed) .sketch-palette {
+    bottom: calc(50dvh + max(8px, var(--safe-bottom)));
+    max-height: calc(50dvh - var(--info-top) - 16px);
+  }
   .sketch-palette { right: auto; width: min(360px, calc(100vw - var(--phone-tool-left) - var(--phone-axis-w) - 16px)); flex-direction: row; flex-wrap: wrap; }
+  body .urban-focus-bar { top: calc(var(--info-top) + var(--stack-urban, 0px)) !important; }
+  body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
+  body .project-brief,
+  body.project-review:not(.project-view) .project-brief {
+    top: calc(var(--info-top) + var(--stack-brief, 0px)) !important;
+  }
   body .project-brief,
   body.project-review:not(.project-view) .project-brief,
   body .urban-focus-bar,
   body .ovd-card {
-    top: var(--info-top) !important;
     bottom: auto !important;
     left: var(--info-left) !important;
     width: min(300px, calc(100vw - var(--info-left) - var(--phone-axis-w) - 12px)) !important;
     max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
     height: auto;
     overflow: auto;
+  }
+  body:has(#investCard:not([hidden])) .project-brief,
+  body:has(#investCard:not([hidden])) .urban-focus-bar,
+  body:has(#investCard:not([hidden])) .ovd-card,
+  body:has(#investCard:not([hidden])) .cad-card:not(.invest-card),
+  body:has(#investCard:not([hidden])) .leaflet-popup.dock-card {
+    display: none !important;
   }
   body .project-brief,
   body.project-review:not(.project-view) .project-brief {
@@ -5862,6 +5894,10 @@ body.project-review.la-page #projectReviewHost {
     max-height: min(46dvh, 240px);
     overflow: auto;
   }
+  body:not(.right-collapsed) .print-dock {
+    bottom: calc(50dvh + max(8px, var(--safe-bottom)));
+    max-height: min(40dvh, calc(50dvh - var(--info-top) - 16px));
+  }
   .print-btn, .print-sizes button, .print-title-lbl input { min-height: 40px; height: 40px; }
   .auth-modal { width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; }
   .tour-card { width: min(340px, calc(100vw - 16px)); padding: 10px 12px; }
@@ -5870,10 +5906,11 @@ body.project-review.la-page #projectReviewHost {
   .ward-check { top: var(--phone-chrome-top); width: min(92vw, 420px); }
   .proof-panel { max-height: min(50dvh, 320px); }
   .sv-panel {
-    left: 8px; right: calc(var(--phone-axis-w) + 8px); width: auto; min-width: 0;
+    left: var(--phone-tool-left); right: calc(var(--phone-axis-w) + 8px); width: auto; min-width: 0;
     bottom: var(--phone-fixed-bottom);
     height: min(220px, 40dvh);
   }
+  body:not(.right-collapsed) .sv-panel { bottom: calc(50dvh + max(8px, var(--safe-bottom))); }
   .add-point-form input, .add-point-form select,
   .decision-assign input { height: 36px; font-size: 13px; }
   .project-search { height: 32px; font-size: 13px; }
@@ -5999,14 +6036,35 @@ body.project-review.la-page #projectReviewHost {
   body.bottom-collapsed .leaflet-popup.dock-card,
   body.bottom-collapsed .urban-focus-bar,
   body.bottom-collapsed .ovd-card { width: min(280px, 42vw) !important; }
-  .review-panel {
-    left: auto;
-    right: calc(max(8px, env(safe-area-inset-right)) + var(--phone-axis-w) + 8px);
-    top: var(--phone-chrome-top) !important;
-    bottom: var(--phone-dock-bottom);
-    width: min(300px, 40vw);
-    max-height: none;
+  .faq-panel, .review-panel, .sketch-palette {
+    left: var(--phone-tool-left);
+    right: calc(var(--phone-panel-w) + 12px);
+    top: var(--info-top) !important;
+    bottom: max(4px, env(safe-area-inset-bottom));
+    width: auto;
+    max-height: calc(100dvh - var(--info-top) - 12px);
   }
+  body.right-collapsed .faq-panel,
+  body.right-collapsed .review-panel,
+  body.right-collapsed .sketch-palette {
+    right: calc(var(--phone-axis-w) + 8px);
+  }
+  .sv-panel { bottom: max(4px, env(safe-area-inset-bottom)); height: min(200px, 42dvh); }
+  body:not(.right-collapsed) .sv-panel { right: calc(var(--phone-panel-w) + 12px); bottom: max(4px, env(safe-area-inset-bottom)); }
+  .print-dock {
+    right: calc(var(--phone-panel-w) + 12px);
+    bottom: max(4px, env(safe-area-inset-bottom));
+    max-height: min(42dvh, calc(100dvh - var(--info-top) - 16px));
+  }
+  body.right-collapsed .print-dock { right: calc(var(--phone-axis-w) + 12px); }
+  #tabAdd.propose-sheet {
+    left: var(--info-left);
+    right: calc(var(--phone-panel-w) + 12px);
+    top: var(--info-top);
+    width: auto;
+    max-height: calc(100dvh - var(--info-top) - 12px);
+  }
+  body.right-collapsed #tabAdd.propose-sheet { right: calc(var(--phone-axis-w) + 12px); }
   body.bottom-collapsed .leaflet-bottom.leaflet-right {
     margin-bottom: max(8px, env(safe-area-inset-bottom));
     margin-right: calc(var(--phone-axis-w) + 8px);
@@ -6612,10 +6670,11 @@ html.is-phone.is-landscape .axis-dock button span {
 body.right-collapsed #tabLegend.map-float { right: 12px; }
 body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) + 12px); }
 #tabAdd.propose-sheet {
-  left: calc(var(--tb-btn) + 22px);
-  top: 72px;
-  width: min(440px, calc(100vw - var(--right-w) - 90px));
-  max-height: min(70vh, 640px);
+  left: auto;
+  right: calc(12px + var(--tb-btn) + 12px);
+  top: var(--info-top);
+  width: min(440px, calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 48px));
+  max-height: calc(100vh - var(--info-top) - var(--bottom-gap) - 16px);
   height: auto;
   flex: 0 0 auto;
   overflow: auto;
@@ -6685,19 +6744,41 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   }
   body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) + 8px); }
   body.bottom-collapsed:not(.right-collapsed) .legend-chip { bottom: calc(50dvh + 10px); }
+  body.bottom-collapsed:not(.right-collapsed) .project-brief,
+  body.bottom-collapsed:not(.right-collapsed) .urban-focus-bar,
+  body.bottom-collapsed:not(.right-collapsed) .ovd-card {
+    max-height: min(22dvh, calc(50dvh - var(--info-top) - 16px)) !important;
+  }
   body.bottom-collapsed:not(.right-collapsed) .leaflet-popup.dock-card,
-  body.bottom-collapsed:not(.right-collapsed) .cad-card,
-  body.bottom-collapsed:not(.right-collapsed) .project-brief {
-    max-height: calc(50dvh - var(--info-top) - 16px) !important;
+  body.bottom-collapsed:not(.right-collapsed) .cad-card {
+    max-height: calc(50dvh - var(--info-top) - var(--brief-stack, 0px) - 16px) !important;
   }
   #tabAdd.propose-sheet {
-    left: 8px;
-    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 8px);
-    width: min(440px, calc(100vw - 16px));
-    max-height: 58vh;
+    left: var(--info-left);
+    right: calc(var(--phone-axis-w) + max(8px, env(safe-area-inset-right)));
+    top: var(--info-top);
+    width: auto;
+    max-height: calc(100dvh - var(--info-top) - max(12px, var(--bottom-gap)) - 8px);
+  }
+  body:not(.right-collapsed) #tabAdd.propose-sheet {
+    max-height: calc(50dvh - var(--info-top) - 8px);
   }
   .legend-chip { left: calc(var(--tb-btn) + 16px); right: auto; }
   body.right-collapsed .legend-chip { right: auto; }
+}
+@media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
+  #tabAdd.propose-sheet {
+    right: calc(var(--phone-panel-w) + 12px);
+    max-height: calc(100dvh - var(--info-top) - 12px);
+  }
+  body.right-collapsed #tabAdd.propose-sheet { right: calc(var(--phone-axis-w) + 12px); }
+  body:not(.right-collapsed) .faq-panel,
+  body:not(.right-collapsed) .review-panel,
+  body:not(.right-collapsed) .sketch-palette,
+  body:not(.right-collapsed) .sv-panel {
+    bottom: max(4px, env(safe-area-inset-bottom));
+  }
+  body:not(.right-collapsed) .sv-panel { right: calc(var(--phone-panel-w) + 12px); }
 }
 /* Điện thoại: dock Chú giải / Lớp nền / Lớp môi trường khoảng một phần ba chiều cao màn hình, cuộn bên trong. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {

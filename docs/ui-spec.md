@@ -97,6 +97,10 @@ Không có trong repo, cột để «—»:
 - km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).
 
+## Bảng nổi
+
+Cột trái của bản đồ xếp dọc, không đè nhau: ghi chú đô thị, thẻ trình diễn, thông tin đồ án, rồi thửa, lô hoặc tra cứu điểm. Bảng dự án kêu gọi đầu tư chiếm cột đó; các bảng kia sang phải bảng đó. Cột phải của bản đồ chỉ mở một bảng một lúc: thẩm định, hỏi đáp, phác thảo, đề xuất, xuất bản đồ, Street View, khung 3D chưa phóng to. Bảng xuất bản đồ nằm trong khoảng trống, phía trên bảng tổng hợp. Mở bảng mới thì bảng cũ ở cột đó đóng. Không đè panel trục, cột nút, tiêu đề hay bảng tổng hợp. Phóng to được phủ lên: bảng tổng hợp toàn màn hình, tờ thẩm định, khung 3D phóng to, hộp thoại phủ kín.
+
 ## Phác thảo
 
 Hình chỉ trong phiên làm việc (bộ nhớ trang), không ghi máy chủ. Bấm một đường, đa giác, mũi tên, vòng tròn hoặc chữ để chọn. Hình đang chọn có viền sáng. Phím Delete xóa hình đó. Chuột phải trên hình mở menu phác thảo, có «Điều chỉnh» và mục xóa hình; chuột phải chỗ khác vẫn là menu bản đồ. «Điều chỉnh» hiện núm đỉnh và núm giữa cạnh (chèn đỉnh). Kéo núm bằng chuột hoặc chạm: bản đồ không kéo theo khi đang giữ núm; hình và số đo cập nhật ngay. Chuột phải núm đỉnh: «Xóa đỉnh» (đường giữ ít nhất 2 đỉnh, đa giác ít nhất 3). Xong bằng Enter, bấm vùng trống trên bản đồ, hoặc mục «Xong». Esc hủy và trả hình về lúc bắt đầu chỉnh. Backspace khi đang chấm vẫn xóa đỉnh vừa chấm. Tọa độ đã ghi nằm lại đúng phiên đó.

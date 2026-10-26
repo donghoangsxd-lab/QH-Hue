@@ -5,7 +5,7 @@
 import { state } from './state.js';
 import { map, deleteSelectedMeasure } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
-import { escapeHtml, fmtNum, announceTool, showToast, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
+import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_EVENT, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
 import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
@@ -771,7 +771,32 @@ function syncButtons() {
 }
 
 function placeFloat(el, btn) {
-  if (el && btn && !el.hidden) el.style.top = `${btn.offsetTop}px`;
+  if (!el || !btn || el.hidden) return;
+  const phone = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches;
+  if (phone) {
+    el.style.top = '';
+    el.style.maxHeight = '';
+    return;
+  }
+  const bar = el.closest('.map-toolbar');
+  const barTop = bar ? bar.getBoundingClientRect().top : 0;
+  const titleBottom = document.getElementById('mapTitle')?.getBoundingClientRect().bottom ?? barTop;
+  const top = Math.max(btn.offsetTop, titleBottom + 8 - barTop);
+  el.style.top = `${top}px`;
+  const bottom = document.body.classList.contains('bottom-collapsed')
+    ? 12
+    : (document.getElementById('bottomPanel')?.getBoundingClientRect().height || 0) + 12;
+  el.style.maxHeight = `${Math.max(72, window.innerHeight - bottom - barTop - top - 8)}px`;
+}
+
+let sketchFloated = false;
+
+function tuckSketchBar() {
+  if (!open) return;
+  if (state.sketchTool) {
+    collapsed = true;
+    syncButtons();
+  } else setOpen(false);
 }
 
 /** Thanh đầy đủ khi chưa chọn công cụ hoặc khi mở lại; đang vẽ thì chỉ còn nút biểu tượng công cụ */
@@ -780,7 +805,13 @@ function syncBar() {
   const pin = $('btnSketchPin');
   const btn = $('btnSketch');
   const showPin = !!(open && collapsed && state.sketchTool);
-  if (pal) pal.hidden = !(open && !showPin);
+  const showPalette = open && !showPin;
+  if (pal) pal.hidden = !showPalette;
+  if (showPalette && !sketchFloated) {
+    sketchFloated = true;
+    announceFloat('sketch');
+  }
+  if (!showPalette) sketchFloated = false;
   if (pin) {
     pin.hidden = !showPin;
     pin.classList.toggle('active', showPin);
@@ -910,6 +941,7 @@ export function initSketchLayer() {
     else if (open && !state.sketchTool && !pts.length) setHint('');
   });
 
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'sketch') tuckSketchBar(); });
   const pal = $('sketchPalette');
   const sketchBtn = $('btnSketch');
   sketchBtnTitle = sketchBtn?.title || '';

@@ -49,7 +49,7 @@ import {
   initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
-import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
+import { escapeHtml, setStatusContent, showToast, announceTool, announceFloat, FLOAT_OPEN_EVENT, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js';
 import { initMapLevel, getLevel, setLevel, DEFAULT_LEVEL } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
@@ -847,8 +847,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     sheet.hidden = !on;
     proposeBtn?.classList.toggle('active', on);
     proposeBtn?.setAttribute('aria-pressed', String(on));
-    if (!on) state.isPickMode = false;
+    if (on) announceFloat('propose');
+    else state.isPickMode = false;
   };
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => {
+    const sheet = document.getElementById('tabAdd');
+    if (e.detail !== 'propose' && sheet && !sheet.hidden) setPropose(false);
+  });
   const showRightTab = (tabId, open = true) => {
     if (tabId === 'tabAdd') {
       setPropose(open !== false);

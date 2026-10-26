@@ -126,17 +126,24 @@ function meterRow(label, title, value, share, tone) {
 
 const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
 
-function briefBesideInvest() {
-  const invest = document.getElementById('investCard');
-  return !PHONE_LAYOUT.matches && !!(invest && !invest.hidden);
-}
-
 function syncBriefStack() {
-  const host = document.getElementById('mapArea');
-  const el = document.getElementById('projectBrief');
-  if (!host || !el) return;
-  const h = el.hidden || briefBesideInvest() ? 0 : el.offsetHeight;
-  host.style.setProperty('--brief-stack', h ? `${h + 8}px` : '0px');
+  const root = document.documentElement;
+  const rows = [
+    [document.querySelector('.urban-focus-bar'), '--stack-urban'],
+    [document.querySelector('.ovd-card'), '--stack-demo'],
+    [document.getElementById('projectBrief'), '--stack-brief']
+  ];
+  let y = 0;
+  rows.forEach(([el, key]) => {
+    root.style.setProperty(key, `${y}px`);
+    const h = el && !el.hidden ? el.offsetHeight : 0;
+    if (h > 2) y += h + 8;
+  });
+  root.style.setProperty('--brief-stack', `${y}px`);
+  const invest = document.getElementById('investCard');
+  const investOn = !!(invest && !invest.hidden && invest.offsetHeight > 2);
+  const col = PHONE_LAYOUT.matches ? '0px' : (y > 0 || investOn ? (investOn ? '408px' : '336px') : '0px');
+  root.style.setProperty('--info-col', col);
 }
 
 function shareLabel(share) {
@@ -304,6 +311,9 @@ export function initProjectBrief() {
   const syncStack = () => syncBriefStack();
   new ResizeObserver(syncStack).observe(el);
   new MutationObserver(syncStack).observe(host, { subtree: true, attributes: true, attributeFilter: ['hidden'], childList: true });
+  new MutationObserver(syncStack).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(syncStack).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
   PHONE_LAYOUT.addEventListener('change', syncStack);
+  window.addEventListener('resize', syncStack);
   syncStack();
 }

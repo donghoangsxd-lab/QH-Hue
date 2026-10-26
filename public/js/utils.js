@@ -275,6 +275,12 @@ export const TOOL_START_EVENT = 'qh:tool-start';
 // Chọn một hình người dùng vẽ. detail: 'sketch' | 'measure'. Lớp còn lại bỏ chọn để phím Delete chỉ xóa một đối tượng.
 export const DRAW_SELECT_EVENT = 'qh:draw-select';
 
+// Bảng nổi cột phải (thẩm định, hỏi đáp, phác thảo, đề xuất, in, Street View, 3D): mở một bảng thì đóng bảng kia.
+export const FLOAT_OPEN_EVENT = 'qh:float-open';
+export function announceFloat(id) {
+  document.dispatchEvent(new CustomEvent(FLOAT_OPEN_EVENT, { detail: id }));
+}
+
 // Chuyển tab panel phải từ module khác (app.js giữ logic panel): detail { tab, open } — open false thì panel đang ẩn vẫn ẩn
 export const RIGHT_TAB_EVENT = 'qh:right-tab';
 // Chọn địa bàn từ module khác (thẻ, popup): detail = tên phường; app.js nạp dữ liệu công trình nếu chưa có rồi chọn

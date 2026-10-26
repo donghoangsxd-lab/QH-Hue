@@ -1,6 +1,8 @@
 // Khung Street View nổi. Menu chuột phải (mapContext.js) mở Google Street View ở thẻ mới.
 // Nhúng kiểu cũ output=svembed không cần khóa Maps Embed API (khóa API bị Google giới hạn vùng); kiểu này Google
 // không công bố chính thức, khung trắng thì dùng nút "Mở Google Maps" trên thanh tiêu đề.
+import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
+
 const EMBED_URL = 'https://maps.google.com/maps';
 const PANO_URL = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=';
 
@@ -78,10 +80,12 @@ function openStreetView(latlng, targetMap) {
   el.querySelector('.sv-frame').src = embedUrl(latlng);
   el.querySelector('.sv-ext').href = panoUrl(latlng);
   el.querySelector('.sv-title').textContent = `Street View · ${fmt(latlng).replace(',', ', ')}`;
+  announceFloat('street');
   placeMarker(latlng, targetMap);
 }
 
 export function initStreetView() {
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'street') closePanel(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && panelEl) closePanel();
   });

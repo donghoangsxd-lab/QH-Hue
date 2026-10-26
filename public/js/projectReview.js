@@ -8,7 +8,7 @@ import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
-import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { setBottomPanelMaximized, setBottomPanelCollapsed } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
 import { setLabelsOverlay, labelsOverlayOn, geeTileOpts, BASEMAP_EVENT } from './basemap.js';
@@ -1341,7 +1341,10 @@ function togglePanel(on) {
   panel.hidden = !next;
   btn?.setAttribute('aria-pressed', String(next));
   btn?.classList.toggle('active', next);
-  if (next) renderDrafts();
+  if (next) {
+    announceFloat('review');
+    renderDrafts();
+  }
 }
 
 function fileLabel(slot) {
@@ -1970,6 +1973,10 @@ export function dismissReviewHost() {
 export function initProjectReview() {
   document.addEventListener(QHC_CENTER_INFO_EVENT, () => openQhcCenterInfo());
   $('btnReviewOpen')?.addEventListener('click', () => togglePanel());
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => {
+    const panel = $('reviewPanel');
+    if (e.detail !== 'review' && panel && !panel.hidden) togglePanel(false);
+  });
   $('btnReviewPanelClose')?.addEventListener('click', () => togglePanel(false));
   ['HT', 'QH'].forEach(slot => $(slot === 'HT' ? 'reviewFileHT' : 'reviewFileQH')?.addEventListener('change', () => fileLabel(slot)));
   $('btnReviewStart')?.addEventListener('click', startReview);

@@ -1,7 +1,7 @@
 // Hỏi đáp số liệu đã tính sẵn (public/data/faq.json, dựng bằng scripts/build-faq.js).
 // Bấm câu trả lời thì tô các phường, xã nêu trong câu. Câu ưu tiên đầu tư tô thêm công trình và buffer QCVN.
 import { getLeftObstruction, getRightObstruction, highlightWardNames, map } from './mapEngine.js';
-import { escapeHtml, showToast, detailDisclosure } from './utils.js';
+import { escapeHtml, showToast, detailDisclosure, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { POP_METHOD_EVENT, spatialQuestions } from './popMethod.js';
 
 const $ = (id) => document.getElementById(id);
@@ -137,8 +137,10 @@ export function initFaqPanel() {
     panel.hidden = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-expanded', String(on));
-    if (!on) clearFocus();
+    if (on) announceFloat('faq');
+    else clearFocus();
   };
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'faq' && !panel.hidden) setOpen(false); });
   btn.addEventListener('click', async () => {
     const on = panel.hidden;
     setOpen(on);

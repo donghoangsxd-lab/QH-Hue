@@ -484,6 +484,7 @@ function pinDock(popup) {
 }
 
 function openDockPopup(targetMap, className, html) {
+  document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'popup' }));
   document.getElementById('cadParcelCard')?.querySelector('.cad-card-x')?.click();
   const popup = L.popup({ className, closeButton: true, autoPan: false, maxWidth: 280, minWidth: 0 }).setContent(html);
   popup._updatePosition = function () { pinDock(this); };

@@ -3,6 +3,7 @@
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ô vệ tinh / canvas đường phố, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
+import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { map, popLayerMeta } from './mapEngine.js';
 import { popMethod } from './popMethod.js';
 import { planMap, isCompareOn, isSplitOn, alignPlanView } from './planMap.js';
@@ -917,6 +918,7 @@ function openPreview() {
   if (!root) return;
   previewOn = true;
   root.hidden = false;
+  announceFloat('print');
   const btn = $('btnPrintA3');
   btn?.classList.add('active');
   btn?.setAttribute('aria-pressed', 'true');
@@ -1102,6 +1104,8 @@ async function runExport() {
 }
 
 /** Mở khung xem trước để căn vùng in, rồi xuất PDF khổ A3 / A2 / A1 / A0 */
+document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'print') closePreview(); });
+
 export function exportMapA3() {
   if (!map || busy) return;
   if (previewOn) closePreview();
