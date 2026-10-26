@@ -468,19 +468,31 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
   });
 }
 
-// Bảng công trình, lô đất và bảng tra cứu điểm nằm ở cột trái (cùng chỗ bảng thửa).
-// Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet. Bảng đồ án chiếm đầu cột thì --brief-stack đẩy bảng này xuống dưới.
+// Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
+// Lô quy hoạch trên máy tính vào #planInfoSlot (thế danh sách đồ án). Còn lại ở cột trái; --brief-stack đẩy xuống dưới bảng đồ án.
+function deskPlanSlot(el) {
+  if (!el?.classList.contains('land-lot-popup') || el.classList.contains('adj-lot-popup')) return null;
+  const slot = document.getElementById('planInfoSlot');
+  const pane = document.getElementById('layerPaneQuyHoach');
+  const phone = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches;
+  if (phone || !slot || !pane || pane.hidden) return null;
+  return slot;
+}
+
 function pinDock(popup) {
   const el = popup.getElement();
   const host = document.getElementById('mapArea');
   if (!el || !host) return;
-  if (el.parentElement !== host) host.appendChild(el);
+  const slot = deskPlanSlot(el);
+  const target = slot || host;
+  if (el.parentElement !== target) target.appendChild(el);
   el.classList.add('dock-card');
   el.style.left = '';
   el.style.bottom = '';
   el.style.right = '';
   el.style.top = '';
   el.style.transform = '';
+  if (slot) document.dispatchEvent(new CustomEvent('qh-plan-info'));
 }
 
 function openDockPopup(targetMap, className, html) {

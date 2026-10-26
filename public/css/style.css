@@ -1110,15 +1110,60 @@ body.right-collapsed .right-panel {
   opacity: 0;
   pointer-events: none;
 }
-/* Bảng lô đất quy hoạch đang mở: panel trục và dải năm trục không che bản đồ. */
-body.plan-info-open .right-panel,
-body.plan-info-open .axis-dock {
-  display: none !important;
-}
+/* Bảng thửa / lô quy hoạch nằm trong panel, thế chỗ danh sách đồ án. */
+#planInfoSlot { display: none; }
+#planInfoSlot[hidden] { display: none !important; }
 @media (min-width: 841px) {
-  body.plan-info-open {
-    --info-left: 12px;
-    --info-card-w: min(320px, calc(100% - var(--tb-btn) - 48px));
+  body.plan-info-open #axisQuyHoach > :not(.level-host):not(#planInfoSlot) {
+    display: none !important;
+  }
+  body.plan-info-open #planInfoSlot {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  body.plan-info-open #planInfoSlot > .cad-card,
+  body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    height: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 !important;
+    transform: none !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    z-index: auto;
+  }
+  body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: transparent !important;
+    border: 0;
+    border-radius: 0 !important;
+    box-shadow: none;
+  }
+  body.plan-info-open #planInfoSlot .cad-page,
+  body.plan-info-open #planInfoSlot .leaflet-popup-content {
+    max-height: none !important;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 }
 .leaflet-qhpkOverlap-pane,
@@ -5452,18 +5497,17 @@ body.project-review.la-page #projectReviewHost {
     --face-w: min(240px, calc(100vw - 28px));
     --bottom-h: min(46dvh, 280px);
     --phone-chrome-top: calc(max(8px, var(--safe-top)) + var(--title-h) + 8px);
-    /* Thẻ trong #mapArea: đáy mapArea đã nằm trên panel dưới. Thanh nút là cột trái, cột trục là mép phải. */
+    /* Thẻ trong #mapArea: đáy mapArea đã nằm trên panel dưới. Panel và dải trục ở mép trái, cột nút ở mép phải. */
     --phone-dock-bottom: max(8px, var(--safe-bottom));
-    --phone-tool-left: calc(max(8px, var(--safe-left)) + var(--tb-btn) + 12px);
+    --phone-tool-left: calc(max(8px, var(--safe-left)) + var(--phone-axis-w) + 12px);
     --phone-fixed-bottom: var(--phone-dock-bottom);
     --info-top: var(--phone-chrome-top);
     --info-bottom: var(--phone-dock-bottom);
     --info-left: var(--phone-tool-left);
-    /* Panel phải là thẻ góc, không chiếm hết chiều ngang. Dấu để đối chiếu bản production. */
-    --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
+    --phone-panel-w: min(300px, calc(100vw - var(--tb-btn) - 28px));
     --phone-title-fit: 1;
   }
-  /* Điện thoại: dải trục ở mép phải, cột nút ở mép trái. Không dùng khoảng cách dải trái của desktop. */
+  /* Điện thoại: dải trục ở mép trái, cột nút ở mép phải. */
   body.right-collapsed { --info-left: var(--phone-tool-left); }
   @media (pointer: fine) {
     html:has(#escHint:not([hidden])) {
@@ -5477,7 +5521,8 @@ body.project-review.la-page #projectReviewHost {
   }
   body:not(.bottom-collapsed):not(.project-review) .bottom-panel {
     top: 0;
-    right: calc(var(--phone-axis-w) + max(4px, var(--safe-right)));
+    left: calc(var(--phone-axis-w) + max(4px, var(--safe-left)));
+    right: calc(var(--tb-btn) + max(4px, var(--safe-right)));
     height: auto;
     z-index: 2500;
   }
@@ -5508,19 +5553,19 @@ body.project-review.la-page #projectReviewHost {
   body.bottom-collapsed .map-title,
   body.compare-on .map-title {
     top: max(8px, env(safe-area-inset-top));
-    left: 60px;
+    left: calc(max(8px, var(--safe-left)) + var(--phone-axis-w) + 8px);
     right: auto;
     transform: none;
     width: fit-content;
     min-width: 0;
-    max-width: calc(100vw - 60px - var(--phone-axis-w) - 16px - max(8px, var(--safe-right)));
+    max-width: calc(100vw - var(--phone-axis-w) - var(--tb-btn) - 36px - max(8px, var(--safe-right)));
     height: auto;
     gap: 4px;
     padding: 4px 6px 5px;
   }
-  /* Panel đang mở: hộp tiêu đề dừng trước cột trục, không kéo một thanh trống sang phải. */
+  /* Panel đang mở: tiêu đề sát mép trái, dừng trước cột nút bên phải. */
   body:not(.right-collapsed) .map-title {
-    max-width: calc(100vw - 60px - var(--phone-axis-w) - 16px - max(8px, var(--safe-right)));
+    max-width: calc(100vw - var(--tb-btn) - 36px - max(8px, var(--safe-right)));
   }
   .map-title-body { flex: 0 1 auto; min-width: 0; }
   .map-title-text {
@@ -5540,13 +5585,13 @@ body.project-review.la-page #projectReviewHost {
   .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
   .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
   .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
-  .bp-expand-btn { top: auto; bottom: max(8px, var(--safe-bottom)); right: calc(var(--phone-axis-w) + 8px); }
-  /* Cột dọc sát mép trái, dưới tiêu đề. Không trải ngang đáy. */
+  .bp-expand-btn { top: auto; bottom: max(8px, var(--safe-bottom)); right: max(8px, var(--safe-right)); }
+  /* Cột nút sát mép phải, dưới tiêu đề. Không trải ngang đáy. */
   .map-toolbar {
     top: var(--phone-chrome-top);
     bottom: max(8px, env(safe-area-inset-bottom));
-    left: max(8px, env(safe-area-inset-left));
-    right: auto;
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
     width: var(--tb-btn);
     flex-direction: column;
     flex-wrap: nowrap;
@@ -5604,11 +5649,11 @@ body.project-review.la-page #projectReviewHost {
   .gp-meta-short { display: inline; }
   .gp-meta { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
   .gp-row { column-gap: 4px; padding: 0 4px; }
-  /* Tờ dưới, tối đa nửa màn hình, không đè cột nút trái và không đè cột trục bên phải. */
+  /* Tờ dưới, tối đa nửa màn hình, sát mép trái, không đè cột nút bên phải. */
   .right-panel {
     top: auto;
-    right: calc(max(8px, var(--safe-right)) + var(--phone-axis-w) + 8px);
-    left: var(--phone-tool-left);
+    left: max(8px, var(--safe-left));
+    right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px);
     bottom: max(8px, var(--safe-bottom));
     width: auto;
     height: auto;
@@ -5619,7 +5664,7 @@ body.project-review.la-page #projectReviewHost {
   body:not(.bottom-collapsed) .right-panel {
     max-height: 50dvh;
   }
-  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
+  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: max(8px, var(--safe-right)); }
   body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; }
   .rp-sheet-handle {
     display: flex;
@@ -5809,7 +5854,7 @@ body.project-review.la-page #projectReviewHost {
   .faq-panel, .review-panel, .sketch-palette {
     position: fixed;
     left: var(--phone-tool-left);
-    right: calc(var(--phone-axis-w) + 8px);
+    right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px);
     top: auto !important;
     bottom: var(--phone-fixed-bottom);
     width: auto;
@@ -5824,7 +5869,7 @@ body.project-review.la-page #projectReviewHost {
     bottom: calc(50dvh + max(8px, var(--safe-bottom)));
     max-height: calc(50dvh - var(--info-top) - 16px);
   }
-  .sketch-palette { right: auto; width: min(360px, calc(100vw - var(--phone-tool-left) - var(--phone-axis-w) - 16px)); flex-direction: row; flex-wrap: wrap; }
+  .sketch-palette { right: auto; width: min(360px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px)); flex-direction: row; flex-wrap: wrap; }
   body .urban-focus-bar { top: calc(var(--info-top) + var(--stack-urban, 0px)) !important; }
   body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
   body .project-brief,
@@ -5837,7 +5882,7 @@ body.project-review.la-page #projectReviewHost {
   body .ovd-card {
     bottom: auto !important;
     left: var(--info-left) !important;
-    width: min(300px, calc(100vw - var(--info-left) - var(--phone-axis-w) - 12px)) !important;
+    width: min(300px, calc(100vw - var(--info-left) - var(--tb-btn) - 20px)) !important;
     max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
     height: auto;
     overflow: auto;
@@ -5861,8 +5906,8 @@ body.project-review.la-page #projectReviewHost {
     bottom: auto !important;
     left: var(--info-left) !important;
     right: auto !important;
-    width: min(300px, calc(100vw - var(--info-left) - var(--phone-axis-w) - 12px)) !important;
-    max-width: min(300px, calc(100vw - var(--info-left) - var(--phone-axis-w) - 12px));
+    width: min(300px, calc(100vw - var(--info-left) - var(--tb-btn) - 20px)) !important;
+    max-width: min(300px, calc(100vw - var(--info-left) - var(--tb-btn) - 20px));
     height: auto;
     max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   }
@@ -5924,7 +5969,7 @@ body.project-review.la-page #projectReviewHost {
   .ov-primary, .ov-ghost, .ov-back, .ov-btn { height: 40px; font-size: 13px; }
   .ov-csd-wrap { max-height: 28dvh; }
   .print-dock {
-    left: var(--phone-tool-left); right: calc(var(--phone-axis-w) + 8px); width: auto; transform: none;
+    left: var(--phone-tool-left); right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px); width: auto; transform: none;
     bottom: var(--phone-dock-bottom);
     max-height: min(46dvh, 240px);
     overflow: auto;
@@ -5941,7 +5986,7 @@ body.project-review.la-page #projectReviewHost {
   .ward-check { top: var(--phone-chrome-top); width: min(92vw, 420px); }
   .proof-panel { max-height: min(50dvh, 320px); }
   .sv-panel {
-    left: var(--phone-tool-left); right: calc(var(--phone-axis-w) + 8px); width: auto; min-width: 0;
+    left: var(--phone-tool-left); right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px); width: auto; min-width: 0;
     bottom: var(--phone-fixed-bottom);
     height: min(220px, 40dvh);
   }
@@ -5951,10 +5996,7 @@ body.project-review.la-page #projectReviewHost {
   .project-search { height: 32px; font-size: 13px; }
   .leaflet-top.leaflet-left { top: var(--phone-chrome-top); left: var(--phone-tool-left) !important; }
   .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 20px; }
-  body.bottom-collapsed .leaflet-bottom.leaflet-right {
-    margin-bottom: max(8px, var(--safe-bottom));
-    margin-right: calc(var(--phone-axis-w) + 8px);
-  }
+    margin-right: calc(var(--tb-btn) + 8px);
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100dvw - 24px); }
   .leaflet-popup-content { font-size: 13px; margin: 8px 10px; }
   .ht-form { max-height: min(46dvh, 320px); }
@@ -5965,7 +6007,7 @@ body.project-review.la-page #projectReviewHost {
 @media (pointer: coarse) {
   .esc-hint { display: none !important; }
 }
-/* Ngang thấp: cột nút trái, sheet góc phải, thanh trục ở đáy.
+/* Ngang thấp: cột nút phải, sheet góc trái. Dải trục khi panel thu nằm mép trái.
    Rộng ≤840 và thấp, hoặc cảm ứng ngang ≤1400×560. Cửa sổ chuột 1024×473 giữ desktop. */
 @media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   :root {
@@ -5983,19 +6025,20 @@ body.project-review.la-page #projectReviewHost {
   body.compare-on .map-title {
     right: auto;
     top: max(4px, env(safe-area-inset-top));
-    left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
-    max-width: min(460px, calc(100vw - var(--tb-btn) - var(--phone-panel-w) - var(--phone-axis-w) - 36px));
+    left: calc(max(4px, var(--safe-left)) + var(--phone-panel-w) + 12px);
+    max-width: min(460px, calc(100vw - var(--tb-btn) - var(--phone-panel-w) - 36px));
     padding: 2px 4px 3px;
   }
   body.right-collapsed .map-title {
+    left: calc(max(4px, var(--safe-left)) + var(--phone-axis-w) + 8px);
     max-width: min(520px, calc(100vw - var(--tb-btn) - var(--phone-axis-w) - 24px));
   }
   .map-title-text { font-size: 12px; }
   .map-toolbar {
     top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
     bottom: max(4px, env(safe-area-inset-bottom));
-    left: max(4px, env(safe-area-inset-left));
-    right: auto;
+    left: auto;
+    right: max(4px, env(safe-area-inset-right));
     width: var(--tb-btn);
     flex-direction: column;
     gap: 4px;
@@ -6016,7 +6059,7 @@ body.project-review.la-page #projectReviewHost {
     max-height: none;
   }
   .map-toolbar .tb-phone-pick .ui-btn-format { flex: none; width: 100%; height: 100%; max-height: none; }
-  body:not(.right-collapsed) .map-toolbar { right: auto; }
+  body:not(.right-collapsed) .map-toolbar { left: auto; }
   body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnExpandBottomPanel {
     position: static;
     right: auto;
@@ -6030,16 +6073,16 @@ body.project-review.la-page #projectReviewHost {
   .right-panel {
     top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
     bottom: max(4px, env(safe-area-inset-bottom));
-    left: auto;
-    right: calc(max(4px, env(safe-area-inset-right)) + var(--phone-axis-w) + 6px);
+    left: calc(max(4px, var(--safe-left)) + var(--phone-axis-w) + 6px);
+    right: auto;
     width: var(--phone-panel-w);
     height: auto;
     max-height: none;
     border-radius: 12px;
-    transform-origin: right center;
+    transform-origin: left center;
   }
   body:not(.bottom-collapsed) .right-panel { max-height: none; bottom: max(4px, env(safe-area-inset-bottom)); }
-  body.right-collapsed .right-panel { transform: translateX(calc(100% + 16px)); visibility: hidden; opacity: 0; }
+  body.right-collapsed .right-panel { transform: translateX(calc(-100% - 16px)); visibility: hidden; opacity: 0; }
   .rp-sheet-handle { display: none; }
   /* phone-side-sheet-end */
   .rp-collapse-btn {
@@ -6059,7 +6102,7 @@ body.project-review.la-page #projectReviewHost {
   :root {
     --info-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
     --info-bottom: max(4px, env(safe-area-inset-bottom));
-    --info-left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+    --info-left: calc(max(4px, var(--safe-left)) + var(--phone-panel-w) + 12px);
   }
   @media (pointer: fine) {
     html:has(#escHint:not([hidden])) {
@@ -6072,8 +6115,8 @@ body.project-review.la-page #projectReviewHost {
   body.bottom-collapsed .urban-focus-bar,
   body.bottom-collapsed .ovd-card { width: min(280px, 42vw) !important; }
   .faq-panel, .review-panel, .sketch-palette {
-    left: var(--phone-tool-left);
-    right: calc(var(--phone-panel-w) + 12px);
+    left: var(--info-left);
+    right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
     top: var(--info-top) !important;
     bottom: max(4px, env(safe-area-inset-bottom));
     width: auto;
@@ -6082,27 +6125,27 @@ body.project-review.la-page #projectReviewHost {
   body.right-collapsed .faq-panel,
   body.right-collapsed .review-panel,
   body.right-collapsed .sketch-palette {
-    right: calc(var(--phone-axis-w) + 8px);
+    right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
   }
   .sv-panel { bottom: max(4px, env(safe-area-inset-bottom)); height: min(200px, 42dvh); }
-  body:not(.right-collapsed) .sv-panel { right: calc(var(--phone-panel-w) + 12px); bottom: max(4px, env(safe-area-inset-bottom)); }
+  body:not(.right-collapsed) .sv-panel { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); bottom: max(4px, env(safe-area-inset-bottom)); }
   .print-dock {
-    right: calc(var(--phone-panel-w) + 12px);
+    right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
     bottom: max(4px, env(safe-area-inset-bottom));
     max-height: min(42dvh, calc(100dvh - var(--info-top) - 16px));
   }
-  body.right-collapsed .print-dock { right: calc(var(--phone-axis-w) + 12px); }
+  body.right-collapsed .print-dock { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); }
   #tabAdd.propose-sheet {
     left: var(--info-left);
-    right: calc(var(--phone-panel-w) + 12px);
+    right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
     top: var(--info-top);
     width: auto;
     max-height: calc(100dvh - var(--info-top) - 12px);
   }
-  body.right-collapsed #tabAdd.propose-sheet { right: calc(var(--phone-axis-w) + 12px); }
+  body.right-collapsed #tabAdd.propose-sheet { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); }
   body.bottom-collapsed .leaflet-bottom.leaflet-right {
     margin-bottom: max(8px, env(safe-area-inset-bottom));
-    margin-right: calc(var(--phone-axis-w) + 8px);
+    margin-right: calc(var(--tb-btn) + 8px);
   }
 }
 /* Điện thoại dọc hẹp: tiêu đề khối không bị nút bóp. */
@@ -6178,10 +6221,10 @@ body.project-review.la-page #projectReviewHost {
   }
   .bp-part2 .apt-ward { margin: 4px 0 0; padding: 0 2px; white-space: normal; }
 }
-/* Dọc hẹp: tờ dưới giữ tối đa nửa màn hình. Ngang thấp dùng sheet góc phải. */
+/* Dọc hẹp: tờ dưới giữ tối đa nửa màn hình. Ngang thấp dùng sheet góc trái. */
 @media (max-width: 700px) and (orientation: portrait) {
   body:not(.right-collapsed) .map-title {
-    max-width: calc(100vw - 60px - var(--phone-axis-w) - 16px - max(8px, env(safe-area-inset-right)));
+    max-width: calc(100vw - var(--tb-btn) - 36px - max(8px, var(--safe-right)));
   }
   .right-panel {
     top: auto;
@@ -6492,8 +6535,8 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
     z-index: 1310;
     top: max(8px, var(--safe-top));
     bottom: max(8px, var(--safe-bottom));
-    left: auto;
-    right: max(4px, var(--safe-right));
+    left: max(4px, var(--safe-left));
+    right: auto;
     transform: none;
     flex-direction: column;
     justify-content: stretch;
@@ -6552,8 +6595,8 @@ html.is-phone.is-landscape {
   --phone-chrome-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
   --info-top: var(--phone-chrome-top);
   --info-bottom: max(4px, env(safe-area-inset-bottom));
-  --info-left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
-  --phone-tool-left: var(--info-left);
+  --info-left: calc(max(4px, var(--safe-left)) + var(--phone-panel-w) + 12px);
+  --phone-tool-left: calc(max(4px, var(--safe-left)) + var(--phone-axis-w) + 12px);
   --vv-w: 100%;
   --vv-h: 100%;
 }
@@ -6568,16 +6611,19 @@ html.is-phone.is-landscape body.bottom-collapsed .map-title,
 html.is-phone.is-landscape body.compare-on .map-title {
   right: auto;
   top: max(4px, env(safe-area-inset-top));
-  left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
-  max-width: min(520px, calc(100vw - var(--tb-btn) - var(--phone-axis-w) - 24px));
+  left: calc(max(4px, var(--safe-left)) + var(--phone-panel-w) + 12px);
+  max-width: min(520px, calc(100vw - var(--tb-btn) - var(--phone-panel-w) - 28px));
   padding: 2px 4px 3px;
 }
-html.is-phone.is-landscape .map-title-text { font-size: 12px; }
+html.is-phone.is-landscape body.right-collapsed .map-title {
+  left: calc(max(4px, var(--safe-left)) + var(--phone-axis-w) + 8px);
+  max-width: min(520px, calc(100vw - var(--tb-btn) - var(--phone-axis-w) - 24px));
+}
 html.is-phone.is-landscape .map-toolbar {
   top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
   bottom: max(4px, env(safe-area-inset-bottom));
-  left: max(4px, env(safe-area-inset-left));
-  right: auto;
+  left: auto;
+  right: max(4px, env(safe-area-inset-right));
   width: var(--tb-btn);
   flex-direction: column;
   overflow: hidden;
@@ -6594,16 +6640,16 @@ html.is-phone.is-landscape .map-toolbar .tb-rotate {
 html.is-phone.is-landscape .right-panel {
   top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
   bottom: max(4px, env(safe-area-inset-bottom));
-  left: auto;
-  right: calc(max(4px, env(safe-area-inset-right)) + var(--phone-axis-w) + 6px);
+  left: calc(max(4px, var(--safe-left)) + var(--phone-axis-w) + 6px);
+  right: auto;
   width: var(--phone-panel-w);
   height: auto;
   max-height: none;
   border-radius: 12px;
-  transform-origin: right center;
+  transform-origin: left center;
 }
 html.is-phone.is-landscape body.right-collapsed .right-panel {
-  transform: translateX(calc(100% + 16px));
+  transform: translateX(calc(-100% - 16px));
   visibility: hidden;
   opacity: 0;
 }
@@ -6626,7 +6672,7 @@ html.is-phone.is-landscape .axis-dock button span {
     position: fixed;
     z-index: 1450;
     top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 10px);
-    right: calc(max(8px, env(safe-area-inset-right)) + var(--phone-axis-w) + 8px);
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--tb-btn) + 8px);
     height: 40px;
     padding: 0 12px 0 8px;
     border: 0;
@@ -6646,7 +6692,7 @@ html.is-phone.is-landscape .axis-dock button span {
     flex: 0 0 auto;
   }
   html.is-phone.is-landscape body:not(.right-collapsed) .install-app:not([hidden]) {
-    right: calc(var(--phone-panel-w) + var(--phone-axis-w) + 16px);
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--tb-btn) + 8px);
   }
   .install-guide:not([hidden]) {
     display: flex;
@@ -6656,9 +6702,8 @@ html.is-phone.is-landscape .axis-dock button span {
     position: fixed;
     z-index: 2700;
     left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
     bottom: max(8px, env(safe-area-inset-bottom));
-    right: calc(max(8px, env(safe-area-inset-right)) + var(--phone-axis-w) + 8px);
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--tb-btn) + 8px);
     width: auto;
     max-width: 420px;
     margin: 0 auto;
@@ -6805,8 +6850,8 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
 .legend-extra .road-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 8px 6px; }
 @media (max-width: 840px) {
   #tabLegend.map-float {
-    left: calc(var(--tb-btn) + 16px);
-    right: auto;
+    left: calc(max(8px, env(safe-area-inset-left)) + var(--phone-axis-w) + 8px);
+    right: calc(var(--tb-btn) + 16px);
     width: min(280px, calc(100vw - var(--tb-btn) - 24px));
     max-height: 36vh;
     bottom: max(8px, env(safe-area-inset-bottom));
@@ -6829,7 +6874,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   }
   #tabAdd.propose-sheet {
     left: var(--info-left);
-    right: calc(var(--phone-axis-w) + max(8px, env(safe-area-inset-right)));
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--tb-btn) + 8px);
     top: var(--info-top);
     width: auto;
     max-height: calc(100dvh - var(--info-top) - max(12px, var(--bottom-gap)) - 8px);
@@ -6837,22 +6882,22 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   body:not(.right-collapsed) #tabAdd.propose-sheet {
     max-height: calc(50dvh - var(--info-top) - 8px);
   }
-  .legend-chip { left: calc(var(--tb-btn) + 16px); right: auto; }
+  .legend-chip { left: calc(max(8px, env(safe-area-inset-left)) + var(--phone-axis-w) + 8px); right: calc(var(--tb-btn) + 16px); }
   body.right-collapsed .legend-chip { right: auto; }
 }
 @media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   #tabAdd.propose-sheet {
-    right: calc(var(--phone-panel-w) + 12px);
+    right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
     max-height: calc(100dvh - var(--info-top) - 12px);
   }
-  body.right-collapsed #tabAdd.propose-sheet { right: calc(var(--phone-axis-w) + 12px); }
+  body.right-collapsed #tabAdd.propose-sheet { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); }
   body:not(.right-collapsed) .faq-panel,
   body:not(.right-collapsed) .review-panel,
   body:not(.right-collapsed) .sketch-palette,
   body:not(.right-collapsed) .sv-panel {
     bottom: max(4px, env(safe-area-inset-bottom));
   }
-  body:not(.right-collapsed) .sv-panel { right: calc(var(--phone-panel-w) + 12px); }
+  body:not(.right-collapsed) .sv-panel { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); }
 }
 /* Điện thoại: dock Chú giải / Lớp nền / Lớp môi trường khoảng một phần ba chiều cao màn hình, cuộn bên trong. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {

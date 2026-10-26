@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { map, wardNameAt, toggleMeasure, handleMeasureClick, inspectAccessAt, consumeMeasureContext } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastreLayer.js';
+import { LOTS_PROGRESS_EVENT, lotsRevision } from './projectFiles.js';
 import { streetViewUrl } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 
@@ -34,6 +35,7 @@ function saveNotes() {
 }
 
 function closeMenu() {
+  if (menuEl?._onLots) document.removeEventListener(LOTS_PROGRESS_EVENT, menuEl._onLots);
   menuEl?._fly?.remove();
   menuEl?.remove();
   menuEl = null;
@@ -253,19 +255,43 @@ function armPlanFly(menu, latlng, targetMap) {
     closeMenu();
     openPlanAt(latlng, targetMap, id);
   });
-  planLevelsAt(latlng).then(list => {
-    if (menuEl !== menu) return;
-    if (!list.length) {
-      fly.innerHTML = '<div class="map-ctx-note">Không có lô đất quy hoạch tại vị trí này</div>';
-    } else {
+  let shown = '';
+  let ticket = 0;
+  let watchRev = -1;
+  const paint = (list) => {
+    const sig = list.map(choice => choice.id).join(',');
+    if (sig === shown && fly.childElementCount) {
+      if (!fly.hidden) placeFly(row, fly);
+      return;
+    }
+    shown = sig;
+    if (!list.length) fly.innerHTML = '<div class="map-ctx-note">Không có lô đất quy hoạch tại vị trí này</div>';
+    else {
       fly.innerHTML = list.map(choice =>
         `<button type="button" class="map-ctx-item" role="menuitem" data-level="${choice.id}">${escapeHtml(choice.label)}</button>`).join('');
     }
     if (!fly.hidden) placeFly(row, fly);
-  }).catch(() => {
-    if (menuEl !== menu) return;
-    fly.innerHTML = '<div class="map-ctx-note">Không kiểm tra được cấp quy hoạch</div>';
-  });
+  };
+  const pull = () => {
+    const mine = ++ticket;
+    const rev = lotsRevision();
+    watchRev = rev;
+    planLevelsAt(latlng).then(list => {
+      if (menuEl !== menu || mine !== ticket) return;
+      if (lotsRevision() !== rev) { pull(); return; }
+      paint(list);
+    }).catch(() => {
+      if (menuEl !== menu || mine !== ticket) return;
+      fly.innerHTML = '<div class="map-ctx-note">Không kiểm tra được cấp quy hoạch</div>';
+    });
+  };
+  const onLots = () => {
+    if (menuEl !== menu || lotsRevision() === watchRev) return;
+    pull();
+  };
+  menu._onLots = onLots;
+  document.addEventListener(LOTS_PROGRESS_EVENT, onLots);
+  pull();
 }
 
 function openMenu(ev, latlng, targetMap) {

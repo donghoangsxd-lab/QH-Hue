@@ -30,6 +30,11 @@ let onChange = () => {};
 let base = '';
 let timer = null;
 let seq = 0;
+let lotsRev = 0;
+let catalogInflight = null;
+let wardTask = null;
+export const lotsRevision = () => lotsRev;
+function bumpLots() { lotsRev += 1; }
 const force = new Set();
 const cache = new Map();
 const netCache = new Map();
@@ -460,6 +465,11 @@ async function fetchEntry(entry) {
 
 async function ensureWard(always = false) {
   if (ward.loaded || (!always && !wantsWard())) return;
+  if (!wardTask) wardTask = loadWard().finally(() => { wardTask = null; });
+  await wardTask;
+}
+
+async function loadWard() {
   const res = await fetch(geeApi('action=getWardParcels'));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
@@ -484,6 +494,7 @@ async function pool(list, n, fn) {
 }
 
 export function composeNow() {
+  bumpLots();
   const next = new Map(ward.loaded && wardLotsOn() ? ward.map : []);
   const lands = ward.loaded && wardLandsOn() ? ward.lands.slice() : [];
   const infra = [];
@@ -595,27 +606,53 @@ export async function infraLotOf(id, tenQH, phases = ['QH', 'HT']) {
  * Lô quy hoạch (giai đoạn QH) trong khung bbox [w, s, e, n]: file các đồ án có ranh tổng giao khung + lô QH theo phường.
  * Mặc định bỏ đồ án đang ẩn hoặc đã tắt lớp sử dụng đất QH. includeHidden: vẫn lấy (bảng thửa khi lớp QH chưa bật).
  * level: chỉ đồ án cấp đó (planLevelOf: QHC / QHPK / QHCT). Chỉ tải / đọc bộ nhớ đệm, không đổi lớp đang vẽ.
- * → { projects: [{ tenQH, bbox, lots }], wardLots }
+ * at: [lng, lat]. Khung bao danh mục không phủ điểm nhưng ranh đồ án có phủ thì vẫn tải (lô tràn khỏi bbox).
+ * → { projects: [{ tenQH, bbox, lots }], wardLots, missed }
  */
-export async function planLotsIn(bbox, { level = null, includeHidden = false } = {}) {
-  const entries = state.projectCatalog.filter(p => p && p.tenQH && !p.sheetOnly && Array.isArray(p.bbox)
-    && (level == null || planLevelOf(p.tenQH) === level)
-    && (includeHidden || (!state.hiddenProjects.has(p.tenQH) && !isLayerHidden(p.tenQH, LOT_LAYER.QH)))
-    && p.bbox[0] <= bbox[2] && p.bbox[2] >= bbox[0] && p.bbox[1] <= bbox[3] && p.bbox[3] >= bbox[1]);
+function pointInBoundary(entry, lng, lat) {
+  const g = entry && entry.boundary;
+  if (!g || typeof turf === 'undefined') return false;
+  try {
+    return turf.booleanPointInPolygon([lng, lat], g.type === 'Feature' ? g : { type: 'Feature', properties: {}, geometry: g });
+  } catch { return false; }
+}
+
+function boxNearPoint(bbox, lng, lat) {
+  if (!Array.isArray(bbox)) return true;
+  const pad = 0.008;
+  return lng >= bbox[0] - pad && lng <= bbox[2] + pad && lat >= bbox[1] - pad && lat <= bbox[3] + pad;
+}
+
+export async function planLotsIn(bbox, { level = null, includeHidden = false, at = null } = {}) {
+  const atLng = Array.isArray(at) ? Number(at[0]) : NaN;
+  const atLat = Array.isArray(at) ? Number(at[1]) : NaN;
+  const atOk = Number.isFinite(atLng) && Number.isFinite(atLat);
+  const entries = state.projectCatalog.filter(p => {
+    if (!p || !p.tenQH || p.sheetOnly) return false;
+    if (level != null && planLevelOf(p.tenQH) !== level) return false;
+    if (!includeHidden && (state.hiddenProjects.has(p.tenQH) || isLayerHidden(p.tenQH, LOT_LAYER.QH))) return false;
+    const box = Array.isArray(p.bbox) && p.bbox[0] <= bbox[2] && p.bbox[2] >= bbox[0] && p.bbox[1] <= bbox[3] && p.bbox[3] >= bbox[1];
+    if (box) return true;
+    return atOk && boxNearPoint(p.bbox, atLng, atLat) && pointInBoundary(p, atLng, atLat);
+  });
   const projects = [];
+  let missed = 0;
   await pool(entries, 3, async (entry) => {
     try {
       const row = await loadEntry(entry);
       const lots = row.parcels.filter(p => p && p.geometry && p.phase === 'QH').map(p => ({ ...p, file: entry.tenQH }));
       if (lots.length) projects.push({ tenQH: entry.tenQH, bbox: entry.bbox, lots });
-    } catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
+    } catch (err) {
+      missed += 1;
+      console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err);
+    }
   });
   await ensureWard(true).catch(err => console.warn('Không tải lô theo phường:', err));
   const wardLots = [
     ...[...ward.map].filter(([k]) => k.startsWith('QH|')).map(([k, v]) => ({ ...v, id: k.slice(3), phase: 'QH' })),
     ...ward.lands.filter(p => p.phase === 'QH').map(p => ({ ...p, kind: 'DXF' }))
   ];
-  return { projects, wardLots };
+  return { projects, wardLots, missed };
 }
 
 // Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án).
@@ -834,7 +871,18 @@ async function fetchLinkedCatalog() {
   }
 }
 
+export function whenCatalogSettled() {
+  return catalogInflight || Promise.resolve();
+}
+
 export async function loadCatalog() {
+  if (catalogInflight) return catalogInflight;
+  const task = loadCatalogNow().finally(() => { if (catalogInflight === task) catalogInflight = null; });
+  catalogInflight = task;
+  return task;
+}
+
+async function loadCatalogNow() {
   const [res, linked] = await Promise.all([
     fetch(geeApi('action=getProjectIndex')),
     fetchLinkedCatalog()
@@ -867,4 +915,5 @@ export async function loadCatalog() {
   ward.loaded = false;
   ward.map = new Map();
   ward.lands = [];
+  bumpLots();
 }

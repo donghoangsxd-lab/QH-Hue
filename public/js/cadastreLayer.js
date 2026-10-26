@@ -25,7 +25,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { mountParcelAssign } from './parcelInfra.js';
 import { restoreInspectFocus } from './projectLayer.js';
-import { planLotsIn } from './projectFiles.js';
+import { planLotsIn, lotsRevision, whenCatalogSettled } from './projectFiles.js';
 import { planLevelOf } from './generalPlan.js';
 import { pickPlanningLot } from './qhpkOverlap.js';
 
@@ -739,7 +739,7 @@ async function showTab(id, { syncMap = true } = {}) {
 function closeDocked() {
   [map, planMap].forEach(m => {
     const cls = m?._popup?.options?.className || '';
-    if (cls === 'infra-popup' || cls === 'inspect-popup') m.closePopup();
+    if (cls === 'infra-popup' || cls === 'inspect-popup' || /\bland-lot-popup\b/.test(cls)) m.closePopup();
   });
 }
 
@@ -833,6 +833,7 @@ function pushLot(lots, seen, lot) {
 }
 
 async function collectPlanLevels(latlng) {
+  await whenCatalogSettled().catch(() => {});
   const lng = latlng.lng;
   const lat = latlng.lat;
   const pad = 0.0008;
@@ -841,7 +842,7 @@ async function collectPlanLevels(latlng) {
     qhcFeatureAt('25', latlng).catch(err => { console.warn('QHC 1/25.000:', err); return null; }),
     qhcFeatureAt('10', latlng).catch(err => { console.warn('QHC 1/10.000:', err); return null; }),
     qhctFeatureAt(latlng).catch(err => { console.warn('QHCT 1/500:', err); return null; }),
-    planLotsIn(bbox, { includeHidden: true }).catch(err => { console.warn('Lô đồ án:', err); return null; })
+    planLotsIn(bbox, { includeHidden: true, at: [lng, lat] }).catch(err => { console.warn('Lô đồ án:', err); return null; })
   ]);
   const lots = [];
   const seen = new Set();
@@ -858,21 +859,27 @@ async function collectPlanLevels(latlng) {
   if (qhpk) rows.push({ id: 'qhpk', label: PLAN_CHOICES[2].label, kind: 'dxf', lot: qhpk });
   if (qhctDxf) rows.push({ id: 'qhct', label: PLAN_CHOICES[3].label, kind: 'dxf', lot: qhctDxf });
   else if (qhct) rows.push({ id: 'qhct', label: PLAN_CHOICES[3].label, kind: 'static', feature: qhct });
-  return rows;
+  return { rows, incomplete: !pack || pack.missed > 0 };
 }
 
 /** Các cấp có lô tại điểm, từ QHC 1/25.000 tới QHCT 1/500. Cấp không có lô bị bỏ. */
 export function planLevelsAt(latlng) {
   if (!latlng) return Promise.resolve([]);
-  const key = `${latlng.lat.toFixed(5)},${latlng.lng.toFixed(5)}`;
-  if (!levelTask || levelTask.key !== key) {
-    const task = collectPlanLevels(latlng).catch(err => {
+  const rev = lotsRevision();
+  const key = `${latlng.lat.toFixed(5)},${latlng.lng.toFixed(5)}|${rev}`;
+  if (levelTask && levelTask.key === key) return levelTask.task;
+  let task;
+  task = collectPlanLevels(latlng).then(out => {
+    if (out.incomplete || lotsRevision() !== rev) {
       if (levelTask && levelTask.task === task) levelTask = null;
-      throw err;
-    });
-    levelTask = { key, task };
-  }
-  return levelTask.task;
+    }
+    return out.rows;
+  }).catch(err => {
+    if (levelTask && levelTask.task === task) levelTask = null;
+    throw err;
+  });
+  levelTask = { key, task };
+  return task;
 }
 
 function showPlanRow(row, latlng, targetMap) {

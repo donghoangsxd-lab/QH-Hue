@@ -899,7 +899,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   const watchPhoneInfo = (el) => {
     if (!el || phoneInfoSeen.has(el)) return;
     phoneInfoSeen.add(el);
-    new MutationObserver(syncPhoneInfoDock).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+    new MutationObserver(() => { syncPhoneInfoDock(); syncPlanInfoDock(); }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  };
+  // Máy tính: thửa và lô quy hoạch thế chỗ danh sách đồ án. Đóng thì danh sách cấp đang bật hiện lại.
+  let planInfoOn = false;
+  let panelBeforePlanInfo = false;
+  const planningPaneOn = () => {
+    const pane = document.getElementById('layerPaneQuyHoach');
+    return !!pane && !pane.hidden;
+  };
+  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup)');
+  const syncPlanInfoDock = () => {
+    const slot = document.getElementById('planInfoSlot');
+    const card = document.getElementById('cadParcelCard');
+    const popup = planLotPopup();
+    const host = document.getElementById('mapArea');
+    const cadOn = !!(card && !card.hidden);
+    const on = !PHONE_INFO.matches && planningPaneOn() && !!slot && (cadOn || !!popup);
+    const park = (el) => { if (el && host && el.parentElement !== host) host.appendChild(el); };
+    if (on) {
+      if (!planInfoOn) {
+        planInfoOn = true;
+        panelBeforePlanInfo = document.body.classList.contains('right-collapsed');
+        if (panelBeforePlanInfo) setRightPanelCollapsed(false);
+      }
+      document.body.classList.add('plan-info-open');
+      slot.hidden = false;
+      if (cadOn && card.parentElement !== slot) slot.appendChild(card);
+      else if (!cadOn) park(card);
+      if (popup && popup.parentElement !== slot) slot.appendChild(popup);
+      return;
+    }
+    if (!planInfoOn && !document.body.classList.contains('plan-info-open')) return;
+    planInfoOn = false;
+    document.body.classList.remove('plan-info-open');
+    if (slot) {
+      [...slot.children].forEach(park);
+      slot.hidden = true;
+    }
+    if (panelBeforePlanInfo) setRightPanelCollapsed(true);
+    panelBeforePlanInfo = false;
   };
   const mapHost = document.getElementById('mapArea');
   if (mapHost) {
@@ -907,11 +946,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       watchPhoneInfo(document.getElementById('projectBrief'));
       watchPhoneInfo(document.getElementById('cadParcelCard'));
       syncPhoneInfoDock();
+      syncPlanInfoDock();
     }).observe(mapHost, { childList: true });
     watchPhoneInfo(document.getElementById('projectBrief'));
     watchPhoneInfo(document.getElementById('cadParcelCard'));
   }
-  PHONE_INFO.addEventListener('change', syncPhoneInfoDock);
+  const planSlot = document.getElementById('planInfoSlot');
+  if (planSlot) new MutationObserver(syncPlanInfoDock).observe(planSlot, { childList: true });
+  const planPane = document.getElementById('layerPaneQuyHoach');
+  if (planPane) new MutationObserver(syncPlanInfoDock).observe(planPane, { attributes: true, attributeFilter: ['hidden'] });
+  document.addEventListener('qh-plan-info', syncPlanInfoDock);
+  PHONE_INFO.addEventListener('change', () => { syncPhoneInfoDock(); syncPlanInfoDock(); });
   const proposeBtn = document.getElementById('btnPropose');
   const setPropose = (on) => {
     const sheet = document.getElementById('tabAdd');
