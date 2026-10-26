@@ -49,7 +49,7 @@ Tám tab theo mã Sheet: công viên, mầm non, tiểu học, THCS, THPT, y t�
 
 ### Kiến trúc
 
-Quy chế và công trình. Không dòng phạm vi. Không chú giải.
+Quy chế và danh mục công trình. Danh mục công trình kiến trúc có giá trị trình bày như danh sách đồ án: nhóm đóng mở, dòng đánh số, ô hiện trên bản đồ, nút thông tin và nút quyết định phê duyệt. Bấm tên thì phóng tới điểm. Không dòng phạm vi. Không chú giải.
 
 ## Đổi trục
 

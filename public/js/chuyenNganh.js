@@ -1,6 +1,6 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map, focusWard, clearWardHighlight, centerOnCity } from './mapEngine.js';
+import { map, focusWard, clearWardHighlight, centerOnCity, getLeftObstruction, getRightObstruction } from './mapEngine.js';
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
@@ -87,6 +87,12 @@ let booted = false;
 let ready = false;
 let saveTimer = 0;
 let kienTruc = null;
+const archHidden = new Set();
+const archOpen = new Set();
+const archClosed = new Set();
+let archPicked = null;
+let archGroups = [];
+const archById = new Map();
 
 const icon = (id) => `<svg class="cn-ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[id] || ''}</svg>`;
 
@@ -552,17 +558,202 @@ function paintAdminList() {
   filterGp();
 }
 
+function archItems() {
+  return kienTruc?.congTrinh?.items || [];
+}
+
+function archDecision() {
+  return kienTruc?.congTrinh?.quyetDinh || null;
+}
+
+function archCite() {
+  const qd = archDecision();
+  if (!qd?.so) return '';
+  return `QĐ ${qd.so}${qd.ngay ? ` ngày ${qd.ngay}` : ''}${qd.coQuan ? ` · ${qd.coQuan}` : ''}`;
+}
+
+function archByKey(id) {
+  return archItems().find(it => it.id === id) || null;
+}
+
+function clearArchLayers() {
+  archGroups.forEach(g => g.remove());
+  archGroups = [];
+  archById.clear();
+}
+
+function archPopup(item) {
+  const bits = [item.diaChi, item.phuong, item.xepHang && item.xepHang !== 'Không' ? `Di tích ${item.xepHang}` : ''].filter(Boolean);
+  const cite = archCite();
+  return `<div class="pp"><b>${escapeHtml(item.ten || '')}</b>${bits.length ? `<br>${escapeHtml(bits.join(' · '))}` : ''}${cite ? `<br><small>${escapeHtml(cite)}</small>` : ''}</div>`;
+}
+
+function restyleArchMarkers() {
+  archById.forEach((list, id) => {
+    const picked = id === archPicked;
+    list.forEach(marker => marker.setStyle({
+      radius: picked ? 8 : 6,
+      color: picked ? '#22d3ee' : '#ffffff',
+      weight: 2,
+      fillColor: '#c2410c',
+      fillOpacity: 0.95
+    }));
+  });
+}
+
+function syncArchMarkers() {
+  clearArchLayers();
+  if (browseState().axis !== 'kientruc' || typeof L === 'undefined') return;
+  const items = archItems().filter(it => !archHidden.has(it.id));
+  hosts().forEach(m => {
+    const group = L.layerGroup();
+    items.forEach(item => {
+      const lat = Number(item.lat);
+      const lng = Number(item.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const picked = item.id === archPicked;
+      const marker = L.circleMarker([lat, lng], {
+        radius: picked ? 8 : 6,
+        color: picked ? '#22d3ee' : '#ffffff',
+        weight: 2,
+        fillColor: '#c2410c',
+        fillOpacity: 0.95
+      });
+      marker.bindTooltip(item.ten || '', { direction: 'top', opacity: 0.95 });
+      marker.bindPopup(archPopup(item), { maxWidth: 280 });
+      marker.on('click', () => revealArch(item.id));
+      const list = archById.get(item.id) || [];
+      list.push(marker);
+      archById.set(item.id, list);
+      group.addLayer(marker);
+    });
+    group.addTo(m);
+    archGroups.push(group);
+  });
+}
+
+function archDossier(item) {
+  const cite = archCite();
+  const rows = [
+    ['Địa điểm', item.diaChi],
+    ['Phường, xã', item.phuong],
+    ['Cơ quan quản lý', item.coQuan],
+    ['Quy mô', item.quyMo],
+    ['Năm xây dựng', item.namXayDung],
+    ['Chất lượng', item.chatLuong],
+    ['Xếp hạng di tích', item.xepHang],
+    ['Ghi chú', item.ghiChu],
+    ['Quyết định phê duyệt', cite]
+  ].filter(([, value]) => value);
+  return `<div class="project-dossier">${rows.map(([label, value]) => `<div class="project-dossier-row"><span class="project-dossier-label">${escapeHtml(label)}</span><span class="project-dossier-meta" title="${escapeHtml(value)}">${escapeHtml(value)}</span></div>`).join('')}</div>`;
+}
+
+function archRow(item) {
+  const on = !archHidden.has(item.id);
+  const open = archOpen.has(item.id);
+  const picked = item.id === archPicked;
+  const ward = item.phuong ? shortPlaceName(item.phuong) : '';
+  const cite = archCite();
+  const blob = [item.ten, item.diaChi, item.phuong, item.coQuan, item.xepHang, item.namXayDung, cite].filter(Boolean).join(' ');
+  const decisionTitle = cite ? `Quyết định phê duyệt: ${cite}` : 'Quyết định phê duyệt';
+  return `<div class="project-row${on ? '' : ' is-off'}${picked ? ' is-picked' : ''}" data-arch-text="${escapeHtml(blob)}">
+      <label class="project-name" title="${escapeHtml([item.ten, item.diaChi, item.phuong].filter(Boolean).join(' — '))}">
+        <input type="checkbox" data-arch="${escapeHtml(item.id)}"${on ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-arch-focus="${escapeHtml(item.id)}">${item.stt}. ${escapeHtml(item.ten || item.id)}${ward ? `<small class="layer-hint"> · ${escapeHtml(ward)}</small>` : ''}</span></label>
+      <span class="project-tools">
+        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-arch-expand="${escapeHtml(item.id)}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
+        <button type="button" class="project-btn has-decision" data-arch-qd="${escapeHtml(item.id)}" title="${escapeHtml(decisionTitle)}" aria-label="Quyết định phê duyệt">${ico('file')}</button>
+      </span>
+    </div>${open ? archDossier(item) : ''}`;
+}
+
+function revealArch(id) {
+  const item = archByKey(id);
+  if (!item) return;
+  archPicked = id;
+  if (item.nhom) archClosed.delete(item.nhom);
+  const box = document.getElementById('axisKienTruc');
+  const top = box?.scrollTop || 0;
+  paintKienTruc();
+  if (box) box.scrollTop = top;
+  const row = box?.querySelector(`[data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
+  row?.scrollIntoView({ block: 'nearest' });
+  restyleArchMarkers();
+}
+
+function focusArch(id) {
+  const item = archByKey(id);
+  if (!item) return;
+  const wasHidden = archHidden.has(id);
+  archHidden.delete(id);
+  archPicked = id;
+  if (item.nhom) archClosed.delete(item.nhom);
+  paintKienTruc();
+  if (wasHidden) syncArchMarkers();
+  else restyleArchMarkers();
+  const lat = Number(item.lat);
+  const lng = Number(item.lng);
+  const host = shownHost();
+  if (host && Number.isFinite(lat) && Number.isFinite(lng)) {
+    try {
+      const opts = { animate: true, duration: 0.8 };
+      const shift = (getLeftObstruction() - getRightObstruction()) / 2;
+      if (!shift || typeof L === 'undefined') host.flyTo([lat, lng], 17, opts);
+      else {
+        const target = host.project(L.latLng(lat, lng), 17).subtract([shift, 0]);
+        host.flyTo(host.unproject(target, 17), 17, opts);
+      }
+    } catch (err) {
+      console.warn('Không phóng tới công trình', err);
+    }
+  }
+  const marker = (archById.get(id) || []).find(layer => layer._map === host) || archById.get(id)?.[0];
+  marker?.openPopup();
+  const row = document.querySelector(`#axisKienTruc [data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
+  row?.scrollIntoView({ block: 'nearest' });
+}
+
+function showArchDecision(id) {
+  const item = id ? archByKey(id) : null;
+  if (item) archOpen.add(item.id);
+  const qd = archDecision();
+  const cite = archCite();
+  if (id) paintKienTruc();
+  if (!cite) return;
+  const detail = [cite, qd?.tieuDe, qd?.nguoiKy ? `${qd.chucVu || 'Người ký'}: ${qd.nguoiKy}` : ''].filter(Boolean).join('. ');
+  showToast(detail);
+}
+
 function paintKienTruc() {
   const box = document.getElementById('axisKienTruc');
   if (!box || browseState().axis !== 'kientruc') return;
+  const top = box.scrollTop;
   const quy = kienTruc?.quyChe?.items || [];
-  const ct = kienTruc?.congTrinh?.items || [];
+  const ct = archItems();
   const list = (items, render) => items.length ? `<ul class="axis-arch-list">${items.map(render).join('')}</ul>` : '<p class="cn-empty">Chưa có dữ liệu</p>';
   const docHref = (url) => {
     const href = typeof url === 'string' ? url.trim() : '';
     if ((href.startsWith('/') && !href.startsWith('//')) || /^https?:\/\//i.test(href)) return href;
     return '';
   };
+  const groups = kienTruc?.congTrinh?.nhom || [];
+  const cite = archCite();
+  const qd = archDecision();
+  const decisionLine = cite
+    ? `<button type="button" class="project-decision" data-arch-qd="" title="${escapeHtml([cite, qd?.tieuDe].filter(Boolean).join(' — '))}">${ico('file')}<span>${escapeHtml(cite)}</span></button>`
+    : '';
+  const groupHtml = groups.map(group => {
+    const items = ct.filter(it => it.nhom === group.id);
+    if (!items.length) return '';
+    const open = !archClosed.has(group.id);
+    return `<div class="pl-group${open ? ' open' : ''}" data-arch-group="${escapeHtml(group.id)}">
+      <div class="pl-hrow">
+        <button type="button" class="pl-head" data-arch-group-toggle="${escapeHtml(group.id)}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${escapeHtml(group.ten || '')}">
+          ${ico('chev-right')}<span>${escapeHtml(group.ten || group.id)}</span><small>${items.length}</small></button>
+      </div>
+      <div class="pl-body"${open ? '' : ' hidden'}>${items.map(archRow).join('')}</div>
+    </div>`;
+  }).join('');
+  const loose = ct.filter(it => !groups.some(group => group.id === it.nhom));
   box.innerHTML = `<section class="axis-arch"><h3>Quy chế quản lý kiến trúc</h3>${list(quy, item => {
     const name = escapeHtml(item.name || item.id || 'Quy chế');
     const title = item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : '';
@@ -570,7 +761,8 @@ function paintKienTruc() {
     const href = docHref(item.doc?.url);
     return href ? `<li><a href="${escapeHtml(href)}" target="_blank" rel="noopener">${body}</a></li>` : `<li>${body}</li>`;
   })}</section>
-    <section class="axis-arch"><h3>Công trình kiến trúc có giá trị</h3>${list(ct, item => `<li><b>${escapeHtml(item.ten || item.id || 'Công trình')}</b>${item.phuong ? `<small>${escapeHtml(item.phuong)}</small>` : ''}</li>`)}</section>`;
+    <section class="axis-arch"><h3>Danh mục công trình kiến trúc có giá trị</h3>${decisionLine}<div class="project-list">${groupHtml || (ct.length ? ct.map(archRow).join('') : '<p class="cn-empty">Chưa có dữ liệu</p>')}${loose.map(archRow).join('')}</div></section>`;
+  box.scrollTop = top;
 }
 
 function paintScopes() {
@@ -756,6 +948,22 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
+  document.querySelectorAll('#layerPaneKienTruc .project-row').forEach(el => {
+    const blob = el.getAttribute('data-arch-text') || el.textContent;
+    const hide = !!q && !foldQuery(blob).includes(q);
+    el.classList.toggle('is-filter-hide', hide);
+    const next = el.nextElementSibling;
+    if (next?.classList.contains('project-dossier')) next.classList.toggle('is-filter-hide', hide);
+  });
+  document.querySelectorAll('#layerPaneKienTruc .pl-group').forEach(group => {
+    const rows = [...group.querySelectorAll('.project-row')];
+    const any = rows.some(row => !row.classList.contains('is-filter-hide'));
+    group.classList.toggle('is-filter-hide', !!q && !any);
+    const body = group.querySelector('.pl-body');
+    if (!body) return;
+    if (q && any) body.hidden = false;
+    else if (!q) body.hidden = archClosed.has(group.dataset.archGroup || '');
+  });
   filterGp();
   const ps = document.getElementById('projectSearch');
   if (ps && ps.value !== layerQuery) {
@@ -819,6 +1027,7 @@ function paint() {
   if (axis === 'hatang') paintHaTang();
   else syncCapNuoc(false);
   if (axis === 'kientruc') paintKienTruc();
+  syncArchMarkers();
   // Tab Quy hoạch không gắn mục «Dữ liệu hiện trạng»: thửa địa chính và công trình vi phạm chỉ ở Lớp nền.
   paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
   paintBase('kientruc', 'baseKienTruc');
@@ -999,7 +1208,10 @@ async function loadKienTruc() {
   ]);
   kienTruc = { quyChe, congTrinh };
   state.kienTruc = kienTruc;
-  if (browseState().axis === 'kientruc') paintKienTruc();
+  if (browseState().axis === 'kientruc') {
+    paintKienTruc();
+    syncArchMarkers();
+  }
 }
 
 export function initChuyenNganh() {
@@ -1041,6 +1253,33 @@ export function initChuyenNganh() {
     }
     if (e.target.closest('#btnAxisAll')) {
       toggleAxisAll();
+      return;
+    }
+    const archFocus = e.target.closest('[data-arch-focus]');
+    if (archFocus) {
+      e.preventDefault();
+      focusArch(archFocus.dataset.archFocus);
+      return;
+    }
+    const archExpand = e.target.closest('[data-arch-expand]');
+    if (archExpand) {
+      const id = archExpand.dataset.archExpand;
+      if (archOpen.has(id)) archOpen.delete(id);
+      else archOpen.add(id);
+      paintKienTruc();
+      return;
+    }
+    const archQd = e.target.closest('[data-arch-qd]');
+    if (archQd) {
+      showArchDecision(archQd.dataset.archQd || '');
+      return;
+    }
+    const archGroup = e.target.closest('[data-arch-group-toggle]');
+    if (archGroup) {
+      const id = archGroup.dataset.archGroupToggle;
+      if (archClosed.has(id)) archClosed.delete(id);
+      else archClosed.add(id);
+      paintKienTruc();
       return;
     }
     const adminTab = e.target.closest('[data-admin-tab]');
@@ -1107,6 +1346,16 @@ export function initChuyenNganh() {
     }
   });
   document.getElementById('layerMain')?.addEventListener('change', (e) => {
+    const archBox = e.target.closest('[data-arch]');
+    if (archBox) {
+      const id = archBox.dataset.arch;
+      if (archBox.checked) archHidden.delete(id);
+      else archHidden.add(id);
+      archBox.closest('.project-row')?.classList.toggle('is-off', !archBox.checked);
+      syncArchMarkers();
+      paintAxisAll();
+      return;
+    }
     const layerId = e.target.closest('[data-cn-layer]')?.dataset.cnLayer;
     if (layerId) {
       const layer = getLayers().find(l => l.id === layerId);

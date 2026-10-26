@@ -165,7 +165,20 @@ assert.doesNotMatch(fs.readFileSync('public/_headers', 'utf8'), /du-thao-quy-che
 const kienTrucUi = fs.readFileSync('public/js/chuyenNganh.js', 'utf8');
 assert.match(kienTrucUi, /item\.doc\?\.url/);
 assert.match(kienTrucUi, /target="_blank" rel="noopener"/);
-assert.deepEqual(congTrinh.items, []);
+assert.equal(congTrinh.items.length, 27);
+assert.equal(congTrinh.quyetDinh.so, '1152/QĐ-UBND');
+assert.equal(congTrinh.quyetDinh.ngay, '30/5/2018');
+assert.equal(congTrinh.nhom.length, 2);
+const gaHue = congTrinh.items.find(it => it.id === 'ct-phap-12');
+assert.equal(gaHue.ten, 'Ga Huế');
+assert.equal(gaHue.nhom, 'B');
+assert.equal(gaHue.stt, 1);
+assert.equal(gaHue.lng, 107.5780361);
+assert.equal(gaHue.lat, 16.456508);
+assert.ok(congTrinh.items.every(it => it.ten && Number.isFinite(it.lng) && Number.isFinite(it.lat) && it.phuong));
+assert.match(kienTrucUi, /Danh mục công trình kiến trúc có giá trị/);
+assert.match(kienTrucUi, /data-arch-focus/);
+assert.match(kienTrucUi, /data-arch-qd/);
 assert.ok(quyChe.schema);
 assert.ok(congTrinh.schema);
 
