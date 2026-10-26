@@ -9,11 +9,11 @@
 //    - QHC 1/10.000: ranh + tên mọi đồ án QHC đang bật (kể cả ngoài vùng trung tâm). Droplist phóng khung nếu còn đồ án ngoài màn hình, không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung, mở thẳng lô.
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
-//    - QHPK 1/2.000: toàn TP chỉ ranh các đồ án; bấm ranh hoặc tick đồ án trong panel mới tải lô.
+//    - QHPK 1/2.000: ranh mọi đồ án; bấm ranh hoặc tick một đồ án trong panel mới tải lô đồ án đó.
 //      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
-//      Chọn phường: lô cả phường (chỉ tiêu panel dưới giữ nguyên).
+//      Chọn phường: vẫn chỉ ranh, lô khi tick đồ án (chỉ tiêu panel dưới giữ nguyên).
 //      Esc khi đang chọn đồ án QHPK: bỏ chọn, giữ lớp và khung nhìn, không phóng ra toàn thành phố.
-//    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), bấm đồ án → chi tiết.
+//    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), tick hoặc bấm đồ án → chi tiết.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
@@ -99,9 +99,11 @@ function onLevelChange({ level, prev, keepView }) {
     clearProjectFocus();
   }
   const ward = isCity(state.selectedWard) ? null : state.selectedWard;
+  if (prev !== level && !keepFocus && (level === 'qhpk' || level === 'qhct' || level === 'qhc10')) {
+    state.lotProjects.clear();
+  }
   if (level === 'qhpk') {
     setQhcPlaceMode(false);
-    if (!ward) state.lotProjects.clear();
     if (!state.focusedProject) revealWardProjects(ward);
     syncEscHint();
     return;
@@ -264,7 +266,7 @@ function leaveScopeFocus(latlng) {
   syncEscHint();
 }
 
-// Thoát thông tin đồ án: về lớp gốc (Hệ thống đô thị, QHC 1/10.000) hoặc phường đang chọn / toàn TP, lô cả phường hiện lại.
+// Thoát thông tin đồ án: về lớp gốc (Hệ thống đô thị, QHC 1/10.000) hoặc phường đang chọn / toàn TP. Ranh giữ, lô không tự mở lại.
 // detail.hidden: thoát do bỏ chọn đồ án trong danh sách → đóng thông tin, không hiện lại đồ án của phường
 function onProjectExit(e) {
   const unchecked = !!e?.detail?.hidden;

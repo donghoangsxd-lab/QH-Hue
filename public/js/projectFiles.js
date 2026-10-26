@@ -1,6 +1,6 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi bấm phóng tới (đồ án đang chọn, mọi zoom),
-// khi tick đồ án ở QHPK toàn TP, khi đang chọn 1 phường và bật lớp Quy hoạch (mọi đồ án thuộc phường, mọi zoom),
-// khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn (không áp dụng QHPK toàn TP), hoặc khi bật lớp lô đã lưu (showLand).
+// khi tick đồ án QHC / QHPK / QHCT, hoặc khi bật «Đồ án đã lưu» (showLand) trong thẩm định.
+// Đang xem QHC / QHPK / QHCT thì không tải theo ngưỡng zoom hay ô «Ranh lô»: có ranh không đủ để mở nội.
 // Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
 // Đồ án linked (QHC xã) đọc GeoJSON đã có qua linkedLots, ghép từ data/qhc-xa/catalog.json.
 // Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
@@ -9,6 +9,7 @@ import { state } from './state.js';
 import { geeApi } from './api.js';
 import { planLevelOf } from './generalPlan.js';
 import { SCHEME_ALIAS } from './facetStore.js';
+import { schemeDetailOpen } from './schemeVisibility.js';
 import { getLevel } from './mapLevel.js';
 import { isLevelPair, sideOf } from './splitPair.js';
 import { planMap } from './planMap.js';
@@ -41,9 +42,13 @@ export function bindMap(fn, zoom, lotZoomFn) {
   if (lotZoomFn) lotZoom = lotZoomFn;
 }
 
-/** QHPK 1/2.000, chưa chọn phường: bản đồ chỉ ranh. Lô khi bấm ranh (focusedProject) hoặc tick đồ án (lotProjects). */
+/** QHPK 1/2.000, chưa chọn phường: ranh bấm được ở mọi zoom. Lô không theo ngưỡng zoom. */
 export function qhpkBoundaryOnly() {
   return getLevel() === 'qhpk' && state.showProjects && !wardScopeName();
+}
+
+export function schemeInteriorOn(name) {
+  return schemeDetailOpen(name, state.focusedProject, state.lotProjects, state.hiddenProjects);
 }
 
 function parcelLayerOn(zoom) {
@@ -96,20 +101,24 @@ function qhcPeerLots(name) {
   return planLevelOf(focus) === 'QHC' && planLevelOf(name) === 'QHC';
 }
 
-/** Lô của đồ án name được vẽ: phường thì mọi đồ án đang hiện; QHPK toàn TP thì đồ án bấm ranh hoặc tick panel.
- *  QHC 1/10.000: chỉ đồ án đang chọn (và các đồ án cùng lỗ tra cứu). Bỏ chọn thì không vẽ lô. */
+/** Lô của đồ án name được vẽ. QHC / QHPK / QHCT: chỉ đồ án đang chọn hoặc đang tick.
+ *  Có ranh không đủ. Chọn phường không tự mở lô mọi đồ án của phường. */
 export function projectLotsDrawn(name) {
   if (!name) return false;
-  if (!isLevelPair() && getLevel() === 'qhc10' && planLevelOf(name) === 'QHC') {
-    if (!lotShown(name)) return false;
-    return name === state.focusedProject || qhcPeerLots(name);
+  if (!isLevelPair()) {
+    const level = getLevel();
+    const kind = planLevelOf(name);
+    if (level === 'qhc10' || level === 'qhct' || level === 'qhpk') {
+      if (level === 'qhc10' && kind === 'QHC') {
+        if (!lotShown(name)) return false;
+        return name === state.focusedProject || qhcPeerLots(name);
+      }
+      if (level === 'qhct' && kind === 'QHCT') return schemeInteriorOn(name) && lotShown(name);
+      if (level === 'qhpk' && kind === 'QHPK') return schemeInteriorOn(name);
+      return false;
+    }
   }
   if (wardScopeName()) return lotShown(name);
-  if (getLevel() === 'qhct' && state.lotProjects.has(name)) return lotShown(name);
-  if (qhpkBoundaryOnly()) {
-    if (state.hiddenProjects.has(name)) return false;
-    return name === state.focusedProject || state.lotProjects.has(name);
-  }
   const map = getMap();
   if (state.showProjects && map && map.getZoom() >= minZoom) return lotShown(name);
   return name === focusedProjectName();
@@ -135,7 +144,7 @@ function wanted() {
     const want = new Set([map, planMap].map(m => ({ qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)])).filter(Boolean));
     return state.projectCatalog.filter(p => {
       if (!p || !p.tenQH || p.sheetOnly || !want.has(planLevelOf(p.tenQH))) return false;
-      if (state.hiddenProjects.has(p.tenQH)) return false;
+      if (!schemeInteriorOn(p.tenQH)) return false;
       if (!p.bbox) return true;
       return intersects(p.bbox, bounds);
     });
@@ -147,10 +156,18 @@ function wanted() {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
-    if (!isLevelPair() && getLevel() === 'qhc10' && planLevelOf(p.tenQH) === 'QHC') return qhcPeerLots(p.tenQH) && lotShown(p.tenQH);
-    if (getLevel() === 'qhct' && state.lotProjects.has(p.tenQH)) return lotShown(p.tenQH);
+    if (!isLevelPair()) {
+      const level = getLevel();
+      const kind = planLevelOf(p.tenQH);
+      if (level === 'qhc10' || level === 'qhct' || level === 'qhpk') {
+        if (state.showLand) return !p.bbox || intersects(p.bbox, bounds);
+        if (level === 'qhc10' && kind === 'QHC') return qhcPeerLots(p.tenQH) && lotShown(p.tenQH);
+        if (level === 'qhct' && kind === 'QHCT') return schemeInteriorOn(p.tenQH) && lotShown(p.tenQH);
+        if (level === 'qhpk' && kind === 'QHPK') return schemeInteriorOn(p.tenQH);
+        return false;
+      }
+    }
     if (wardName && inWard(p, wardName) && lotShown(p.tenQH)) return true;
-    if (qhpkBoundaryOnly() && !state.hiddenProjects.has(p.tenQH) && (p.tenQH === state.focusedProject || state.lotProjects.has(p.tenQH))) return true;
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && !lotShown(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;
