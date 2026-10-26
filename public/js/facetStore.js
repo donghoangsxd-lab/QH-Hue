@@ -262,8 +262,9 @@ const BASE = [
   { id: 'base-rail', base: true, sector: 'giao-thong', kind: 'hien-trang', name: 'Đường sắt hiện trạng', bind: 'chk_osmRail', axes: ['hatang'], area: { ...AREA_TP } },
   { id: 'base-water', base: true, sector: 'giao-thong', kind: 'hien-trang', name: 'Đường thủy nội địa', bind: 'chk_osmWater', axes: ['hatang'], area: { ...AREA_TP } },
   { id: 'base-cadastre', base: true, sector: '', kind: 'hien-trang', name: 'Thửa đất địa chính 2016', bind: 'chk_cadastre', axes: ['quyhoach'], area: { ...AREA_TP } },
+  // axes rỗng thành null và hiện trên mọi trục. Giữ kientruc để nhớ ô bật; panel Kiến trúc không gọi paintBase.
   { id: 'base-gba', base: true, sector: '', kind: 'hien-trang', name: 'Công trình xây dựng (GBA)', bind: 'chk_gba', axes: ['kientruc'], area: { ...AREA_TP } },
-  { id: 'base-violate', base: true, sector: '', kind: 'hien-trang', name: 'Công trình vi phạm', bind: 'chk_violate', axes: ['quyhoach', 'kientruc'], area: { ...AREA_TP } },
+  { id: 'base-violate', base: true, sector: '', kind: 'hien-trang', name: 'Công trình vi phạm', bind: 'chk_violate', axes: ['quyhoach'], area: { ...AREA_TP } },
   {
     id: 'ht-tam-giao-thong', base: true, sector: 'giao-thong', kind: 'hien-trang',
     name: 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)',

@@ -684,9 +684,24 @@ function archPhotoStrip(item) {
   return `<div class="arch-photos">${cells}</div>`;
 }
 
+function archWard(name) {
+  const s = String(name || '').trim();
+  if (s.startsWith('Phường ')) return `phường ${s.slice(7)}`;
+  if (s.startsWith('Xã ')) return `xã ${s.slice(3)}`;
+  return s;
+}
+
+function archPlace(item) {
+  const ward = archWard(item.phuong);
+  const street = String(item.diaChi || '').trim();
+  if (!ward) return street;
+  if (street.toLowerCase().includes(ward.toLowerCase())) return street;
+  return street ? `${street}, ${ward}` : ward;
+}
+
 function archDossier(item) {
   const rows = [
-    ['Địa điểm', item.diaChi],
+    ['Địa điểm', archPlace(item)],
     ['Cơ quan quản lý', item.coQuan],
     ['Quy mô', item.quyMo],
     ['Năm xây dựng', item.namXayDung],
@@ -702,14 +717,13 @@ function archRow(item) {
   const on = !archHidden.has(item.id);
   const open = archOpen.has(item.id);
   const picked = item.id === archPicked;
-  const ward = item.phuong ? shortPlaceName(item.phuong) : '';
-  const blob = [item.ten, item.diaChi, item.phuong, item.coQuan, item.xepHang, item.namXayDung, item.chatLuong, archCite()].filter(Boolean).join(' ');
+  const blob = [item.ten, archPlace(item), item.coQuan, item.xepHang, item.namXayDung, item.chatLuong, archCite()].filter(Boolean).join(' ');
   const photoBtn = archAdmin()
     ? `<label class="project-btn" title="Tải ảnh công trình, tối đa 3 ảnh, mỗi ảnh 2 MB">${ico('camera')}<input class="arch-file" type="file" accept="image/jpeg,image/png,image/webp" multiple data-arch-photo="${escapeHtml(item.id)}"></label>`
     : '';
   return `<div class="project-row${on ? '' : ' is-off'}${picked ? ' is-picked' : ''}" data-arch-text="${escapeHtml(blob)}">
-      <label class="project-name" title="${escapeHtml([item.ten, item.diaChi, item.phuong].filter(Boolean).join(' — '))}">
-        <input type="checkbox" data-arch="${escapeHtml(item.id)}"${on ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-arch-focus="${escapeHtml(item.id)}">${item.stt}. ${escapeHtml(item.ten || item.id)}${ward ? `<small class="layer-hint"> · ${escapeHtml(ward)}</small>` : ''}</span></label>
+      <label class="project-name" title="${escapeHtml([item.ten, archPlace(item)].filter(Boolean).join(' — '))}">
+        <input type="checkbox" data-arch="${escapeHtml(item.id)}"${on ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-arch-focus="${escapeHtml(item.id)}">${item.stt}. ${escapeHtml(item.ten || item.id)}</span></label>
       <span class="project-tools">
         ${photoBtn}
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-arch-expand="${escapeHtml(item.id)}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
@@ -1184,9 +1198,8 @@ function paint() {
   else syncCapNuoc(false);
   if (axis === 'kientruc') paintKienTruc();
   syncArchMarkers();
-  // Tab Quy hoạch không gắn mục «Dữ liệu hiện trạng»: thửa địa chính và công trình vi phạm chỉ ở Lớp nền.
+  // Quy hoạch và Kiến trúc không gắn mục «Dữ liệu hiện trạng». GBA và công trình vi phạm chỉ ở Lớp nền.
   paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
-  paintBase('kientruc', 'baseKienTruc');
   paintXaHoi();
   paintXahoiList();
   paintAxisAll();

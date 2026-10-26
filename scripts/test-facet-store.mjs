@@ -188,6 +188,9 @@ assert.match(kienTrucUi, /class="arch-pin/);
 assert.doesNotMatch(kienTrucUi, /data-arch-qd/);
 assert.doesNotMatch(kienTrucUi, /archPopup|marker\.bindPopup|marker\.bindTooltip/);
 assert.doesNotMatch(kienTrucUi, /Phường, xã/);
+assert.doesNotMatch(kienTrucUi, /shortPlaceName\(item\.phuong\)/);
+assert.match(kienTrucUi, /function archPlace/);
+assert.match(kienTrucUi, /\['Địa điểm', archPlace\(item\)\]/);
 assert.ok(quyChe.schema);
 assert.ok(congTrinh.schema);
 
