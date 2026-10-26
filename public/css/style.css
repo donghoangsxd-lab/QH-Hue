@@ -1321,9 +1321,6 @@ body.right-collapsed .right-panel {
 .edu-levels::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .edu-levels button { height: var(--axis-chip-h); padding: 0 6px; border: 1px solid var(--axis-chip-border); border-radius: 999px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); cursor: pointer; }
 .edu-levels button.active { border-color: var(--accent-cyan); background: var(--axis-bg-active); color: var(--axis-color); }
-.lp-axes { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, .35); }
-.lp-axes h4 { margin: 6px 0 2px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
-.lp-axes p { margin: 0; font-size: 12px; color: var(--text-main); }
 .is-filter-hide { display: none !important; }
 .layer-main-count { flex-shrink: 0; font-size: calc(var(--fs-xs) * 0.9); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .layer-main-count:empty { display: none; }
@@ -4979,19 +4976,24 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 
 /* Popup ranh đất đồ án (sheet DXF-NN): đầu = ô ký hiệu + mã lô + loại đất, 3 ô chỉ tiêu tối đa, bảng thông tin */
 .land-lot-popup .leaflet-popup-content { margin: 12px 14px 10px; }
-.land-popup { font-size: var(--fs-md); line-height: 1.35; }
-.lp-head { display: flex; align-items: center; gap: 10px; padding: 0 22px 9px 0; border-bottom: 1px solid var(--border-soft); }
+.land-popup { font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.3; }
+/* Thẻ ghim dùng cỡ --fs-sm; bảng lô trong panel giữ cỡ hàng trục. */
+.dock-card .land-popup { font-size: var(--axis-fs-row); }
+.dock-card .land-popup .lp-title { font-size: 13px; }
+.dock-card .land-popup .lp-info { font-size: 12px; }
+.dock-card .land-popup .pp-row > :first-child { white-space: nowrap; }
+.lp-head { display: flex; align-items: center; gap: 8px; padding: 0 22px 6px 0; border-bottom: 1px solid var(--border-soft); }
 .land-lot-popup.pp-editable .lp-head { padding-right: 68px; }
 .land-lot-popup.pp-collapsible .lp-head { padding-right: 46px; }
 .land-lot-popup.pp-collapsible.pp-editable .lp-head { padding-right: 94px; }
-.lp-swatch { flex: none; width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
-.lp-head-main { min-width: 0; }
-/* Mã lô + nhãn giai đoạn chung 1 hàng (mã lô ngắn), loại đất ở hàng dưới */
-.lp-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
-.lp-title { min-width: 0; color: #fff; font-size: var(--fs-xl); font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
-.land-popup .lp-title { font-size: 18px; font-weight: 700; letter-spacing: 0; line-height: 1.25; }
+.lp-swatch { flex: none; width: 22px; height: 22px; border-radius: var(--r-sm); border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+.lp-head-main { flex: 1 1 auto; min-width: 0; }
+/* Mã lô + nhãn giai đoạn một hàng; tên dài thì cắt, không xuống dòng. */
+.lp-title-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.land-popup .lp-title { font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; }
 .lp-sub { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
-.land-popup .lp-kind { margin-top: 2px; color: var(--accent-orange); font-size: 16px; font-weight: 600; line-height: 1.3; }
+.land-popup .lp-kind { margin-top: 1px; color: var(--accent-orange); font-size: 12px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lp-phase { flex: none; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
 .land-popup .lp-phase { padding: 0 6px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 .lp-phase-qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); border: 1px solid rgba(var(--orange-rgb), 0.4); }
@@ -5006,7 +5008,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info dt { color: var(--text-muted); white-space: nowrap; }
 .lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
 .lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
-.land-popup .lp-specs { margin-top: 8px; font-size: 14px; line-height: 1.35; color: var(--text-main); }
+.land-popup .lp-specs { margin-top: 6px; font-size: 12px; line-height: 1.35; color: var(--text-main); }
 .land-popup .lp-specs:empty { display: none; }
 .land-popup .lp-spec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
 .land-popup .lp-spec + .lp-spec,
@@ -5020,13 +5022,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .land-popup .lp-limit { white-space: nowrap; }
 .land-popup .lp-meta { margin-top: 8px; font-size: 12px; line-height: 1.35; }
 .land-popup .lp-meta:empty { display: none; }
-.land-popup .lp-project-row > b { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-weight: 600; }
-.land-popup .lp-project-name { min-width: 0; }
+.land-popup .lp-project-row > b { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; font-weight: 600; }
+.land-popup .lp-project-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .land-popup .lp-dossier {
-  flex: none; margin: 0; padding: 1px 6px; border: 1px solid rgba(var(--orange-rgb), 0.55);
-  border-radius: var(--r-sm); background: transparent; color: var(--accent-orange);
-  font: 600 12px/1.3 var(--font-sans); cursor: pointer;
+  flex: 0 0 22px; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; margin: 0; padding: 0; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--accent-orange); cursor: pointer;
 }
+.land-popup .lp-dossier .ico { width: 16px; height: 16px; margin: 0; }
 .land-popup .lp-dossier:hover { background: rgba(var(--orange-rgb), 0.14); }
 .land-popup .lp-actions { display: flex; align-items: stretch; gap: 6px; margin-top: 8px; }
 .land-popup .lp-actions:empty { display: none; }
@@ -6254,19 +6257,21 @@ body.project-review.la-page #projectReviewHost {
 .gba-legend i, .gba-cls i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .gba-stats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.35); font-size: 12px; }
 .gba-stats b { font-size: 12px; }
-.lot-buildup { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-size: 12px; line-height: 1.35; }
-.lot-buildup b { font-size: 12px; }
+.lot-buildup { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-family: var(--axis-font); font-size: 12px; line-height: 1.35; }
+.lot-buildup .lot-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.lot-buildup .lot-line b { font-weight: 600; }
 .lot-buildup .is-over { color: var(--accent-red); }
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }
-.lot-buildup span { white-space: normal; }
 .lot-buildup .lot-buildup-btn {
+  align-self: flex-start;
   margin-top: 0;
   min-width: 0;
-  min-height: 36px;
-  height: auto;
-  padding: 6px 8px;
-  white-space: normal;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px;
+  white-space: nowrap;
+  font-size: 12px;
   line-height: 1.3;
 }
 @media (pointer: coarse) {

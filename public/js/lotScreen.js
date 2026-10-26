@@ -1,13 +1,13 @@
 // So sánh mật độ, hệ số sử dụng đất và tầng cao thực tế với chỉ tiêu tối đa của lô.
 // Tầng cao = làm tròn (mét / 4). Chiều cao GBA là ước lượng, sai số khoảng ±1 tầng.
-// Số tầng công bố gắn ở lotBuildup, không nằm trong hàm thuần này.
+// Nút trên thẻ lô chỉ ghi bốn dòng khi bấm: số công trình, diện tích xây dựng, mật độ, khoảng chiều cao mét.
 
 const EPS = { '%': 0.05, 'lần': 0.005, 'tầng': 0.01 };
 
-export const LOT_BUILDUP_LABEL = 'Kiểm tra mật độ xây dựng thực tế';
+export const LOT_BUILDUP_LABEL = 'Mật độ xây dựng';
 
 export function lotBuildupButtonHtml() {
-  return `<button type="button" class="proof-btn lot-buildup-btn" data-lot-buildup-run>${LOT_BUILDUP_LABEL}</button>`;
+  return `<button type="button" class="proof-btn lot-buildup-btn" data-lot-buildup-run title="Kiểm tra mật độ xây dựng thực tế">${LOT_BUILDUP_LABEL}</button>`;
 }
 
 export function lotBuildupSlotHtml() {
@@ -46,35 +46,9 @@ function num(value, digits) {
   return n.toLocaleString('vi-VN', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 }
 
-function verdictHtml(label, actual, limit, unit, digits) {
-  const shown = Number.isFinite(actual) ? num(actual, digits) : '';
-  const cap = limit == null ? '' : num(limit, digits);
-  if (limit == null && !Number.isFinite(actual)) {
-    return `<span class="is-miss">${label}: chưa có chỉ tiêu, chưa tính được</span>`;
-  }
-  if (limit == null) {
-    return `<span class="is-miss">${label}: ${shown} ${unit}. Chưa có chỉ tiêu quy hoạch</span>`;
-  }
-  if (!Number.isFinite(actual)) {
-    return `<span class="is-miss">${label}: chưa tính được. Chỉ tiêu ≤ ${cap} ${unit}</span>`;
-  }
-  const verdict = screenVerdict(actual, limit, unit);
-  const gapUnit = unit === '%' ? 'điểm %' : unit;
-  const actualText = unit === '%' ? `${shown}%` : `${shown} ${unit}`;
-  const capText = unit === '%' ? `${cap}%` : `${cap} ${unit}`;
-  if (verdict.state === 'over') {
-    return `<span class="is-over">${label}: vượt ${num(verdict.diff, digits)} ${gapUnit} (thực tế ${actualText}, chỉ tiêu ≤ ${capText})</span>`;
-  }
-  if (verdict.diff > (EPS[unit] ?? 0.05)) {
-    return `<span class="is-ok">${label}: đạt, thấp hơn ${num(verdict.diff, digits)} ${gapUnit} (thực tế ${actualText}, chỉ tiêu ≤ ${capText})</span>`;
-  }
-  return `<span class="is-ok">${label}: đạt (thực tế ${actualText}, chỉ tiêu ≤ ${capText})</span>`;
-}
-
 /**
- * stats: { lotM2, footM2, count, maxF, meanF, gfaM2, missingHeight, heightReady, plan }
- * meanF là trung bình theo diện tích chiếm đất của các công trình đã khớp chiều cao.
- * Khi còn công trình chưa khớp chiều cao thì không kết luận hệ số và tầng cao.
+ * stats: { lotM2, footM2, count, minM, maxM }
+ * minM, maxM là mét chiều cao ảnh vệ tinh của các dấu chân trong ranh. Chưa có mét thì ghi «chưa có».
  */
 export function buildupHtml(stats) {
   const lot = Number(stats.lotM2);
@@ -82,41 +56,19 @@ export function buildupHtml(stats) {
   const count = Number(stats.count) || 0;
   const foot = Number(stats.footM2) || 0;
   const cover = lot > 0 ? (100 * foot) / lot : 0;
-  const heightReady = stats.heightReady !== false;
-  const missing = Number(stats.missingHeight) || 0;
-  const complete = heightReady && missing === 0 && (count === 0 || Number.isFinite(stats.maxF));
-  const maxF = Number.isFinite(stats.maxF) ? stats.maxF : null;
-  const meanF = Number.isFinite(stats.meanF) ? stats.meanF : null;
-  const gfa = Number(stats.gfaM2);
-  const far = complete && lot > 0 ? (Number.isFinite(gfa) ? gfa : 0) / lot : null;
-  const plan = stats.plan || null;
-  const floorLine = !heightReady
-    ? '<span class="is-miss">Tầng cao, diện tích sàn và hệ số sử dụng đất: chưa tính được vì chưa tải được chiều cao mét.</span>'
-    : (maxF == null && count > 0)
-      ? '<span class="is-miss">Chưa khớp được chiều cao nên chưa tính tầng cao, diện tích sàn và hệ số sử dụng đất.</span>'
-      : `<span>Tầng cao cao nhất ${count ? num(maxF || 0, 0) : 0} · trung bình ${count && meanF != null ? num(meanF, 1) : '0,0'}</span>
-         <span>Tổng diện tích sàn ≈ ${num(Number.isFinite(gfa) ? gfa : 0, 0)} m²</span>
-         <span>Hệ số sử dụng đất thực tế ${complete ? num(far, 2) : 'chưa đủ'} lần</span>`;
-  const compare = [
-    verdictHtml('Mật độ xây dựng', cover, planLimit(plan, 'coverage'), '%', 1),
-    complete
-      ? verdictHtml('Hệ số sử dụng đất', far, planLimit(plan, 'far'), 'lần', 2)
-      : '<span class="is-miss">Hệ số sử dụng đất: chưa kết luận vì còn công trình chưa khớp chiều cao.</span>',
-    complete
-      ? verdictHtml('Tầng cao', count ? maxF : 0, planLimit(plan, 'floors'), 'tầng', 0)
-      : '<span class="is-miss">Tầng cao: chưa kết luận vì còn công trình chưa khớp chiều cao.</span>'
+  const minM = Number(stats.minM);
+  const maxM = Number(stats.maxM);
+  let height = 'chưa có';
+  if (minM > 0 && maxM > 0) {
+    const a = Math.round(minM);
+    const b = Math.round(maxM);
+    height = a === b ? `${num(a, 0)} m` : `${num(a, 0)} – ${num(b, 0)} m`;
+  }
+  const line = (label, value) => `<span class="lot-line"><span>${label}</span><b>${value}</b></span>`;
+  return [
+    line('Số công trình trên đất', `${num(count, 0)} công trình`),
+    line('Diện tích xây dựng', `${num(Math.round(foot), 0)} m²`),
+    line('Mật độ xây dựng', `${num(cover, 1)}%`),
+    line('Chiều cao (ảnh vệ tinh)', height)
   ].join('');
-  const gap = missing > 0
-    ? `<span class="is-miss">${num(missing, 0)} công trình không khớp chiều cao, không tính vào sàn và tầng cao.</span>`
-    : '';
-  const note = heightReady
-    ? '<span class="lot-note">Chiều cao là ước lượng Global Building Atlas, đã chỉnh theo OSM hoặc số công bố ở một số nhà cao. Tầng cao ≈ mét / 4; nhà đã công bố số tầng giữ số đó. Sai số khoảng ±1 tầng, chỉ để sàng lọc.</span>'
-    : '';
-  return `<b>${LOT_BUILDUP_LABEL}</b>
-    ${compare}
-    <span>Diện tích lô ${num(lot, 0)} m² · chiếm đất ${num(foot, 0)} m² · ${num(count, 0)} công trình · mật độ ${num(cover, 1)}%</span>
-    ${floorLine}
-    ${gap}
-    <span class="lot-note">Chiếm đất là phần dấu chân cắt trong ranh lô. Sàn ≈ tổng (phần cắt × số tầng). Tầng cao trung bình theo diện tích chiếm đất.</span>
-    ${note}`;
 }

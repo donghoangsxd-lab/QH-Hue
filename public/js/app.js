@@ -908,7 +908,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pane = document.getElementById('layerPaneQuyHoach');
     return !!pane && !pane.hidden;
   };
-  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup)');
+  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup), .leaflet-popup.dock-card.infra-popup');
   const syncPlanInfoDock = () => {
     const slot = document.getElementById('planInfoSlot');
     const card = document.getElementById('cadParcelCard');

@@ -15,17 +15,17 @@ if (over.state !== 'over' || Math.abs(over.diff - 15) > 0.01) throw new Error('v
 const ok = screenVerdict(2, 3, 'tầng');
 if (ok.state !== 'ok') throw new Error('đạt');
 const html = buildupHtml({
-  lotM2: 472.7, footM2: 100, count: 1, maxF: 2, meanF: 2, gfaM2: 200, missingHeight: 0, heightReady: true,
-  plan: { coverage: 40, floors: 3, far: 2 }
+  lotM2: 472.7, footM2: 2019, count: 16, minM: 15.2, maxM: 20.4
 });
-if (!html.includes('đạt') || !html.includes('Mật độ xây dựng')) throw new Error(html);
+if (!html.includes('Số công trình trên đất') || !html.includes('16 công trình')) throw new Error(html);
+if (!html.includes('Mật độ xây dựng') || !html.includes('Diện tích xây dựng')) throw new Error(html);
+if (!html.includes('15') || !html.includes('20')) throw new Error(html);
 const partial = buildupHtml({
-  lotM2: 500, footM2: 100, count: 2, maxF: 4, meanF: 4, gfaM2: 200, missingHeight: 1, heightReady: true,
-  plan: { coverage: 40, floors: 3 }
+  lotM2: 500, footM2: 100, count: 2
 });
-if (!partial.includes('chưa kết luận')) throw new Error('thiếu chiều cao vẫn kết luận');
+if (!partial.includes('chưa có')) throw new Error('thiếu chiều cao phải ghi chưa có');
 const slot = lotBuildupSlotHtml();
-if (!slot.includes('data-lot-buildup-run') || !slot.includes('Kiểm tra mật độ xây dựng thực tế')) {
+if (!slot.includes('data-lot-buildup-run') || !slot.includes('Mật độ xây dựng')) {
   throw new Error('thẻ lô thiếu nút kiểm tra mật độ');
 }
 if (slot.includes('Đang đối chiếu')) throw new Error('nút không được tự đối chiếu');

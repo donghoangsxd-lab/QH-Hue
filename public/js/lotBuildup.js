@@ -148,6 +148,8 @@ async function measure(lotFeature, polys, heights, heightReady, zones) {
   let missingHeight = 0;
   let knownArea = 0;
   let maxF = null;
+  let minM = null;
+  let maxM = null;
   for (let i = 0; i < polys.length; i++) {
     const poly = polys[i];
     let clipped = null;
@@ -160,6 +162,10 @@ async function measure(lotFeature, polys, heights, heightReady, zones) {
     let center = null;
     try { center = turf.centroid(poly).geometry.coordinates; } catch (e) { center = null; }
     const meters = heightReady && center ? heightAt(center[0], center[1], heights) : null;
+    if (meters > 0) {
+      if (minM == null || meters < minM) minM = meters;
+      if (maxM == null || meters > maxM) maxM = meters;
+    }
     const published = center ? publishedFloors(center, turf.area(poly), zones) : null;
     const storey = published != null ? published : floorsFromHeight(meters);
     if (storey == null) {
@@ -177,7 +183,9 @@ async function measure(lotFeature, polys, heights, heightReady, zones) {
     gfaM2,
     missingHeight,
     maxF,
-    meanF: knownArea > 0 ? gfaM2 / knownArea : null
+    meanF: knownArea > 0 ? gfaM2 / knownArea : null,
+    minM,
+    maxM
   };
 }
 

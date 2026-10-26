@@ -826,10 +826,25 @@ function dxfAt(lots, lng, lat, level) {
 
 function pushLot(lots, seen, lot) {
   if (!lot || !lot.geometry) return;
-  const key = `${lot.file || ''}|${lot.phase || ''}|${lot.id || ''}`;
+  const key = `${lot.kind || ''}|${lot.file || ''}|${lot.phase || ''}|${lot.id || ''}`;
   if (lot.id && seen.has(key)) return;
   if (lot.id) seen.add(key);
   lots.push(lot);
+}
+
+// Lô nhóm hạ tầng (kind INFRA) không phải ô đất DXF, nhưng vẫn là lô của đồ án tại cấp đó.
+function infraAt(lots, lng, lat, level) {
+  let best = null;
+  let bestArea = Infinity;
+  (lots || []).forEach(lot => {
+    if (!lot || lot.kind !== 'INFRA' || !lot.geometry || !lot.file) return;
+    if (lot.phase && lot.phase !== 'QH') return;
+    if (planLevelOf(lot.file) !== level) return;
+    if (!lotContains(lot.geometry, lng, lat)) return;
+    const area = lotM2(lot);
+    if (area < bestArea) { best = lot; bestArea = area; }
+  });
+  return best;
 }
 
 async function collectPlanLevels(latlng) {
@@ -847,11 +862,14 @@ async function collectPlanLevels(latlng) {
   const lots = [];
   const seen = new Set();
   (state.landParcels || []).forEach(lot => pushLot(lots, seen, lot));
+  (state.projectInfraLots || []).forEach(lot => {
+    if (lot && lot.phase === 'QH') pushLot(lots, seen, { ...lot, kind: 'INFRA' });
+  });
   (pack?.projects || []).forEach(p => (p.lots || []).forEach(lot => pushLot(lots, seen, lot)));
   (pack?.wardLots || []).forEach(lot => pushLot(lots, seen, lot));
-  const qhcDxf = dxfAt(lots, lng, lat, 'QHC');
-  const qhpk = dxfAt(lots, lng, lat, 'QHPK');
-  const qhctDxf = dxfAt(lots, lng, lat, 'QHCT');
+  const qhcDxf = dxfAt(lots, lng, lat, 'QHC') || infraAt(lots, lng, lat, 'QHC');
+  const qhpk = dxfAt(lots, lng, lat, 'QHPK') || infraAt(lots, lng, lat, 'QHPK');
+  const qhctDxf = dxfAt(lots, lng, lat, 'QHCT') || infraAt(lots, lng, lat, 'QHCT');
   const rows = [];
   if (vision) rows.push({ id: 'qhc25', label: PLAN_CHOICES[0].label, kind: 'vision', feature: vision });
   if (qhcDxf) rows.push({ id: 'qhc10', label: PLAN_CHOICES[1].label, kind: 'dxf', lot: qhcDxf });

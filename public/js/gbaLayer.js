@@ -2,12 +2,12 @@
 // màu vẽ theo số tầng (chiều cao mét / 4) từ bldg-hf.bin. Nhà có labelFloors giữ số công bố.
 // Từ mức phóng 17, số tầng ghi trên dấu chân đủ rộng, tại điểm xa biên nhất.
 // Lưới cường độ 150 m không còn là lớp riêng. Số liệu lô / phường vẫn lấy từ agg.json.
-import { map, setLandPopupExtra } from './mapEngine.js';
+import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, FLOOR_LABEL_ZOOM, floorClassIndex, floorLabelVisible, floorsForReading, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
+import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, FLOOR_LABEL_ZOOM, floorClassIndex, floorLabelVisible, floorsForReading, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { trackWork, watchTiles } from './loadProgress.js';
@@ -726,14 +726,6 @@ function wardHtml(name) {
   return gbaStatsHtml(line, gbaWardExtra(row, { largeM2: agg.largeM2, smallM2: agg.smallM2 }));
 }
 
-function lotHtml(p) {
-  ensureAgg();
-  if (!agg || !p) return '';
-  const key = gbaLotKey(p.file, p.phase, p.id);
-  const row = agg.lots && agg.lots[key];
-  return row ? gbaStatsHtml(row) : '';
-}
-
 function lngLatOf(z, x, y, px, py, extent) {
   const n = 2 ** z;
   const gx = x + px / extent;
@@ -783,7 +775,6 @@ export function initGbaLayer() {
   if (!map) return;
   const box = $('gbaBox');
   if (box) box.innerHTML = legendHtml();
-  setLandPopupExtra(lotHtml);
   setWardGbaHtml(wardHtml);
   map.on('zoomend', paintBox);
   map.on('zoomend', refreshPartZoom);

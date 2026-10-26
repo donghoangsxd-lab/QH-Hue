@@ -1,5 +1,5 @@
 // Chuỗi và khung HTML của bảng thông tin lô. Không đụng bản đồ, không gọi mạng.
-import { escapeHtml, planItems } from './utils.js';
+import { escapeHtml, ico, planItems } from './utils.js';
 import { namesOfProject } from './projectNames.js';
 
 function fold(s) {
@@ -131,11 +131,17 @@ export function dossierButtons(entry) {
   return out;
 }
 
+const DOSSIER_ICON = { 'quy-dinh': 'book', 'phe-duyet': 'file' };
+
 export function projectValueHtml(rawName, entry) {
   const name = projectFullName(rawName);
   if (!name) return '';
-  const btns = dossierButtons(entry).map(b => `<button type="button" class="lp-dossier" data-dossier="${b.key}">${escapeHtml(b.label)}</button>`).join('');
-  return `<span class="lp-project-name">${escapeHtml(name)}</span>${btns}`;
+  const btns = dossierButtons(entry).map(b => {
+    const icon = DOSSIER_ICON[b.key] || 'file';
+    const label = escapeHtml(b.label);
+    return `<button type="button" class="lp-dossier" data-dossier="${b.key}" title="${label}" aria-label="${label}">${ico(icon)}</button>`;
+  }).join('');
+  return `<span class="lp-project-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>${btns}`;
 }
 
 export function pointToken(scenario, id) {

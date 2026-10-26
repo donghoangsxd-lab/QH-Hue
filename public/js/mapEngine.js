@@ -469,9 +469,10 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
 }
 
 // Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
-// Lô quy hoạch trên máy tính vào #planInfoSlot (thế danh sách đồ án). Còn lại ở cột trái; --brief-stack đẩy xuống dưới bảng đồ án.
+// Lô quy hoạch và lô nhóm hạ tầng trên máy tính vào #planInfoSlot (thế danh sách đồ án). Còn lại ở cột trái.
 function deskPlanSlot(el) {
-  if (!el?.classList.contains('land-lot-popup') || el.classList.contains('adj-lot-popup')) return null;
+  if (!el || el.classList.contains('adj-lot-popup')) return null;
+  if (!el.classList.contains('land-lot-popup') && !el.classList.contains('infra-popup')) return null;
   const slot = document.getElementById('planInfoSlot');
   const pane = document.getElementById('layerPaneQuyHoach');
   const phone = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches;
@@ -2193,10 +2194,6 @@ function lotActionsHtml(analyze, view3d) {
   return `<div class="lp-actions">${analyze}${view3d}</div>`;
 }
 
-let landPopupExtra = () => '';
-/** Module khác gắn thêm dòng vào thẻ lô đất (GBA), không import vòng */
-export function setLandPopupExtra(fn) { landPopupExtra = typeof fn === 'function' ? fn : () => ''; }
-
 let fillLotBuildup = () => {};
 /** Gắn nút kiểm tra mật độ. Phép tính và tải dấu chân chỉ chạy khi bấm nút. */
 export function setLotBuildup(fn) { fillLotBuildup = typeof fn === 'function' ? fn : () => {}; }
@@ -2208,64 +2205,6 @@ function ntPointVisible(p) {
   const funeral = kind === 'funeral' || kind === 'crematorium';
   const box = document.getElementById(funeral ? 'chk_nt_funeral' : 'chk_nt_grave');
   return !box || box.checked;
-}
-
-function tallyInside(list, feature, bbox) {
-  const counts = new Map();
-  for (const it of list || []) {
-    const lat = Number(it.lat);
-    const lng = Number(it.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    if (lng < bbox[0] || lng > bbox[2] || lat < bbox[1] || lat > bbox[3]) continue;
-    try {
-      if (!turf.booleanPointInPolygon([lng, lat], feature)) continue;
-    } catch (e) {
-      continue;
-    }
-    const type = layerType(it);
-    const label = type === '11-NT'
-      ? (NT_KIND_LABELS[ntKindOf(it)] || infraLabels[type] || 'Điểm')
-      : (infraLabels[type] || 'Điểm');
-    counts.set(label, (counts.get(label) || 0) + 1);
-  }
-  return counts;
-}
-
-const foldWard = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
-
-function axisCardHtml(p, opts) {
-  const ward = p.ward || 'Chưa rõ';
-  const planBits = [p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng', opts?.hideProject ? '' : p.file, landLabel(p.layer)].filter(Boolean);
-  let infra = 'Không có điểm đã tải trong ranh lô.';
-  try {
-    const feature = turf.feature(p.geometry);
-    const bbox = turf.bbox(feature);
-    const fmt = (counts) => [...counts.entries()].map(([k, v]) => `${k}: ${v}`).join('; ');
-    const parts = [];
-    const ht = tallyInside(state.rawDataList, feature, bbox);
-    const qh = tallyInside(state.planDataList, feature, bbox);
-    if (ht.size) parts.push(`Hiện trạng — ${fmt(ht)}`);
-    if (qh.size) parts.push(`Quy hoạch — ${fmt(qh)}`);
-    if (parts.length) infra = parts.join('. ');
-  } catch (e) {
-    infra = 'Không đối chiếu được điểm trong lô.';
-  }
-  const arch = state.kienTruc;
-  const items = [...(arch?.quyChe?.items || []), ...(arch?.congTrinh?.items || [])];
-  let archText = 'Chưa có dữ liệu kiến trúc.';
-  if (items.length) {
-    const key = foldWard(ward);
-    const hit = key ? items.filter(it => foldWard([it.phuong, it.khuVuc, it.name, it.ten, it.area?.code, it.area?.name].filter(Boolean).join(' ')).includes(key)) : [];
-    archText = hit.length
-      ? hit.slice(0, 6).map(it => it.ten || it.name || it.id || 'Công trình').join('; ')
-      : 'Không có công trình kiến trúc khớp phường, xã của lô.';
-  }
-  return `<section class="lp-axes" aria-label="Thông tin bốn trục">
-    <h4>Hành chính</h4><p>${escapeHtml(String(ward))}</p>
-    <h4>Quy hoạch</h4><p>${escapeHtml(planBits.join(' · ') || 'Chưa rõ')}</p>
-    <h4>Hạ tầng</h4><p>${escapeHtml(infra)}</p>
-    <h4>Kiến trúc</h4><p>${escapeHtml(archText)}</p>
-  </section>`;
 }
 
 function landPopupHtml(p, opts) {
@@ -2299,9 +2238,7 @@ function landPopupHtml(p, opts) {
     </div>
     <div class="lp-specs">${areaSpecHtml(p.area ? `${fmtNum(Math.round(p.area))} m²` : '', '', '')}${stamp}${lotStatsHtml(p.plan)}</div>
     ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
-    ${axisCardHtml(p, opts)}
     ${lotActionsHtml('', view3d)}
-    ${landPopupExtra(p)}
     ${lotBuildupSlotHtml()}
   </div>`;
 }
