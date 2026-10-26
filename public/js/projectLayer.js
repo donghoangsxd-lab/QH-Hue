@@ -10,9 +10,9 @@
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng (giao thông, cấp nước, thoát nước, cấp điện).
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
 // Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
-// Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. QHPK toàn TP (droplist, chưa chọn phường): ranh mọi đồ án QHPK,
-// bấm được ở mọi zoom; lô chỉ đồ án vừa bấm hoặc đang tick trong panel. Chọn phường: ranh các đồ án của phường,
-// lô cả phường ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
+// Mỗi đồ án một màu viền, nhãn tên ở giữa ranh. Nền polygon ranh trong suốt: nội (lô) chỉ khi tick hoặc đang mở đúng đồ án.
+// QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
+// bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn.
 // Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
 // trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
 // Lô QHC 1/10.000 (trung tâm và đồ án nhập) chỉ khi đang chọn: phủ tối ngoài ranh. Bỏ chọn thì ẩn lô và phủ tối, còn đường ranh.
@@ -39,7 +39,7 @@ import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js'
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { namesOfProject } from './projectNames.js';
-import { enabledSchemes, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
+import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
 import { getAreaFilter, onFacet } from './facetStore.js';
 import {
   STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
@@ -57,13 +57,13 @@ const GAP_M = 15;
 const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
-// Màu viền / nền do assignColors gán theo đồ án; nền mờ 10% ở mọi mức zoom.
-// nonzero: ranh có mảnh trùng nhau vẫn tô kín (evenodd mặc định khoét thành lỗ, rê / bấm bên trong không trúng)
-const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0.1, fillRule: 'nonzero' };
+// Màu viền do assignColors. fillOpacity 0: vùng trong suốt vẫn nhận chuột, không tô như lớp sử dụng đất.
+// nonzero: ranh có mảnh trùng nhau vẫn là một vùng (evenodd mặc định khoét thành lỗ, rê / bấm bên trong không trúng)
+const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0, fillRule: 'nonzero' };
 const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm
-const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0.08 };
+const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0 };
 // Họ màu theo cấp, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a) và đô thị loại I (#facc15).
 // QHC lạnh, QHPK ấm (cam / hồng), QHCT tím. Đồ án cùng cấp có khung bao giao nhau không trùng màu.
 const PALETTES = {
@@ -222,6 +222,8 @@ function loadHidden() {
     state.hiddenProjects = new Set(projects);
     state.hiddenProjectLayers = new Set(layerList);
     state.shownProjectNets = new Set(parseNameList(localStorage.getItem(SHOWN_NETS_KEY)).list);
+    // Nội đồ án không có khóa lưu. Xóa để phiên trước (hoặc mã cũ từng coi «không ẩn» là đang mở) không tô lại sau F5.
+    state.lotProjects.clear();
   } catch (e) { /* chế độ riêng tư */ }
 }
 
@@ -348,9 +350,8 @@ function setMaster(on) {
   state.showProjects = on;
 }
 
-// Bật lớp Quy hoạch đang tắt mà chỉ thêm đồ án cần hiện: đồ án QHPK chưa hiện bị ẩn trước
+// Bật lớp QHPK mà không ẩn các đồ án còn lại. Ẩn cả nhóm là lỗi cũ (storageSchema phiên 0).
 function enableMaster() {
-  projects.forEach(p => { if (p.level === 'QHPK' && !projectShown(p.name)) state.hiddenProjects.add(p.name); });
   setMaster(true);
 }
 
@@ -846,16 +847,15 @@ function paintEyes() {
 function setLevelShown(key, on) {
   const list = projects.filter(p => p.level === key);
   if (on) {
-    if (key === 'QHPK' && list.length && !state.showProjects) enableMaster();
+    if (key === 'QHPK' && list.length && !state.showProjects) setMaster(true);
     list.forEach(p => {
       state.hiddenProjects.delete(p.name);
-      if (key === 'QHPK') state.lotProjects.add(p.name);
+      state.lotProjects.delete(p.name);
     });
-    if (list.length) ensureFullLots();
   } else {
     list.forEach(p => {
       state.hiddenProjects.add(p.name);
-      if (key === 'QHPK') state.lotProjects.delete(p.name);
+      state.lotProjects.delete(p.name);
     });
     if (state.showProjects && projects.every(p => state.hiddenProjects.has(p.name))) setMaster(false);
   }
@@ -974,7 +974,8 @@ function wardGroups(items) {
 function rowHtml(p, idx, admin, labelNo = null) {
   const on = schemeRowOn(p);
   const qhcPick = p.level === 'QHC' && qhcSelectMode();
-  const dim = qhcPick ? state.hiddenProjects.has(p.name) : !on;
+  const detailPick = qhcPick || p.level === 'QHPK' || p.level === 'QHCT';
+  const dim = detailPick ? state.hiddenProjects.has(p.name) : !on;
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const extraN = (p.docs || []).length;
@@ -991,8 +992,10 @@ function rowHtml(p, idx, admin, labelNo = null) {
   const proposeBtn = (!admin || waiting)
     ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
     : '';
-  const boxTitle = qhcPick
-    ? 'Xem lô và phủ tối ngoài ranh. Bỏ chọn: chỉ còn đường ranh.'
+  const boxTitle = detailPick
+    ? (qhcPick
+      ? 'Xem lô và phủ tối ngoài ranh. Bỏ chọn: chỉ còn đường ranh.'
+      : 'Hiện lô trong ranh. Bỏ chọn: chỉ còn đường ranh.')
     : 'Hiện ranh, tên và lô của đồ án';
   const n = labelNo == null ? idx + 1 : labelNo;
   return `<div class="project-row${dim ? ' is-off' : ''}${p.name === pickedName ? ' is-picked' : ''}">
@@ -1870,21 +1873,22 @@ function drawOutlinesOn(m, list, below) {
   const group = L.featureGroup();
   const shapes = [];
   const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
-  // Đồ án đã hiện lô: ranh chỉ còn viền, không tô và không bắt chuột.
-  // QHPK toàn TP: đồ án vừa bấm hoặc đang tick. QHC / QHCT: đồ án đang mở (lớp QHPK tắt nên nhánh «dưới ngưỡng» luôn bật).
+  // Đồ án đã hiện lô: ranh không bắt chuột để click rơi xuống lô. Nền ranh luôn trong suốt.
   const lotsOpen = (p) => {
-    if (qhpkBoundaryOnly() && p.level === 'QHPK') return p.name === state.focusedProject || state.lotProjects.has(p.name);
-    if (p.level === 'QHCT' && state.lotProjects.has(p.name)) return true;
-    return (p.level === 'QHCT' || p.level === 'QHC') && p.name === state.focusedProject;
+    if (p.level === 'QHPK' || p.level === 'QHCT') {
+      return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
+    }
+    if (p.level === 'QHC') return p.name === state.focusedProject || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
+    return false;
   };
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = shownOutline(p);
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
-    const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color };
+    const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color, fillOpacity: 0 };
     const open = lotsOpen(p);
-    const shown = open ? { ...style, fillOpacity: 0, ...(quietOutline ? { opacity: 0 } : {}) } : style;
+    const shown = open && quietOutline ? { ...style, opacity: 0 } : style;
     // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
     if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
       const shape = L.geoJSON(geom, { style: shown, interactive: false });
@@ -1905,8 +1909,8 @@ function drawOutlinesOn(m, list, below) {
     group.addLayer(shape);
   });
   group.addTo(m);
-  // Có lô đang vẽ (từ ngưỡng, hoặc đồ án đang chọn): nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16 và không chặn
-  // click vào lô; đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới
+  // Ranh đang mở lô không bắt chuột và nằm dưới lô để không che ký hiệu TT16.
+  // Đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới.
   shapes.reverse().forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
   updateGlow(m);
@@ -1939,10 +1943,10 @@ function qhcSelectMode() {
   return !isLevelPair() && getLevel() === 'qhc10';
 }
 
-// QHC 1/10.000: ô tick = đang xem lô và phủ tối, không phải ẩn cả ranh. Tra cứu nhiều đồ án thì các đồ án cùng lỗ cũng bật.
+// Ô tick của QHC / QHPK / QHCT = đang xem lô, không phải «ranh đang bật». Ranh bật khi tên không nằm trong hiddenProjects.
+// Tra cứu nhiều đồ án QHC thì các đồ án cùng lỗ cũng bật.
 function schemeRowOn(p) {
-  const selected = !isLevelPair() && levelKeyOf(getLevel());
-  if (p.level === 'QHC' && selected === 'QHC') {
+  if (p.level === 'QHC' && qhcSelectMode()) {
     if (state.hiddenProjects.has(p.name)) return false;
     if (state.focusedProject === p.name) return true;
     if (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject)) {
@@ -1951,8 +1955,8 @@ function schemeRowOn(p) {
     }
     return false;
   }
-  if ((selected && p.level === selected) || (qhpkBoundaryOnly() && p.level === 'QHPK')) {
-    return !state.hiddenProjects.has(p.name);
+  if (p.level === 'QHPK' || p.level === 'QHCT') {
+    return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
   }
   return projectShown(p.name);
 }
@@ -2131,14 +2135,27 @@ function dropSchemeFromFocus(name) {
   if (wasPeer && still) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: state.focusedProject }));
 }
 
-// QHPK toàn TP: tick hiện lại ranh và lô (bỏ chọn đã ghi đồ án vào danh sách ẩn)
-function pickProjectLots(p) {
-  state.hiddenProjects.delete(p.name);
-  saveHidden();
+// Tick một đồ án QHPK / QHCT: hiện lô đồ án đó, không phóng khung, không ẩn đồ án khác.
+function openSchemeDetail(p) {
+  if (state.hiddenProjects.delete(p.name)) saveHidden();
   state.lotProjects.add(p.name);
-  if (!state.showProjects) enableMaster();
+  if (p.level === 'QHPK') {
+    if (!state.showProjects) setMaster(true);
+  } else if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
   ensureFullLots();
   refreshAll();
+}
+
+// Bỏ tick: tắt lô, giữ đường ranh. Không ghi qh_hidden_projects.
+function closeSchemeDetail(p) {
+  const focused = p.name === focusName || p.name === state.focusedProject;
+  state.lotProjects.delete(p.name);
+  dropSchemeFromFocus(p.name);
+  if (focused) {
+    document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: true } }));
+  }
+  refreshAll();
+  drawFocus();
 }
 
 // ============================ XÓA ĐỒ ÁN ============================
@@ -2409,12 +2426,13 @@ export function initProjectLayer(opts = {}) {
     if (!p) return;
     if (box.checked) {
       if (qhcSelectMode() && p.level === 'QHC') { selectQhcScheme(p); return; }
-      if (qhpkBoundaryOnly() && p.level === 'QHPK') pickProjectLots(p);
-      else showProject(p);
+      if (p.level === 'QHPK' || p.level === 'QHCT') { openSchemeDetail(p); return; }
+      showProject(p);
       return;
     }
-    // QHC 1/10.000: bỏ tick chỉ tắt lô và phủ tối, đường ranh giữ nguyên.
+    // QHC 1/10.000, QHPK, QHCT: bỏ tick chỉ tắt lô. Đường ranh giữ nguyên, không ghi danh sách ẩn.
     if (qhcSelectMode() && p.level === 'QHC') { unselectQhcScheme(p); return; }
+    if (p.level === 'QHPK' || p.level === 'QHCT') { closeSchemeDetail(p); return; }
     // Bỏ chọn: ẩn ranh, nhãn, lô đất và lô công trình của đúng đồ án. Đồ án kia trong tra cứu nhiều đồ án giữ nguyên.
     state.hiddenProjects.add(p.name);
     dropSchemeFromFocus(p.name);

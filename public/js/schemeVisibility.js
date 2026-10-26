@@ -30,3 +30,14 @@ export function enabledSchemes(projects, level, hidden, layerOff) {
     return !!p.boundary;
   });
 }
+
+// Có ranh không phải đang mở nội thất. focused: Ten_QH đang chọn. lots: đồ án được tick.
+// hidden: ranh bị tắt (nút mắt), không phải danh sách «đang đóng chi tiết».
+export function schemeDetailOpen(name, focused, lots, hidden) {
+  if (!name) return false;
+  const hide = hidden instanceof Set ? hidden : new Set(hidden || []);
+  if (hide.has(name)) return false;
+  if (focused && name === focused) return true;
+  const open = lots instanceof Set ? lots : new Set(lots || []);
+  return open.has(name);
+}
