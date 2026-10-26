@@ -7102,3 +7102,60 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
 .cnu-note td { text-align: left; color: var(--axis-color-muted); font-variant-numeric: normal; }
 .cnu-more { margin-top: 4px; }
 .cnu-more summary { cursor: pointer; color: var(--axis-color); font-weight: 700; font-size: var(--axis-fs-chip); }
+
+/* Điện thoại: bảng đồ án và một lô nằm trong panel. Danh sách trục ẩn, chỉ còn Chú giải, bản đồ phía trên vẫn thấy. */
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
+  body.phone-info-dock .right-panel { display: flex !important; }
+  body.phone-info-dock:not(.right-collapsed) .axis-dock { display: none !important; }
+  body.phone-info-dock.right-collapsed .axis-dock { display: flex !important; }
+  body.phone-info-dock .rp-body,
+  body.phone-info-dock .urban-focus-bar,
+  body.phone-info-dock .ovd-card,
+  body.phone-info-dock #btnDockBase,
+  body.phone-info-dock #btnDockEnv,
+  body.phone-info-dock #btnDockCollapse,
+  body.phone-info-dock #axisBaseFold,
+  body.phone-info-dock #axisEnvFold { display: none !important; }
+  body.phone-info-dock #legendFold,
+  body.phone-info-dock #rpDock.is-collapsed > #legendFold { display: flex !important; }
+  body.phone-info-dock .phone-info-slot {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 54%;
+    min-height: 0;
+    overflow: auto;
+  }
+  body.phone-info-dock .rp-dock,
+  body.phone-info-dock #rpDock.is-collapsed {
+    flex: 1 1 46%;
+    height: auto;
+    max-height: 46%;
+  }
+  body.phone-info-dock .phone-info-slot .project-brief,
+  body.phone-info-dock .phone-info-slot .cad-card {
+    position: static !important;
+    inset: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0;
+    flex: 0 0 auto;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none !important;
+  }
+}
+@media (max-width: 840px) and (min-height: 501px) {
+  body.phone-info-dock .right-panel {
+    height: min(50dvh, calc(100dvh - var(--info-top) - 8px));
+    max-height: min(50dvh, calc(100dvh - var(--info-top) - 8px));
+  }
+}
+@media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
+  body.phone-info-dock .right-panel { height: auto; max-height: none; }
+}

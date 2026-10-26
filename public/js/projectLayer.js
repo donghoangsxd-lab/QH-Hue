@@ -1702,6 +1702,7 @@ function setHover(m, name) {
   if ((hovered.get(m) || null) === (name || null)) return;
   if (name) hovered.set(m, name); else hovered.delete(m);
   updateGlow(m);
+  applyOverlapHatch(m);
 }
 
 function pinGlow(p) {
@@ -1923,6 +1924,7 @@ function shownOutline(p) {
 }
 
 // Sọc 45° vẽ trên canvas theo pixel màn hình. Pattern SVG bị kéo theo hệ tọa độ lớp nên không còn sọc đều.
+// Chỉ sọc của đồ án đang rê ranh hoặc đồ án đang chọn; không tô mọi giao trong khung nhìn.
 const OVERLAP_PANE = 'qhpkOverlapPane';
 const HATCH_STEP = 8;
 const overlapByMap = new Map();
@@ -2033,8 +2035,36 @@ function clearOverlapTip() {
 function clearOverlaps(m) {
   overlapGen.set(m, (overlapGen.get(m) || 0) + 1);
   overlapByMap.delete(m);
+  overlapShownName.delete(m);
   hatchLayers.get(m)?.setRows([]);
   if (overlapTipMap === m) clearOverlapTip();
+}
+
+function overlapFocusName(m) {
+  return hovered.get(m) || state.focusedProject || '';
+}
+
+function shownOverlapRows(m) {
+  const rows = overlapByMap.get(m);
+  const name = overlapFocusName(m);
+  if (!rows || !rows.length || !name) return [];
+  return rows.filter(row => row.names && row.names.includes(name));
+}
+
+const overlapShownName = new Map();
+
+function applyOverlapHatch(m) {
+  const name = overlapFocusName(m);
+  if ((overlapShownName.get(m) || '') !== name) {
+    overlapShownName.set(m, name);
+    if (overlapTipMap === m) clearOverlapTip();
+  }
+  const shown = shownOverlapRows(m);
+  if (!shown.length) {
+    hatchLayers.get(m)?.setRows([]);
+    return;
+  }
+  ensureHatch(m).setRows(shown);
 }
 
 function polyOf(hit) {
@@ -2090,8 +2120,8 @@ function ensureHatch(m) {
 }
 
 function syncOverlapTip(m, latlng) {
-  const rows = overlapByMap.get(m);
-  if (!rows || !rows.length || typeof turf === 'undefined') {
+  const rows = shownOverlapRows(m);
+  if (!rows.length || typeof turf === 'undefined') {
     if (overlapTipMap === m) clearOverlapTip();
     return;
   }
@@ -2142,7 +2172,7 @@ function paintQhpkOverlaps(m, list) {
   }
   if (!rows.length) return;
   overlapByMap.set(m, rows);
-  ensureHatch(m).setRows(rows);
+  applyOverlapHatch(m);
 }
 
 function drawOutlinesOn(m, list, below) {

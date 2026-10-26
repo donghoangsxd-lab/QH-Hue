@@ -840,6 +840,79 @@ document.addEventListener('DOMContentLoaded', async () => {
   const setRightPanelCollapsed = (collapsed) => {
     document.body.classList.toggle('right-collapsed', collapsed);
   };
+  // Điện thoại: bảng đồ án / một lô vào panel, danh sách trục nhường chỗ, chỉ còn Chú giải.
+  const PHONE_INFO = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
+  const phoneInfoSeen = new WeakSet();
+  let phoneInfoOn = false;
+  let panelBeforePhoneInfo = false;
+  let dockBeforePhoneInfo = null;
+  const phoneInfoOpen = (id) => {
+    const el = document.getElementById(id);
+    return !!(el && !el.hidden);
+  };
+  const parkPhoneInfo = (el) => {
+    const host = document.getElementById('mapArea');
+    if (el && host && el.parentElement !== host) host.appendChild(el);
+  };
+  const syncPhoneInfoDock = () => {
+    const brief = document.getElementById('projectBrief');
+    const lot = document.getElementById('cadParcelCard');
+    const slot = document.getElementById('phoneInfoSlot');
+    const on = PHONE_INFO.matches && (phoneInfoOpen('projectBrief') || phoneInfoOpen('cadParcelCard'));
+    if (on && slot) {
+      if (!phoneInfoOn) {
+        phoneInfoOn = true;
+        panelBeforePhoneInfo = document.body.classList.contains('right-collapsed');
+        const frame = document.getElementById('tabLegend');
+        dockBeforePhoneInfo = frame?.dataset.dock || 'legend';
+        setRightPanelCollapsed(false);
+        document.getElementById('rpDock')?.classList.remove('is-collapsed');
+        const collapseBtn = document.getElementById('btnDockCollapse');
+        if (collapseBtn) {
+          collapseBtn.setAttribute('aria-expanded', 'true');
+          collapseBtn.querySelector('use')?.setAttribute('href', '#i-chev-down');
+        }
+        if (frame) frame.dataset.dock = 'legend';
+        document.dispatchEvent(new CustomEvent('qh:legend-sync'));
+      }
+      document.body.classList.add('phone-info-dock');
+      slot.hidden = false;
+      if (brief && !brief.hidden) {
+        if (brief.parentElement !== slot) slot.appendChild(brief);
+      } else parkPhoneInfo(brief);
+      if (lot && !lot.hidden) {
+        if (lot.parentElement !== slot) slot.appendChild(lot);
+      } else parkPhoneInfo(lot);
+      return;
+    }
+    if (!phoneInfoOn && !document.body.classList.contains('phone-info-dock')) return;
+    phoneInfoOn = false;
+    document.body.classList.remove('phone-info-dock');
+    if (slot) slot.hidden = true;
+    parkPhoneInfo(brief);
+    parkPhoneInfo(lot);
+    const frame = document.getElementById('tabLegend');
+    if (frame && dockBeforePhoneInfo) frame.dataset.dock = dockBeforePhoneInfo;
+    dockBeforePhoneInfo = null;
+    document.dispatchEvent(new CustomEvent('qh:legend-sync'));
+    setRightPanelCollapsed(panelBeforePhoneInfo);
+  };
+  const watchPhoneInfo = (el) => {
+    if (!el || phoneInfoSeen.has(el)) return;
+    phoneInfoSeen.add(el);
+    new MutationObserver(syncPhoneInfoDock).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  };
+  const mapHost = document.getElementById('mapArea');
+  if (mapHost) {
+    new MutationObserver(() => {
+      watchPhoneInfo(document.getElementById('projectBrief'));
+      watchPhoneInfo(document.getElementById('cadParcelCard'));
+      syncPhoneInfoDock();
+    }).observe(mapHost, { childList: true });
+    watchPhoneInfo(document.getElementById('projectBrief'));
+    watchPhoneInfo(document.getElementById('cadParcelCard'));
+  }
+  PHONE_INFO.addEventListener('change', syncPhoneInfoDock);
   const proposeBtn = document.getElementById('btnPropose');
   const setPropose = (on) => {
     const sheet = document.getElementById('tabAdd');
