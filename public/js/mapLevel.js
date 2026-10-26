@@ -5,9 +5,9 @@
 //  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
 //  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi
-//  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; bấm ranh hoặc tick đồ án mới hiện lô.
-//                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường: lô cả phường
-//  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
+//  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; tick hoặc bấm một đồ án mới hiện lô.
+//                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường vẫn chỉ ranh.
+//  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, tick hoặc bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
 // Bốn cấp quy hoạch là một nhóm radio: bật một cấp thì tắt ba cấp kia. Nền cam là cấp đang bật.
 // Muốn xem đồ án cấp khác thì chuyển cấp, rồi bật từng đồ án trong danh sách của cấp đó.
 export const LEVELS = [

@@ -2,7 +2,7 @@
 const assert = require('assert');
 
 (async () => {
-  const { enabledSchemes, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } = await import('../public/js/schemeVisibility.js');
+  const { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } = await import('../public/js/schemeVisibility.js');
   const list = [
     { name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', boundary: { type: 'Polygon' } },
     { name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', boundary: { type: 'Polygon' } },
@@ -47,6 +47,14 @@ const assert = require('assert');
   assert.strictEqual(groupSchemesByWard({ areaType: 'dothi' }), true);
   assert.strictEqual(groupSchemesByWard({ areaType: 'xa' }), true);
   assert.strictEqual(groupSchemesByWard({ areaType: 'tdp' }), true);
+
+  const lots = new Set();
+  assert.strictEqual(schemeDetailOpen('QHPK Thanh Toàn', null, lots, new Set()), false);
+  assert.strictEqual(schemeDetailOpen('QHPK Thanh Toàn', 'QHPK Thanh Toàn', lots, new Set()), true);
+  lots.add('QHPK Thanh Toàn');
+  assert.strictEqual(schemeDetailOpen('QHPK Thanh Toàn', null, lots, new Set()), true);
+  assert.strictEqual(schemeDetailOpen('QHPK Thanh Toàn', 'QHPK Thanh Toàn', lots, new Set(['QHPK Thanh Toàn'])), false);
+  assert.strictEqual(schemeDetailOpen('', null, lots, new Set()), false);
   console.log('schemeVisibility: ok');
 })().catch((err) => {
   console.error(err);

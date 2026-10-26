@@ -42,7 +42,7 @@ export const state = {
   hiddenProjects: new Set(),
   // Đồ án vừa chọn (bấm ranh / tên): lô hiện ở mọi mức zoom, không chờ ngưỡng PARCEL_MIN_ZOOM
   focusedProject: null,
-  // QHPK toàn TP: tên đồ án được tick trong panel để vẽ lô (không lưu; droplist QHPK xóa tập này)
+  // Đồ án được tick để vẽ lô (QHC / QHPK / QHCT). Không ghi localStorage.
   lotProjects: new Set(),
   // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage)
   hiddenProjectLayers: new Set(),

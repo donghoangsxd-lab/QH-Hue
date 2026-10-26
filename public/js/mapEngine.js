@@ -25,7 +25,7 @@ import {
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, onViewChange, onPlanBoundariesPainted,
   getViewMode, setViewMode, passToolClick, shownMaps, alignPlanView
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf } from './generalPlan.js';
 import { touchPrimary } from './touchGroups.js';
@@ -1662,8 +1662,13 @@ function bindNameTip(layer, p) {
 // khi bật "Lô hạ tầng trong đồ án", còn lại vẽ cùng marker theo 14 nhóm.
 // Lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô theo lớp công trình"
 function parcelShown(project, file) {
-  if (state.showProjects && file && state.showProjectInfra && state.projectInfraFiles.has(file) && lotShown(file)) return false;
-  if (state.showProjects && project) return lotShown(project);
+  const level = getLevel();
+  const detailScale = level === 'qhpk' || level === 'qhct' || level === 'qhc10';
+  if (file && state.showProjectInfra && state.projectInfraFiles.has(file) && projectLotsDrawn(file)) return false;
+  if (project && (state.showProjects || detailScale)) {
+    if (detailScale) return projectLotsDrawn(project);
+    return lotShown(project);
+  }
   return state.showParcels;
 }
 
@@ -2698,7 +2703,7 @@ function redrawLands() {
       }
       const level = PLAN_SIDE[side];
       if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawLandsOn(m, [], []); return; }
-      const match = (p) => p.phase === 'QH' && planLevelOf(p.file) === level && !state.hiddenProjects.has(p.file);
+      const match = (p) => p.phase === 'QH' && planLevelOf(p.file) === level && schemeInteriorOn(p.file);
       drawLandsOn(m, landAll.filter(match), state.showProjectInfra ? infraAll.filter(match) : []);
     };
     paint(map);
@@ -2798,7 +2803,7 @@ function redrawNets() {
       }
       const level = PLAN_SIDE[side];
       if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawNetsOn(m, []); return; }
-      drawNetsOn(m, (state.projectNets || []).filter(f => f.phase === 'QH' && planLevelOf(f.file) === level && !state.hiddenProjects.has(f.file)));
+      drawNetsOn(m, (state.projectNets || []).filter(f => f.phase === 'QH' && planLevelOf(f.file) === level && schemeInteriorOn(f.file)));
     };
     paint(map);
     paint(planMap);
