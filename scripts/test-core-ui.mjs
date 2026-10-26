@@ -256,7 +256,7 @@ assert.doesNotMatch(title, /btnMapLevel|map-title-level/);
 const ctx = read('public/js/mapContext.js');
 for (const label of [
   'Xem thông tin thửa đất',
-  'Xem thông tin quy hoạch',
+  'Xem thông tin lô đất quy hoạch',
   'Xem khả năng tiếp cận hạ tầng',
   'Xem thông tin địa điểm',
   'Đánh dấu và ghi chú',
@@ -267,6 +267,14 @@ for (const label of [
   assert.ok(ctx.includes(label), `menu chuột phải thiếu ${label}`);
 }
 assert.match(ctx, /map-ctx-menu/);
+assert.doesNotMatch(ctx, /Xem thông tin quy hoạch/);
+assert.match(read('public/js/cadastreLayer.js'), /pickPlanningLot/);
+assert.match(read('public/js/cadastreLayer.js'), /place: 'lot'/);
+assert.match(read('public/css/style.css'), /body\.plan-info-open \.right-panel/);
+assert.match(read('public/css/style.css'), /--info-card-w/);
+assert.match(read('public/js/projectLayer.js'), /paintQhpkOverlaps/);
+assert.match(read('public/js/qhpkOverlap.js'), /cần kiểm tra pháp lý theo đồ án được phê duyệt sau/);
+assert.match(read('docs/ui-spec.md'), /plan-info-open/);
 assert.doesNotMatch(ctx, /Xóa kết quả đo|Xóa phép đo/);
 
 const engine = read('public/js/mapEngine.js');
@@ -575,8 +583,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261083/);
-assert.match(html, /js\/app\.js\?v=20261083/);
+assert.match(html, /css\/style\.css\?v=20261085/);
+assert.match(html, /js\/app\.js\?v=20261085/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -628,7 +636,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261083'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261085'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -691,7 +699,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261083"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261085"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);
