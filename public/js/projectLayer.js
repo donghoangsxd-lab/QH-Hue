@@ -21,7 +21,7 @@ import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
-import { planMap, getViewMode, onCompareChange, passToolClick } from './planMap.js';
+import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
   wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
@@ -91,8 +91,6 @@ let busy = null;
 let belowZoom = null;
 let query = '';
 const outlineGroups = new Map();
-// Danh mục tới sau khi đã chọn QHC 1/10.000: phóng một lần tới các đồ án còn ngoài khung
-let qhcFrameWait = false;
 const fallbackCache = new Map();
 // Danh sách lớp đang mở: Ten_QH → { loading, error, list: projectLayersOf() }
 const expanded = new Set();
@@ -2332,53 +2330,6 @@ function redrawOutlines() {
   if (planMap) drawOutlinesOn(planMap, list, below);
 }
 
-function shownMap() {
-  if (planMap && getViewMode() === 'QH' && planMap.getContainer()?.offsetParent) return planMap;
-  return map;
-}
-
-function boundsOfLevel(levelKey) {
-  let b = null;
-  const add = (bounds) => {
-    if (!bounds || !bounds.isValid()) return;
-    b = b ? b.extend(bounds) : L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
-  };
-  schemesOnLevel(levelKey).forEach(p => add(boundsOf(p)));
-  if (levelKey === 'QHC') {
-    (state.wardLabelsList || []).forEach(w => {
-      if (!w.geometry || !isCoreWard(w.name)) return;
-      try { add(L.geoJSON(w.geometry).getBounds()); } catch (e) { /* ranh phường lỗi */ }
-    });
-  }
-  return b;
-}
-
-/** Phóng khung tới mọi đồ án đang bật của cấp nếu còn đồ án nằm ngoài màn hình. Chưa có danh mục thì hoãn một lần. */
-export function frameVisibleSchemes(levelKey) {
-  if (isLevelPair() || state.focusedProject || focusExtra) {
-    qhcFrameWait = false;
-    return false;
-  }
-  const list = schemesOnLevel(levelKey);
-  if (!list.length) {
-    if (levelKey === 'QHC') qhcFrameWait = true;
-    return false;
-  }
-  qhcFrameWait = false;
-  const m = shownMap();
-  if (!m) return false;
-  const view = m.getBounds();
-  const outside = list.some(p => {
-    const b = boundsOf(p);
-    return b && b.isValid() && !view.intersects(b);
-  });
-  if (!outside) return false;
-  const b = boundsOfLevel(levelKey);
-  if (!b || !b.isValid()) return false;
-  m.flyToBounds(b, { padding: [36, 36], duration: 0.6, maxZoom: 11 });
-  return true;
-}
-
 function refreshAll() {
   redrawOutlines();
   refreshProjectLots();
@@ -2397,7 +2348,6 @@ function rebuild() {
   redrawOutlines();
   renderList();
   projects.filter(p => expanded.has(p.name)).forEach(p => loadLayers(p));
-  if (qhcFrameWait && getLevel() === 'qhc10') frameVisibleSchemes('QHC');
 }
 
 function showProject(p) {

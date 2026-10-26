@@ -23,7 +23,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, frameVisibleSchemes } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
@@ -112,15 +112,7 @@ function onLevelChange({ level, prev, keepView }) {
   const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
   setQhcPlaceMode(place);
   if (level === 'qhc10') setCoreOpen(place);
-  // Droplist QHC 1/10.000 (keepView): không phóng vào riêng vùng trung tâm. Đồ án đang bật mà nằm ngoài khung thì phóng tới hợp ranh của chúng và vùng lõi.
-  if (level === 'qhc10' && keepView && !state.focusedProject && !inspectSync) {
-    if (frameVisibleSchemes('QHC')) {
-      setQhcPlaceMode(false);
-      setCoreOpen(false);
-    }
-    syncEscHint();
-    return;
-  }
+  // keepView (bấm QHC 1/25.000 hoặc 1/10.000): giữ nguyên khung nhìn, không phóng ra toàn thành phố.
   // Địa điểm cụ thể: giữ khung. Bấm đô thị trung tâm (không keepView) vẫn phóng tới vùng trung tâm.
   if (place || level !== 'qhc10' || state.focusedProject || keepView) {
     syncEscHint();
