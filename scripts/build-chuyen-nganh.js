@@ -49,7 +49,7 @@ const SCHEMES = [
   { slug: KCN, name: 'QHC Khu công nghiệp Phong Điền', level: 'QHC', mapid: 22880, scale: null, parent: PHONG_DIEN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN', priority: 2, gcs: 'add', area: { type: 'dothi', code: 'phong-dien' }, boundaryFile: `data/chuyen-nganh/${KCN}/sdd/quy-hoach/ranh-gioi-quy-hoach-a.geojson` },
   { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: null, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', skipLayers: true },
   { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', mapid: 23935, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } },
-  { slug: 'qhc-xa-thuong-long-3f2c4da4', name: 'QHC xã Thượng Long', level: 'QHC', mapid: 20797, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'long-quang' }, authority: 'UBND huyện Nam Đông, tỉnh Thừa Thiên Huế' }
+  { slug: 'qhc-xa-thuong-long-3f2c4da4', name: 'QHC xã Thượng Long', level: 'QHC', mapid: 20797, scale: 10000, sourceScale: 25000, homeLevel: 'QHC10', parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'long-quang' }, authority: 'UBND huyện Nam Đông, tỉnh Thừa Thiên Huế' }
 ];
 
 // Không có thư mục LOP. Bản vẽ mạng lưới đã nằm trên GCS (đồ án), chỉ ngành giao thông, quy hoạch.
@@ -497,6 +497,8 @@ function schemesDoc() {
       priority: s.priority,
       ...(s.catalogScheme ? { catalogScheme: s.catalogScheme } : {}),
       ...(s.scale != null ? { scale: s.scale } : {}),
+      ...(s.sourceScale != null ? { sourceScale: s.sourceScale } : {}),
+      ...(s.homeLevel ? { homeLevel: s.homeLevel } : {}),
       ...(s.overrideArea ? { overrideArea: s.overrideArea } : {}),
       ...(s.area ? { area: s.area } : {}),
       ...(s.boundaryFile ? { boundaryFile: s.boundaryFile } : {}),
@@ -533,13 +535,13 @@ function docOf(manifest, heavy) {
   lines.push('');
   lines.push('QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.');
   lines.push('');
-  lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Thượng Long: `xa:long-quang`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.');
+  lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Thượng Long: `xa:long-quang`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương (Phú Lộc, Khe Tre, Vinh Hưng, KCN, Chân Mây) hiện ở cả hai tab QHC, rồi bị lọc theo phạm vi đang chọn. Bốn QHC xã (Thượng Long, Hương Hữu, Hương Lộc, Thượng Nhật) có `homeLevel: QHC10`: đồ án gốc ở Quy hoạch → QHC 1/10.000, trích ngành chỉ ở tab QHC 1/10.000.');
   lines.push('');
   lines.push('QHCT 1/500 nằm trong QHPK hoặc QHC cha khi xác định được (`parent`, `overrides`, `overrideArea: ranh QHCT`, priority 3). Trong ranh QHCT, QHCT được ưu tiên hơn đồ án cha. Không cắt hình cha.');
   lines.push('');
   lines.push('Lô đất hạ tầng (ghép danh sách hạ tầng trên Sheet): luôn ghi lô QHCT và ghép với dòng Sheet — sát ranh thửa thật hơn. Lô QHPK đã ghép trước đó chỉ gỡ ghép (đổi mã INFRA thành DXF, giữ polygon), không xóa và không từ chối lô QHCT. Mỗi lần gỡ ghi `docs/qhct-unpair.json` (mã lô QHPK, đồ án, mã lô QHCT, mã dòng hạ tầng). Chỉ mục ghép nằm ở khóa `pairings` của `public/data/su-dung-dat-index.json` (cùng file với chỉ mục lớp sử dụng đất, không ghi đè `layers`).');
   lines.push('');
-  lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. QHC xã Thượng Long (mapid 20797, 1/25.000): cơ quan UBND huyện Nam Đông, tỉnh Thừa Thiên Huế; số quyết định trên lớp ranh để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
+  lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. QHC xã Thượng Long (mapid 20797): tờ gisHue ghi tỷ lệ 1/25.000, đồ án gốc đăng ký QHC 1/10.000 (`sourceScale` 25000, `scale` 10000, `homeLevel` QHC10); cơ quan UBND huyện Nam Đông, tỉnh Thừa Thiên Huế; số quyết định trên lớp ranh để trống. Hương Hữu (20800), Hương Lộc (20799), Thượng Nhật (20805) cùng cách gắn. Không có Thượng Quảng trong repo. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
   lines.push('');
   lines.push('## Catalog');
   lines.push('');

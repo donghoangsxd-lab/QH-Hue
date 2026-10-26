@@ -72,8 +72,8 @@ assert.equal(city.cap, 'QHC25');
 assert.equal(graph.nodes.get('qhc-trung-tam').parent, CITY_QHC25_ID);
 assert.equal(graph.nodes.get('qhc-khe-tre').cap, 'QHC10');
 assert.equal(graph.nodes.get('qhc-khe-tre').parent, CITY_QHC25_ID);
-assert.equal(graph.nodes.get('qhc-xa-thuong-long-3f2c4da4').cap, 'QHC25');
-assert.equal(graph.nodes.get('qhc-xa-thuong-long-3f2c4da4').parent, null);
+assert.equal(graph.nodes.get('qhc-xa-thuong-long-3f2c4da4').cap, 'QHC10');
+assert.equal(graph.nodes.get('qhc-xa-thuong-long-3f2c4da4').parent, CITY_QHC25_ID);
 const kcn = graph.nodes.get('qhc-khu-cong-nghiep-phong-dien-f997bd2c');
 assert.equal(kcn.cap, 'QHC10');
 assert.equal(kcn.parent, CITY_QHC25_ID);
@@ -276,7 +276,7 @@ assert.equal(commitCapacityResult(refused, { schemeId: 'qhct-a', sector: 'cap-nu
 assert.equal(activeRows().some(row => row.giaTri === 99), false);
 
 const local = checksForScheme('qhc-xa-thuong-long-3f2c4da4', graph, indexCapacityRows([], graph.alias), water);
-assert.equal(local[0].reason, 'khong-phai-tran');
+assert.equal(local[0].parentId, CITY_QHC25_ID);
 assert.equal(combineChecks(local).label, 'chưa đủ dữ liệu');
 
 applyCapacityDoc(doc, { schemes });

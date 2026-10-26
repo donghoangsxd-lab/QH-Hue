@@ -19404,7 +19404,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19440,7 +19440,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19491,7 +19491,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19529,7 +19529,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19565,7 +19565,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19607,7 +19607,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19647,7 +19647,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19685,7 +19685,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19731,7 +19731,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19768,7 +19768,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19804,7 +19804,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19855,7 +19855,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-long-3f2c4da4",
       "level": "QHC",
@@ -19906,7 +19906,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -19945,7 +19945,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -19981,7 +19981,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20032,7 +20032,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20070,7 +20070,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20106,7 +20106,7 @@
     },
     {
       "sector": "cap-nuoc",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20144,7 +20144,7 @@
     },
     {
       "sector": "cap-dien",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20184,7 +20184,7 @@
     },
     {
       "sector": "cap-dien",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20227,7 +20227,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20267,7 +20267,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20306,7 +20306,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20349,7 +20349,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20391,7 +20391,7 @@
     },
     {
       "sector": "chat-thai-ran-nghia-trang",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20432,7 +20432,7 @@
     },
     {
       "sector": "chat-thai-ran-nghia-trang",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20474,7 +20474,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20512,7 +20512,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20552,7 +20552,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20590,7 +20590,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20636,7 +20636,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20673,7 +20673,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20709,7 +20709,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20747,7 +20747,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20798,7 +20798,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-huu-cb7f4149",
       "level": "QHC",
@@ -20849,7 +20849,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -20885,7 +20885,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -20936,7 +20936,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -20974,7 +20974,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21010,7 +21010,7 @@
     },
     {
       "sector": "cap-nuoc",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21048,7 +21048,7 @@
     },
     {
       "sector": "cap-dien",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21091,7 +21091,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21133,7 +21133,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21171,7 +21171,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21211,7 +21211,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21249,7 +21249,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21295,7 +21295,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21332,7 +21332,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21368,7 +21368,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21406,7 +21406,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -21457,7 +21457,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-huong-loc-1487608f",
       "level": "QHC",
@@ -23362,7 +23362,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23401,7 +23401,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23437,7 +23437,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23480,7 +23480,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23531,7 +23531,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23569,7 +23569,7 @@
     },
     {
       "sector": "giao-thong",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23605,7 +23605,7 @@
     },
     {
       "sector": "cap-nuoc",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23643,7 +23643,7 @@
     },
     {
       "sector": "cap-dien",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23683,7 +23683,7 @@
     },
     {
       "sector": "cap-dien",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23726,7 +23726,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23765,7 +23765,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23805,7 +23805,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23848,7 +23848,7 @@
     },
     {
       "sector": "san-nen-thoat-mua",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23890,7 +23890,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23928,7 +23928,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "hien-trang",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -23968,7 +23968,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -24006,7 +24006,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -24052,7 +24052,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -24089,7 +24089,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -24125,7 +24125,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",
@@ -24176,7 +24176,7 @@
     },
     {
       "sector": "sdd",
-      "scale": 25000,
+      "scale": 10000,
       "status": "quy-hoach",
       "scheme": "qhc-xa-thuong-nhat-550f030f",
       "level": "QHC",

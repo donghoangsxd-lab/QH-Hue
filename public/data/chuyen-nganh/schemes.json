@@ -124,12 +124,14 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
-      "scale": 25000,
+      "scale": 10000,
       "area": {
         "type": "xa",
         "code": "long-quang"
       },
-      "authority": "UBND huyện Nam Đông, tỉnh Thừa Thiên Huế"
+      "authority": "UBND huyện Nam Đông, tỉnh Thừa Thiên Huế",
+      "sourceScale": 25000,
+      "homeLevel": "QHC10"
     },
     {
       "slug": "qhct-tdc-phu-my-khu-c-7bfa4d26",
@@ -290,12 +292,14 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
-      "scale": 25000,
+      "scale": 10000,
       "area": {
         "type": "xa",
         "code": "nam-dong"
       },
-      "authority": "UBND huyện Nam Đông"
+      "authority": "UBND huyện Nam Đông",
+      "sourceScale": 25000,
+      "homeLevel": "QHC10"
     },
     {
       "slug": "qhc-xa-huong-loc-1487608f",
@@ -305,12 +309,14 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
-      "scale": 25000,
+      "scale": 10000,
       "area": {
         "type": "xa",
         "code": "nam-dong"
       },
-      "authority": "UBND huyện Nam Đông"
+      "authority": "UBND huyện Nam Đông",
+      "sourceScale": 25000,
+      "homeLevel": "QHC10"
     },
     {
       "slug": "qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe",
@@ -337,12 +343,14 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
-      "scale": 25000,
+      "scale": 10000,
       "area": {
         "type": "xa",
         "code": "nam-dong"
       },
-      "authority": "UBND huyện Nam Đông"
+      "authority": "UBND huyện Nam Đông",
+      "sourceScale": 25000,
+      "homeLevel": "QHC10"
     }
   ]
 }

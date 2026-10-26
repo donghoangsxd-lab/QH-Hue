@@ -289,4 +289,16 @@ assert.equal(coast.some(s => s.slug === 'qhc-khe-tre'), false);
 assert.ok(coast.some(s => s.slug === 'qhc-hue-2045'));
 setAreaFilter({ ...AREA_TP }, 'user', { url: false });
 
+const xaSlugs = [
+  'qhc-xa-thuong-long-3f2c4da4',
+  'qhc-xa-huong-huu-cb7f4149',
+  'qhc-xa-huong-loc-1487608f',
+  'qhc-xa-thuong-nhat-550f030f'
+];
+for (const slug of xaSlugs) {
+  assert.ok(schemesForSector('giao-thong', 'QHC10', []).some(s => s.slug === slug), `QHC10 ${slug}`);
+  assert.equal(schemesForSector('giao-thong', 'QHC25', []).some(s => s.slug === slug), false, `QHC25 ${slug}`);
+}
+assert.ok(schemesForSector('giao-thong', 'QHC25', []).some(s => s.slug === 'qhc-tt-phu-loc-19e96a86'));
+
 console.log('facet store ok');
