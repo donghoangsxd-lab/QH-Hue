@@ -307,6 +307,10 @@ const kienTrucPdfHits = new Map();
 function checkKienTrucPdfRate(req) {
   checkRate(kienTrucPdfHits, req, 8, 60 * 60 * 1000, 'Mỗi máy chỉ ghi được 8 quy chế mỗi giờ');
 }
+const ctPhapHits = new Map();
+function checkCtPhapRate(req) {
+  checkRate(ctPhapHits, req, 90, 60 * 60 * 1000, 'Mỗi máy chỉ ghi được 90 ảnh hoặc PDF công trình mỗi giờ');
+}
 const pendingPdfHits = new Map();
 function checkPendingPdfRate(req) {
   checkRate(pendingPdfHits, req, 8, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 8 file PDF chờ duyệt mỗi giờ');
@@ -4775,6 +4779,35 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, ...saved });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được quy chế' });
+      }
+    }
+
+    if (action === 'putCtPhapTep') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      checkCtPhapRate(req);
+      const body = readJsonBody(req);
+      const kind = String(body.kind || '');
+      try {
+        let tep;
+        if (kind === 'pdf') {
+          const staged = stagedTokenOf(body);
+          let buffer = null;
+          if (!staged) {
+            try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
+            catch (err) { return sendInlinePdfError(res, err); }
+          }
+          tep = await projects.saveCtPhapPdf({ fileName: body.name, buffer, stagedToken: staged });
+        } else if (kind === 'anh') {
+          tep = await projects.saveCtPhapAnh({ id: body.id, slot: body.slot, fileName: body.name, image: body.image });
+        } else if (kind === 'xoa') {
+          tep = await projects.removeCtPhapAnh({ id: body.id, slot: body.slot });
+        } else {
+          return res.status(400).json({ error: true, message: 'Không rõ loại tệp' });
+        }
+        return res.status(200).json({ success: true, tep });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được tệp công trình' });
       }
     }
 

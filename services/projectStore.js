@@ -2906,6 +2906,141 @@ async function saveKienTrucPdf({ unitKey, fileName, buffer, stagedToken }) {
   return { name: decisionFileName(fileName), bytes, url: `${publicUrl(dest)}?v=${Date.now()}`, via };
 }
 
+const CT_PHAP_ID = /^ct-phap-(0[1-9]|1\d|2[0-7])$/;
+const CT_PHAP_PDF = 'kien-truc/ct-phap/qd-1152.pdf';
+const CT_PHAP_META = 'kien-truc/ct-phap/tep.json';
+const CT_PHAP_IMG_MAX = 2 * 1024 * 1024;
+let ctPhapChain = Promise.resolve();
+
+function ctPhapLocked(fn) {
+  const run = ctPhapChain.then(fn, fn);
+  ctPhapChain = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+function ctFail(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function ctPhotoObject(id, n, ext) {
+  return `kien-truc/ct-phap/anh/${id}-${n}.${ext}`;
+}
+
+function plainFileName(raw, fallback) {
+  const base = String(raw || '').replace(/[\u0000-\u001f"\\]/g, '').trim().slice(0, 120);
+  return base || fallback;
+}
+
+function emptyCtPhap() {
+  return { v: 1, anh: {} };
+}
+
+async function readCtPhap() {
+  const stored = await readJson(CT_PHAP_META);
+  if (stored.missing || !stored.data || typeof stored.data !== 'object' || Array.isArray(stored.data)) return emptyCtPhap();
+  const data = stored.data;
+  if (!data.anh || typeof data.anh !== 'object' || Array.isArray(data.anh)) data.anh = {};
+  data.v = 1;
+  return data;
+}
+
+async function writeCtPhap(doc) {
+  await writeText(CT_PHAP_META, JSON.stringify(doc));
+  await stampShortCache(CT_PHAP_META);
+  return doc;
+}
+
+function sniffImage(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return { type: 'image/jpeg', ext: 'jpg' };
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return { type: 'image/png', ext: 'png' };
+  if (buffer.length >= 12 && buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') return { type: 'image/webp', ext: 'webp' };
+  return null;
+}
+
+function imageBuffer(raw) {
+  const clean = String(raw || '').replace(/\s+/g, '');
+  if (!clean || !/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) throw ctFail('Ảnh không hợp lệ.', 400);
+  if (clean.length > Math.ceil(CT_PHAP_IMG_MAX * 4 / 3) + 4) throw ctFail('Mỗi ảnh tối đa 2 MB.', 413);
+  const buffer = Buffer.from(clean, 'base64');
+  if (!buffer.length || buffer.length > CT_PHAP_IMG_MAX) throw ctFail('Mỗi ảnh tối đa 2 MB.', 413);
+  return buffer;
+}
+
+async function writeCtPhapImage(name, buffer, contentType) {
+  try {
+    await gcsWrite.putObject(name, buffer, contentType);
+  } catch (err) {
+    const denied = err.code === 'NO_SA' || err.status === 401 || err.status === 403;
+    if (denied) throw ctFail('Tải ảnh cần service account ghi bucket (GEE_PRIVATE_KEY, quyền roles/storage.objectAdmin trên hue-infra-data-us).', 503);
+    throw err;
+  }
+}
+
+async function saveCtPhapPdf({ fileName, buffer, stagedToken }) {
+  return ctPhapLocked(async () => {
+    let bytes = 0;
+    if (stagedToken) {
+      bytes = await takeStagedPdf(stagedToken, CT_PHAP_PDF, pdfLimits.PDF_ADMIN_MAX_BYTES);
+    } else {
+      if (!pdfOk(buffer, pdfLimits.PDF_INLINE_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_INLINE_MAX_BYTES);
+      await writeBytes(CT_PHAP_PDF, buffer, 'application/pdf');
+      bytes = buffer.length;
+    }
+    await stampShortCache(CT_PHAP_PDF);
+    const doc = await readCtPhap();
+    doc.quyetDinh = { name: decisionFileName(fileName), bytes, at: Date.now() };
+    return writeCtPhap(doc);
+  });
+}
+
+async function saveCtPhapAnh({ id, slot, fileName, image }) {
+  return ctPhapLocked(async () => {
+    const workId = String(id || '');
+    if (!CT_PHAP_ID.test(workId)) throw ctFail('Công trình không hợp lệ', 400);
+    const buffer = imageBuffer(image);
+    const kind = sniffImage(buffer);
+    if (!kind) throw ctFail('Chỉ nhận ảnh JPEG, PNG hoặc WebP.', 400);
+    const doc = await readCtPhap();
+    const list = Array.isArray(doc.anh[workId]) ? doc.anh[workId].filter(p => p && p.n >= 1 && p.n <= 3) : [];
+    let n = Number(slot);
+    if (![1, 2, 3].includes(n)) {
+      const used = new Set(list.map(p => p.n));
+      n = [1, 2, 3].find(i => !used.has(i)) || 0;
+    }
+    if (!n) throw ctFail('Mỗi công trình tối đa 3 ảnh.', 400);
+    const prev = list.find(p => p.n === n);
+    if (prev && prev.ext && prev.ext !== kind.ext) {
+      await removeName(ctPhotoObject(workId, n, prev.ext)).catch(() => {});
+    }
+    const objectName = ctPhotoObject(workId, n, kind.ext);
+    await writeCtPhapImage(objectName, buffer, kind.type);
+    await stampShortCache(objectName);
+    const next = list.filter(p => p.n !== n);
+    next.push({ n, ext: kind.ext, name: plainFileName(fileName, `anh-${n}.${kind.ext}`), bytes: buffer.length, at: Date.now() });
+    next.sort((a, b) => a.n - b.n);
+    doc.anh[workId] = next;
+    return writeCtPhap(doc);
+  });
+}
+
+async function removeCtPhapAnh({ id, slot }) {
+  return ctPhapLocked(async () => {
+    const workId = String(id || '');
+    const n = Number(slot);
+    if (!CT_PHAP_ID.test(workId) || ![1, 2, 3].includes(n)) throw ctFail('Ảnh không hợp lệ', 400);
+    const doc = await readCtPhap();
+    const list = Array.isArray(doc.anh[workId]) ? doc.anh[workId] : [];
+    const prev = list.find(p => p.n === n);
+    if (prev?.ext) await removeName(ctPhotoObject(workId, n, prev.ext)).catch(() => {});
+    const next = list.filter(p => p.n !== n);
+    if (next.length) doc.anh[workId] = next;
+    else delete doc.anh[workId];
+    return writeCtPhap(doc);
+  });
+}
+
 // Quản trị (hoặc lúc duyệt hàng chờ): bản vẽ sử dụng đất / ranh thành lớp đồ án.
 // Đồ án đã có lớp cùng vai trò trong su-dung-dat-index.json, hoặc file lô đã có polygon, thì không ghi thêm.
 async function publishSchemeDraw({ tenQH, kind, features }) {
@@ -2965,7 +3100,7 @@ async function publishSchemeDraw({ tenQH, kind, features }) {
 module.exports = {
   setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject, publishSchemeDraw,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
-  saveProjectDoc, removeProjectDoc, docRoleLabel, saveNet, saveKienTrucPdf,
+  saveProjectDoc, removeProjectDoc, docRoleLabel, saveNet, saveKienTrucPdf, saveCtPhapPdf, saveCtPhapAnh, removeCtPhapAnh,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustDraw, attachAdjustPdf, attachAdjustScan, listAdjustments, listOwnAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,

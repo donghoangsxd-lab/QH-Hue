@@ -16,6 +16,9 @@ export function cacheControlFor(name) {
   if (n === 'projects/_pdf-in' || n.startsWith('projects/_pdf-in/')) return 'private, no-store';
   if (n === 'quyet-dinh-cho.pdf' || n.endsWith('/quyet-dinh-cho.pdf')) return 'private, no-store';
   if (/^kien-truc\/[a-z0-9]+(?:-[a-z0-9]+)*\/quy-che\.pdf$/.test(n)) return INFRA_JSON;
+  // Danh mục QĐ 1152: ghi đè cùng khóa, ?v= trên URL để khỏi giữ bản cũ.
+  if (n === 'kien-truc/ct-phap/tep.json' || n === 'kien-truc/ct-phap/qd-1152.pdf') return INFRA_JSON;
+  if (/^kien-truc\/ct-phap\/anh\/ct-phap-(0[1-9]|1\d|2[0-7])-[123]\.(jpg|png|webp)$/.test(n)) return INFRA_JSON;
   if (/^docs\/[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.pdf$/.test(n)) return DOCS_PDF;
   return '';
 }

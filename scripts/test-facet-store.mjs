@@ -176,9 +176,14 @@ assert.equal(gaHue.stt, 1);
 assert.equal(gaHue.lng, 107.5780361);
 assert.equal(gaHue.lat, 16.456508);
 assert.ok(congTrinh.items.every(it => it.ten && Number.isFinite(it.lng) && Number.isFinite(it.lat) && it.phuong));
-assert.match(kienTrucUi, /Danh mục công trình kiến trúc có giá trị/);
+assert.match(kienTrucUi, /Danh mục công trình kiến trúc Pháp \(Quyết định số 1152\/QĐ-UBND\)/);
+assert.match(kienTrucUi, /data-arch-tab/);
 assert.match(kienTrucUi, /data-arch-focus/);
-assert.match(kienTrucUi, /data-arch-qd/);
+assert.match(kienTrucUi, /data-arch-photo/);
+assert.match(kienTrucUi, /class="arch-pin/);
+assert.doesNotMatch(kienTrucUi, /data-arch-qd/);
+assert.doesNotMatch(kienTrucUi, /archPopup|marker\.bindPopup|marker\.bindTooltip/);
+assert.doesNotMatch(kienTrucUi, /Phường, xã/);
 assert.ok(quyChe.schema);
 assert.ok(congTrinh.schema);
 

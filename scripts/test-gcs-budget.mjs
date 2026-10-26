@@ -22,6 +22,11 @@ assert.equal(cacheControlFor('chuyen-nganh/v1/qhc/sdd/hien-trang/a.geojson'), IM
 assert.equal(cacheControlFor('infrastructure_hue.json'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/dothi-vinh-thanh/quy-che.pdf'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/tp-tp/quy-che.pdf'), INFRA_JSON);
+assert.equal(cacheControlFor('kien-truc/ct-phap/tep.json'), INFRA_JSON);
+assert.equal(cacheControlFor('kien-truc/ct-phap/qd-1152.pdf'), INFRA_JSON);
+assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-01-1.jpg'), INFRA_JSON);
+assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-27-3.webp'), INFRA_JSON);
+assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-28-1.jpg'), '');
 assert.equal(cacheControlFor('docs/614-QD-UBND.pdf'), 'public, max-age=86400');
 assert.equal(cacheControlFor('docs/108-QD-TTg.pdf'), 'public, max-age=86400');
 assert.equal(cacheControlFor('projects/_pdf-in/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf'), 'private, no-store');
