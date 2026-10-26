@@ -35,6 +35,9 @@ for (const rel of ['../public/js/mapEngine.js', '../public/js/qhctLayer.js']) {
   if (file.includes('Đang đối chiếu dấu chân')) throw new Error(`${rel} vẫn tự đối chiếu khi mở thẻ`);
   if (!file.includes('lotBuildupSlotHtml()')) throw new Error(`${rel} thiếu nút`);
 }
+const engine = src('../public/js/mapEngine.js');
+if (!engine.includes('if (lotGeom) html += lotBuildupSlotHtml()')) throw new Error('lô hạ tầng thiếu nút mật độ');
+if (!engine.includes('if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom })')) throw new Error('lô hạ tầng không gắn phép tính mật độ');
 const attach = src('../public/js/lotBuildup.js').split('export function attachLotBuildup')[1] || '';
 const beforeClick = attach.split("addEventListener('click'")[0];
 if (beforeClick.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');

@@ -3528,6 +3528,8 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     analyze = `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="${escapeHtml(tip)}">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
   }
   html += lotActionsHtml(analyze, point3dButton(p.lat, p.lng, noZone ? 150 : itemRadius));
+  const lotGeom = parcelGeometry || parcelFor(p)?.geometry || null;
+  if (lotGeom) html += lotBuildupSlotHtml();
   if (conflicts.length) html += parcelConflictHtml(p, conflicts);
   if (isCSD && approved) {
     html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG <span class="pp-sub">(căn cứ quy hoạch)</span></div>`;
@@ -3541,6 +3543,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   html += `</div>`;
 
   const popup = openDockPopup(targetMap, 'infra-popup', html);
+  if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom });
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
   popup.getElement()?.querySelectorAll('.js-conflict-go').forEach(btn => btn.addEventListener('click', (e) => {
     L.DomEvent.stop(e);
