@@ -1580,6 +1580,20 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-meta { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .project-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-btn .ico { width: 14px; height: 14px; margin: 0; }
+/* Input file phủ đúng nút: tránh clip absolute lệch khung khiến focus tự cuộn panel thành nền đen. */
+.project-btn:has(.arch-file) { position: relative; overflow: hidden; }
+.project-btn > .arch-file {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
 .project-btn:hover:not(:disabled) { border-color: var(--border-color); background: var(--bg-hover); color: var(--accent-cyan); }
 .project-btn.danger:hover:not(:disabled) { color: var(--accent-red); border-color: rgba(var(--red-rgb), 0.5); }
 .project-btn:disabled { opacity: 0.4; cursor: wait; }
@@ -6530,10 +6544,32 @@ body.project-review.la-page #projectReviewHost {
 .arch-tab.active { background: var(--accent-orange); color: #1c1917; border-color: transparent; }
 .arch-catalog-head { display: flex; align-items: flex-start; gap: 4px; margin: 0 0 4px; }
 .arch-catalog-head h3 { flex: 1; min-width: 0; margin: 0; white-space: normal; }
-.arch-file { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
-#axisKienTruc .arch-photos { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px 22px; }
-.arch-photo { position: relative; display: inline-block; }
-.arch-photo img { display: block; width: 96px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.35); background: #1e293b; }
+/* Căn trái sát mép danh sách; tối đa 3 ảnh một hàng không bị cắt ở panel ~340px. */
+#axisKienTruc .arch-photos {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 4px;
+  margin: 2px 0 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.arch-photo {
+  position: relative;
+  flex: 0 1 96px;
+  width: 96px;
+  max-width: calc((100% - 8px) / 3);
+  min-width: 0;
+}
+.arch-photo img {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: #1e293b;
+}
 .arch-photo-del {
   position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;

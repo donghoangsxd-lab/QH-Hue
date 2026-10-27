@@ -719,7 +719,7 @@ function archRow(item) {
   const picked = item.id === archPicked;
   const blob = [item.ten, archPlace(item), item.coQuan, item.xepHang, item.namXayDung, item.chatLuong, archCite()].filter(Boolean).join(' ');
   const photoBtn = archAdmin()
-    ? `<label class="project-btn" title="Tải ảnh công trình, tối đa 3 ảnh, mỗi ảnh 2 MB">${ico('camera')}<input class="arch-file" type="file" accept="image/jpeg,image/png,image/webp" multiple data-arch-photo="${escapeHtml(item.id)}"></label>`
+    ? `<label class="project-btn" data-arch-pick="anh" title="Tải ảnh công trình, tối đa 3 ảnh, mỗi ảnh 2 MB">${ico('camera')}<input class="arch-file" type="file" accept="image/jpeg,image/png,image/webp" multiple data-arch-photo="${escapeHtml(item.id)}" tabindex="-1"></label>`
     : '';
   return `<div class="project-row${on ? '' : ' is-off'}${picked ? ' is-picked' : ''}" data-arch-text="${escapeHtml(blob)}">
       <label class="project-name" title="${escapeHtml([item.ten, archPlace(item)].filter(Boolean).join(' — '))}">
@@ -729,6 +729,70 @@ function archRow(item) {
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-arch-expand="${escapeHtml(item.id)}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
       </span>
     </div>${archPhotoStrip(item)}${open ? archDossier(item) : ''}`;
+}
+
+// Không dùng scrollIntoView: nó cuộn cả khung cha overflow:hidden và dễ kéo lệch xuống dock Lớp nền.
+let archFileScrollHold = null;
+
+function archScrollSnap() {
+  return {
+    list: document.getElementById('axisKienTruc')?.scrollTop || 0,
+    pane: document.getElementById('layerPaneKienTruc')?.scrollTop || 0,
+    base: document.getElementById('layerPaneBase')?.scrollTop || 0,
+    env: document.getElementById('layerPaneEnv')?.scrollTop || 0
+  };
+}
+
+function restoreArchScroll(snap) {
+  if (!snap) return;
+  const list = document.getElementById('axisKienTruc');
+  const pane = document.getElementById('layerPaneKienTruc');
+  const base = document.getElementById('layerPaneBase');
+  const env = document.getElementById('layerPaneEnv');
+  if (list) list.scrollTop = snap.list;
+  if (pane) pane.scrollTop = snap.pane;
+  if (base) base.scrollTop = snap.base;
+  if (env) env.scrollTop = snap.env;
+}
+
+function holdArchFileScroll() {
+  archFileScrollHold = archScrollSnap();
+}
+
+function applyArchFileScrollHold() {
+  if (!archFileScrollHold) return;
+  restoreArchScroll(archFileScrollHold);
+  requestAnimationFrame(() => restoreArchScroll(archFileScrollHold));
+}
+
+function takeArchFileScrollHold() {
+  const snap = archFileScrollHold || archScrollSnap();
+  archFileScrollHold = null;
+  return snap;
+}
+
+function isArchFilePick(el) {
+  return !!el?.closest?.('[data-arch-pick], [data-arch-photo], [data-arch-pdf-file], .arch-file');
+}
+
+function scrollArchNearest(el) {
+  if (!el) return;
+  let box = el.parentElement;
+  while (box && box !== document.body) {
+    if (box.id === 'rpDock' || box.classList?.contains('rp-dock')) return;
+    if (box.id === 'rightPanel' || box.classList?.contains('right-panel') || box.classList?.contains('rp-body')) {
+      box = box.parentElement;
+      continue;
+    }
+    const oy = getComputedStyle(box).overflowY;
+    if (box.scrollHeight > box.clientHeight + 1 && /(auto|scroll)/.test(oy)) break;
+    box = box.parentElement;
+  }
+  if (!box || box === document.body) return;
+  const b = box.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (r.top < b.top) box.scrollTop += r.top - b.top - 4;
+  else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + 4;
 }
 
 function revealArch(id) {
@@ -744,7 +808,7 @@ function revealArch(id) {
     const row = document.querySelector(`#axisKienTruc [data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
     const next = row?.nextElementSibling;
     const target = next && (next.classList.contains('arch-photos') || next.classList.contains('project-dossier')) ? next : row;
-    target?.scrollIntoView({ block: 'nearest' });
+    scrollArchNearest(target);
   };
   showInfo();
   requestAnimationFrame(showInfo);
@@ -779,14 +843,14 @@ function focusArch(id) {
     }
   }
   const row = document.querySelector(`#axisKienTruc [data-arch-focus="${CSS.escape(id)}"]`)?.closest('.project-row');
-  row?.scrollIntoView({ block: 'nearest' });
+  scrollArchNearest(row);
 }
 
 function paintKienTruc() {
   const box = document.getElementById('axisKienTruc');
   if (!box || browseState().axis !== 'kientruc') return;
   ensureArchTep();
-  const top = box.scrollTop;
+  const snap = archScrollSnap();
   const quy = kienTruc?.quyChe?.items || [];
   const ct = archItems();
   const list = (items, render) => items.length ? `<ul class="axis-arch-list">${items.map(render).join('')}</ul>` : '<p class="cn-empty">Chưa có dữ liệu</p>';
@@ -809,7 +873,7 @@ function paintKienTruc() {
     ? `<a class="project-btn has-decision" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" title="Mở PDF quyết định" aria-label="Mở PDF quyết định">${ico('file')}</a>`
     : `<span class="project-btn is-empty" title="Chưa có file PDF" aria-label="Chưa có file PDF">${ico('file')}</span>`;
   const uploadBtn = archAdmin()
-    ? `<label class="project-btn" title="Quản trị tải PDF quyết định, tối đa 10 MB">${ico('save')}<input class="arch-file" type="file" accept="application/pdf,.pdf" data-arch-pdf-file></label>`
+    ? `<label class="project-btn" data-arch-pick="pdf" title="Quản trị tải PDF quyết định, tối đa 10 MB">${ico('save')}<input class="arch-file" type="file" accept="application/pdf,.pdf" data-arch-pdf-file tabindex="-1"></label>`
     : '';
   const groupHtml = groups.map(group => {
     const items = ct.filter(it => it.nhom === group.id);
@@ -826,7 +890,7 @@ function paintKienTruc() {
   const loose = ct.filter(it => !groups.some(group => group.id === it.nhom));
   const catalog = `<section class="axis-arch"><div class="arch-catalog-head"><h3>Danh mục công trình kiến trúc Pháp (Quyết định số 1152/QĐ-UBND)</h3><span class="project-tools">${pdfBtn}${uploadBtn}</span></div><div class="project-list">${groupHtml || (ct.length ? ct.map(archRow).join('') : '<p class="cn-empty">Chưa có dữ liệu</p>')}${loose.map(archRow).join('')}</div></section>`;
   box.innerHTML = `<div class="arch-tabs" role="tablist">${tab('quyche', 'Quy chế kiến trúc')}${tab('congtrinh', 'Công trình có giá trị')}</div>${archTab === 'quyche' ? quyHtml : catalog}`;
-  box.scrollTop = top;
+  restoreArchScroll(snap);
 }
 
 function fileBase64(file) {
@@ -856,6 +920,7 @@ async function uploadArchPdf(file) {
     showToast('Chỉ nhận PDF không quá 10 MB.');
     return;
   }
+  const snap = takeArchFileScrollHold();
   try {
     const saved = await postArch({
       action: 'putCtPhapTep',
@@ -865,8 +930,11 @@ async function uploadArchPdf(file) {
     });
     if (saved.tep) archTep = saved.tep;
     paintKienTruc();
+    restoreArchScroll(snap);
+    requestAnimationFrame(() => restoreArchScroll(snap));
     showToast('Đã ghi PDF quyết định.');
   } catch (err) {
+    restoreArchScroll(snap);
     showToast(err.message || 'Không ghi được PDF');
   }
 }
@@ -881,6 +949,7 @@ async function uploadArchPhotos(id, files) {
     showToast('Mỗi công trình tối đa 3 ảnh.');
     return;
   }
+  const snap = takeArchFileScrollHold();
   let savedCount = 0;
   for (const file of list) {
     if (savedCount >= free.length) {
@@ -910,17 +979,24 @@ async function uploadArchPhotos(id, files) {
   if (savedCount) {
     archOpen.add(id);
     paintKienTruc();
+    restoreArchScroll(snap);
+    requestAnimationFrame(() => restoreArchScroll(snap));
     showToast(savedCount === 1 ? 'Đã lưu ảnh công trình.' : `Đã lưu ${savedCount} ảnh.`);
+  } else {
+    restoreArchScroll(snap);
   }
 }
 
 async function removeArchPhoto(id, slot) {
   if (!archAdmin()) return;
+  const snap = archScrollSnap();
   try {
     const saved = await postArch({ action: 'putCtPhapTep', kind: 'xoa', id, slot });
     if (saved.tep) archTep = saved.tep;
     paintKienTruc();
+    restoreArchScroll(snap);
   } catch (err) {
+    restoreArchScroll(snap);
     showToast(err.message || 'Không gỡ được ảnh');
   }
 }
@@ -1471,7 +1547,7 @@ export function initChuyenNganh() {
       }
       return;
     }
-    if (e.target.closest('[data-arch-photo], [data-arch-pdf-file]')) return;
+    if (isArchFilePick(e.target)) return;
     const photoDel = e.target.closest('[data-arch-photo-del]');
     if (photoDel) {
       const [id, slot] = String(photoDel.dataset.archPhotoDel || '').split(':');
@@ -1563,10 +1639,31 @@ export function initChuyenNganh() {
       return;
     }
   });
-  document.getElementById('layerMain')?.addEventListener('change', (e) => {
+  const layerMain = document.getElementById('layerMain');
+  // Giữ cuộn trước khi hộp thoại file mở / focus input: lúc này panel dễ bị trình duyệt kéo thành nền đen.
+  layerMain?.addEventListener('pointerdown', (e) => {
+    if (!isArchFilePick(e.target)) return;
+    holdArchFileScroll();
+  }, true);
+  layerMain?.addEventListener('focusin', (e) => {
+    if (!e.target?.classList?.contains('arch-file')) return;
+    applyArchFileScrollHold();
+  });
+  window.addEventListener('focus', () => {
+    if (!archFileScrollHold || browseState().axis !== 'kientruc') return;
+    const snap = archFileScrollHold;
+    restoreArchScroll(snap);
+    requestAnimationFrame(() => restoreArchScroll(snap));
+    // Hủy hộp thoại thì không có change: bỏ hold sau một nhịp. Đang upload thì takeArchFileScrollHold đã lấy.
+    setTimeout(() => {
+      if (archFileScrollHold === snap) archFileScrollHold = null;
+    }, 300);
+  });
+  layerMain?.addEventListener('change', (e) => {
     const pdfInput = e.target.closest('[data-arch-pdf-file]');
     if (pdfInput) {
       const file = pdfInput.files && pdfInput.files[0];
+      pdfInput.blur();
       pdfInput.value = '';
       uploadArchPdf(file);
       return;
@@ -1575,6 +1672,7 @@ export function initChuyenNganh() {
     if (photoInput) {
       const files = [...(photoInput.files || [])];
       const id = photoInput.dataset.archPhoto;
+      photoInput.blur();
       photoInput.value = '';
       uploadArchPhotos(id, files);
       return;

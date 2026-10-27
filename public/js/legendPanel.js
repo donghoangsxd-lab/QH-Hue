@@ -314,6 +314,8 @@ export function initLegendPanel() {
   });
   tabs.forEach(t => t.addEventListener('click', () => { prefer = t.dataset.legendSet; }));
   document.addEventListener('change', (e) => {
+    // File input kiến trúc không đổi chú giải; sync lúc này dễ kéo lệch cuộn panel/dock.
+    if (e.target?.type === 'file' || e.target?.closest?.('.arch-file, [data-arch-photo], [data-arch-pdf-file]')) return;
     const mirror = e.target?.dataset?.xhMirror;
     if (mirror) {
       const src = document.getElementById(mirror);
