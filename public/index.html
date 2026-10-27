@@ -513,6 +513,10 @@
             <label>Bên phải<select id="splitSideRight" aria-label="Lớp bên phải"></select></label>
           </div>
         </div>
+        <!-- Thông tin đồ án (projectBrief): gắn vào đây trên máy tính, danh sách đồ án phía dưới dịch xuống -->
+        <div id="planBriefSlot" class="plan-brief-slot" hidden></div>
+        <!-- Vùng danh sách: bảng lô quy hoạch (#planInfoSlot) phủ lên vùng này khi mở -->
+        <div id="planListPane" class="plan-list-pane">
         <div id="planInfoSlot" class="plan-info-slot" hidden></div>
         <div class="cn-tools" id="axisToolsQuyHoach"></div>
         <span class="layer-main-count" id="planTabCount" hidden title="Số đồ án đang hiện / tổng số"></span>
@@ -577,11 +581,13 @@
             <div class="qhc-stages" id="qhcStages" role="group" aria-label="Giai đoạn lô, tuyến giao thông và ranh mở rộng QHC 1/10.000" hidden></div>
           </div>
           <div class="plan-static" data-plan-static="QHCT">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: ranh, lô đất các đồ án QHCT đã nhập (tên đồ án bắt đầu bằng QHCT hoặc Quy hoạch chi tiết). Bấm ranh hoặc lô để xem chi tiết"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Đồ án QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
+            <!-- Ô lớp ẩn: bật/tắt cùng #btnAxisAll và mapLevel; không còn dòng tiêu đề trùng tab -->
+            <input type="checkbox" id="chk_qhct" hidden title="QHCT 1/500: ranh và lô các đồ án đã nhập">
           </div>
         </div>
-        </div>
-          </div>
+        </div><!-- #planListPane -->
+        </div><!-- #axisQuyHoach -->
+          </div><!-- #layerPaneQuyHoach -->
           <div class="layer-main-pane" id="layerPaneHaTang" data-main-pane="hatang" role="tabpanel" hidden>
             <div id="browseNganh"></div>
             <section class="axis-base" id="baseHaTang"></section>

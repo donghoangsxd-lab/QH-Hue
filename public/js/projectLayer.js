@@ -16,7 +16,7 @@
 // Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
 // trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
 // Lô QHC 1/10.000 (trung tâm và đồ án nhập) chỉ khi đang chọn: phủ tối ngoài ranh. Bỏ chọn thì ẩn lô và phủ tối, còn đường ranh.
-// Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
+// Nút #btnAxisAll (cuối thanh tìm) bật / tắt cả cấp đang xem; không đổi khung nhìn.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -771,11 +771,11 @@ function scrollWithin(el) {
   let box = el.parentElement;
   while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
   if (!box) return;
-  // Chừa chỗ cho tiêu đề nhóm cấp / nhóm phường đang dính đầu khung phía trên el
+  // Chừa chỗ cho tiêu đề nhóm phường đang dính đầu khung phía trên el
   let pad = 4;
   for (let g = el.parentElement; g && g !== box; g = g.parentElement) {
-    const head = g.querySelector(':scope > .pl-hrow, :scope > .pg-head');
-    if (head && (g.classList.contains('pl-group') || g.classList.contains('pg-group'))) pad += head.offsetHeight;
+    const head = g.querySelector(':scope > .pg-head');
+    if (head && g.classList.contains('pg-group')) pad += head.offsetHeight;
   }
   const scale = box.getBoundingClientRect().height / (box.offsetHeight || 1) || 1;
   const dy = (el.getBoundingClientRect().top - box.getBoundingClientRect().top) / scale;
@@ -808,6 +808,24 @@ function renderHead() {
   if (count) count.textContent = `(${shownN}/${projects.length})`;
   const search = $('projectSearch');
   if (search) search.hidden = true;
+  paintLevelCounts();
+}
+
+/** Số đồ án trên từng tab cấp: «QHPK 1/2.000 (78)». Cấp không có đồ án nhập giữ nhãn gốc. */
+function paintLevelCounts() {
+  const counts = { qhc25: 0, qhc10: 0, qhpk: 0, qhct: 0 };
+  projects.forEach(p => {
+    const id = GROUP_LEVEL[p.level];
+    if (id in counts) counts[id] += 1;
+  });
+  document.querySelectorAll('#levelPickQh [data-level]').forEach(btn => {
+    const id = btn.dataset.level;
+    const base = LIST_LEVELS.find(l => GROUP_LEVEL[l.key] === id)?.label;
+    const span = btn.querySelector('span');
+    if (!base || !span) return;
+    const n = counts[id] || 0;
+    span.textContent = n > 0 ? `${base} (${n})` : base;
+  });
 }
 
 // Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js); Hệ thống đô thị nằm ở mục Đô thị riêng
@@ -851,7 +869,7 @@ const LEVEL_CHK = { QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
 // Lớp giao thông QHC 2045 (qhc2045Layer.js) cùng nhóm cấp: nút mắt bật / tắt kèm
 const LEVEL_EXTRA_CHK = { QHC25: 'chk_gt25', QHC: 'chk_gt10' };
 
-// Nút mắt nhóm cấp (sáng = nhóm đang hiện): còn lớp / đồ án nào đang hiện thì bấm tắt hết, đang tắt hết thì bấm bật cả nhóm
+// Trạng thái «cả cấp» (nút #btnAxisAll trên trục Quy hoạch): còn lớp / đồ án đang hiện → tắt hết; đang tắt hết → bật cả cấp
 function eyeState(key) {
   const list = projects.filter(p => p.level === key);
   const chk = $(LEVEL_CHK[key]);
@@ -860,19 +878,28 @@ function eyeState(key) {
   return { on, tip, empty: !list.length && !chk };
 }
 
-function eyeHtml(key) {
-  const { on, tip, empty } = eyeState(key);
-  return `<button type="button" class="layer-eye-btn pl-eye" data-level-eye="${key}" aria-pressed="${on}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}"${empty ? ' disabled' : ''}>${ico('eye-off', 'eye-hide')}${ico('eye', 'eye-show')}</button>`;
+export function planLevelAllOn() {
+  const key = activeGroup();
+  return key ? eyeState(key).on : false;
 }
 
-// Ô lớp riêng đổi trạng thái (droplist, bấm ô) không dựng lại danh sách: chỉ cập nhật nút mắt
+export function planLevelAllTip() {
+  const key = activeGroup();
+  return key ? eyeState(key).tip : 'Bật hoặc tắt các lớp đang hiện trong nhóm này';
+}
+
+/** Bật / tắt cả lớp và đồ án của cấp đang xem. Không đổi cấp, không phóng khung nhìn. */
+export function toggleActivePlanLevel() {
+  const key = activeGroup();
+  if (!key) return;
+  const { on, empty } = eyeState(key);
+  if (empty) return;
+  setLevelShown(key, !on);
+}
+
+// Ô lớp riêng đổi trạng thái: cập nhật nút #btnAxisAll (chuyenNganh lắng nghe)
 function paintEyes() {
-  $('projectList')?.querySelectorAll('[data-level-eye]').forEach(btn => {
-    const { on, tip } = eyeState(btn.dataset.levelEye);
-    btn.setAttribute('aria-pressed', String(on));
-    btn.title = tip;
-    btn.setAttribute('aria-label', tip);
-  });
+  document.dispatchEvent(new Event('qh:axis-all-paint'));
 }
 
 function setLevelShown(key, on) {
@@ -946,10 +973,11 @@ function renderList() {
       ${open ? `<div class="pg-body">${rows(items)}</div>` : ''}
     </div>`;
   };
-  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp › (dòng lớp riêng) + nhóm phường (QHC: đồ án), nhóm phường đóng chưa dựng dòng.
-  // Thân nhóm có dòng lớp riêng luôn dựng (ẩn khi đóng) để ô lớp không rời document
+  // Đang tìm: danh sách phẳng; không tìm: nội dung cấp đang bật (lớp tĩnh + đồ án). Không hàng tiêu đề trùng tên tab.
+  // Ô lớp tĩnh luôn nằm trong thân nhóm để không rời document khi dựng lại danh sách.
   if (q) {
     box.innerHTML = migrateBtn + none + rows(visible);
+    paintLevelCounts();
     return;
   }
   // Đang xem QHC 1/10.000: nhóm QHPK chỉ giữ đồ án và nhóm phường trong vùng lõi.
@@ -969,27 +997,19 @@ function renderList() {
     const items = scoped ? all.filter(({ p }) => p.wards.some(isCoreWard)) : all;
     const fixed = !!staticOf(level.key);
     if (!fixed && !items.length && level.key !== 'QHPK') return '';
-    const open = !closedLevels.has(level.key);
     const empty = level.key === 'QHPK' && !projects.length
       ? '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>' : '';
     const scopeNote = scoped && all.length
       ? `<div class="project-scope" title="Đồ án có phường, xã thuộc vùng lõi (phạm vi QHC 1/10.000 mở rộng theo QĐ 756). Chọn lớp khác để xem toàn bộ">${ico('coverage')}<span>Trong phạm vi QHC 1/10.000: <b>${items.length}</b>/${all.length} đồ án</span></div>` : '';
-    const list = !open ? ''
-      : FLAT_LEVELS.has(level.key) ? rows(items)
-        : !byWard ? rows(flatOnce(items), true)
-          : wardGroups(items).filter(([w]) => !scoped || isCoreWard(w)).map(wardHtml).join('');
+    const list = FLAT_LEVELS.has(level.key) ? rows(items)
+      : !byWard ? rows(flatOnce(items), true)
+        : wardGroups(items).filter(([w]) => !scoped || isCoreWard(w)).map(wardHtml).join('');
     const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote + list;
-    return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
-      <div class="pl-hrow">
-        <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
-          ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>
-        ${eyeHtml(level.key)}
-      </div>
-      <div class="pl-body"${open ? '' : ' hidden'}>${body}</div>
-    </div>`;
+    return `<div class="pl-group open" data-level-group="${level.key}"><div class="pl-body">${body}</div></div>`;
   }).join('');
   mountStatic(box);
   refreshQhct();
+  paintEyes();
 }
 
 function wardGroups(items) {
@@ -2747,15 +2767,6 @@ export function initProjectLayer(opts = {}) {
   });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
-    const eye = e.target.closest('[data-level-eye]');
-    if (eye) { setLevelShown(eye.dataset.levelEye, !eyeState(eye.dataset.levelEye).on); return; }
-    const level = e.target.closest('[data-level-toggle]');
-    if (level) {
-      const key = level.dataset.levelToggle;
-      if (closedLevels.has(key)) closedLevels.delete(key); else closedLevels.add(key);
-      renderList();
-      return;
-    }
     const group = e.target.closest('[data-group-toggle]');
     if (group) {
       const ward = group.dataset.groupToggle;

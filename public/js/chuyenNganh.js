@@ -4,6 +4,7 @@ import { map, focusWard, clearWardHighlight, centerOnCity, getLeftObstruction, g
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
+import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel } from './projectLayer.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { geeApi } from './api.js';
@@ -1135,8 +1136,16 @@ function paintXaHoi() {
 
 function paintAxisAll() {
   const btn = document.getElementById('btnAxisAll');
+  if (!btn) return;
+  if (browseState().axis === 'quyhoach') {
+    const on = planLevelAllOn();
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = planLevelAllTip();
+    btn.setAttribute('aria-label', planLevelAllTip());
+    return;
+  }
   const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
-  if (!btn || !pane) return;
+  if (!pane) return;
   const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
     if (el.id === 'chk_parcel') return false;
     if (el.closest('#xahoiHeat')) return false;
@@ -1260,6 +1269,12 @@ function toggleAxisAll() {
     const turnOn = listed.some(l => !isLayerOn(l.id));
     listed.forEach(l => setLayerOn(l, turnOn));
     publishSectorLegend(turnOn);
+    return;
+  }
+  // Quy hoạch: bật/tắt cả lớp + đồ án cấp đang xem; không đổi khung nhìn (setLevelShown + keepView).
+  if (browseState().axis === 'quyhoach') {
+    toggleActivePlanLevel();
+    paintAxisAll();
     return;
   }
   const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
@@ -1499,6 +1514,7 @@ function initDauTuTabs() {
 export function initChuyenNganh() {
   if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
+  document.addEventListener('qh:axis-all-paint', paintAxisAll);
   initDauTuTabs();
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));

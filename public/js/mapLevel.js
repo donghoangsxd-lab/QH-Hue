@@ -114,7 +114,8 @@ function onLayerChange(e) {
     return;
   }
   origin = null;
-  emit(prev);
+  // Đổi lớp qua ô checkbox (gồm tắt/bật cả cấp): giữ khung nhìn, không phóng toàn thành phố.
+  emit(prev, { keepView: true });
 }
 
 function paint() {

@@ -525,21 +525,20 @@ body.compare-on .map-title {
 .project-brief-meter.is-on .project-brief-track i { min-width: 10px; }
 .project-brief-meter[data-tone="adjust"] .project-brief-track i { background: var(--accent-orange); }
 .project-brief-wait { color: var(--text-muted); font-weight: 600; }
-/* Panel dưới mở: thu cột thông tin (bảng tra cứu, lô, đồ án) để không che bản đồ phía trên bảng.
-   Đóng panel thì các bảng hiện lại đúng chỗ. Tờ thẩm định đã rút #mapArea lên trên tờ, không cần dời. */
-body:not(.bottom-collapsed) .project-brief,
+/* Panel dưới mở: ẩn bảng nổi trên bản đồ (không ẩn brief/lô đã gắn trong panel trục). */
+body:not(.bottom-collapsed) #mapArea > .project-brief,
 body:not(.bottom-collapsed) .urban-focus-bar,
 body:not(.bottom-collapsed) .ovd-card,
-body:not(.bottom-collapsed) .cad-card,
-body:not(.bottom-collapsed) .leaflet-popup.dock-card {
+body:not(.bottom-collapsed) #mapArea > .cad-card,
+body:not(.bottom-collapsed) #mapArea > .leaflet-popup.dock-card {
   display: none !important;
 }
-/* Bảng dự án kêu gọi đầu tư chiếm cột trái: các bảng thông tin sang phải bảng đó. */
-body:has(#investCard:not([hidden])) .project-brief,
+/* Bảng dự án kêu gọi đầu tư chiếm cột trái: các bảng nổi trên bản đồ sang phải bảng đó. */
+body:has(#investCard:not([hidden])) #mapArea > .project-brief,
 body:has(#investCard:not([hidden])) .urban-focus-bar,
 body:has(#investCard:not([hidden])) .ovd-card,
-body:has(#investCard:not([hidden])) .cad-card:not(.invest-card),
-body:has(#investCard:not([hidden])) .leaflet-popup.dock-card {
+body:has(#investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
+body:has(#investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
   left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px)) + 8px);
   width: min(276px, calc(100vw - var(--info-left) - var(--tb-btn) - 380px - 56px));
 }
@@ -1149,20 +1148,54 @@ body.right-collapsed .right-panel {
   opacity: 0;
   pointer-events: none;
 }
-/* Bảng thửa / lô quy hoạch nằm trong panel, thế chỗ danh sách đồ án. */
+/* Thông tin đồ án trong panel (dưới tab cấp); danh sách đồ án ở #planListPane dịch xuống. */
+#planBriefSlot { display: none; }
+#planBriefSlot[hidden] { display: none !important; }
+.plan-list-pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief phía trên. */
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
 @media (min-width: 841px) {
-  body.plan-info-open #axisQuyHoach > :not(.level-host):not(#planInfoSlot) {
-    display: none !important;
+  body.plan-brief-open #planBriefSlot {
+    display: block;
+    flex: 0 1 auto;
+    max-height: min(42%, 280px);
+    min-height: 0;
+    overflow: auto;
+    margin: 2px 0 4px;
+  }
+  body.plan-brief-open #planBriefSlot > .project-brief {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0;
+    z-index: auto;
+  }
+  body.plan-info-open #planListPane > :not(#planInfoSlot) {
+    visibility: hidden;
+    pointer-events: none;
   }
   body.plan-info-open #planInfoSlot {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
     overflow: hidden;
-    position: relative;
+    background: var(--bg-panel);
   }
   body.plan-info-open #planInfoSlot > .cad-card,
   body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
@@ -5965,12 +5998,12 @@ body.project-review.la-page #projectReviewHost {
   .sketch-palette { right: auto; width: min(360px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px)); flex-direction: row; flex-wrap: wrap; }
   body .urban-focus-bar { top: calc(var(--info-top) + var(--stack-urban, 0px)) !important; }
   body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
-  body .project-brief,
-  body.project-review:not(.project-view) .project-brief {
+  body #mapArea > .project-brief,
+  body.project-review:not(.project-view) #mapArea > .project-brief {
     top: calc(var(--info-top) + var(--stack-brief, 0px)) !important;
   }
-  body .project-brief,
-  body.project-review:not(.project-view) .project-brief,
+  body #mapArea > .project-brief,
+  body.project-review:not(.project-view) #mapArea > .project-brief,
   body .urban-focus-bar,
   body .ovd-card {
     bottom: auto !important;
@@ -5980,11 +6013,11 @@ body.project-review.la-page #projectReviewHost {
     height: auto;
     overflow: auto;
   }
-  body:has(#investCard:not([hidden])) .project-brief,
+  body:has(#investCard:not([hidden])) #mapArea > .project-brief,
   body:has(#investCard:not([hidden])) .urban-focus-bar,
   body:has(#investCard:not([hidden])) .ovd-card,
-  body:has(#investCard:not([hidden])) .cad-card:not(.invest-card),
-  body:has(#investCard:not([hidden])) .leaflet-popup.dock-card {
+  body:has(#investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
+  body:has(#investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
     display: none !important;
   }
   body .project-brief,

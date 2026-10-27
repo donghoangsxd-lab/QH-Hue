@@ -1,6 +1,6 @@
-// Bảng nhỏ khi mở một đồ án (góc dưới trái; panel dưới mở thì lên góc trên trái): diện tích ranh, dân số, số lần và diện tích điều chỉnh cục bộ,
-// phần diện tích đã có QHPK (chỉ QHC) và đã có QHCT (QHC, QHPK). Diện tích con là hợp các ranh cắt theo đồ án đang mở,
-// nên chỗ chồng nhau chỉ tính một lần. Ẩn khi bỏ chọn đồ án.
+// Bảng thông tin đồ án: trên máy tính gắn vào #planBriefSlot trong panel Quy hoạch (danh sách đồ án dịch xuống);
+// điện thoại vào #phoneInfoSlot. Diện tích ranh, dân số, điều chỉnh cục bộ, phần đã có QHPK / QHCT.
+// Diện tích con là hợp các ranh cắt theo đồ án đang mở (chỗ chồng chỉ tính một lần). Ẩn khi bỏ chọn đồ án.
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
@@ -126,12 +126,19 @@ function meterRow(label, title, value, share, tone) {
 
 const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
 
+function briefOnMap(el) {
+  const host = el?.parentElement;
+  return !!(el && !el.hidden && host && (host.id === 'mapArea' || host.classList?.contains('leaflet-container')));
+}
+
 function syncBriefStack() {
   const root = document.documentElement;
+  const brief = document.getElementById('projectBrief');
+  // Brief đã gắn trong panel trục không đẩy cột bảng nổi trên bản đồ.
   const rows = [
     [document.querySelector('.urban-focus-bar'), '--stack-urban'],
     [document.querySelector('.ovd-card'), '--stack-demo'],
-    [document.getElementById('projectBrief'), '--stack-brief']
+    [briefOnMap(brief) ? brief : null, '--stack-brief']
   ];
   let y = 0;
   rows.forEach(([el, key]) => {

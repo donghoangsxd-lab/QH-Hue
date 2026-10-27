@@ -469,7 +469,7 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
 }
 
 // Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
-// Lô quy hoạch và lô nhóm hạ tầng trên máy tính vào #planInfoSlot (thế danh sách đồ án). Còn lại ở cột trái.
+// Lô quy hoạch và lô nhóm hạ tầng trên máy tính vào #planInfoSlot (phủ #planListPane). Còn lại nổi trên bản đồ.
 function deskPlanSlot(el) {
   if (!el || el.classList.contains('adj-lot-popup')) return null;
   if (!el.classList.contains('land-lot-popup') && !el.classList.contains('infra-popup')) return null;
