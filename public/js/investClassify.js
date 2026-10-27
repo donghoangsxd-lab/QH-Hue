@@ -5,10 +5,10 @@ export const INVEST_GROUPS = [
   { id: 'dvtm', label: 'DVTM', title: 'Thương mại, dịch vụ và du lịch' },
   { id: 'congnghiep', label: 'Công nghiệp', title: 'Công nghiệp' },
   { id: 'nangluong', label: 'Năng lượng', title: 'Năng lượng' },
-  { id: 'khudothi', label: 'Khu đô thị', title: 'Khu đô thị' },
+  { id: 'khudothi', label: 'Đô thị', title: 'Khu đô thị' },
   { id: 'chungcu', label: 'Chung cư', title: 'Chung cư' },
   { id: 'nongnghiep', label: 'Nông nghiệp', title: 'Nông nghiệp' },
-  { id: 'vanhoaxahoi', label: 'Văn hóa xã hội', title: 'Văn hóa xã hội' },
+  { id: 'vanhoaxahoi', label: 'VHXH', title: 'Văn hóa xã hội' },
   { id: 'khac', label: 'Dự án khác', title: 'Dự án khác' }
 ];
 

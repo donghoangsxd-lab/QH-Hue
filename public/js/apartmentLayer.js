@@ -344,6 +344,7 @@ function paintBox() {
   if (m2 && document.activeElement !== m2) m2.value = String(c.m2PerPerson);
   if (eff && document.activeElement !== eff) eff.value = String(c.efficiency);
   paintAptList();
+  document.dispatchEvent(new CustomEvent('qh:dt-counts'));
 }
 
 function readCfg() {
@@ -445,6 +446,11 @@ function onPopupSubmit(e) {
   draw();
   paintBox();
   saveItem(it);
+}
+
+/** Số chung cư (hiện trạng + quy hoạch) đang có trong danh sách tab Chung cư. */
+export function countApartments() {
+  return popItems().length + planItems.length;
 }
 
 export function initApartmentLayer() {

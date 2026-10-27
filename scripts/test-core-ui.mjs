@@ -210,10 +210,10 @@ for (const [id, label] of [
   ['dvtm', 'DVTM'],
   ['congnghiep', 'Công nghiệp'],
   ['nangluong', 'Năng lượng'],
-  ['khudothi', 'Khu đô thị'],
+  ['khudothi', 'Đô thị'],
   ['chungcu', 'Chung cư'],
   ['nongnghiep', 'Nông nghiệp'],
-  ['vanhoaxahoi', 'Văn hóa xã hội'],
+  ['vanhoaxahoi', 'VHXH'],
   ['khac', 'Dự án khác']
 ]) {
   const at = dtPick.indexOf(`data-dt-tab="${id}"`);
@@ -223,6 +223,9 @@ for (const [id, label] of [
 }
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
+assert.match(dauTu, /class="dt-invest-check"/);
+assert.doesNotMatch(dauTu, /Dự án kêu gọi đầu tư/);
+assert.match(html, /id="dtMagLabel"/);
 assert.match(dauTu, /id="aptBox"/);
 assert.match(dauTu, /id="aptList"/);
 assert.match(dauTu, /id="investList-dvtm"/);

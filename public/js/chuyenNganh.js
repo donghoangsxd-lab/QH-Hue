@@ -1066,12 +1066,12 @@ function placeMagMenu() {
 function fillMagMenu() {
   const menu = document.getElementById('layerMagMenu');
   const track = document.getElementById('layerMagTrack');
-  if (!menu || !track || menu.dataset.ready) return;
+  if (!menu || !track) return;
   menu.dataset.ready = '1';
   menu.innerHTML = [...track.querySelectorAll('[data-main-tab]')].map(btn => {
     const id = btn.dataset.mainTab;
-    const name = btn.title || btn.textContent;
-    return `<button type="button" role="option" data-mag-go="${escapeHtml(id)}">${escapeHtml(name)}</button>`;
+    const name = btn.title || btn.querySelector('.layer-main-label')?.textContent || btn.textContent;
+    return `<button type="button" role="option" data-mag-go="${escapeHtml(id)}">${escapeHtml(name.trim())}</button>`;
   }).join('');
 }
 

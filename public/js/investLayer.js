@@ -13,6 +13,7 @@ import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatc
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import { classifyInvestGroup, INVEST_GROUPS, isInvestGroupId, investGroupLabel } from './investClassify.js';
 import { readDrawingFile } from './drawingReaders.js';
+import { countApartments } from './apartmentLayer.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
@@ -460,16 +461,45 @@ function editButtonHtml() {
     : '';
 }
 
-function setHint(text) {
-  const el = $('investHint');
-  if (el) el.textContent = text || '';
+function groupCounts() {
+  const all = projectList(pack || []);
+  const counts = Object.fromEntries(INVEST_GROUPS.map(g => [g.id, 0]));
+  all.forEach(p => { if (counts[p.dtGroup] != null) counts[p.dtGroup] += 1; });
+  counts.chungcu += countApartments();
+  return counts;
+}
+
+function paintDtCounts() {
+  const counts = groupCounts();
+  let total = 0;
+  INVEST_GROUPS.forEach(g => {
+    const n = counts[g.id] || 0;
+    total += n;
+    const btn = document.querySelector(`#levelPickDt [data-dt-tab="${g.id}"]`);
+    const span = btn?.querySelector('span');
+    if (span) span.textContent = `${g.label} (${n})`;
+    if (btn) btn.title = `${g.title} (${n})`;
+  });
+  const mag = $('dtMagLabel');
+  const magBtn = document.querySelector('#layerMagTrack [data-main-tab="dautu"]');
+  const title = total ? `F. Dự án đầu tư (${total} dự án)` : 'F. Dự án đầu tư';
+  if (mag) mag.textContent = title;
+  if (magBtn) magBtn.title = title;
+  const menuBtn = document.querySelector('#layerMagMenu [data-mag-go="dautu"]');
+  if (menuBtn) menuBtn.textContent = title;
 }
 
 function refreshHint() {
-  const projects = projectList(pack || []);
-  const withGeom = projects.filter(p => p.hasBoundary).length;
-  const tab = projectsForTab().length;
-  setHint(`(${projects.length} dự án · ${withGeom} có ranh · tab ${tab})`);
+  paintDtCounts();
+}
+
+function ensureInvestOn() {
+  const box = $('chk_invest');
+  if (!box) return;
+  if (!box.checked) {
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (!visible) void setVisible(true);
 }
 
 function attachAdminBoundaries(features, rows, boundaries) {
@@ -1537,9 +1567,19 @@ export function initInvestLayer() {
     queueInvestDraw();
   });
   document.addEventListener('qh:dt-tab', () => {
+    ensureInvestOn();
     ensureInvestList();
     if (visible) redrawMaps();
   });
-  if ($('chk_invest')?.checked) setVisible(true);
-  else if (document.querySelector('#layerPaneDauTu:not([hidden])')) ensureInvestList();
+  document.addEventListener('qh:axis-tab', (e) => {
+    if (e.detail?.id === 'dautu') {
+      ensureInvestOn();
+      ensureInvestList();
+    }
+  });
+  document.addEventListener('qh:dt-counts', () => paintDtCounts());
+  if (document.querySelector('#layerPaneDauTu:not([hidden])')) {
+    ensureInvestOn();
+    ensureInvestList();
+  } else if ($('chk_invest')?.checked) setVisible(true);
 }
