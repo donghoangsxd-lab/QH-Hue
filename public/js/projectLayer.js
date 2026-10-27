@@ -43,14 +43,15 @@ import { namesOfProject } from './projectNames.js';
 import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
 import { getAreaFilter, onFacet, schemeRecords as catalogSchemeRecords } from './facetStore.js';
 import {
-  STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
+  STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, HIDDEN_PROJECTS_KEY,
+  parseNameList, durableLayerKeys, isBoundaryLayerKey
 } from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 import { capacityPanelHtml } from './congSuatUi.js';
 import { schemeSlug } from './congSuat.js';
 import { sameLevelOverlaps } from './qhpkOverlap.js';
 
-const HIDDEN_KEY = 'qh_hidden_projects';
+const HIDDEN_KEY = HIDDEN_PROJECTS_KEY;
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
 const SHOWN_NETS_KEY = 'qh_shown_nets';
 // Ranh tổng = hợp các lô nới GAP_M rồi co lại GAP_M: lấp đường / khe giữa các lô rộng ≤ 2·GAP_M
@@ -202,38 +203,34 @@ export function projectBoundary(geometries) {
 
 function loadHidden() {
   try {
-    const version = readStorageVersion(localStorage);
-    const saved = parseNameList(localStorage.getItem(HIDDEN_KEY));
-    const layers = parseNameList(localStorage.getItem(HIDDEN_LAYERS_KEY));
-    let projects = saved.list;
-    let layerList = layers.list;
-    let dirty = !saved.ok || !layers.ok;
-    if (version < STORAGE_VERSION) {
-      const next = migrateHiddenState(projects, layerList);
-      projects = next.projects;
-      layerList = next.layers;
-      dirty = true;
-      localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-      localStorage.removeItem(HIDDEN_KIND_FIX_KEY);
+    // Không khôi phục đồ án ẩn / khóa ranh-gioi từ phiên trước — mỗi lần mở hiện đủ ranh.
+    localStorage.removeItem(HIDDEN_KEY);
+    localStorage.removeItem(HIDDEN_KIND_FIX_KEY);
+    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    const rawLayers = localStorage.getItem(HIDDEN_LAYERS_KEY);
+    const layers = durableLayerKeys(rawLayers);
+    const prev = parseNameList(rawLayers);
+    if (!layers.ok || layers.list.length !== prev.list.length) {
+      localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify(layers.list));
     }
-    if (dirty) {
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify(projects));
-      localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify(layerList));
-    }
-    state.hiddenProjects = new Set(projects);
-    state.hiddenProjectLayers = new Set(layerList);
+    state.hiddenProjects = new Set();
+    state.hiddenProjectLayers = new Set(layers.list);
     state.shownProjectNets = new Set(parseNameList(localStorage.getItem(SHOWN_NETS_KEY)).list);
-    // Nội đồ án không có khóa lưu. Xóa để phiên trước (hoặc mã cũ từng coi «không ẩn» là đang mở) không tô lại sau F5.
+    // Nội đồ án không có khóa lưu. Xóa để phiên trước không tô lại sau F5.
     state.lotProjects.clear();
   } catch (e) { /* chế độ riêng tư */ }
 }
 
+// Ẩn đồ án chỉ trong phiên hiện tại; không ghi máy để F5 / mở lại luôn đủ ranh.
 function saveHidden() {
-  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...state.hiddenProjects])); } catch (e) { /* chế độ riêng tư */ }
+  try { localStorage.removeItem(HIDDEN_KEY); } catch (e) { /* chế độ riêng tư */ }
 }
 
 function saveHiddenLayers() {
-  try { localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify([...state.hiddenProjectLayers])); } catch (e) { /* chế độ riêng tư */ }
+  try {
+    const keys = [...state.hiddenProjectLayers].filter(k => !isBoundaryLayerKey(k));
+    localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify(keys));
+  } catch (e) { /* chế độ riêng tư */ }
 }
 
 function saveShownNets() {
@@ -824,6 +821,17 @@ const LEVEL_GROUP = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }
 const GROUP_LEVEL = { QHC25: 'qhc25', QHC: 'qhc10', QHPK: 'qhpk', QHCT: 'qhct' };
 const activeGroup = () => LEVEL_GROUP[getLevel()] || null;
 
+// Khi mở một cấp: bỏ ẩn ranh mọi đồ án của cấp đó (chỉ phiên hiện tại; không ghi máy).
+function revealLevelOutlines(key) {
+  if (!key) return false;
+  let changed = false;
+  projects.filter(p => p.level === key).forEach(p => {
+    if (state.hiddenProjects.delete(p.name)) changed = true;
+    if (state.hiddenProjectLayers.delete(layerKey(p.name, 'ranh-gioi'))) changed = true;
+  });
+  return changed;
+}
+
 // Tab cấp đang bật thì mở nhóm danh sách của tab đó. Tab tắt thì không gắn nhóm.
 function focusLevelGroup() {
   const open = listedLevels();
@@ -831,7 +839,11 @@ function focusLevelGroup() {
     if (open.has(GROUP_LEVEL[l.key])) closedLevels.delete(l.key);
     else closedLevels.add(l.key);
   });
+  const group = activeGroup();
+  const revealed = revealLevelOutlines(group);
+  if (revealed) saveHiddenLayers();
   renderList();
+  if (revealed) redrawOutlines();
 }
 
 // Ô lớp riêng của cấp (#planStaticRows) bật / tắt cùng nút mắt của nhóm

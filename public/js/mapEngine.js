@@ -2189,10 +2189,6 @@ function metaRow(label, valueHtml, cls = '') {
   return `<div class="pp-row${cls ? ` ${cls}` : ''}"><span>${label}</span><b>${valueHtml}</b></div>`;
 }
 
-function lotActionsHtml(analyze, view3d) {
-  if (!analyze && !view3d) return '';
-  return `<div class="lp-actions">${analyze}${view3d}</div>`;
-}
 
 let fillLotBuildup = () => {};
 /** Gắn nút kiểm tra mật độ. Phép tính và tải dấu chân chỉ chạy khi bấm nút. */
@@ -2225,8 +2221,6 @@ function landPopupHtml(p, opts) {
     project ? metaRow('Đồ án', project, 'lp-project-row') : '',
     place.name ? metaRow(place.label, escapeHtml(place.name)) : ''
   ].filter(Boolean).join('');
-  const center = geometryCenter(p.geometry);
-  const view3d = center ? point3dButton(center.lat, center.lng, p.area ? Math.sqrt(Number(p.area) / Math.PI) : 150) : '';
   const tip = [p.name, p.layer].filter(Boolean).join(' · ');
   return `<div class="pp land-popup">
     <div class="pp-title lp-head" title="${escapeHtml(tip)}">
@@ -2238,7 +2232,6 @@ function landPopupHtml(p, opts) {
     </div>
     <div class="lp-specs">${areaSpecHtml(p.area ? `${fmtNum(Math.round(p.area))} m²` : '', '', '')}${stamp}${lotStatsHtml(p.plan)}</div>
     ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
-    ${lotActionsHtml('', view3d)}
     ${lotBuildupSlotHtml()}
   </div>`;
 }
@@ -2387,20 +2380,43 @@ async function copyPlain(text) {
   }
 }
 
-function addLotLocateTools(popup, { lat, lng, token, project, title }) {
+/**
+ * Hàng icon bảng thông tin lô (trái → phải):
+ * bán kính phục vụ › mật độ xây dựng › chia sẻ › chỉ đường › chỉnh sửa › xóa › ẩn › tắt.
+ * Chỉnh sửa / xóa / ẩn do module khác gắn; đây gắn bán kính, mật độ, chia sẻ, chỉ đường.
+ */
+function addLotLocateTools(popup, {
+  lat, lng, token, project, title, analyzeLabel, analyzeTip, onAnalyze, buildup
+} = {}) {
   const container = popup.getElement();
-  if (!container || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return;
-  container.classList.add('pp-located');
-  const make = (cls, icon, label) => {
+  if (!container) return;
+  const hasPoint = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+  if (hasPoint || typeof onAnalyze === 'function' || buildup) container.classList.add('pp-located');
+  const make = (cls, icon, label, attrs = {}) => {
     const btn = L.DomUtil.create('a', cls, container);
     btn.href = '#';
     btn.setAttribute('role', 'button');
     btn.innerHTML = ico(icon);
     btn.title = label;
     btn.setAttribute('aria-label', label);
+    Object.entries(attrs).forEach(([k, v]) => btn.setAttribute(k, v));
     L.DomEvent.disableClickPropagation(btn);
     return btn;
   };
+  if (typeof onAnalyze === 'function') {
+    container.classList.add('pp-has-radius');
+    const tip = analyzeTip || analyzeLabel || 'Xem bán kính phục vụ';
+    const radius = make('pp-radius-btn', 'radius', tip);
+    L.DomEvent.on(radius, 'click', (e) => {
+      L.DomEvent.stop(e);
+      onAnalyze();
+    });
+  }
+  if (buildup) {
+    container.classList.add('pp-has-buildup');
+    make('pp-buildup-btn', 'coverage', 'Xem mật độ xây dựng thực tế', { 'data-lot-buildup-run': '' });
+  }
+  if (!hasPoint) return;
   const share = make('pp-share-btn', 'send', 'Chia sẻ vị trí');
   const route = make('pp-route-btn', 'road', 'Chỉ đường');
   L.DomEvent.on(route, 'click', (e) => {
@@ -2480,14 +2496,13 @@ function openLandPopup(p, m, opts) {
   attachSelectionOutline(m, p.geometry, popup);
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   const center = geometryCenter(p.geometry);
-  if (center) {
-    addLotLocateTools(popup, {
-      lat: center.lat, lng: center.lng,
-      token: landToken(p.phase, p.file, p.id || p.lotCode || landCode(p)),
-      project: p.file || '',
-      title: lotHeading(p.name || '', p.lotCode || landCode(p), '')
-    });
-  }
+  addLotLocateTools(popup, {
+    lat: center?.lat, lng: center?.lng,
+    token: landToken(p.phase, p.file, p.id || p.lotCode || landCode(p)),
+    project: p.file || '',
+    title: lotHeading(p.name || '', p.lotCode || landCode(p), ''),
+    buildup: true
+  });
   if (!opts?.hideProject) bindDossier(popup, p.file);
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   trackLandInfo(popup, p, m, opts);
@@ -3514,20 +3529,20 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   const showServed = !isCSD && !noZone;
   const servedLabel = ntKind ? 'Dân số trong vùng cách ly' : `Dân số phục vụ${approved ? '' : ' dự kiến'}`;
   const showArea = hasZone && roadArea;
-  let analyze = '';
-  if (parcelGeometry && (showArea || showServed)) {
-    const refNote = radiusRef ? `, ${radiusRef}` : '';
-    analyze = `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="Phóng tới toàn ${radiusLabel.toLowerCase()}, bật chế độ âm bản, dựng phạm vi thực tế và tính dân số phục vụ">${ico('locate')}Xem ${radiusLabel.toLowerCase()}<span class="lp-action-sub">${fmtNum(itemRadius)} m${refNote}</span></button></div>`;
-  } else if (showArea || showServed) {
-    const what = showArea
-      ? `${p.type === '13-BUS' ? 'Xem phạm vi đi bộ thực tế' : 'Xem phạm vi phục vụ thực tế'}${showServed ? ' và dân số' : ''}`
-      : `Xem ${radiusLabel.toLowerCase()} và ${ntKind ? 'dân số vùng cách ly' : 'dân số phục vụ'}`;
-    const tip = showArea
-      ? 'Bật chế độ âm bản, dựng vùng phục vụ theo mạng đường và tính dân số (tốn thời gian, chỉ chạy khi bấm)'
-      : `Bật chế độ âm bản theo ${radiusLabel.toLowerCase()} (đường chim bay) và tính dân số`;
-    analyze = `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="${escapeHtml(tip)}">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
+  const canAnalyze = showArea || showServed;
+  let analyzeLabel = '';
+  let analyzeTip = '';
+  if (canAnalyze) {
+    analyzeLabel = `Xem ${radiusLabel.toLowerCase()}`;
+    if (parcelGeometry) {
+      const refNote = radiusRef ? `, ${radiusRef}` : '';
+      analyzeTip = `Phóng tới toàn ${radiusLabel.toLowerCase()}, bật chế độ âm bản, dựng phạm vi thực tế và tính dân số phục vụ (${fmtNum(itemRadius)} m${refNote})`;
+    } else if (showArea) {
+      analyzeTip = 'Bật chế độ âm bản, dựng vùng phục vụ theo mạng đường và tính dân số (tốn thời gian, chỉ chạy khi bấm)';
+    } else {
+      analyzeTip = `Bật chế độ âm bản theo ${radiusLabel.toLowerCase()} (đường chim bay) và tính dân số`;
+    }
   }
-  html += lotActionsHtml(analyze, point3dButton(p.lat, p.lng, noZone ? 150 : itemRadius));
   const lotGeom = parcelGeometry || parcelFor(p)?.geometry || null;
   if (lotGeom) html += lotBuildupSlotHtml();
   if (conflicts.length) html += parcelConflictHtml(p, conflicts);
@@ -3556,28 +3571,6 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
       .catch(() => showToast(`Không chép được, ID: ${btn.dataset.id}`, 'error'));
   }));
   addPopupCollapseToggle(popup, parcelGeometry ? 'ranh khu đất và vùng phục vụ' : 'vùng phục vụ');
-  const center = lotCenterOf(parcelGeometry, p.lat, p.lng);
-  if (center) {
-    addLotLocateTools(popup, {
-      lat: center.lat, lng: center.lng,
-      token: p.id ? pointToken(p.scenario, p.id) : '',
-      project: p.tenQH || '',
-      title
-    });
-  }
-  bindDossier(popup, p.tenQH);
-  if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
-  pointPopup = { popup, id: p.id, scenario: p.scenario };
-  if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, 0);
-  else {
-    try { nudgeOffDock(targetMap, L.geoJSON(parcelGeometry).getBounds()); } catch (e) { /* ranh không đọc được thì giữ khung hình */ }
-  }
-  // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
-  popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
-  riskData?.then(d => {
-    const el = popup.isOpen() && popup.getElement()?.querySelector('.js-risk > :last-child');
-    if (el) { el.outerHTML = `<b>${riskSummaryHtml(p, d)}</b>`; popup._updateLayout(); popup._updatePosition(); }
-  }).catch(() => popup.getElement()?.querySelector('.js-risk')?.remove());
 
   // Kết quả tải chậm chỉ ghi vào đúng popup này (popup đã đóng / đã mở popup khác thì bỏ qua)
   const fill = (selector, content) => {
@@ -3589,27 +3582,16 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     popup._updatePosition();
   };
 
-  if (!geoWardNow) {
-    fetchJson(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
-      .then(res => {
-        fill('.js-ward', buildDiaBanHtml(res.ward, p.ward));
-        const lab = popup.isOpen() && popup.getElement()?.querySelector('.js-place-label');
-        if (lab) lab.textContent = placeLabelOf(res.ward, p.ward);
-      })
-      .catch(() => {});
-  }
-
+  let analysisDone = false;
   const runAnalysis = () => {
-    const box = popup.isOpen() && popup.getElement()?.querySelector('.js-analysis');
-    if (!box) return;
+    if (!popup.isOpen() || analysisDone) return;
+    analysisDone = true;
+    popup.getElement()?.querySelector('.pp-radius-btn')?.classList.add('is-on');
     let rows = '';
     if (showArea) rows += `<div class="pp-row js-area"><span>Phạm vi thực tế</span><span class="pp-loading">${ico('clock')}đang dựng theo mạng đường...</span></div>`;
     if (showServed) rows += `<div class="pp-row pp-served js-served"><span>${servedLabel}</span><span class="pp-loading">${ico('clock')}đang tính...</span></div>`;
-    const info = popup.getElement().querySelector('.lp-info');
-    if (info) {
-      info.insertAdjacentHTML('beforeend', rows);
-      box.remove();
-    } else box.outerHTML = rows;
+    const info = popup.getElement()?.querySelector('.lp-info');
+    if (info && rows) info.insertAdjacentHTML('beforeend', rows);
     popup._updateLayout();
     popup._updatePosition();
 
@@ -3648,10 +3630,41 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
         .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
     }
   };
-  popup.getElement()?.querySelector('.js-analyze')?.addEventListener('click', (e) => {
-    L.DomEvent.stop(e);
-    runAnalysis();
+
+  const center = lotCenterOf(parcelGeometry, p.lat, p.lng);
+  addLotLocateTools(popup, {
+    lat: center?.lat, lng: center?.lng,
+    token: p.id ? pointToken(p.scenario, p.id) : '',
+    project: p.tenQH || '',
+    title,
+    analyzeLabel: canAnalyze ? analyzeLabel : '',
+    analyzeTip: canAnalyze ? analyzeTip : '',
+    onAnalyze: canAnalyze ? runAnalysis : null,
+    buildup: !!lotGeom
   });
+  bindDossier(popup, p.tenQH);
+  if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
+  pointPopup = { popup, id: p.id, scenario: p.scenario };
+  if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, 0);
+  else {
+    try { nudgeOffDock(targetMap, L.geoJSON(parcelGeometry).getBounds()); } catch (e) { /* ranh không đọc được thì giữ khung hình */ }
+  }
+  // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
+  popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
+  riskData?.then(d => {
+    const el = popup.isOpen() && popup.getElement()?.querySelector('.js-risk > :last-child');
+    if (el) { el.outerHTML = `<b>${riskSummaryHtml(p, d)}</b>`; popup._updateLayout(); popup._updatePosition(); }
+  }).catch(() => popup.getElement()?.querySelector('.js-risk')?.remove());
+
+  if (!geoWardNow) {
+    fetchJson(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
+      .then(res => {
+        fill('.js-ward', buildDiaBanHtml(res.ward, p.ward));
+        const lab = popup.isOpen() && popup.getElement()?.querySelector('.js-place-label');
+        if (lab) lab.textContent = placeLabelOf(res.ward, p.ward);
+      })
+      .catch(() => {});
+  }
 
   if (isCSD && approved) {
     const csdQuery = `id=${encodeURIComponent(p.id || '')}&lat=${p.lat}&lng=${p.lng}&size=${Number(p.size) || 0}`;

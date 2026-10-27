@@ -772,7 +772,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   font-size: 10px;
   line-height: 1.2;
 }
-#axisDauTu .dt-invest-layer { margin: 2px 0 6px; }
+#axisDauTu .dt-invest-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
 .level-pick-btn.is-on {
   background: var(--accent-orange);
@@ -3499,7 +3499,7 @@ table.ward-table th {
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
 }
 .pp-collapsed .pp-title .badge-pending, .pp-collapsed .pp-title .ico { display: none; }
-/* Nút bút (Admin sửa lô) bên trái nút ẩn */
+/* Hàng icon (trái→phải): bán kính › mật độ › chia sẻ › chỉ đường › sửa › xóa › ẩn › tắt */
 .leaflet-container a.pp-edit-btn, .dock-card a.pp-edit-btn {
   position: absolute; top: 0; right: 48px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
@@ -3507,7 +3507,6 @@ table.ward-table th {
 }
 .leaflet-container .land-lot-popup:not(.pp-collapsible) a.pp-edit-btn { right: 24px; }
 .leaflet-container a.pp-edit-btn:hover { color: var(--accent-yellow); }
-/* Nút sọt rác (Admin xóa lô) bên trái nút bút */
 .leaflet-container a.pp-del-btn, .dock-card a.pp-del-btn {
   position: absolute; top: 0; right: 72px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
@@ -3520,37 +3519,74 @@ table.ward-table th {
 .leaflet-container .pp-collapsed a.pp-edit-btn, .leaflet-container .pp-collapsed a.pp-del-btn,
 .dock-card.pp-collapsed a.pp-edit-btn, .dock-card.pp-collapsed a.pp-del-btn,
 .leaflet-container .pp-collapsed a.pp-share-btn, .leaflet-container .pp-collapsed a.pp-route-btn,
-.dock-card.pp-collapsed a.pp-share-btn, .dock-card.pp-collapsed a.pp-route-btn { display: none; }
+.leaflet-container .pp-collapsed a.pp-radius-btn, .leaflet-container .pp-collapsed a.pp-buildup-btn,
+.dock-card.pp-collapsed a.pp-share-btn, .dock-card.pp-collapsed a.pp-route-btn,
+.dock-card.pp-collapsed a.pp-radius-btn, .dock-card.pp-collapsed a.pp-buildup-btn { display: none; }
 .leaflet-container .pp-located a.pp-share-btn,
 .leaflet-container .pp-located a.pp-route-btn,
+.leaflet-container .pp-located a.pp-radius-btn,
+.leaflet-container .pp-located a.pp-buildup-btn,
 .dock-card.pp-located a.pp-share-btn,
-.dock-card.pp-located a.pp-route-btn {
+.dock-card.pp-located a.pp-route-btn,
+.dock-card.pp-located a.pp-radius-btn,
+.dock-card.pp-located a.pp-buildup-btn {
   position: absolute; top: 2px; width: 22px; height: 22px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
 }
 .leaflet-container .pp-located a.pp-share-btn:hover,
 .leaflet-container .pp-located a.pp-route-btn:hover,
+.leaflet-container .pp-located a.pp-radius-btn:hover,
+.leaflet-container .pp-located a.pp-buildup-btn:hover,
 .dock-card.pp-located a.pp-share-btn:hover,
-.dock-card.pp-located a.pp-route-btn:hover { color: var(--accent-cyan); }
-.pp-share-btn .ico, .pp-route-btn .ico { width: 14px; height: 14px; margin: 0; }
+.dock-card.pp-located a.pp-route-btn:hover,
+.dock-card.pp-located a.pp-radius-btn:hover,
+.dock-card.pp-located a.pp-buildup-btn:hover { color: var(--accent-cyan); }
+.leaflet-container .pp-located a.pp-radius-btn.is-on,
+.dock-card.pp-located a.pp-radius-btn.is-on { color: var(--accent-cyan); }
+.pp-share-btn .ico, .pp-route-btn .ico, .pp-radius-btn .ico, .pp-buildup-btn .ico { width: 14px; height: 14px; margin: 0; }
 .dock-card.pp-located a.pp-collapse-btn,
 .leaflet-container .pp-located a.pp-collapse-btn { right: 26px; top: 2px; }
-.dock-card.pp-located a.pp-route-btn,
-.leaflet-container .pp-located a.pp-route-btn { right: 50px; }
-.dock-card.pp-located a.pp-share-btn,
-.leaflet-container .pp-located a.pp-share-btn { right: 74px; }
-.leaflet-container .pp-located a.pp-edit-btn,
-.dock-card.pp-located a.pp-edit-btn { right: 98px; }
 .leaflet-container .pp-located a.pp-del-btn,
-.dock-card.pp-located a.pp-del-btn { right: 122px; }
+.dock-card.pp-located a.pp-del-btn { right: 50px; top: 2px; }
+.leaflet-container .pp-located a.pp-edit-btn,
+.dock-card.pp-located a.pp-edit-btn { right: 74px; top: 2px; }
+.dock-card.pp-located a.pp-route-btn,
+.leaflet-container .pp-located a.pp-route-btn { right: 98px; }
+.dock-card.pp-located a.pp-share-btn,
+.leaflet-container .pp-located a.pp-share-btn { right: 122px; }
+.dock-card.pp-located a.pp-buildup-btn,
+.leaflet-container .pp-located a.pp-buildup-btn { right: 146px; }
+.dock-card.pp-located a.pp-radius-btn,
+.leaflet-container .pp-located a.pp-radius-btn { right: 170px; }
+/* Không sửa/xóa: kéo các icon còn lại sát nút ẩn */
+.pp-located:not(.pp-editable) a.pp-route-btn { right: 50px; }
+.pp-located:not(.pp-editable) a.pp-share-btn { right: 74px; }
+.pp-located:not(.pp-editable) a.pp-buildup-btn { right: 98px; }
+.pp-located:not(.pp-editable) a.pp-radius-btn { right: 122px; }
+.pp-located:not(.pp-has-buildup) a.pp-radius-btn { right: 146px; }
+.pp-located:not(.pp-editable):not(.pp-has-buildup) a.pp-radius-btn { right: 98px; }
+.pp-located:not(.pp-has-radius) a.pp-buildup-btn { right: 146px; }
+.pp-located:not(.pp-editable):not(.pp-has-radius) a.pp-buildup-btn { right: 98px; }
 .pp-located .lp-head,
 .pp-located .pp-title.lp-head,
 .infra-popup.pp-located .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible .lp-head { padding-right: 100px; }
+.land-lot-popup.pp-located.pp-collapsible .lp-head { padding-right: 150px; }
+.pp-located.pp-has-radius .lp-head,
+.pp-located.pp-has-buildup .lp-head,
+.pp-located.pp-has-radius .pp-title.lp-head,
+.pp-located.pp-has-buildup .pp-title.lp-head,
+.infra-popup.pp-located.pp-has-radius .pp-title.lp-head,
+.infra-popup.pp-located.pp-has-buildup .pp-title.lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head { padding-right: 200px; }
 .pp-located.pp-editable .pp-title.lp-head,
 .infra-popup.pp-located.pp-editable .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head { padding-right: 150px; }
+.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head { padding-right: 200px; }
+.pp-located.pp-editable.pp-has-radius .pp-title.lp-head,
+.pp-located.pp-editable.pp-has-buildup .pp-title.lp-head,
+.infra-popup.pp-located.pp-editable.pp-has-radius .pp-title.lp-head,
+.infra-popup.pp-located.pp-editable.pp-has-buildup .pp-title.lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-editable.pp-has-buildup .lp-head { padding-right: 250px; }
 .infra-popup.pp-editable .pp-title { padding-right: 70px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
 .lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 64px; font-weight: 700; }
@@ -3598,6 +3634,7 @@ table.ward-table th {
   text-decoration: none; text-align: center;
 }
 .proof-btn.pp-3d .ico { margin: 0; }
+/* Chỉ còn ở bảng tra cứu điểm (không gắn thẻ lô hạ tầng) */
 .ht-assign { margin-top: 6px; }
 .ht-assign:empty { display: none; margin: 0; }
 .ht-form [hidden] { display: none; }
@@ -5085,9 +5122,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 }
 .land-popup .lp-dossier .ico { width: 16px; height: 16px; margin: 0; }
 .land-popup .lp-dossier:hover { background: rgba(var(--orange-rgb), 0.14); }
-.land-popup .lp-actions { display: flex; align-items: stretch; gap: 6px; margin-top: 8px; }
-.land-popup .lp-actions:empty { display: none; }
-.land-popup .lp-actions .js-analysis { flex: 1 1 0; min-width: 0; display: flex; }
+.land-popup .lp-actions { display: none; }
 .land-popup .lp-actions .proof-btn,
 .land-popup .lp-actions .proof-btn.pp-3d {
   flex: 1 1 0; width: auto; min-width: 0; margin-top: 0; min-height: 34px; padding: 4px 6px;
@@ -5106,6 +5141,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info .pp-cap { white-space: nowrap; }
 .lp-info > .pp-served > :first-child { color: var(--text-main); font-weight: 600; }
 .infra-popup .pp-analyze-btn { width: 100%; margin-top: 10px; }
+.lot-buildup:empty { display: none; margin: 0; padding: 0; border: 0; }
 .leaflet-popup.infra-popup.pp-collapsed .pp-title.lp-head { padding: 0; }
 .leaflet-popup.land-lot-popup.pp-collapsed .land-popup { min-width: 0; }
 .leaflet-popup.land-lot-popup.pp-collapsed .land-popup > :not(.lp-head) { display: none; }
@@ -5982,14 +6018,22 @@ body.project-review.la-page #projectReviewHost {
   }
   .dock-card.pp-located a.pp-collapse-btn,
   .dock-card.pp-located a.pp-route-btn,
-  .dock-card.pp-located a.pp-share-btn {
+  .dock-card.pp-located a.pp-share-btn,
+  .dock-card.pp-located a.pp-radius-btn,
+  .dock-card.pp-located a.pp-buildup-btn {
     top: 2px; width: 40px; height: 40px;
   }
   .dock-card.pp-located a.pp-collapse-btn { right: 42px; }
-  .dock-card.pp-located a.pp-route-btn { right: 84px; }
-  .dock-card.pp-located a.pp-share-btn { right: 126px; }
-  .dock-card.pp-located a.pp-edit-btn { right: 168px; width: 40px; height: 40px; }
-  .dock-card.pp-located a.pp-del-btn { right: 210px; width: 40px; height: 40px; }
+  .dock-card.pp-located a.pp-del-btn { right: 84px; width: 40px; height: 40px; }
+  .dock-card.pp-located a.pp-edit-btn { right: 126px; width: 40px; height: 40px; }
+  .dock-card.pp-located a.pp-route-btn { right: 168px; }
+  .dock-card.pp-located a.pp-share-btn { right: 210px; }
+  .dock-card.pp-located a.pp-buildup-btn { right: 252px; }
+  .dock-card.pp-located a.pp-radius-btn { right: 294px; }
+  .dock-card.pp-located:not(.pp-editable) a.pp-route-btn { right: 84px; }
+  .dock-card.pp-located:not(.pp-editable) a.pp-share-btn { right: 126px; }
+  .dock-card.pp-located:not(.pp-editable) a.pp-buildup-btn { right: 168px; }
+  .dock-card.pp-located:not(.pp-editable) a.pp-radius-btn { right: 210px; }
   .dock-card.infra-popup.pp-located .pp-title.lp-head,
   .dock-card.land-lot-popup.pp-located .lp-head,
   .dock-card.land-lot-popup.pp-located.pp-collapsible .lp-head { padding: 46px 4px 9px 0; }

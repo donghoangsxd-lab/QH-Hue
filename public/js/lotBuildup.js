@@ -269,13 +269,21 @@ function stopMapClick(e) {
 
 export function attachLotBuildup(popup, lot) {
   const arm = () => {
-    const el = popup.getElement()?.querySelector('[data-lot-buildup]');
-    if (!el || el.dataset.armed === '1') return;
-    el.dataset.armed = '1';
-    if (!el.querySelector('[data-lot-buildup-run]')) el.innerHTML = lotBuildupButtonHtml();
-    el.addEventListener('click', (e) => {
+    const root = popup.getElement();
+    if (!root || root.dataset.buildupArmed === '1') return;
+    root.dataset.buildupArmed = '1';
+    let el = root.querySelector('[data-lot-buildup]');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'lot-buildup';
+      el.setAttribute('data-lot-buildup', '');
+      root.querySelector('.pp, .qhc-pop')?.appendChild(el) || root.appendChild(el);
+    }
+    // Popup không có icon hàng công cụ (QHCT tĩnh): giữ nút chữ trong khung kết quả.
+    if (!root.querySelector('[data-lot-buildup-run]')) el.innerHTML = lotBuildupButtonHtml();
+    const run = (e) => {
       const btn = e.target.closest?.('[data-lot-buildup-run]');
-      if (!btn || !el.contains(btn)) return;
+      if (!btn || !root.contains(btn)) return;
       stopMapClick(e);
       if (el.dataset.running === '1') return;
       el.dataset.running = '1';
@@ -295,7 +303,8 @@ export function attachLotBuildup(popup, lot) {
         el.innerHTML = `<span class="is-miss">Chưa đối chiếu được dấu chân công trình.</span>${lotBuildupButtonHtml()}`;
         relayout(popup);
       });
-    });
+    };
+    root.addEventListener('click', run);
   };
   if (popup.getElement()) arm();
   else popup.once('add', arm);

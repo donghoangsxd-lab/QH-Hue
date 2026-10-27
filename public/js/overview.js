@@ -305,7 +305,7 @@ const SECTIONS = [
         steps: [
           'Bảng bên phải › panel <b>Hạ tầng xã hội</b>. Chọn nhóm công trình cần xem (ví dụ <b>Giáo dục</b> › <b>Tiểu học</b>).',
           'Bấm biểu tượng công trình trên bản đồ. Bảng thông tin nêu quy mô hiện trạng, quy hoạch và bán kính phục vụ.',
-          'Trong bảng, bấm nút <b>Xem bán kính phục vụ</b> (kèm số mét). Trạm xe buýt là <b>Xem phạm vi đi bộ</b>; nhà tang lễ, nghĩa trang là <b>Xem khoảng cách an toàn</b>. Bản đồ chuyển âm bản, dựng phạm vi đi được theo đường và tính dân số phục vụ.',
+          'Trong bảng, bấm icon <b>bán kính phục vụ</b> (vòng tròn) trên hàng công cụ. Trạm xe buýt là phạm vi đi bộ; nhà tang lễ, nghĩa trang là khoảng cách an toàn. Bản đồ chuyển âm bản, dựng phạm vi đi được theo đường và tính dân số phục vụ. Icon <b>mật độ xây dựng</b> (ô vuông) đối chiếu dấu chân công trình trên lô.',
           'Nút con mắt trên bảng thu bảng về tên công trình để nhìn trọn vùng; bấm lại công trình để mở bảng. Nút tròn ● cạnh tên nhóm bật vùng phủ cả nhóm (chú thích <b>Bật/tắt vùng phủ</b>, <b>Bật/tắt bán kính phục vụ</b>, <b>Bật/tắt khoảng cách an toàn</b> hoặc <b>Bật/tắt phạm vi 500 m</b> tùy nhóm).'
         ],
         facts: [

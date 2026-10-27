@@ -19,30 +19,42 @@ const html = buildupHtml({
 });
 if (!html.includes('Số công trình trên đất') || !html.includes('16 công trình')) throw new Error(html);
 if (!html.includes('Mật độ xây dựng') || !html.includes('Diện tích xây dựng')) throw new Error(html);
-if (!html.includes('15') || !html.includes('20')) throw new Error(html);
-const partial = buildupHtml({
-  lotM2: 500, footM2: 100, count: 2
-});
-if (!partial.includes('chưa có')) throw new Error('thiếu chiều cao phải ghi chưa có');
+if (html.includes('Chiều cao') || html.includes('ảnh vệ tinh')) throw new Error('không được hiện chiều cao ảnh vệ tinh');
 const slot = lotBuildupSlotHtml();
-if (!slot.includes('data-lot-buildup-run') || !slot.includes('Mật độ xây dựng')) {
-  throw new Error('thẻ lô thiếu nút kiểm tra mật độ');
+if (!slot.includes('data-lot-buildup') || slot.includes('data-lot-buildup-run')) {
+  throw new Error('khung kết quả mật độ không được chứa nút chữ (nút nằm trên hàng icon)');
 }
 if (slot.includes('Đang đối chiếu')) throw new Error('nút không được tự đối chiếu');
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 for (const rel of ['../public/js/mapEngine.js', '../public/js/qhctLayer.js']) {
   const file = src(rel);
   if (file.includes('Đang đối chiếu dấu chân')) throw new Error(`${rel} vẫn tự đối chiếu khi mở thẻ`);
-  if (!file.includes('lotBuildupSlotHtml()')) throw new Error(`${rel} thiếu nút`);
+  if (!file.includes('lotBuildupSlotHtml()')) throw new Error(`${rel} thiếu khung mật độ`);
 }
 const engine = src('../public/js/mapEngine.js');
-if (!engine.includes('if (lotGeom) html += lotBuildupSlotHtml()')) throw new Error('lô hạ tầng thiếu nút mật độ');
+if (!engine.includes('if (lotGeom) html += lotBuildupSlotHtml()')) throw new Error('lô hạ tầng thiếu khung mật độ');
 if (!engine.includes('if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom })')) throw new Error('lô hạ tầng không gắn phép tính mật độ');
+if (!engine.includes('pp-radius-btn') || !engine.includes('pp-buildup-btn')) {
+  throw new Error('thiếu icon bán kính / mật độ trên bảng lô');
+}
+const landChunk = engine.slice(engine.indexOf('function landPopupHtml'), engine.indexOf('function landLotShape'));
+if (landChunk.includes('point3dButton') || landChunk.includes('pp-3d') || landChunk.includes('Xem 3D')) {
+  throw new Error('thẻ lô đất vẫn còn nút Xem 3D');
+}
+if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (nút chữ bán kính/3D)');
+const infraTools = engine.includes('onAnalyze: canAnalyze ? runAnalysis : null')
+  && engine.includes('buildup: !!lotGeom');
+if (!infraTools) throw new Error('lô hạ tầng chưa gắn icon bán kính / mật độ');
 const attach = src('../public/js/lotBuildup.js').split('export function attachLotBuildup')[1] || '';
-const beforeClick = attach.split("addEventListener('click'")[0];
-if (beforeClick.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');
+const armBody = attach.split('const arm = ')[1] || attach;
+const beforeRun = armBody.split('const run =')[0];
+if (beforeRun.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');
 if (!attach.includes('el.textContent = LOADING')) throw new Error('thiếu trạng thái đang kiểm tra');
 if (!src('../public/js/lotBuildup.js').includes("const LOADING = 'Đang đối chiếu dấu chân công trình…'")) {
   throw new Error('thiếu câu đang đối chiếu');
+}
+const ui = src('../docs/ui-spec.md');
+if (!ui.includes('không nút «Xem 3D»') || !ui.includes('bán kính phục vụ › mật độ xây dựng')) {
+  throw new Error('ui-spec thiếu mô tả hàng icon bảng lô');
 }
 console.log('ok', vin);

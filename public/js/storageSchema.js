@@ -5,12 +5,13 @@
 // Phiên 1 — 2f84d44: cờ qh_hidden_kind_fix='1' chỉ lọc một lần. Máy đã có cờ thì tên QHC ghi lại
 // (nút mắt nhóm, hoặc lần lưu sau cờ) không bị bỏ, ranh QHC biến mất, chỉ còn vùng trung tâm.
 // Phiên 2: lọc lại qh_hidden_projects (chỉ giữ QHPK) và bỏ khóa "<Ten_QH>|ranh-gioi" của QHC/QHCT.
-// Bỏ chọn sau phiên 2 vẫn được giữ.
+// Phiên 3: không còn ghi / khôi phục đồ án ẩn và khóa ranh-gioi. Mỗi lần mở trang hiện đủ ranh mọi đồ án.
 import { planLevelOf } from './generalPlan.js';
 
-export const STORAGE_VERSION = 2;
+export const STORAGE_VERSION = 3;
 export const STORAGE_VERSION_KEY = 'qh_storage_version';
 export const HIDDEN_KIND_FIX_KEY = 'qh_hidden_kind_fix';
+export const HIDDEN_PROJECTS_KEY = 'qh_hidden_projects';
 
 export function readStorageVersion(store) {
   const raw = store.getItem(STORAGE_VERSION_KEY);
@@ -41,12 +42,27 @@ export function parseNameList(raw) {
   }
 }
 
+/** Khóa lớp chính dạng "<Ten_QH>|ranh-gioi" — không lưu / không khôi phục (ranh luôn hiện khi mở). */
+export function isBoundaryLayerKey(key) {
+  const bar = String(key || '').indexOf('|');
+  return bar >= 0 && key.slice(bar + 1) === 'ranh-gioi';
+}
+
+/** Phiên ≤ 2: bỏ tên QHC/QHCT khỏi danh sách ẩn và khóa ranh-gioi ngoài QHPK. Phiên 3 không còn dùng. */
 export function migrateHiddenState(names, layerKeys) {
   const projects = (asNameList(names) || []).filter(n => planLevelOf(n) === 'QHPK');
   const layers = (asNameList(layerKeys) || []).filter(k => {
-    const bar = k.indexOf('|');
-    if (bar < 0) return true;
-    return !(k.slice(bar + 1) === 'ranh-gioi' && planLevelOf(k.slice(0, bar)) !== 'QHPK');
+    if (isBoundaryLayerKey(k)) return planLevelOf(k.slice(0, k.indexOf('|'))) === 'QHPK';
+    return true;
   });
   return { projects, layers };
+}
+
+/** Lọc lớp lưu máy: bỏ ranh-gioi; JSON hỏng → list rỗng. */
+export function durableLayerKeys(raw) {
+  const parsed = parseNameList(raw);
+  return {
+    ok: parsed.ok,
+    list: parsed.list.filter(k => !isBoundaryLayerKey(k))
+  };
 }

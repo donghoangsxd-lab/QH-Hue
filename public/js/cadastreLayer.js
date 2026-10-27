@@ -39,8 +39,9 @@ const MIN_ZOOM = 15;
 const DATA_ZOOM = 16;
 const LABEL_ZOOM = 18;
 const PANE = 'cadastrePane';
-// Dưới lô đồ án (overlayPane 400) để nền thửa không che màu ô đất quy hoạch. Pane không bắt chuột.
-const PANE_Z = 390;
+// Trên hatch / lô quy hoạch (overlayPane 400), dưới dấu chân công trình (gbaPane 408).
+// Pane không bắt chuột: click vẫn tới lô / marker bên dưới; bấm nền mới mở thửa.
+const PANE_Z = 405;
 const TILE_CACHE = 96;
 const INDEX_CACHE = 8;
 const FILL_ALPHA = 0.35;
@@ -1023,7 +1024,7 @@ export function cadastreClick(e, targetMap) {
   return true;
 }
 
-// Lớp thửa không bắt chuột và nằm dưới ô đất. Popup lô, công trình, marker giữ nguyên; click nền mới mở thửa.
+// Lớp thửa không bắt chuột (nổi trên hatch nhưng click xuyên xuống). Popup lô, công trình, marker giữ nguyên; click nền mới mở thửa.
 function onPopupOpen(e) {
   const cls = e.popup.options.className || '';
   if (e.popup === popup || /\bcadastre-popup\b/.test(cls)) return;

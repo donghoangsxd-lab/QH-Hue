@@ -187,7 +187,7 @@ async function openAxisPanel(page) {
   await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
 }
 
-async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
+async function staleDesktop(page, base, { qhc, panel, shot }) {
   await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await waitCatalog(page);
   if (panel) {
@@ -207,20 +207,15 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
   const stored = await page.evaluate((qhc) => ({
     version: localStorage.getItem('qh_storage_version'),
     kind: localStorage.getItem('qh_hidden_kind_fix'),
-    hidden: JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]'),
+    hiddenRaw: localStorage.getItem('qh_hidden_projects'),
     layers: JSON.parse(localStorage.getItem('qh_hidden_layers') || '[]'),
     qhc
   }), qhc);
-  if (stored.version !== '2') throw new Error(`${shot}: phiên lưu trữ ${stored.version}`);
+  if (stored.version !== '3') throw new Error(`${shot}: phiên lưu trữ ${stored.version}`);
   if (stored.kind) throw new Error(`${shot}: còn cờ qh_hidden_kind_fix`);
-  const still = stored.hidden.filter(n => qhc.includes(n));
-  if (still.length) throw new Error(`${shot}: còn ẩn QHC ${still.join(' | ')}`);
-  if (stored.layers.some(k => qhc.some(n => k === `${n}|ranh-gioi`))) {
-    throw new Error(`${shot}: còn khóa ranh-gioi của QHC`);
-  }
-  if (keepQhpk) {
-    if (!stored.hidden.includes('QHPK Thanh Toàn')) throw new Error(`${shot}: mất ẩn QHPK đã lưu`);
-    if (!stored.layers.includes('QHPK Thanh Toàn|ranh-gioi')) throw new Error(`${shot}: mất ranh-gioi QHPK`);
+  if (stored.hiddenRaw != null) throw new Error(`${shot}: còn khóa qh_hidden_projects`);
+  if (stored.layers.some(k => /\|ranh-gioi$/.test(k))) {
+    throw new Error(`${shot}: còn khóa ranh-gioi trong qh_hidden_layers`);
   }
   fs.mkdirSync(shotDir, { recursive: true });
   const file = path.join(shotDir, shot);
@@ -228,18 +223,26 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
   console.log('shot', file, seen.on.join(' | '));
   const chan = qhc.find(n => /Chân Mây/.test(n));
   await page.evaluate((name) => {
-    const cur = JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]');
-    if (!cur.includes(name)) cur.push(name);
-    localStorage.setItem('qh_hidden_projects', JSON.stringify(cur));
+    localStorage.setItem('qh_hidden_projects', JSON.stringify([name]));
   }, chan);
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 });
   await waitCatalog(page);
-  const kept = await page.evaluate((name) => {
-    const hidden = JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]');
-    return { version: localStorage.getItem('qh_storage_version'), hidden: hidden.includes(name) };
+  await openLevel(page, 'qhc10');
+  const after = await page.evaluate((name) => ({
+    version: localStorage.getItem('qh_storage_version'),
+    hiddenRaw: localStorage.getItem('qh_hidden_projects'),
+    inMemory: null
+  }), chan);
+  const memory = await page.evaluate(async (name) => {
+    const { state } = await import('./js/state.js');
+    const { visibleOutlineNames } = await import('./js/projectLayer.js');
+    return {
+      hidden: state.hiddenProjects.has(name),
+      outlined: visibleOutlineNames('QHC').some(p => p.name === name)
+    };
   }, chan);
-  if (kept.version !== '2' || !kept.hidden) {
-    throw new Error(`${shot}: phiên 2 không giữ bỏ chọn ${JSON.stringify(kept)}`);
+  if (after.version !== '3' || after.hiddenRaw != null || memory.hidden || !memory.outlined) {
+    throw new Error(`${shot}: phiên 3 vẫn khôi phục ẩn ranh ${JSON.stringify({ after, memory })}`);
   }
 }
 
@@ -365,16 +368,16 @@ async function main() {
     await desk.close();
 
     const seeds = [
-      { width: 1920, height: 1080, kindFix: true, invalid: false, panel: true, shot: 'qhc-desk-1920-stuck.png', keepQhpk: true },
-      { width: 1536, height: 864, kindFix: false, invalid: false, panel: false, shot: 'qhc-desk-1536-legacy.png', keepQhpk: true },
-      { width: 1366, height: 768, kindFix: true, invalid: true, panel: false, shot: 'qhc-desk-1366-invalid.png', keepQhpk: false }
+      { width: 1920, height: 1080, kindFix: true, invalid: false, panel: true, shot: 'qhc-desk-1920-stuck.png' },
+      { width: 1536, height: 864, kindFix: false, invalid: false, panel: false, shot: 'qhc-desk-1536-legacy.png' },
+      { width: 1366, height: 768, kindFix: true, invalid: true, panel: false, shot: 'qhc-desk-1366-invalid.png' }
     ];
     for (const seed of seeds) {
       const ctx = await browser.newContext({ viewport: { width: seed.width, height: seed.height } });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => console.log('ERR', seed.shot, e.message));
       await page.addInitScript(seedScript, { qhc, kindFix: seed.kindFix, invalid: seed.invalid });
-      await staleDesktop(page, base, { qhc, panel: seed.panel, shot: seed.shot, keepQhpk: seed.keepQhpk });
+      await staleDesktop(page, base, { qhc, panel: seed.panel, shot: seed.shot });
       await ctx.close();
     }
 

@@ -1,4 +1,4 @@
-// Khóa localStorage các bản cũ ghi để ẩn đồ án. Cửa sổ ẩn danh không có khóa nên QHC vẫn đủ.
+// Khóa localStorage các bản cũ ghi để ẩn đồ án. Phiên 3 không còn khôi phục danh sách ẩn.
 // enableMaster trước 2f84d44 ghi mọi Ten_QH chưa hiện vào qh_hidden_projects.
 // 2f84d44 thêm qh_hidden_kind_fix='1' chỉ lọc một lần; máy đã có cờ thì tên QHC còn lại không bị bỏ.
 const assert = require('assert');
@@ -23,7 +23,8 @@ function mem(init) {
 
 (async () => {
   const {
-    STORAGE_VERSION, readStorageVersion, parseNameList, migrateHiddenState
+    STORAGE_VERSION, readStorageVersion, parseNameList, migrateHiddenState,
+    durableLayerKeys, isBoundaryLayerKey, HIDDEN_PROJECTS_KEY
   } = await import('../public/js/storageSchema.js');
 
   const dumped = [...QHC, QHPK, QHCT];
@@ -36,6 +37,7 @@ function mem(init) {
   assert.strictEqual(readStorageVersion(mem({})), 0);
   assert.strictEqual(readStorageVersion(mem({ qh_hidden_kind_fix: '1' })), 1);
   assert.strictEqual(readStorageVersion(mem({ qh_storage_version: '2', qh_hidden_kind_fix: '1' })), 2);
+  assert.strictEqual(readStorageVersion(mem({ qh_storage_version: '3' })), 3);
   assert.strictEqual(readStorageVersion(mem({ qh_storage_version: 'nope' })), 0);
 
   const migrated = migrateHiddenState(dumped, layers);
@@ -47,27 +49,14 @@ function mem(init) {
   assert.deepStrictEqual(parseNameList('['), { ok: false, list: [] });
   assert.deepStrictEqual(parseNameList(JSON.stringify(dumped)).list.length, dumped.length);
 
-  const stuck = mem({
-    qh_hidden_projects: JSON.stringify(dumped),
-    qh_hidden_layers: JSON.stringify(layers),
-    qh_hidden_kind_fix: '1'
-  });
-  assert.strictEqual(readStorageVersion(stuck), 1);
-  const again = migrateHiddenState(
-    parseNameList(stuck.getItem('qh_hidden_projects')).list,
-    parseNameList(stuck.getItem('qh_hidden_layers')).list
-  );
-  assert.deepStrictEqual(again.projects, [QHPK]);
-  assert.ok(!again.projects.some(n => n.startsWith('QHC')));
-  assert.ok(again.layers.some(k => k.startsWith(`${QHPK}|`)));
-  assert.ok(!again.layers.some(k => k.startsWith('QHC ') && k.endsWith('|ranh-gioi')));
+  assert.ok(isBoundaryLayerKey(`${QHPK}|ranh-gioi`));
+  assert.ok(!isBoundaryLayerKey('QHC Khe Tre|su-dung-dat'));
+  const durable = durableLayerKeys(JSON.stringify(layers));
+  assert.deepStrictEqual(durable.list, ['QHC Khe Tre|su-dung-dat']);
+  assert.deepStrictEqual(durableLayerKeys('['), { ok: false, list: [] });
 
-  const kept = migrateHiddenState(
-    parseNameList(JSON.stringify([QHPK, QHC[0]])).list,
-    []
-  );
-  assert.deepStrictEqual(kept.projects, [QHPK]);
-  assert.strictEqual(STORAGE_VERSION, 2);
+  assert.strictEqual(HIDDEN_PROJECTS_KEY, 'qh_hidden_projects');
+  assert.strictEqual(STORAGE_VERSION, 3);
   console.log('storageSchema: ok');
 })().catch((err) => {
   console.error(err);

@@ -38,13 +38,13 @@ export const state = {
   // Ranh tổng [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }]
   projectAreas: [],
   showProjects: false,
-  // Đồ án người dùng ẩn (Ten_QH, lưu localStorage)
+  // Đồ án người dùng ẩn trong phiên (Ten_QH). Không ghi localStorage — mở lại luôn đủ ranh.
   hiddenProjects: new Set(),
   // Đồ án vừa chọn (bấm ranh / tên): lô hiện ở mọi mức zoom, không chờ ngưỡng PARCEL_MIN_ZOOM
   focusedProject: null,
   // Đồ án được tick để vẽ lô (QHC / QHPK / QHCT). Không ghi localStorage.
   lotProjects: new Set(),
-  // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage)
+  // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage; không gồm ranh-gioi)
   hiddenProjectLayers: new Set(),
   // Bản vẽ hạ tầng người dùng đang bật: "<Ten_QH>|<key>" (lưu localStorage). Mặc định tắt.
   shownProjectNets: new Set(),

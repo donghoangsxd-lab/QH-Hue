@@ -29,6 +29,7 @@ const MIN_ZOOM = 13;
 const DATA_ZOOM = 16;
 // Dưới mức này chỉ tô mảng theo nhóm tầng, không viền từng dấu chân.
 const OUTLINE_ZOOM = 16;
+// Trên thửa địa chính (cadastrePane 405) và hatch quy hoạch (overlayPane 400).
 const FOOT_PANE = 'gbaPane';
 const FOOT_Z = 408;
 const PART_PANE = 'gbaPartPane';
