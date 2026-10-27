@@ -233,6 +233,9 @@ for (const [id, label] of [
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
 assert.match(dauTu, /class="dt-invest-check"/);
+assert.doesNotMatch(dauTu, /id="chk_invest"[^>]*\schecked\b/);
+assert.match(read('docs/ui-spec.md'), /tắt khi mở trang/);
+assert.match(read('public/js/investLayer.js'), /ensureInvestOn/);
 assert.doesNotMatch(dauTu, /Dự án kêu gọi đầu tư/);
 assert.match(html, /id="dtMagLabel"/);
 assert.match(dauTu, /id="aptBox"/);
@@ -347,6 +350,9 @@ assert.match(read('public/css/style.css'), /body\.plan-brief-open #planBriefSlot
 assert.match(read('public/css/style.css'), /z-index: 4/);
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot/);
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planListPane > :not\(#planInfoSlot\)/);
+assert.doesNotMatch(read('public/css/style.css'), /planInfoSlot > \.cad-card[\s\S]{0,500}inset 3px 0 0 rgb\(var\(--orange-rgb\)\)/);
+assert.match(read('public/css/style.css'), /#levelHostQh,\s*#levelHostDt/);
+assert.match(read('docs/ui-spec.md'), /không thanh inset dày mép trái/);
 assert.match(read('public/css/style.css'), /rgba\(var\(--orange-rgb\), 0\.55\)/);
 assert.match(read('docs/ui-spec.md'), /không bị bảng lô đè/);
 assert.doesNotMatch(read('public/css/style.css'), /body\.plan-info-open #axisQuyHoach > :not\(\.level-host\):not\(#planInfoSlot\)/);

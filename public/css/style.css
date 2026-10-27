@@ -351,7 +351,7 @@ body.compare-on .map-title {
   -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid rgba(var(--brief), 0.45);
   border-radius: var(--r-lg);
-  box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--brief));
+  box-shadow: var(--panel-shadow);
 }
 .project-brief[data-level="QHPK"] { --brief: var(--orange-rgb); }
 .project-brief[data-level="QHCT"] { --brief: var(--purple-rgb); }
@@ -713,6 +713,12 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg-head);
 }
+/* Quy hoạch / đầu tư: kéo sát mép pane (bù padding ngang .layer-main-pane) để tab rộng hơn. */
+#levelHostQh,
+#levelHostDt {
+  padding: 4px 0;
+  margin: 0 -6px;
+}
 .level-host-label {
   flex: 0 0 auto;
   margin: 0;
@@ -744,7 +750,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 .level-pick-btn .ico { width: 12px; height: 12px; margin: 0; color: var(--accent-cyan); }
 #levelHostQh .level-host-label { display: none; }
-#levelPickQh { width: 100%; overflow: visible; padding: 4px 2px; }
+#levelPickQh { width: 100%; overflow: visible; padding: 4px 0; }
 #levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
 #levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
 #levelHostDt .level-host-label { display: none; }
@@ -755,7 +761,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   gap: 4px;
   flex-wrap: nowrap;
   overflow: visible;
-  padding: 4px 2px;
+  padding: 4px 0;
 }
 #levelPickDt .level-pick-btn {
   flex: none;
@@ -1172,7 +1178,7 @@ body.right-collapsed .right-panel {
     max-height: min(42%, 280px);
     min-height: 0;
     overflow: auto;
-    margin: 2px 0 6px;
+    margin: 2px -6px 6px;
   }
   body.plan-brief-open #planBriefSlot > .project-brief {
     position: relative !important;
@@ -1186,6 +1192,7 @@ body.right-collapsed .right-panel {
     max-height: none !important;
     margin: 0;
     z-index: auto;
+    box-shadow: var(--panel-shadow);
   }
   body.plan-info-open #planListPane {
     z-index: 1;
@@ -1198,14 +1205,14 @@ body.right-collapsed .right-panel {
     display: flex;
     flex-direction: column;
     position: absolute;
-    inset: 0;
+    inset: 0 -6px 0 -6px;
     z-index: 3;
     overflow: hidden;
-    padding: 2px;
+    padding: 0;
     box-sizing: border-box;
     background: transparent;
   }
-  /* Đồng bộ khung bảng đồ án: viền cam, bo 4 góc, nền tối. */
+  /* Đồng bộ khung bảng đồ án: viền cam đều 4 cạnh, bo góc, nền tối — không thanh inset mép trái. */
   body.plan-info-open #planInfoSlot > .cad-card,
   body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
     position: relative !important;
@@ -1224,7 +1231,7 @@ body.right-collapsed .right-panel {
     transform: none !important;
     border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
     border-radius: var(--r-lg) !important;
-    box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--orange-rgb)) !important;
+    box-shadow: var(--panel-shadow) !important;
     background: var(--bg-dark) !important;
     z-index: auto;
     overflow: hidden;
@@ -7447,7 +7454,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
     flex: 0 0 auto;
     border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
     border-radius: var(--r-lg) !important;
-    box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--orange-rgb)) !important;
+    box-shadow: var(--panel-shadow) !important;
     background: var(--bg-dark) !important;
     transform: none !important;
   }
