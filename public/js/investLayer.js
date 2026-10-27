@@ -115,6 +115,10 @@ function fieldKind(key) {
 
 function shortLabel(key) {
   const k = String(key || '');
+  if (/ưu tiên/i.test(k)) return 'Mức độ ưu tiên';
+  if (/địa điểm/i.test(k)) return 'Địa điểm';
+  if (/diện tích/i.test(k)) return 'Diện tích';
+  if (/lĩnh vực/i.test(k)) return 'Lĩnh vực';
   if (/hiện trạng/i.test(k)) return 'Hiện trạng sử dụng đất';
   if (/mục tiêu/i.test(k)) return 'Mục tiêu và nhu cầu đầu tư';
   if (/phù hợp/i.test(k)) return 'Sự phù hợp quy hoạch';
