@@ -1,4 +1,4 @@
-// Bốn trục: Hành chính (phạm vi) · Quy hoạch · Hạ tầng · Kiến trúc.
+// Sáu trục: Hành chính (phạm vi) · Quy hoạch · Hạ tầng kỹ thuật · Hạ tầng xã hội · Kiến trúc · Dự án đầu tư.
 // Mỗi lớp: { area, level|null, scheme|null, sector|null, kind: hien-trang|quy-hoach }.
 // Hiện trạng thực tế: level = null (kho chung, lọc theo phạm vi và trục).
 // status trên catalog đồ án là «Hiện trạng khi lập đồ án», không phải kho này.
@@ -14,7 +14,8 @@ export const AXES = [
   { id: 'quyhoach', label: 'B. Hệ thống bản đồ quy hoạch' },
   { id: 'hatang', label: 'C. Hệ thống hạ tầng kỹ thuật' },
   { id: 'xahoi', label: 'D. Hệ thống hạ tầng xã hội' },
-  { id: 'kientruc', label: 'E. Quản lý về kiến trúc' }
+  { id: 'kientruc', label: 'E. Quản lý về kiến trúc' },
+  { id: 'dautu', label: 'F. Dự án đầu tư' }
 ];
 const AXIS_IDS = new Set(AXES.map(a => a.id));
 

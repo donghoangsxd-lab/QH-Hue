@@ -21,7 +21,7 @@ export function flash(el) {
 const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh', infra: 'hatang' };
 const PANE_HOME = { base: { fold: 'axisBaseFold' }, env: { fold: 'axisEnvFold' } };
 
-export function openLayerTab({ main, pane } = {}) {
+export function openLayerTab({ main, pane, dt } = {}) {
   document.body.classList.remove('right-collapsed');
   const home = pane ? PANE_HOME[pane] : null;
   const tab = MAIN_TAB[main] || main || home?.main;
@@ -34,6 +34,7 @@ export function openLayerTab({ main, pane } = {}) {
   }
   if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiTabs')?.scrollIntoView({ block: 'nearest' });
   if (main === 'quyhoach') document.getElementById('planPoints')?.scrollIntoView({ block: 'nearest' });
+  if (dt) document.querySelector(`#levelPickDt [data-dt-tab="${dt}"]`)?.click();
 }
 
 let card = null;

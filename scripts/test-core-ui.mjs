@@ -36,7 +36,8 @@ const TITLES = [
   ['quyhoach', 'B. Hệ thống bản đồ quy hoạch'],
   ['hatang', 'C. Hệ thống hạ tầng kỹ thuật'],
   ['xahoi', 'D. Hệ thống hạ tầng xã hội'],
-  ['kientruc', 'E. Quản lý về kiến trúc']
+  ['kientruc', 'E. Quản lý về kiến trúc'],
+  ['dautu', 'F. Dự án đầu tư']
 ];
 
 assert.match(html, /<body[^>]*\bright-collapsed\b/);
@@ -49,7 +50,7 @@ assert.doesNotMatch(html, /Bản đồ nền và bản đồ môi trường/);
 assert.doesNotMatch(html, /data-map-tab=/);
 
 const main = innerById(html, 'layerMain');
-for (const id of ['layerPaneHanhChinh', 'layerPaneQuyHoach', 'layerPaneHaTang', 'layerPaneXaHoi', 'layerPaneKienTruc']) {
+for (const id of ['layerPaneHanhChinh', 'layerPaneQuyHoach', 'layerPaneHaTang', 'layerPaneXaHoi', 'layerPaneKienTruc', 'layerPaneDauTu']) {
   assert.ok(main.includes(`id="${id}"`), `#${id} nằm ngoài #layerMain`);
 }
 
@@ -196,7 +197,42 @@ assert.match(social, /id="inputIsoRadius"/);
 assert.match(social, /Giả lập bán kính chung/);
 assert.match(social, /id="planPoints"/);
 assert.match(social, /Quỹ đất và công trình/);
+assert.match(social, /id="chk_c9"/);
+assert.doesNotMatch(social, /id="chk_c14"/);
+assert.doesNotMatch(social, /id="chk_invest"/);
 assert.match(social, /id="chk_c1"/);
+const dauTu = innerById(html, 'layerPaneDauTu');
+assert.ok(main.indexOf('id="layerPaneKienTruc"') < main.indexOf('id="layerPaneDauTu"'), 'Dự án đầu tư đứng sau Kiến trúc');
+const dtPick = innerById(html, 'levelPickDt');
+let dtAt = 0;
+for (const [id, label] of [
+  ['chungcu', 'Nhà chung cư'],
+  ['dien', 'Nhà máy điện'],
+  ['khudothi', 'Khu đô thị'],
+  ['dulich', 'Du lịch dịch vụ'],
+  ['khac', 'Dự án khác']
+]) {
+  const at = dtPick.indexOf(`data-dt-tab="${id}"`);
+  assert.ok(at > dtAt, `sai thứ tự tab ${label}`);
+  dtAt = at;
+  assert.ok(dtPick.slice(at, at + 280).includes(label), `thiếu nhãn ${label}`);
+}
+assert.match(dauTu, /id="chk_c14"/);
+assert.match(dauTu, /id="chk_invest"/);
+assert.match(dauTu, /id="aptBox"/);
+assert.match(dauTu, /Chưa có đồ án\./);
+assert.equal((dauTu.match(/Chưa có đồ án\./g) || []).length, 3);
+assert.match(dauTu, /class="level-pick"/);
+assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);
+assert.match(html, /id="legendDauTu"/);
+const axisDock = innerById(html, 'axisDock');
+assert.ok(axisDock.indexOf('data-axis-dock="kientruc"') < axisDock.indexOf('data-axis-dock="dautu"'), 'nút Đầu tư đứng sau Kiến trúc');
+assert.match(axisDock, /title="F\. Dự án đầu tư"/);
+assert.match(read('public/js/facetStore.js'), /F\. Dự án đầu tư/);
+assert.match(read('public/js/chuyenNganh.js'), /'dautu'/);
+assert.match(read('public/js/legendPanel.js'), /dauTuLegendHtml/);
+assert.doesNotMatch(read('public/js/legendPanel.js'), /LEGEND_OFF = new Set\(\[[^\]]*dautu/);
+assert.match(read('docs/ui-spec.md'), /F\. Dự án đầu tư/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
 assert.doesNotMatch(plan, /id="inputIsoRadius"/);
@@ -608,8 +644,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261089/);
-assert.match(html, /js\/app\.js\?v=20261089/);
+assert.match(html, /css\/style\.css\?v=20261090/);
+assert.match(html, /js\/app\.js\?v=20261090/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -661,7 +697,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261089'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261090'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -724,7 +760,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261089"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261090"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

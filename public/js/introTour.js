@@ -31,7 +31,7 @@ const STEPS = [
   {
     target: ['#rightPanel', '#axisDock'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel trục được ẩn sẵn cho rộng bản đồ; bấm một nút trên dải năm trục bên trái để mở, nút thu trên hàng tiêu đề để đóng. Hàng trên là droplist năm panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải và Lớp nền là hai tab ở đáy panel.'
+    text: 'Panel trục được ẩn sẵn cho rộng bản đồ; bấm một nút trên dải sáu trục bên trái để mở, nút thu trên hàng tiêu đề để đóng. Hàng trên là droplist sáu panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc, Dự án đầu tư. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải, Lớp nền và Lớp môi trường là ba tab ở đáy panel.'
   },
   {
     target: ['#btnInspectPick', '#btnInspectMode'],

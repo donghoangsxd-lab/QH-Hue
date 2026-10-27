@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261089">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261090">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261089">
+  <link rel="stylesheet" href="css/style.css?v=20261090">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -428,12 +428,13 @@
       </div>
     </div>
 
-    <div class="axis-dock" id="axisDock" role="tablist" aria-label="Năm panel">
+    <div class="axis-dock" id="axisDock" role="tablist" aria-label="Sáu panel">
       <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="A. Quản lý phát triển đô thị"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
       <button type="button" data-axis-dock="quyhoach" class="active" role="tab" aria-selected="true" title="B. Hệ thống bản đồ quy hoạch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg><span>Quy hoạch</span></button>
       <button type="button" data-axis-dock="hatang" role="tab" aria-selected="false" title="C. Hệ thống hạ tầng kỹ thuật"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/></svg><span>Hạ tầng KT</span></button>
       <button type="button" data-axis-dock="xahoi" role="tab" aria-selected="false" title="D. Hệ thống hạ tầng xã hội"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16 19a5 5 0 0 1 5-4"/></svg><span>Hạ tầng XH</span></button>
       <button type="button" data-axis-dock="kientruc" role="tab" aria-selected="false" title="E. Quản lý về kiến trúc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/></svg><span>Kiến trúc</span></button>
+      <button type="button" data-axis-dock="dautu" role="tab" aria-selected="false" title="F. Dự án đầu tư"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4z"/><path d="M9 8V6h6v2"/><path d="M4 12h16"/></svg><span>Đầu tư</span></button>
     </div>
   </div>
 
@@ -454,12 +455,13 @@
         <div class="layer-main" id="layerMain">
           <div class="layer-mag" id="layerMag">
             <button type="button" class="mag-nav" data-mag-step="-1" title="Panel phía trước" aria-label="Panel phía trước"><svg class="ico"><use href="#i-step-left"/></svg></button>
-            <div class="mag-track" id="layerMagTrack" role="tablist" aria-label="Năm panel lớp dữ liệu">
+            <div class="mag-track" id="layerMagTrack" role="tablist" aria-label="Sáu panel lớp dữ liệu">
               <button type="button" class="mag-item is-before" role="tab" data-main-tab="hanhchinh" data-dist="1" aria-selected="false" aria-controls="layerPaneHanhChinh" title="A. Quản lý phát triển đô thị"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">A. Quản lý phát triển đô thị</span></button>
               <button type="button" class="mag-item is-current active" role="tab" data-main-tab="quyhoach" aria-selected="true" aria-controls="layerPaneQuyHoach" title="B. Hệ thống bản đồ quy hoạch"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">B. Hệ thống bản đồ quy hoạch</span></button>
               <button type="button" class="mag-item is-after" role="tab" data-main-tab="hatang" data-dist="1" aria-selected="false" aria-controls="layerPaneHaTang" title="C. Hệ thống hạ tầng kỹ thuật"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">C. Hệ thống hạ tầng kỹ thuật</span></button>
               <button type="button" class="mag-item is-after" role="tab" data-main-tab="xahoi" data-dist="2" aria-selected="false" aria-controls="layerPaneXaHoi" title="D. Hệ thống hạ tầng xã hội"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">D. Hệ thống hạ tầng xã hội</span></button>
               <button type="button" class="mag-item is-after" role="tab" data-main-tab="kientruc" data-dist="3" aria-selected="false" aria-controls="layerPaneKienTruc" title="E. Quản lý về kiến trúc"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">E. Quản lý về kiến trúc</span></button>
+              <button type="button" class="mag-item is-after" role="tab" data-main-tab="dautu" data-dist="4" aria-selected="false" aria-controls="layerPaneDauTu" title="F. Dự án đầu tư"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">F. Dự án đầu tư</span></button>
             </div>
             <button type="button" class="mag-nav" data-mag-step="1" title="Panel phía sau" aria-label="Panel phía sau"><svg class="ico"><use href="#i-step-right"/></svg></button>
             <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Ẩn panel" aria-label="Ẩn panel"><svg class="ico"><use href="#i-chev-left"/></svg></button>
@@ -594,9 +596,9 @@
             <div id="axisXaHoi">
               <p class="axis-scope" id="axisScopeXaHoi" hidden></p>
               <div class="layer-pane-tools">
-                <span class="layer-pane-note">Đang hiện <b id="layerCount">0/14</b> nhóm điểm</span>
+                <span class="layer-pane-note">Đang hiện <b id="layerCount">0/13</b> nhóm điểm</span>
                 <span id="infraTabCount" hidden></span>
-                <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình">
+                <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Bật / tắt toàn bộ 13 nhóm công trình" aria-label="Bật / tắt toàn bộ 13 nhóm công trình">
                   <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>Tất cả
                 </button>
               </div>
@@ -683,25 +685,6 @@
                     <input type="checkbox" id="chk_parcel" checked aria-label="Ranh lô theo lớp công trình"><svg class="ico"><use href="#i-parcel"/></svg>Ranh lô
                   </label></div>
                 <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">Cơ sở chưa sử dụng</label></div></div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
-                <div class="flood-box" id="aptBox" style="display:none;">
-                  <div class="apt-legend" aria-label="Chú giải chung cư">
-                    <span><i class="apt-mark" data-kind="noxh"></i>NOXH</span>
-                    <span><i class="apt-mark" data-kind="thuongmai"></i>Thương mại</span>
-                    <span><i class="apt-mark" data-kind="noxh" data-plan="1"></i>NOXH, quy hoạch</span>
-                    <span><i class="apt-mark" data-kind="thuongmai" data-plan="1"></i>Thương mại, quy hoạch</span>
-                  </div>
-                  <p class="apt-summary" id="aptSummary"></p>
-                  <label class="apt-kind">Lọc loại
-                    <select id="aptKind" aria-label="Lọc chung cư theo loại">
-                      <option value="">Tất cả</option>
-                      <option value="noxh">NOXH</option>
-                      <option value="thuongmai">Thương mại</option>
-                    </select>
-                  </label>
-                  <p id="aptStatus" class="apt-status"></p>
-                </div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
               </section>
               <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
                 <span class="layer-status-title">Ghi chú:</span>
@@ -713,6 +696,47 @@
           </div>
           <div class="layer-main-pane" id="layerPaneKienTruc" data-main-pane="kientruc" role="tabpanel" hidden>
             <div id="axisKienTruc"></div>
+          </div>
+          <div class="layer-main-pane" id="layerPaneDauTu" data-main-pane="dautu" role="tabpanel" hidden>
+            <div id="axisDauTu">
+              <div class="level-host" id="levelHostDt">
+                <div class="level-pick" id="levelPickDt" role="listbox" aria-label="Nhóm dự án đầu tư">
+                  <button type="button" class="level-pick-btn is-on" role="option" data-dt-tab="chungcu" aria-selected="true" title="Nhà chung cư"><span>Nhà chung cư</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="dien" aria-selected="false" title="Nhà máy điện"><span>Nhà máy điện</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khudothi" aria-selected="false" title="Khu đô thị"><span>Khu đô thị</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="dulich" aria-selected="false" title="Du lịch dịch vụ"><span>Du lịch dịch vụ</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khac" aria-selected="false" title="Dự án khác"><span>Dự án khác</span></button>
+                </div>
+              </div>
+              <div id="dtList" class="project-list">
+                <div data-dt-pane="chungcu">
+                  <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
+                  <div class="flood-box" id="aptBox" style="display:none;">
+                    <div class="apt-legend" aria-label="Chú giải chung cư">
+                      <span><i class="apt-mark" data-kind="noxh"></i>NOXH</span>
+                      <span><i class="apt-mark" data-kind="thuongmai"></i>Thương mại</span>
+                      <span><i class="apt-mark" data-kind="noxh" data-plan="1"></i>NOXH, quy hoạch</span>
+                      <span><i class="apt-mark" data-kind="thuongmai" data-plan="1"></i>Thương mại, quy hoạch</span>
+                    </div>
+                    <p class="apt-summary" id="aptSummary"></p>
+                    <label class="apt-kind">Lọc loại
+                      <select id="aptKind" aria-label="Lọc chung cư theo loại">
+                        <option value="">Tất cả</option>
+                        <option value="noxh">NOXH</option>
+                        <option value="thuongmai">Thương mại</option>
+                      </select>
+                    </label>
+                    <p id="aptStatus" class="apt-status"></p>
+                  </div>
+                </div>
+                <div data-dt-pane="dien" hidden><div class="project-empty">Chưa có đồ án.</div></div>
+                <div data-dt-pane="khudothi" hidden><div class="project-empty">Chưa có đồ án.</div></div>
+                <div data-dt-pane="dulich" hidden><div class="project-empty">Chưa có đồ án.</div></div>
+                <div data-dt-pane="khac" hidden>
+                  <div class="layer-row infra-point"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -746,6 +770,7 @@
             <p id="legendHtktNote" class="cn-empty" hidden>Tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc.</p>
           </div>
           <div id="legendXh" hidden></div>
+          <div id="legendDauTu" hidden></div>
           <div class="layer-map legend-display">
             <div class="layer-map-tabs">
               <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
@@ -1644,6 +1669,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261089"></script>
+  <script type="module" src="./js/app.js?v=20261090"></script>
 </body>
 </html>

@@ -100,7 +100,7 @@ html.title-dismissed { --title-h: 8px; }
   body { --bp-rows: 12; }
 }
 
-/* Dải năm trục khi panel thu: mép 8px + hộp 78px (viền, đệm, nút 64px). Bảng lô đứng sau dải, chừa bóng đổ. */
+/* Dải sáu trục khi panel thu: mép 8px + hộp 78px (viền, đệm, nút 64px). Bảng lô đứng sau dải, chừa bóng đổ. */
 body.right-collapsed { --info-left: calc(max(8px, env(safe-area-inset-left)) + 78px + 20px); }
 body, html {
   margin: 0; padding: 0; height: 100vh;
@@ -748,6 +748,10 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 #levelPickQh { width: 100%; overflow: visible; padding: 4px 2px; }
 #levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
 #levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+#levelHostDt .level-host-label { display: none; }
+#levelPickDt { width: 100%; flex-wrap: wrap; overflow: visible; padding: 4px 2px; }
+#levelPickDt .level-pick-btn { flex: 0 1 auto; justify-content: center; }
+#axisDauTu [data-dt-pane][hidden] { display: none !important; }
 .level-pick-btn.is-on {
   background: var(--accent-orange);
   border-color: var(--accent-orange);
@@ -760,7 +764,9 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   color: var(--text-on-accent);
 }
 body.view-ht .level-host { display: none; }
+body.view-ht #levelHostDt { display: flex; }
 body.compare-on .level-pick { display: none; }
+body.compare-on #levelPickDt { display: flex; }
 .level-split { display: none; flex-direction: column; gap: 4px; }
 .level-split[hidden] { display: none !important; }
 body.compare-on .level-host { flex-wrap: wrap; }
@@ -1255,7 +1261,7 @@ body.right-collapsed .right-panel {
 .layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
 .layer-main-tabs .layer-eye-btn:disabled, .layer-pane-tools .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
-/* Droplist panel: một tiêu đề. Cùng cỡ chữ với năm mục trong danh sách. */
+/* Droplist panel: một tiêu đề. Cùng cỡ chữ với mọi mục trong danh sách. */
 .layer-mag { position: relative; z-index: 6; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
 .mag-nav { display: none; }
 .layer-mag .rp-collapse-btn { flex: 0 0 28px; width: 28px; height: 28px; min-width: 28px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-muted); }
@@ -1959,6 +1965,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .axis-area-list,
 .cn-schemes,
 #xahoiList,
+#dtList,
 #legendFold > .dock-body,
 #layerPaneBase,
 #layerPaneEnv {
@@ -6384,6 +6391,20 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-xh .ua-legend-pane,
 #tabLegend.is-xh #legendSector,
 #tabLegend.is-xh .legend-extra { display: none !important; }
+#legendDauTu { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 2px; }
+#legendDauTu[hidden] { display: none !important; }
+#legendDauTu .layer-type-icon,
+#legendDauTu .apt-legend { flex: 0 0 auto; }
+#legendDauTu .apt-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+#tabLegend.is-dt .legend-display,
+#tabLegend.is-dt .legend-main,
+#tabLegend.is-dt .legend-find,
+#tabLegend.is-dt #parcelLegend,
+#tabLegend.is-dt .road-net,
+#tabLegend.is-dt .road-sections,
+#tabLegend.is-dt .ua-legend-pane,
+#tabLegend.is-dt #legendSector,
+#tabLegend.is-dt .legend-extra { display: none !important; }
 .xh-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .xh-table { margin: 0 6px 6px; }
 .xh-table td:nth-child(2), .xh-table td.is-miss { text-align: left; color: var(--axis-color-muted); }
@@ -7008,6 +7029,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   }
   #axisHanhChinh,
   #axisQuyHoach,
+  #axisDauTu,
   #layerPaneHaTang,
   #browseNganh,
   #axisXaHoi {
@@ -7035,6 +7057,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   .axis-area-list,
   #gpList,
   #projectList,
+  #dtList,
   .cn-body,
   #xahoiList {
     flex: 1 1 auto;

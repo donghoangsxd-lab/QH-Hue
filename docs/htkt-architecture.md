@@ -4,7 +4,7 @@ Chốt với Dong, 2026-10-24: tám tab HTKT gồm Tổng hợp đường ống;
 
 Tài liệu nghiên cứu bên dưới giữ số đếm catalog. Dung sai 2 m / 5 m ở mục 2 đã được thay bằng số chốt ở trên. Số liệu đếm ngày 2026-10-24 từ `public/data/chuyen-nganh/index.json`, `schemes.json` và GeoJSON local trong `data/chuyen-nganh/` (chỉ in tên lớp, kiểu hình, tên trường, số đối tượng, CRS, đồ án, mapid). Không GET GCS, không mở `infrastructure_hue.json`. CRS catalog: **EPSG:4326** (`index.json`, nguồn `gissonganh.hue.gov.vn/geditor.aspx`). File GeoJSON không có thành viên `crs`; tọa độ mẫu là kinh/vĩ độ Huế (khoảng 107,57°E, 16,39°N).
 
-Khung năm panel (Hành chính, Quy hoạch, HTKT, HTXH, Kiến trúc) giữ nguyên. Đề xuất dưới đây chỉ nằm trong panel HTKT và phần điểm dùng chung với HTXH.
+Khung panel (Hành chính, Quy hoạch, HTKT, HTXH, Kiến trúc, Dự án đầu tư) giữ nguyên ngoài trục HTKT. Đề xuất dưới đây chỉ nằm trong panel HTKT và phần điểm dùng chung với HTXH.
 
 ## 1. Hiện trạng
 
@@ -202,7 +202,7 @@ Lọc một đồ án là lọc thuộc tính trên file đã build, không tạ
 
 ## 4. Giao diện panel HTKT
 
-Khung droplist năm panel, ô tìm, nút HT/QH, nút cả nhóm, `#isoSlotHaTang` giữ nguyên. `#axisEnvFold` là tab Lớp môi trường đáy panel. Thay dải bảy nút trong `#browseNganh` bằng tám tab: bảy nhóm, rồi **Tổng hợp đường ống**.
+Khung droplist panel, ô tìm, nút HT/QH, nút cả nhóm, `#isoSlotHaTang` giữ nguyên. `#axisEnvFold` là tab Lớp môi trường đáy panel. Thay dải bảy nút trong `#browseNganh` bằng tám tab: bảy nhóm, rồi **Tổng hợp đường ống**.
 
 Trong mỗi tab:
 
