@@ -319,16 +319,16 @@ const SECTIONS = [
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên trái › <b>F. Dự án đầu tư</b> › tab <b>Dự án khác</b>. Bật <b>Dự án kêu gọi đầu tư</b>.',
-          'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
-          'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
+          'Bảng bên trái › <b>F. Dự án đầu tư</b> › chọn nhóm (DVTM, Công nghiệp…). Bật <b>Dự án kêu gọi đầu tư</b>.',
+          'Bấm ranh dự án trên bản đồ hoặc tên trong danh sách. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
+          'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b> (khi đã có ranh). Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
         ],
         facts: [
-          'Ranh lấy từ file KML, thông tin từ sheet danh sách dự án. Dự án chưa ghép được ranh không vẽ trên bản đồ.',
+          'Thông tin từ sheet danh sách dự án; ranh từ KML hoặc admin tải lên. Dự án chưa có ranh vẫn hiện trong danh sách.',
           'Nhóm này không có bán kính phục vụ và không tính vào bản đồ độ phủ.'
         ],
-        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'dautu', dt: 'khac' }) }]
+        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'dautu', dt: 'dvtm' }) }]
       }
     ]
   },

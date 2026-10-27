@@ -204,12 +204,16 @@ assert.match(social, /id="chk_c1"/);
 const dauTu = innerById(html, 'layerPaneDauTu');
 assert.ok(main.indexOf('id="layerPaneKienTruc"') < main.indexOf('id="layerPaneDauTu"'), 'Dự án đầu tư đứng sau Kiến trúc');
 const dtPick = innerById(html, 'levelPickDt');
+assert.match(html, /class="level-pick level-pick-dt"/);
 let dtAt = 0;
 for (const [id, label] of [
-  ['chungcu', 'Nhà chung cư'],
-  ['dien', 'Nhà máy điện'],
+  ['dvtm', 'DVTM'],
+  ['congnghiep', 'Công nghiệp'],
+  ['nangluong', 'Năng lượng'],
   ['khudothi', 'Khu đô thị'],
-  ['dulich', 'Du lịch dịch vụ'],
+  ['chungcu', 'Chung cư'],
+  ['nongnghiep', 'Nông nghiệp'],
+  ['vanhoaxahoi', 'Văn hóa xã hội'],
   ['khac', 'Dự án khác']
 ]) {
   const at = dtPick.indexOf(`data-dt-tab="${id}"`);
@@ -221,13 +225,13 @@ assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
 assert.match(dauTu, /id="aptBox"/);
 assert.match(dauTu, /id="aptList"/);
-assert.match(dauTu, /id="investList"/);
+assert.match(dauTu, /id="investList-dvtm"/);
+assert.match(dauTu, /id="investList-khac"/);
+assert.match(dauTu, /id="investList-chungcu"/);
 assert.match(read('public/js/apartmentLayer.js'), /data-apt-expand/);
 assert.match(read('public/js/investLayer.js'), /data-invest-expand/);
 assert.match(read('docs/ui-spec.md'), /cùng kiểu công trình kiến trúc Pháp/);
-assert.match(dauTu, /Chưa có đồ án\./);
-assert.equal((dauTu.match(/Chưa có đồ án\./g) || []).length, 3);
-assert.match(dauTu, /class="level-pick"/);
+assert.match(dauTu, /class="level-pick level-pick-dt"/);
 assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);
 assert.match(html, /id="legendDauTu"/);
 const axisDock = innerById(html, 'axisDock');

@@ -191,12 +191,50 @@ function parseInvestCalls(text) {
   }
 }
 
+const INVEST_GROUP_IDS = new Set([
+  'dvtm', 'congnghiep', 'nangluong', 'khudothi', 'chungcu', 'nongnghiep', 'vanhoaxahoi', 'khac'
+]);
+
+function cleanInvestGroupId(value) {
+  const id = cleanInvestText(value, 40);
+  return INVEST_GROUP_IDS.has(id) ? id : '';
+}
+
+function cleanInvestGeometry(raw) {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const type = raw.type;
+  if (type !== 'Polygon' && type !== 'MultiPolygon') return undefined;
+  const text = JSON.stringify(raw);
+  if (text.length > 800000) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return undefined;
+  }
+}
+
 function parseInvestStore(text) {
   if (!text) return { items: [], groups: [] };
   try {
     const data = JSON.parse(text);
     const list = data && Array.isArray(data.items) ? data.items : [];
-    const items = list.filter(it => it && it.key && it.fields && typeof it.fields === 'object').slice(0, INVEST_EDIT_MAX);
+    const items = [];
+    list.forEach(it => {
+      if (items.length >= INVEST_EDIT_MAX) return;
+      if (!it || !it.key || !it.fields || typeof it.fields !== 'object') return;
+      const row = {
+        key: cleanInvestText(it.key, 200),
+        match: cleanInvestText(it.match, 200),
+        fields: it.fields
+      };
+      const groupId = cleanInvestGroupId(it.groupId);
+      if (groupId) row.groupId = groupId;
+      const geometry = cleanInvestGeometry(it.geometry);
+      if (geometry) row.geometry = geometry;
+      if (it.geometry === null) row.geometry = null;
+      items.push(row);
+    });
     const groups = [];
     (data && Array.isArray(data.groups) ? data.groups : []).forEach(g => {
       if (groups.length >= 200) return;
@@ -225,6 +263,7 @@ function applyInvestEdits(base, items) {
   const data = base ? JSON.parse(JSON.stringify(base)) : { headers: [], rows: [] };
   if (!Array.isArray(data.rows)) data.rows = [];
   if (!Array.isArray(data.headers)) data.headers = [];
+  const boundaries = [];
   items.forEach(it => {
     const key = it.key;
     const match = it.match || '';
@@ -240,8 +279,11 @@ function applyInvestEdits(base, items) {
     Object.assign(row, it.fields);
     row._alias = key;
     if (map) row._map = map;
+    if (it.groupId) row._groupId = it.groupId;
     Object.keys(it.fields).forEach(k => { if (!data.headers.includes(k)) data.headers.push(k); });
+    if (it.geometry) boundaries.push({ key, match, geometry: it.geometry });
   });
+  data.boundaries = boundaries;
   return data;
 }
 
@@ -3189,6 +3231,7 @@ module.exports = async (req, res) => {
         const bare = parseInvestCalls(d.text);
         if (!bare) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
         bare.groups = [];
+        bare.boundaries = [];
         res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         return res.status(200).json(bare);
@@ -3196,6 +3239,11 @@ module.exports = async (req, res) => {
       const base = parseInvestCalls(d.text);
       if (!base) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
       const data = store.items.length ? applyInvestEdits(base, store.items) : base;
+      if (!Array.isArray(data.boundaries)) {
+        data.boundaries = store.items.filter(it => it.geometry).map(it => ({
+          key: it.key, match: it.match || '', geometry: it.geometry
+        }));
+      }
       data.groups = store.groups;
       setCdn(res, ...CDN_EDIT);
       return res.status(200).json(data);
@@ -3210,14 +3258,28 @@ module.exports = async (req, res) => {
       const fields = parseInvestFields(body.fields);
       if (!key || !fields) return res.status(400).json({ error: true, message: 'Thiếu tên dự án hoặc nội dung không hợp lệ' });
       const store = parseInvestStore((await getInvestEdits())?.text);
+      const prev = store.items.find(it => it.key === key);
+      const groupId = body.groupId === undefined
+        ? (prev && prev.groupId) || ''
+        : cleanInvestGroupId(body.groupId);
+      let geometry;
+      if (body.geometry === undefined) geometry = prev && prev.geometry !== undefined ? prev.geometry : undefined;
+      else if (body.geometry === null) geometry = null;
+      else geometry = cleanInvestGeometry(body.geometry);
+      if (body.geometry !== undefined && body.geometry !== null && !geometry) {
+        return res.status(400).json({ error: true, message: 'Ranh chỉ nhận Polygon hoặc MultiPolygon' });
+      }
       const current = store.items.filter(it => it.key !== key);
-      current.push({ key, match, fields });
+      const row = { key, match, fields };
+      if (groupId) row.groupId = groupId;
+      if (geometry) row.geometry = geometry;
+      current.push(row);
       if (current.length > INVEST_EDIT_MAX) return res.status(413).json({ error: true, message: 'Quá nhiều dự án đã sửa' });
       const text = investStoreText(current, store.groups);
-      if (text.length > 400000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
+      if (text.length > 1200000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
       await gcsWrite.putJson(INVEST_EDITS_NAME, text);
       forgetTextFile(constants.INVEST_EDITS_URL);
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, groupId: groupId || null, hasGeometry: !!geometry });
     }
 
     // Gộp nhiều ranh KML thành một dự án. keys là khóa ranh; clear=true thì chỉ gỡ các khóa đó khỏi nhóm.

@@ -749,8 +749,30 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 #levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
 #levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
 #levelHostDt .level-host-label { display: none; }
-#levelPickDt { width: 100%; flex-wrap: wrap; overflow: visible; padding: 4px 2px; }
-#levelPickDt .level-pick-btn { flex: 0 1 auto; justify-content: center; }
+#levelPickDt {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: visible;
+  padding: 4px 2px;
+}
+#levelPickDt .level-pick-btn {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  padding: 0 3px;
+}
+#levelPickDt .level-pick-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.2;
+}
+#axisDauTu .dt-invest-layer { margin: 2px 0 6px; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
 .level-pick-btn.is-on {
   background: var(--accent-orange);
@@ -766,7 +788,18 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 body.view-ht .level-host { display: none; }
 body.view-ht #levelHostDt { display: flex; }
 body.compare-on .level-pick { display: none; }
-body.compare-on #levelPickDt { display: flex; }
+body.compare-on #levelPickDt { display: grid; }
+.invest-admin-tools {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 8px 0; padding: 8px; border: 1px solid var(--border, #334155); border-radius: 6px;
+}
+.invest-admin-tools .invest-group-move {
+  display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-muted, #94a3b8);
+}
+.invest-admin-tools .invest-group-select {
+  min-width: 140px; font-size: 12px; padding: 4px 6px;
+}
+.invest-admin-tools .invest-bound-upload { cursor: pointer; margin: 0; }
 .level-split { display: none; flex-direction: column; gap: 4px; }
 .level-split[hidden] { display: none !important; }
 body.compare-on .level-host { flex-wrap: wrap; }

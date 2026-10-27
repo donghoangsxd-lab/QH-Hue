@@ -9,8 +9,10 @@ import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
-import { matchInvestDetail, sheetProjectName } from './investMatch.js';
+import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatch.js';
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
+import { classifyInvestGroup, INVEST_GROUPS, isInvestGroupId, investGroupLabel } from './investClassify.js';
+import { readDrawingFile } from './drawingReaders.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
@@ -62,6 +64,8 @@ const isPlanLevel = (id) => PLAN_TABS.some(t => t.id === id);
 let visible = false;
 let ready = null;
 let pack = null;
+let sheetRows = [];
+let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
 let investPicked = '';
@@ -76,6 +80,19 @@ let landFill = null;
 let openSeq = 0;
 let drawToken = 0;
 let groups = [];
+
+function activeDtTab() {
+  return document.querySelector('#levelPickDt .level-pick-btn.is-on')?.dataset?.dtTab || 'dvtm';
+}
+
+function rowAlias(row) {
+  if (!row) return '';
+  return String(row._alias || sheetProjectName(row) || '').replace(/\s+/g, ' ').trim();
+}
+
+function rowGroupId(row, title) {
+  return classifyInvestGroup(row, title, row?._groupId);
+}
 
 function toolBusy() {
   return !!(state.sketchTool || state.adminDrawMode || state.isPickMode || state.activeMeasureType || state.isInspectMode);
@@ -168,6 +185,7 @@ function centerOf(geom) {
 
 function projectList(features) {
   const seen = new Set();
+  const matchedRows = new Set();
   const out = [];
   (features || []).forEach(feature => {
     const id = feature.properties?.groupId || feature.properties?._key;
@@ -177,18 +195,38 @@ function projectList(features) {
       ? features.filter(f => f.properties?.groupId === feature.properties.groupId)
       : [feature];
     const sheet = sheetOf(members, feature);
+    if (sheet) matchedRows.add(sheet);
+    const title = sheetProjectName(sheet) || feature.properties?.name || 'Ranh dự án';
     const sectorText = entry(sheet, /lĩnh vực/i) || members.map(m => m.properties?.folder).find(Boolean) || '';
+    const geom = unionGeom(members);
+    const pin = !geom && sheet ? sheetMapPoint(sheet) : null;
     out.push({
       feature: members[0],
       members,
-      geom: unionGeom(members),
+      geom,
+      pin,
       sheet,
       sector: sectorOf(sectorText),
       matched: !!sheet,
-      title: sheetProjectName(sheet) || feature.properties?.name || 'Ranh dự án'
+      hasBoundary: !!geom,
+      sheetOnly: !!feature.properties?._sheetOnly,
+      title,
+      dtGroup: rowGroupId(sheet, title)
     });
   });
+  sheetOnly.forEach(p => {
+    if (p.sheet && matchedRows.has(p.sheet)) return;
+    const id = projectKey(p);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(p);
+  });
   return out;
+}
+
+function projectsForTab(tab) {
+  const id = tab || activeDtTab();
+  return projectList(pack || []).filter(p => p.dtGroup === id);
 }
 
 function readStore() {
@@ -334,19 +372,25 @@ function overviewHtml(st, props) {
   const listed = listedArea(row);
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
   const ambiguous = !row && !!props._ambiguous;
-  const chip = row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`;
-  const alert = row
-    ? ''
-    : ambiguous
-      ? '<div class="invest-alert">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</div>'
-      : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
+  const noBound = !st.geom;
+  const chip = noBound
+    ? '<span class="invest-chip">Chưa có ranh</span>'
+    : (row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`);
+  const alert = noBound
+    ? '<div class="invest-alert">Dự án chưa có ranh giới. Admin có thể tải file KML hoặc DXF để bổ sung.</div>'
+    : row
+      ? ''
+      : ambiguous
+        ? '<div class="invest-alert">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</div>'
+        : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
   const goalHtml = goal
     ? `<div class="invest-lead"><small>Mục tiêu và nhu cầu đầu tư</small><p>${escapeHtml(goal)}</p></div>`
     : '';
+  const groupName = investGroupLabel(st.dtGroup || rowGroupId(row, titleOf(props)));
   return `<div class="invest-head">
       <span class="invest-badge" style="color:${sector.color}">${ico(sector.icon)}</span>
       <div class="invest-head-main">
-        <div class="invest-kicker"><b>${escapeHtml(sector.label)}</b>${pieces}${chip}</div>
+        <div class="invest-kicker"><b>${escapeHtml(sector.label)}</b><span class="invest-pieces">${escapeHtml(groupName)}</span>${pieces}${chip}</div>
         <div class="lp-title">${escapeHtml(titleOf(props))}</div>
       </div>
     </div>
@@ -356,7 +400,7 @@ function overviewHtml(st, props) {
       ${statHtml('Địa điểm', place, 'pin', true)}
       ${statHtml('Mức độ ưu tiên', priority, 'flag', !place)}
     </div>
-    ${goalHtml}${alert}${groupHtml(st)}`;
+    ${goalHtml}${alert}${adminToolsHtml(st)}${groupHtml(st)}`;
 }
 
 function detailHtml(props) {
@@ -365,8 +409,24 @@ function detailHtml(props) {
   return blocks.map(([k, v]) => `<section class="invest-block"><h4>${escapeHtml(shortLabel(k))}</h4><div class="invest-copy">${fieldValue(v)}</div></section>`).join('');
 }
 
-function groupHtml(st) {
+function adminToolsHtml(st) {
   if (!isAdmin()) return '';
+  const cur = st.dtGroup || rowGroupId(st.sheet, titleOf(viewOf(st)));
+  const opts = INVEST_GROUPS.map(g =>
+    `<option value="${g.id}"${g.id === cur ? ' selected' : ''}>${escapeHtml(g.label)}</option>`
+  ).join('');
+  return `<div class="invest-admin-tools">
+    <label class="invest-group-move">Nhóm tab
+      <select class="invest-group-select" aria-label="Chuyển nhóm dự án">${opts}</select>
+    </label>
+    <label class="invest-bound-upload proof-btn">${ico('layers')}Tải ranh KML/DXF
+      <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
+    </label>
+  </div>`;
+}
+
+function groupHtml(st) {
+  if (!isAdmin() || !st.geom) return '';
   if (st.grouping) {
     return `<div class="invest-group-bar"><b>Gộp ranh thành một dự án</b><span>Bấm ranh trên bản đồ để thêm hoặc bỏ. Đang chọn ${st.picks.size} mảnh.</span>
       <div class="invest-edit-actions"><button type="button" class="proof-btn invest-group-save">Lưu thành một dự án</button><button type="button" class="invest-group-cancel">Hủy</button></div></div>`;
@@ -374,7 +434,7 @@ function groupHtml(st) {
   const grouped = (st.members || []).length > 1;
   return `<div class="invest-group-actions">
     <button type="button" class="invest-group">${ico('layers')}Gộp thêm ranh vào dự án này</button>
-    ${grouped ? '<button type="button" class="invest-ungroup">Tách ranh đang xem</button><button type="button" class="invest-ungroup-all">Bỏ gộp cả nhóm</button>' : ''}
+    ${grouped ? '<button type="button" class="invest-ungroup">Tách ranh khỏi dự án</button><button type="button" class="invest-ungroup-all">Bỏ gộp cả nhóm</button>' : ''}
   </div>`;
 }
 
@@ -407,8 +467,86 @@ function setHint(text) {
 
 function refreshHint() {
   const projects = projectList(pack || []);
-  const hit = projects.filter(p => p.matched).length;
-  setHint(`(${(pack || []).length} ranh · ${projects.length} dự án · ${hit} khớp)`);
+  const withGeom = projects.filter(p => p.hasBoundary).length;
+  const tab = projectsForTab().length;
+  setHint(`(${projects.length} dự án · ${withGeom} có ranh · tab ${tab})`);
+}
+
+function attachAdminBoundaries(features, rows, boundaries) {
+  (boundaries || []).forEach(b => {
+    if (!b?.geometry) return;
+    const key = String(b.key || '').trim();
+    const match = String(b.match || '').trim();
+    let row = rows.find(r => r && r._alias === key);
+    if (!row && match) row = rows.find(r => sheetProjectName(r) === match);
+    if (!row && key) row = rows.find(r => sheetProjectName(r) === key);
+    const name = sheetProjectName(row) || match || key || 'Ranh tải lên';
+    const alias = rowAlias(row) || key || name;
+    const existing = features.find(f => f.properties?._adminKey === alias || (row && f.properties?.sheet === row));
+    if (existing) {
+      existing.geometry = b.geometry;
+      existing.properties = existing.properties || {};
+      existing.properties._adminKey = alias;
+      existing.properties.sheet = row || existing.properties.sheet;
+      existing.properties._key = `admin:${alias}`;
+      existing.properties._sheetOnly = false;
+      return;
+    }
+    features.push({
+      type: 'Feature',
+      geometry: b.geometry,
+      properties: {
+        name,
+        folder: entry(row, /lĩnh vực/i) || '',
+        kml: {},
+        sheet: row || null,
+        _key: `admin:${alias}`,
+        _adminKey: alias,
+        _sheetOnly: false
+      }
+    });
+  });
+}
+
+function rebuildSheetOnly(features, rows) {
+  const used = new Set();
+  (features || []).forEach(f => {
+    const sheet = f.properties?.sheet;
+    if (sheet) used.add(sheet);
+  });
+  sheetOnly = [];
+  (rows || []).forEach(row => {
+    if (!row || used.has(row)) return;
+    const title = sheetProjectName(row);
+    if (!title) return;
+    const alias = rowAlias(row) || title;
+    const pin = sheetMapPoint(row);
+    const feature = {
+      type: 'Feature',
+      geometry: null,
+      properties: {
+        name: title,
+        folder: entry(row, /lĩnh vực/i) || '',
+        kml: {},
+        sheet: row,
+        _key: `sheet:${alias}`,
+        _sheetOnly: true
+      }
+    };
+    sheetOnly.push({
+      feature,
+      members: [feature],
+      geom: null,
+      pin,
+      sheet: row,
+      sector: sectorOf(entry(row, /lĩnh vực/i)),
+      matched: true,
+      hasBoundary: false,
+      sheetOnly: true,
+      title,
+      dtGroup: rowGroupId(row, title)
+    });
+  });
 }
 
 async function loadPack() {
@@ -419,19 +557,23 @@ async function loadPack() {
     ]).then(async ([fc, loaded]) => {
       const features = (fc && fc.features) || [];
       const rows = loaded.rows || [];
+      sheetRows = rows;
       const detail = matchInvestDetail(features, rows);
       features.forEach((f, i) => {
         f.properties = f.properties || {};
         f.properties._key = featureKey(f);
         f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
         f.properties._ambiguous = !!detail[i].ambiguous;
+        f.properties._sheetOnly = false;
       });
+      attachAdminBoundaries(features, rows, loaded.boundaries);
       pack = features;
       adoptGroups(loaded.groups);
       if (isAdmin()) {
         try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
       }
       stampGroups();
+      rebuildSheetOnly(pack, rows);
       refreshHint();
       return features;
     });
@@ -446,14 +588,18 @@ async function loadRows() {
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.rows) && data.rows.length) {
-        return { rows: data.rows, groups: Array.isArray(data.groups) ? data.groups : null };
+        return {
+          rows: data.rows,
+          groups: Array.isArray(data.groups) ? data.groups : null,
+          boundaries: Array.isArray(data.boundaries) ? data.boundaries : []
+        };
       }
     }
   } catch { /* bản đóng gói theo file Excel hiện có */ }
   const res = await fetch('./data/invest-sheet.json');
-  if (!res.ok) return { rows: [], groups: null };
+  if (!res.ok) return { rows: [], groups: null, boundaries: [] };
   const data = await res.json();
-  return { rows: data.rows || [], groups: null };
+  return { rows: data.rows || [], groups: null, boundaries: [] };
 }
 
 function ensurePane(m, name, z) {
@@ -466,7 +612,7 @@ function ensurePane(m, name, z) {
 function openFromMark(feature, layer, host, e) {
   if (toolBusy()) return;
   L.DomEvent.stopPropagation(e);
-  if (card?.grouping) { toggleGroupPick(feature); return; }
+  if (card?.grouping && feature?.geometry) { toggleGroupPick(feature); return; }
   openCard(feature, layer, host);
 }
 
@@ -484,23 +630,23 @@ function projectKey(p) {
 }
 
 function shownPack(features) {
-  if (!investHidden.size) return features;
+  const tab = activeDtTab();
   const drop = new Set();
   projectList(features).forEach(p => {
-    if (investHidden.has(projectKey(p))) p.members.forEach(f => drop.add(f));
+    if (p.dtGroup !== tab || investHidden.has(projectKey(p))) p.members.forEach(f => drop.add(f));
   });
-  return features.filter(f => !drop.has(f));
+  return features.filter(f => f.geometry && !drop.has(f));
 }
 
 function drawOn(m, features) {
-  features = shownPack(features);
+  const drawFeatures = shownPack(features);
   ensurePane(m, PANE, PANE_Z);
   ensurePane(m, MARK_PANE, MARK_PANE_Z);
   const byFeature = new Map();
-  const projects = projectList(features);
+  const tabProjects = projectsForTab();
   const titleByFeature = new Map();
-  projects.forEach(p => p.members.forEach(f => titleByFeature.set(f, p.title)));
-  const group = L.geoJSON({ type: 'FeatureCollection', features }, {
+  tabProjects.forEach(p => p.members.forEach(f => titleByFeature.set(f, p.title)));
+  const group = L.geoJSON({ type: 'FeatureCollection', features: drawFeatures }, {
     pane: PANE,
     keyboard: false,
     style: f => styleFor(f),
@@ -521,10 +667,24 @@ function drawOn(m, features) {
     }
   });
   group.addTo(m);
-  projects.forEach(p => {
-    const at = centerOf(p.geom);
+  tabProjects.filter(p => !investHidden.has(projectKey(p))).forEach(p => {
+    let at = p.geom ? centerOf(p.geom) : null;
+    if (!at && p.pin) at = L.latLng(p.pin[1], p.pin[0]);
     const layer = byFeature.get(p.feature);
-    if (!at || !layer) return;
+    if (!at) return;
+    if (!p.hasBoundary && p.pin) {
+      const mark = L.marker(at, {
+        pane: MARK_PANE,
+        keyboard: false,
+        zIndexOffset: 140,
+        icon: sectorMarker(p.sector, true)
+      });
+      mark.bindTooltip(`${p.sector.label} · ${p.title} · chưa có ranh`, { className: 'invest-tip', direction: 'top', offset: [0, -28] });
+      mark.on('click', (e) => openFromMark(p.feature, layer || mark, m, e));
+      mark.addTo(group);
+      return;
+    }
+    if (!layer) return;
     if (!p.matched) {
       const dot = L.marker(at, {
         pane: MARK_PANE,
@@ -695,7 +855,20 @@ function ensureCard() {
     if (e.target.closest('.invest-add')) { addEditRow(); return; }
     if (e.target.closest('.invest-cancel')) { paintCard(); return; }
     if (e.target.closest('.invest-save')) { saveEdit(); return; }
+    if (e.target.closest('.invest-bound-upload') && !e.target.closest('.invest-bound-file')) {
+      el.querySelector('.invest-bound-file')?.click();
+      return;
+    }
     if (e.target.closest('.cad-card-x')) closeCard();
+  });
+  el.addEventListener('change', (e) => {
+    const sel = e.target.closest('.invest-group-select');
+    if (sel) { saveGroupMove(sel.value); return; }
+    const file = e.target.closest('.invest-bound-file');
+    if (file?.files?.[0]) {
+      uploadBoundary(file.files[0]);
+      file.value = '';
+    }
   });
   el.addEventListener('pls-pick', (e) => toggleLand(e.detail?.key, e.detail?.color));
   return el;
@@ -816,11 +989,11 @@ function paintCard() {
       <div class="invest-pages">
         <div data-info-page="overview"${info === 'overview' ? '' : ' hidden'}>
           ${overviewHtml(st, props)}
-          <button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}</button>
+          ${st.geom ? `<button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}</button>
           <div class="invest-plan"${planOpen ? '' : ' hidden'}>
             ${tabsBar(st.tab)}
             <div class="cad-page" role="tabpanel"></div>
-          </div>
+          </div>` : ''}
         </div>
         <div data-info-page="detail"${info === 'detail' ? '' : ' hidden'}>${detailHtml(props)}</div>
       </div>
@@ -864,23 +1037,62 @@ function redrawMaps() {
   if (feature && host && card) selectLayer(findLayer(feature, host), host, geom);
 }
 
-function applySaved(feature, fields) {
+function saveKeyOf(st) {
+  const sheet = st?.sheet;
+  const props = st?.feature?.properties || {};
+  return String(props._adminKey || rowAlias(sheet) || props.name || titleOf(props) || '').trim();
+}
+
+function applySaved(feature, fields, extra = {}) {
   const props = feature.properties || {};
-  const key = props.name || '';
+  const key = props._adminKey || props.name || '';
   const match = sheetProjectName(props.sheet) || '';
   const targets = (pack || [feature]).filter(f => {
     const p = f.properties || {};
-    return f === feature || (key && p.name === key) || (match && sheetProjectName(p.sheet) === match);
+    return f === feature || (key && (p.name === key || p._adminKey === key)) || (match && sheetProjectName(p.sheet) === match);
   });
   membersOf(feature).forEach(f => { if (!targets.includes(f)) targets.push(f); });
+  if (!targets.includes(feature)) targets.push(feature);
   targets.forEach(f => {
     const prev = f.properties?.sheet;
-    const sheet = { ...fields, _alias: key || f.properties?.name || '' };
+    const sheet = { ...(prev || {}), ...fields, _alias: rowAlias(prev) || key || f.properties?.name || '' };
     if (prev && prev._map) sheet._map = prev._map;
+    if (extra.groupId) sheet._groupId = extra.groupId;
     f.properties.sheet = sheet;
+    if (extra.geometry) {
+      f.geometry = extra.geometry;
+      f.properties._sheetOnly = false;
+      f.properties._adminKey = sheet._alias || key;
+      f.properties._key = f.properties._key?.startsWith('sheet:') ? `admin:${sheet._alias || key}` : (f.properties._key || `admin:${sheet._alias || key}`);
+      if (pack && !pack.includes(f)) pack.push(f);
+    }
   });
-  if (card) card.sheet = sheetOf(membersOf(feature), feature);
+  rebuildSheetOnly(pack, sheetRows);
+  if (card) {
+    card.sheet = sheetOf(membersOf(feature), feature);
+    if (extra.groupId) card.dtGroup = extra.groupId;
+    if (extra.geometry) {
+      card.geom = extra.geometry;
+      card.members = membersOf(feature);
+    }
+  }
   redrawMaps();
+  paintInvestList();
+}
+
+async function postInvestSave({ key, match, fields, groupId, geometry }) {
+  const body = { key, match, fields };
+  if (groupId !== undefined) body.groupId = groupId;
+  if (geometry !== undefined) body.geometry = geometry;
+  const res = await fetch(geeApi('action=saveInvestProject'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 403) signOutAdmin();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Không lưu được thông tin dự án');
+  return data;
 }
 
 async function saveEdit() {
@@ -899,25 +1111,22 @@ async function saveEdit() {
     showToast('Cần giữ tên dự án', 'error');
     return;
   }
-  const props = feature.properties || {};
-  const key = String(props.name || titleOf(props)).trim();
+  const key = saveKeyOf(st);
   if (!key) {
-    showToast('Ranh này chưa có tên để lưu', 'error');
+    showToast('Dự án chưa có tên để lưu', 'error');
     return;
   }
   st.saving = true;
   const btn = el.querySelector('.invest-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu…'; }
   try {
-    const res = await fetch(geeApi('action=saveInvestProject'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
-      body: JSON.stringify({ key, match: sheetProjectName(st.sheet || props.sheet) || '', fields })
+    await postInvestSave({
+      key,
+      match: sheetProjectName(st.sheet) || '',
+      fields,
+      groupId: st.dtGroup || undefined
     });
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 401 || res.status === 403) signOutAdmin();
-    if (!res.ok || !data.success) throw new Error(data.message || 'Không lưu được thông tin dự án');
-    applySaved(feature, fields);
+    applySaved(feature, fields, { groupId: st.dtGroup });
     st.recorded = recordedM2(st.sheet || feature.properties.sheet);
     st.cache.clear();
     paintCard();
@@ -926,6 +1135,84 @@ async function saveEdit() {
     st.saving = false;
     if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'Lưu'; }
     showToast(err.message || 'Không lưu được thông tin dự án', 'error');
+  }
+}
+
+async function saveGroupMove(groupId) {
+  const st = card;
+  if (!st || !isAdmin() || !isInvestGroupId(groupId) || st.saving) return;
+  const fields = {};
+  rowEntries(viewOf(st)).forEach(([k, v]) => { fields[k] = String(v); });
+  if (!sheetProjectName(fields)) fields['Tên dự án'] = titleOf(viewOf(st));
+  const key = saveKeyOf(st);
+  if (!key) {
+    showToast('Dự án chưa có tên để chuyển nhóm', 'error');
+    return;
+  }
+  st.saving = true;
+  try {
+    await postInvestSave({ key, match: sheetProjectName(st.sheet) || '', fields, groupId });
+    applySaved(st.feature, fields, { groupId });
+    st.dtGroup = groupId;
+    paintCard();
+    paintInvestList();
+    if (visible) redrawMaps();
+    showToast(`Đã chuyển sang nhóm ${investGroupLabel(groupId)}`);
+  } catch (err) {
+    showToast(err.message || 'Không chuyển được nhóm', 'error');
+    paintCard();
+  } finally {
+    st.saving = false;
+  }
+}
+
+function unionBoundary(features) {
+  const polys = [];
+  (features || []).forEach(f => {
+    const g = f?.geometry;
+    if (!g) return;
+    if (g.type === 'Polygon') polys.push(g.coordinates);
+    else if (g.type === 'MultiPolygon') polys.push(...g.coordinates);
+  });
+  if (!polys.length) return null;
+  return polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys };
+}
+
+async function uploadBoundary(file) {
+  const st = card;
+  if (!st || !isAdmin() || !file || st.saving) return;
+  st.saving = true;
+  showToast('Đang đọc bản vẽ ranh…');
+  try {
+    const drawn = await readDrawingFile(file, 'boundary');
+    if (drawn.error) throw new Error(drawn.error);
+    const geometry = unionBoundary(drawn.features);
+    if (!geometry) throw new Error('File không có polygon ranh');
+    const fields = {};
+    rowEntries(viewOf(st)).forEach(([k, v]) => { fields[k] = String(v); });
+    if (!sheetProjectName(fields)) fields['Tên dự án'] = titleOf(viewOf(st));
+    const key = saveKeyOf(st);
+    if (!key) throw new Error('Dự án chưa có tên để gắn ranh');
+    await postInvestSave({
+      key,
+      match: sheetProjectName(st.sheet) || '',
+      fields,
+      groupId: st.dtGroup || undefined,
+      geometry
+    });
+    applySaved(st.feature, fields, { groupId: st.dtGroup, geometry });
+    st.geom = geometry;
+    st.cache.clear();
+    let area = 0;
+    try { area = turf.area(turf.feature(geometry)); } catch { area = 0; }
+    st.areaText = area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`;
+    paintCard();
+    openCard(st.feature, findLayer(st.feature, st.map), st.map);
+    showToast('Đã gắn ranh dự án');
+  } catch (err) {
+    showToast(err.message || 'Không tải được ranh', 'error');
+  } finally {
+    st.saving = false;
   }
 }
 
@@ -1032,37 +1319,51 @@ async function ungroup(all) {
 }
 
 function openCard(feature, layer, targetMap) {
-  if (!feature?.geometry) return;
+  if (!feature) return;
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'invest' }));
   clearParcelPies();
   const seq = ++openSeq;
   const members = membersOf(feature);
-  const geom = unionGeom(members);
+  const geom = unionGeom(members.filter(m => m.geometry));
   const sheet = sheetOf(members, feature);
+  const title = sheetProjectName(sheet) || feature.properties?.name || 'Dự án';
   ensureCard();
-  setQuietProjectOutline(true);
+  setQuietProjectOutline(!!geom);
   const tab = isPlanLevel(getLevel()) ? getLevel() : 'qhpk';
   let area = 0;
-  members.forEach(m => { try { area += turf.area(m); } catch { /* mảnh hỏng thì bỏ qua */ } });
-  const areaText = area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`;
+  members.forEach(m => { if (!m.geometry) return; try { area += turf.area(m); } catch { /* mảnh hỏng thì bỏ qua */ } });
+  const areaText = area > 0
+    ? (area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`)
+    : '';
   card = {
-    seq, tab, infoTab: 'overview', cache: new Map(), map: targetMap, feature, members, geom, sheet,
-    areaText, pieces: members.length, recorded: recordedM2(sheet), bounds: null,
-    landKey: null, editing: false, saving: false, grouping: false, picks: new Set()
+    seq, tab, infoTab: 'overview', cache: new Map(), map: targetMap || map, feature, members, geom, sheet,
+    areaText, pieces: members.filter(m => m.geometry).length || 1, recorded: recordedM2(sheet), bounds: null,
+    landKey: null, editing: false, saving: false, grouping: false, picks: new Set(),
+    dtGroup: rowGroupId(sheet, title)
   };
   paintCard();
-  selectLayer(layer, targetMap, geom);
+  if (geom) selectLayer(layer, targetMap || map, geom);
+  else {
+    selected = null;
+    clearHighlight();
+  }
   let bounds = null;
   try { bounds = geom ? L.geoJSON(geom).getBounds() : null; } catch { bounds = null; }
+  if (!bounds) {
+    const pin = sheetMapPoint(sheet);
+    if (pin) bounds = L.latLngBounds([L.latLng(pin[1], pin[0])]);
+  }
   card.bounds = bounds;
   if (seq !== openSeq) return;
-  requestAnimationFrame(() => { if (card && card.seq === seq) frameProject(targetMap, bounds); });
+  if (bounds) requestAnimationFrame(() => { if (card && card.seq === seq) frameProject(targetMap || map, bounds); });
 }
 
 function investDossierRows(p) {
   const props = viewOf(p);
   const rows = [];
-  if (p.members.length > 1) rows.push(['Quy mô', `${p.members.length} mảnh`]);
+  rows.push(['Nhóm', investGroupLabel(p.dtGroup)]);
+  if (!p.hasBoundary) rows.push(['Ranh giới', 'Chưa có ranh']);
+  if ((p.members || []).filter(m => m.geometry).length > 1) rows.push(['Quy mô', `${p.members.filter(m => m.geometry).length} mảnh`]);
   rowEntries(props).forEach(([k, v]) => {
     if (/tên dự án|^stt$/i.test(k)) return;
     let value = String(v).replace(/\s+/g, ' ').trim();
@@ -1086,10 +1387,11 @@ function investRow(p, n) {
   const open = investOpen.has(id);
   const shown = !investHidden.has(id);
   const rows = investDossierRows(p);
+  const badge = p.hasBoundary ? '' : ' <small class="layer-hint">Chưa có ranh</small>';
   const blob = [p.title, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
   return `<div class="project-row${shown ? '' : ' is-off'}${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
       <label class="project-name" title="${escapeHtml(p.title || '')}">
-        <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}</span></label>
+        <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}${badge}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-invest-expand="${safe}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
       </span>
@@ -1097,15 +1399,19 @@ function investRow(p, n) {
 }
 
 function paintInvestList() {
-  const host = $('investList');
-  if (!host) return;
   const scroller = $('dtList');
   const y = scroller?.scrollTop || 0;
-  const items = projectList(pack || []).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
-  host.innerHTML = items.length
-    ? items.map((p, i) => investRow(p, i + 1)).join('')
-    : (pack ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
+  const all = projectList(pack || []);
+  INVEST_GROUPS.forEach(g => {
+    const host = $(`investList-${g.id}`);
+    if (!host) return;
+    const items = all.filter(p => p.dtGroup === g.id).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+    host.innerHTML = items.length
+      ? items.map((p, i) => investRow(p, i + 1)).join('')
+      : (pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
+  });
   if (scroller) scroller.scrollTop = y;
+  refreshHint();
 }
 
 function queueInvestDraw() {
@@ -1118,12 +1424,16 @@ function queueInvestDraw() {
 }
 
 async function ensureInvestList() {
-  const host = $('investList');
-  if (!host) return;
-  if (!pack) host.innerHTML = '<div class="project-empty">Đang tải danh sách.</div>';
+  INVEST_GROUPS.forEach(g => {
+    const host = $(`investList-${g.id}`);
+    if (host && !pack) host.innerHTML = '<div class="project-empty">Đang tải danh sách.</div>';
+  });
   try { await loadPack(); } catch { /* loadPack đã báo */ }
   if (!pack) {
-    host.innerHTML = '<div class="project-empty">Chưa có đồ án.</div>';
+    INVEST_GROUPS.forEach(g => {
+      const host = $(`investList-${g.id}`);
+      if (host) host.innerHTML = '<div class="project-empty">Chưa có đồ án.</div>';
+    });
     return;
   }
   paintInvestList();
@@ -1138,6 +1448,9 @@ async function focusInvest(id) {
   const p = projectList(features).find(item => projectKey(item) === id);
   paintInvestList();
   if (!p) return;
+  if (p.dtGroup && p.dtGroup !== activeDtTab()) {
+    document.querySelector(`#levelPickDt [data-dt-tab="${p.dtGroup}"]`)?.click();
+  }
   const box = $('chk_invest');
   if (box && !box.checked) {
     box.checked = true;
@@ -1192,7 +1505,9 @@ export function initInvestLayer() {
   });
   onCompareChange(() => { if (visible && planMap && !rightGroup && ready) loadPack().then(features => { if (visible && planMap && !rightGroup) rightGroup = drawOn(planMap, features); }); });
   $('chk_invest')?.addEventListener('change', (e) => setVisible(e.target.checked));
-  $('investList')?.addEventListener('click', (e) => {
+  const listHost = $('dtList');
+  listHost?.addEventListener('click', (e) => {
+    if (!e.target.closest('.invest-tab-list')) return;
     const expand = e.target.closest('[data-invest-expand]');
     if (expand) {
       const id = expand.dataset.investExpand;
@@ -1207,7 +1522,7 @@ export function initInvestLayer() {
       focusInvest(focus.dataset.investFocus);
     }
   });
-  $('investList')?.addEventListener('change', (e) => {
+  listHost?.addEventListener('change', (e) => {
     const box = e.target.closest('[data-invest]');
     if (!box) return;
     const id = box.dataset.invest;
@@ -1221,8 +1536,10 @@ export function initInvestLayer() {
     }
     queueInvestDraw();
   });
-  document.addEventListener('qh:dt-tab', (e) => {
-    if (e.detail?.id === 'khac') ensureInvestList();
+  document.addEventListener('qh:dt-tab', () => {
+    ensureInvestList();
+    if (visible) redrawMaps();
   });
   if ($('chk_invest')?.checked) setVisible(true);
+  else if (document.querySelector('#layerPaneDauTu:not([hidden])')) ensureInvestList();
 }
