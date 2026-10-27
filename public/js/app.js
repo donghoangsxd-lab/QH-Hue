@@ -146,7 +146,7 @@ function initLayerMapTabs() {
   show('base');
   refreshCounts();
 }
-const MAIN_AXES = new Set(['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc']);
+const MAIN_AXES = new Set(['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc', 'dautu']);
 
 function initLayerMainTabs() {
   const root = document.getElementById('layerMain');
@@ -1132,8 +1132,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => submitInfraPoint('new'));
 
   // ---------- Ẩn/hiện toàn bộ icon (thanh đầu tab Lớp dữ liệu) ----------
-  // Đủ 14 nhóm đang bật: bấm tắt hết; còn nhóm nào tắt: bấm bật cả 14 nhóm
-  const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'c14'];
+  // Chung cư (c14) đã sang trục Dự án đầu tư, không còn trong nút Tất cả của Hạ tầng xã hội.
+  const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13'];
   const btnEye = document.getElementById('btnToggleAllIcons');
   const layerCount = document.getElementById('layerCount');
   const tabCount = document.getElementById('infraTabCount');
@@ -1148,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!btnEye) return;
     const allOn = on === ICON_GROUPS.length;
     btnEye.setAttribute('aria-pressed', String(!allOn));
-    btnEye.title = allOn ? 'Tắt toàn bộ 14 nhóm công trình' : 'Bật toàn bộ 14 nhóm công trình';
+    btnEye.title = allOn ? 'Tắt toàn bộ 13 nhóm công trình' : 'Bật toàn bộ 13 nhóm công trình';
   };
   const setIconGroups = (keys) => ICON_GROUPS.forEach(k => {
     const chk = iconCheck(k);
@@ -1235,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
     'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_gt25', 'chk_gt10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
-    'chk_lst', 'chk_ndvi', 'chk_tree', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_violate', 'chk_invest', 'chk_heat'
+    'chk_lst', 'chk_ndvi', 'chk_tree', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_violate', 'chk_c14', 'chk_invest', 'chk_heat'
   ];
   let focusSnapshot = null;
   const setChecked = (id, on) => {

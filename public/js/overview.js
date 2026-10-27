@@ -319,7 +319,7 @@ const SECTIONS = [
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên phải › <b>Quy hoạch</b> › mục <b>Quỹ đất và công trình</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên trái › <b>F. Dự án đầu tư</b> › tab <b>Dự án khác</b>. Bật <b>Dự án kêu gọi đầu tư</b>.',
           'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
@@ -328,7 +328,7 @@ const SECTIONS = [
           'Ranh lấy từ file KML, thông tin từ sheet danh sách dự án. Dự án chưa ghép được ranh không vẽ trên bản đồ.',
           'Nhóm này không có bán kính phục vụ và không tính vào bản đồ độ phủ.'
         ],
-        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'quyhoach' }) }]
+        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'dautu', dt: 'khac' }) }]
       }
     ]
   },
@@ -342,8 +342,8 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel trái. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel trái đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Droplist: <b>A. Quản lý phát triển đô thị</b>, <b>B. Hệ thống bản đồ quy hoạch</b>, <b>C. Hệ thống hạ tầng kỹ thuật</b>, <b>D. Hệ thống hạ tầng xã hội</b>, <b>E. Quản lý về kiến trúc</b>. Trong Hành chính có tab <b>Đơn vị hành chính</b>, <b>Đô thị</b> và <b>Chấm điểm</b>. Trong Quy hoạch, bốn cấp có thể bật cùng lúc.',
-          'Dòng dưới droplist có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút cả nhóm. Công trình xã hội, PCCC, điểm giao thông, lớp điểm theo đồ án và mục <b>Quỹ đất và công trình</b> ở panel <b>Hạ tầng xã hội</b>. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
+          'Droplist: <b>A. Quản lý phát triển đô thị</b>, <b>B. Hệ thống bản đồ quy hoạch</b>, <b>C. Hệ thống hạ tầng kỹ thuật</b>, <b>D. Hệ thống hạ tầng xã hội</b>, <b>E. Quản lý về kiến trúc</b>, <b>F. Dự án đầu tư</b>. Trong Hành chính có tab <b>Đơn vị hành chính</b>, <b>Đô thị</b> và <b>Chấm điểm</b>. Trong Quy hoạch, mỗi lúc một cấp.',
+          'Dòng dưới droplist có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút cả nhóm. Công trình xã hội, PCCC, điểm giao thông và mục <b>Quỹ đất và công trình</b> (ranh lô, cơ sở chưa sử dụng) ở panel <b>Hạ tầng xã hội</b>. Chung cư và dự án kêu gọi đầu tư ở <b>F. Dự án đầu tư</b>. Nút <b>Tất cả</b> bật hoặc tắt 13 nhóm điểm của Hạ tầng xã hội.',
           'Mục <b>Lớp nền</b> ghim đáy mọi trục: ảnh nền, ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư. Tab <b>Lớp môi trường</b> cùng hàng: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
         ],
         facts: [

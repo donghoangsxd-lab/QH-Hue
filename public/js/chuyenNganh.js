@@ -944,7 +944,7 @@ function paintDock() {
   paintMag();
 }
 
-const MAG_ORDER = ['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc'];
+const MAG_ORDER = ['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc', 'dautu'];
 
 function paintMag() {
   const track = document.getElementById('layerMagTrack');
@@ -1099,7 +1099,7 @@ function filterGp() {
 
 function applyLayerQuery() {
   const q = foldQuery(layerQuery);
-  ['#layerPaneHaTang', '#layerPaneXaHoi', '#layerPaneKienTruc'].forEach(sel => {
+  ['#layerPaneHaTang', '#layerPaneXaHoi', '#layerPaneKienTruc', '#layerPaneDauTu'].forEach(sel => {
     document.querySelectorAll(`${sel} .cn-scheme, ${sel} .layer-row, ${sel} .axis-arch li, ${sel} .cn-layer`).forEach(el => {
       el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
     });
@@ -1108,6 +1108,21 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
+  document.querySelectorAll('#dtList .project-row').forEach(el => {
+    const blob = el.getAttribute('data-dt-text') || el.textContent;
+    const hide = !!q && !foldQuery(blob).includes(q);
+    el.classList.toggle('is-filter-hide', hide);
+    const next = el.nextElementSibling;
+    if (next?.classList.contains('project-dossier')) next.classList.toggle('is-filter-hide', hide);
+  });
+  if (q && browseState().axis === 'dautu') {
+    const hit = [...document.querySelectorAll('#axisDauTu [data-dt-pane]')].find(pane => {
+      const blob = [...pane.querySelectorAll('.layer-row, .project-row')]
+        .map(el => el.getAttribute('data-dt-text') || el.textContent).join(' ');
+      return foldQuery(blob).includes(q);
+    });
+    if (hit) document.querySelector(`#levelPickDt [data-dt-tab="${hit.dataset.dtPane}"]`)?.click();
+  }
   if (q && browseState().axis === 'kientruc' && archTab !== 'congtrinh') {
     const hit = archItems().some(it => foldQuery([it.ten, it.diaChi, it.coQuan, it.phuong, it.chatLuong].filter(Boolean).join(' ')).includes(q));
     if (hit) {
@@ -1383,9 +1398,32 @@ async function loadKienTruc() {
   }
 }
 
+function showDauTuTab(id) {
+  const pick = document.getElementById('levelPickDt');
+  if (!pick || !id) return;
+  pick.querySelectorAll('[data-dt-tab]').forEach(btn => {
+    const on = btn.dataset.dtTab === id;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-selected', String(on));
+  });
+  document.querySelectorAll('#axisDauTu [data-dt-pane]').forEach(pane => {
+    pane.hidden = pane.dataset.dtPane !== id;
+  });
+  paintAxisAll();
+  document.dispatchEvent(new CustomEvent('qh:dt-tab', { detail: { id } }));
+}
+
+function initDauTuTabs() {
+  document.getElementById('levelPickDt')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-dt-tab]');
+    if (btn) showDauTuTab(btn.dataset.dtTab);
+  });
+}
+
 export function initChuyenNganh() {
   if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
+  initDauTuTabs();
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));
   const facetLink = ['kv', 'nganh', 'truc', 'tt'].some(k => q.has(k));

@@ -31,10 +31,27 @@ const SOCIAL_LEGEND = [
   ['chk_c11', 'Bus.svg', 'Trạm xe buýt'],
   ['chk_c12', 'Pccc.svg', 'Trụ sở PCCC'],
   ['chk_nt_grave', 'Nghiatrang.svg', 'Nghĩa trang'],
-  ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng'],
+  ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng']
+];
+
+const DAU_TU_LEGEND = [
   ['chk_c14', 'Noxh.svg', 'Chung cư'],
   ['chk_invest', '', 'Dự án kêu gọi đầu tư']
 ];
+
+function dauTuLegendHtml() {
+  const rows = DAU_TU_LEGEND.filter(([id]) => document.getElementById(id)?.checked).map(([id, file, label]) => {
+    const mark = file
+      ? `<img class="layer-type-icon" src="./icons/${file}" alt="" width="14" height="16">`
+      : `<svg class="ico" aria-hidden="true"><use href="#i-coverage"/></svg>`;
+    return `<label class="htkt-legend-row">${mark}<span>${label}</span><input type="checkbox" data-xh-mirror="${id}" checked aria-label="${label}"></label>`;
+  }).join('');
+  if (!rows) return '<p class="cn-empty">Bật lớp trong tab đang chọn để xem ký hiệu.</p>';
+  const apt = document.getElementById('chk_c14')?.checked
+    ? (document.querySelector('#aptBox .apt-legend')?.outerHTML || '')
+    : '';
+  return rows + apt;
+}
 
 function socialLegendHtml() {
   const rows = SOCIAL_LEGEND.map(([id, file, label]) => {
@@ -231,8 +248,10 @@ export function initLegendPanel() {
     const axisNow = document.getElementById('layerMain')?.dataset.active || '';
     const hatang = axisNow === 'hatang';
     const xahoi = axisNow === 'xahoi';
+    const dautu = axisNow === 'dautu';
     frame.classList.toggle('is-htkt', hatang);
     frame.classList.toggle('is-xh', xahoi);
+    frame.classList.toggle('is-dt', dautu);
     const htktLegend = document.getElementById('legendHtkt');
     if (htktLegend) htktLegend.hidden = !hatang;
     const xhLegend = document.getElementById('legendXh');
@@ -240,14 +259,19 @@ export function initLegendPanel() {
       xhLegend.hidden = !xahoi;
       if (xahoi) xhLegend.innerHTML = socialLegendHtml();
     }
+    const dtLegend = document.getElementById('legendDauTu');
+    if (dtLegend) {
+      dtLegend.hidden = !dautu;
+      if (dautu) dtLegend.innerHTML = dauTuLegendHtml();
+    }
     const main = frame.querySelector('.legend-main');
-    if (main) main.hidden = xahoi ? true : (hatang ? false : !symbols);
+    if (main) main.hidden = (xahoi || dautu) ? true : (hatang ? false : !symbols);
     const display = document.querySelector('#tabLegend .legend-display');
-    if (display) display.hidden = hatang || xahoi || !land;
+    if (display) display.hidden = hatang || xahoi || dautu || !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
     const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]
-      .filter(inp => inp.id !== 'chk_c13');
+      .filter(inp => inp.id !== 'chk_c13' && inp.id !== 'chk_c14' && inp.id !== 'chk_invest');
     if (pointHost && pointList) {
       pointList.replaceChildren();
       pointRows.forEach(inp => {
@@ -259,16 +283,12 @@ export function initLegendPanel() {
         row.append(document.createTextNode(name));
         pointList.append(row);
       });
-      if (checked('chk_c14')) {
-        const apt = document.querySelector('#aptBox .apt-legend');
-        if (apt) pointList.append(apt.cloneNode(true));
-      }
-      pointHost.hidden = xahoi || pointRows.length === 0;
+      pointHost.hidden = xahoi || dautu || pointRows.length === 0;
     }
     const roads = document.getElementById('legendRoads');
     if (roads) roads.hidden = !checked('chk_roads');
     const extra = document.getElementById('legendExtra');
-    const extraOn = !xahoi && (pointRows.length > 0 || checked('chk_roads'));
+    const extraOn = !xahoi && !dautu && (pointRows.length > 0 || checked('chk_roads'));
     if (extra) extra.hidden = !extraOn;
     if (chip) chip.hidden = true;
   };

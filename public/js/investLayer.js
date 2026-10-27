@@ -62,6 +62,10 @@ const isPlanLevel = (id) => PLAN_TABS.some(t => t.id === id);
 let visible = false;
 let ready = null;
 let pack = null;
+const investOpen = new Set();
+const investHidden = new Set();
+let investPicked = '';
+let investDrawQueued = false;
 let leftGroup = null;
 let rightGroup = null;
 let hovered = null;
@@ -111,6 +115,10 @@ function fieldKind(key) {
 
 function shortLabel(key) {
   const k = String(key || '');
+  if (/ưu tiên/i.test(k)) return 'Mức độ ưu tiên';
+  if (/địa điểm/i.test(k)) return 'Địa điểm';
+  if (/diện tích/i.test(k)) return 'Diện tích';
+  if (/lĩnh vực/i.test(k)) return 'Lĩnh vực';
   if (/hiện trạng/i.test(k)) return 'Hiện trạng sử dụng đất';
   if (/mục tiêu/i.test(k)) return 'Mục tiêu và nhu cầu đầu tư';
   if (/phù hợp/i.test(k)) return 'Sự phù hợp quy hoạch';
@@ -471,7 +479,21 @@ function sectorMarker(sector, unmatched) {
   });
 }
 
+function projectKey(p) {
+  return String(p.feature?.properties?.groupId || p.feature?.properties?._key || '');
+}
+
+function shownPack(features) {
+  if (!investHidden.size) return features;
+  const drop = new Set();
+  projectList(features).forEach(p => {
+    if (investHidden.has(projectKey(p))) p.members.forEach(f => drop.add(f));
+  });
+  return features.filter(f => !drop.has(f));
+}
+
 function drawOn(m, features) {
+  features = shownPack(features);
   ensurePane(m, PANE, PANE_Z);
   ensurePane(m, MARK_PANE, MARK_PANE_Z);
   const byFeature = new Map();
@@ -1037,6 +1059,93 @@ function openCard(feature, layer, targetMap) {
   requestAnimationFrame(() => { if (card && card.seq === seq) frameProject(targetMap, bounds); });
 }
 
+function investDossierRows(p) {
+  const props = viewOf(p);
+  const rows = [];
+  if (p.members.length > 1) rows.push(['Quy mô', `${p.members.length} mảnh`]);
+  rowEntries(props).forEach(([k, v]) => {
+    if (/tên dự án|^stt$/i.test(k)) return;
+    let value = String(v).replace(/\s+/g, ' ').trim();
+    if (/diện tích/i.test(k)) value = listedArea(props.sheet) || value;
+    if (value) rows.push([shortLabel(k), value]);
+  });
+  if (!p.matched) rows.push(['Ghi chú', 'Chưa khớp tên với danh sách sheet 15-DA.']);
+  return rows;
+}
+
+function investDossierHtml(rows) {
+  const body = rows.map(([label, value]) =>
+    `<div class="project-dossier-row"><span class="project-dossier-label">${escapeHtml(label)}</span><span class="project-dossier-meta">${escapeHtml(String(value))}</span></div>`
+  ).join('');
+  return body ? `<div class="project-dossier">${body}</div>` : '';
+}
+
+function investRow(p, n) {
+  const id = projectKey(p);
+  const safe = escapeHtml(id);
+  const open = investOpen.has(id);
+  const shown = !investHidden.has(id);
+  const rows = investDossierRows(p);
+  const blob = [p.title, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
+  return `<div class="project-row${shown ? '' : ' is-off'}${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
+      <label class="project-name" title="${escapeHtml(p.title || '')}">
+        <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}</span></label>
+      <span class="project-tools">
+        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-invest-expand="${safe}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
+      </span>
+    </div>${open ? investDossierHtml(rows) : ''}`;
+}
+
+function paintInvestList() {
+  const host = $('investList');
+  if (!host) return;
+  const scroller = $('dtList');
+  const y = scroller?.scrollTop || 0;
+  const items = projectList(pack || []).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+  host.innerHTML = items.length
+    ? items.map((p, i) => investRow(p, i + 1)).join('')
+    : (pack ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
+  if (scroller) scroller.scrollTop = y;
+}
+
+function queueInvestDraw() {
+  if (investDrawQueued) return;
+  investDrawQueued = true;
+  queueMicrotask(() => {
+    investDrawQueued = false;
+    if (visible && pack) redrawMaps();
+  });
+}
+
+async function ensureInvestList() {
+  const host = $('investList');
+  if (!host) return;
+  if (!pack) host.innerHTML = '<div class="project-empty">Đang tải danh sách.</div>';
+  try { await loadPack(); } catch { /* loadPack đã báo */ }
+  if (!pack) {
+    host.innerHTML = '<div class="project-empty">Chưa có đồ án.</div>';
+    return;
+  }
+  paintInvestList();
+}
+
+async function focusInvest(id) {
+  investHidden.delete(id);
+  investOpen.add(id);
+  investPicked = id;
+  let features;
+  try { features = await loadPack(); } catch { return; }
+  const p = projectList(features).find(item => projectKey(item) === id);
+  paintInvestList();
+  if (!p) return;
+  const box = $('chk_invest');
+  if (box && !box.checked) {
+    box.checked = true;
+    await setVisible(true);
+  } else if (visible) redrawMaps();
+  openCard(p.feature, findLayer(p.feature, map), map);
+}
+
 async function setVisible(on) {
   const token = ++drawToken;
   visible = !!on;
@@ -1052,6 +1161,7 @@ async function setVisible(on) {
   let features;
   try { features = await loadPack(); } catch { return; }
   if (!visible || token !== drawToken || !features) return;
+  paintInvestList();
   if (!leftGroup) leftGroup = drawOn(map, features);
   if (planMap && !rightGroup) rightGroup = drawOn(planMap, features);
 }
@@ -1082,5 +1192,37 @@ export function initInvestLayer() {
   });
   onCompareChange(() => { if (visible && planMap && !rightGroup && ready) loadPack().then(features => { if (visible && planMap && !rightGroup) rightGroup = drawOn(planMap, features); }); });
   $('chk_invest')?.addEventListener('change', (e) => setVisible(e.target.checked));
+  $('investList')?.addEventListener('click', (e) => {
+    const expand = e.target.closest('[data-invest-expand]');
+    if (expand) {
+      const id = expand.dataset.investExpand;
+      if (investOpen.has(id)) investOpen.delete(id);
+      else investOpen.add(id);
+      paintInvestList();
+      return;
+    }
+    const focus = e.target.closest('[data-invest-focus]');
+    if (focus) {
+      e.preventDefault();
+      focusInvest(focus.dataset.investFocus);
+    }
+  });
+  $('investList')?.addEventListener('change', (e) => {
+    const box = e.target.closest('[data-invest]');
+    if (!box) return;
+    const id = box.dataset.invest;
+    if (box.checked) investHidden.delete(id);
+    else investHidden.add(id);
+    box.closest('.project-row')?.classList.toggle('is-off', !box.checked);
+    if (box.checked && !$('chk_invest')?.checked) {
+      $('chk_invest').checked = true;
+      $('chk_invest').dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    queueInvestDraw();
+  });
+  document.addEventListener('qh:dt-tab', (e) => {
+    if (e.detail?.id === 'khac') ensureInvestList();
+  });
   if ($('chk_invest')?.checked) setVisible(true);
 }
