@@ -3558,7 +3558,6 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   html += `</div>`;
 
   const popup = openDockPopup(targetMap, 'infra-popup', html);
-  if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom });
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
   popup.getElement()?.querySelectorAll('.js-conflict-go').forEach(btn => btn.addEventListener('click', (e) => {
     L.DomEvent.stop(e);
@@ -3632,6 +3631,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   };
 
   const center = lotCenterOf(parcelGeometry, p.lat, p.lng);
+  // Icon mật độ trước fillLotBuildup: tránh attachLotBuildup gắn thêm nút chữ trùng.
   addLotLocateTools(popup, {
     lat: center?.lat, lng: center?.lng,
     token: p.id ? pointToken(p.scenario, p.id) : '',
@@ -3642,6 +3642,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     onAnalyze: canAnalyze ? runAnalysis : null,
     buildup: !!lotGeom
   });
+  if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom });
   bindDossier(popup, p.tenQH);
   if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
   pointPopup = { popup, id: p.id, scenario: p.scenario };

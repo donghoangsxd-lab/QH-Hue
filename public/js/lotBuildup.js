@@ -1,14 +1,21 @@
-// Nút trên thẻ lô mới cắt dấu chân theo ranh và đối chiếu mật độ, hệ số, tầng cao.
-// Mở thẻ không gọi mạng và không tính.
-import { setLotBuildup } from './mapEngine.js';
+// Icon mật độ trên thẻ lô: cắt dấu chân theo ranh, đối chiếu mật độ; phần ngoài ranh gạch chéo đỏ, không tính.
+// Mở thẻ không gọi mạng và không tính. Popup có hàng icon thì không gắn nút chữ trùng.
+import { map, setLotBuildup } from './mapEngine.js';
+import { planMap } from './planMap.js';
 import { gbaFootprintsIn } from './gbaLayer.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { buildupHtml, floorsFromHeight, lotBuildupButtonHtml } from './lotScreen.js';
 import { withAssetVersion } from './gbaVersion.js';
 
 const MAX_TILES = 48;
+const BUILDUP_PANE = 'lotBuildupPane';
+const BUILDUP_Z = 450;
+const HATCH_STEP = 7;
 
 let overridesP = null;
+let buildupGroup = null;
+let buildupHatch = null;
+let buildupMap = null;
 
 function asFeature(geom) {
   if (!geom) return null;
@@ -140,9 +147,153 @@ function insideOverride(center, extras) {
   });
 }
 
+function hostMap() {
+  if (planMap && planMap.getContainer()?.offsetParent) return planMap;
+  return map;
+}
+
+function clearLotBuildupMap() {
+  if (buildupHatch && buildupMap) {
+    try { buildupMap.removeLayer(buildupHatch); } catch (e) { /* đã gỡ */ }
+  }
+  if (buildupGroup && buildupMap) {
+    try { buildupMap.removeLayer(buildupGroup); } catch (e) { /* đã gỡ */ }
+  }
+  buildupHatch = null;
+  buildupGroup = null;
+  buildupMap = null;
+}
+
+let OutsideHatch = null;
+
+function outsideHatchClass() {
+  const L = globalThis.L;
+  if (!L) return null;
+  if (OutsideHatch) return OutsideHatch;
+  OutsideHatch = L.Layer.extend({
+    initialize(geoms) { this._geoms = geoms || []; },
+    onAdd(host) {
+      if (!host.getPane(BUILDUP_PANE)) {
+        const pane = host.createPane(BUILDUP_PANE);
+        pane.style.zIndex = String(BUILDUP_Z);
+        pane.style.pointerEvents = 'none';
+      }
+      this._canvas = document.createElement('canvas');
+      this._canvas.className = 'lot-buildup-hatch';
+      this._canvas.style.pointerEvents = 'none';
+      host.getPane(BUILDUP_PANE).appendChild(this._canvas);
+      this._ctx = this._canvas.getContext('2d');
+      host.on('move zoom viewreset resize zoomend moveend', this._paint, this);
+      this._paint();
+    },
+    onRemove(host) {
+      host.off('move zoom viewreset resize zoomend moveend', this._paint, this);
+      if (this._raf) cancelAnimationFrame(this._raf);
+      this._raf = 0;
+      this._canvas?.remove();
+      this._canvas = null;
+      this._ctx = null;
+    },
+    _paint() {
+      if (!this._map || !this._canvas) return;
+      if (this._raf) return;
+      this._raf = requestAnimationFrame(() => {
+        this._raf = 0;
+        this._draw();
+      });
+    },
+    _draw() {
+      const host = this._map;
+      const canvas = this._canvas;
+      if (!host || !canvas) return;
+      const size = host.getSize();
+      const origin = host.containerPointToLayerPoint([0, 0]);
+      L.DomUtil.setPosition(canvas, origin);
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.round(size.x));
+      const h = Math.max(1, Math.round(size.y));
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      const ctx = this._ctx;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const toPx = (coord) => {
+        const p = host.latLngToLayerPoint([coord[1], coord[0]]);
+        return { x: p.x - origin.x, y: p.y - origin.y };
+      };
+      ctx.strokeStyle = '#ef4444';
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'square';
+      (this._geoms || []).forEach((geom) => {
+        const polys = geom?.type === 'Polygon' ? [geom.coordinates]
+          : geom?.type === 'MultiPolygon' ? geom.coordinates : [];
+        if (!polys.length) return;
+        ctx.save();
+        ctx.beginPath();
+        polys.forEach((poly) => {
+          poly.forEach((ring) => {
+            ring.forEach((coord, i) => {
+              const p = toPx(coord);
+              if (i === 0) ctx.moveTo(p.x, p.y);
+              else ctx.lineTo(p.x, p.y);
+            });
+            ctx.closePath();
+          });
+        });
+        ctx.fill('evenodd');
+        ctx.clip('evenodd');
+        for (let x = -h; x < w + h; x += HATCH_STEP) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x - h, h);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+    }
+  });
+  return OutsideHatch;
+}
+
+function paintBuildup(insides, outsides) {
+  clearLotBuildupMap();
+  const L = globalThis.L;
+  const host = hostMap();
+  if (!L || !host) return;
+  if (!host.getPane(BUILDUP_PANE)) {
+    const pane = host.createPane(BUILDUP_PANE);
+    pane.style.zIndex = String(BUILDUP_Z);
+    pane.style.pointerEvents = 'none';
+  }
+  const group = L.featureGroup();
+  insides.forEach((f) => {
+    L.geoJSON(f, {
+      pane: BUILDUP_PANE,
+      interactive: false,
+      style: {
+        color: '#0ea5e9', weight: 1.4, opacity: 1,
+        fillColor: '#38bdf8', fillOpacity: 0.5
+      }
+    }).addTo(group);
+  });
+  group.addTo(host);
+  buildupGroup = group;
+  buildupMap = host;
+  const outGeoms = outsides.map((f) => f.geometry || f).filter(Boolean);
+  const Hatch = outsideHatchClass();
+  if (outGeoms.length && Hatch) {
+    buildupHatch = new Hatch(outGeoms);
+    host.addLayer(buildupHatch);
+  }
+}
+
 async function measure(lotFeature, polys, heights, heightReady, zones) {
   const turf = globalThis.turf;
   let footM2 = 0;
+  let outM2 = 0;
   let count = 0;
   let gfaM2 = 0;
   let missingHeight = 0;
@@ -150,13 +301,25 @@ async function measure(lotFeature, polys, heights, heightReady, zones) {
   let maxF = null;
   let minM = null;
   let maxM = null;
+  const insides = [];
+  const outsides = [];
   for (let i = 0; i < polys.length; i++) {
     const poly = polys[i];
     let clipped = null;
+    let outside = null;
     try { clipped = turf.intersect(poly, lotFeature); } catch (e) { clipped = null; }
+    try { outside = turf.difference(poly, lotFeature); } catch (e) { outside = null; }
+    if (outside) {
+      const outArea = turf.area(outside);
+      if (outArea >= 0.5) {
+        outM2 += outArea;
+        outsides.push(outside);
+      }
+    }
     if (!clipped) continue;
     const area = turf.area(clipped);
     if (!(area >= 0.5)) continue;
+    insides.push(clipped);
     count += 1;
     footM2 += area;
     let center = null;
@@ -179,38 +342,43 @@ async function measure(lotFeature, polys, heights, heightReady, zones) {
   }
   return {
     footM2,
+    outM2,
     count,
     gfaM2,
     missingHeight,
     maxF,
     meanF: knownArea > 0 ? gfaM2 / knownArea : null,
     minM,
-    maxM
+    maxM,
+    insides,
+    outsides
   };
 }
 
 async function compute(lot) {
   const turf = globalThis.turf;
   const feature = asFeature(lot && lot.geometry);
-  if (!turf || !feature) return '<span>Không có ranh lô để đối chiếu.</span>';
+  if (!turf || !feature) return { html: '<span>Không có ranh lô để đối chiếu.</span>' };
   const box = bboxOf(feature);
-  if (!box) return '<span>Không tính được diện tích lô.</span>';
+  if (!box) return { html: '<span>Không tính được diện tích lô.</span>' };
   const lotM2 = turf.area(feature);
   let pack;
   try {
     pack = await gbaFootprintsIn(box);
   } catch (e) {
-    return '<span>Chưa tải được dấu chân công trình.</span>';
+    return { html: '<span>Chưa tải được dấu chân công trình.</span>' };
   }
   if (pack.tiles > MAX_TILES) {
-    return `<span>Lô phủ ${pack.tiles} ô bản đồ. Chỉ cắt dấu chân khi lô nằm trong ${MAX_TILES} ô mức 16.</span>`;
+    return {
+      html: `<span>Lô phủ ${pack.tiles} ô bản đồ. Chỉ cắt dấu chân khi lô nằm trong ${MAX_TILES} ô mức 16.</span>`
+    };
   }
   let extras = [];
   let zones = [];
   try {
-    const pack = await loadOverridePack();
-    extras = pack.parts;
-    zones = pack.zones;
+    const ov = await loadOverridePack();
+    extras = ov.parts;
+    zones = ov.zones;
   } catch (e) { extras = []; zones = []; }
   const lotBox = [box.west, box.south, box.east, box.north];
   const extraHits = extras.filter((poly) => {
@@ -244,12 +412,17 @@ async function compute(lot) {
     heightReady = false;
   }
   const measured = await measure(feature, polys, heights, heightReady, zones);
-  return buildupHtml({
-    lotM2,
-    ...measured,
-    heightReady,
-    plan: lot.plan || null
-  });
+  paintBuildup(measured.insides, measured.outsides);
+  return {
+    html: buildupHtml({
+      lotM2,
+      ...measured,
+      heightReady,
+      plan: lot.plan || null
+    }),
+    insides: measured.insides,
+    outsides: measured.outsides
+  };
 }
 
 const LOADING = 'Đang đối chiếu dấu chân công trình…';
@@ -267,6 +440,10 @@ function stopMapClick(e) {
   globalThis.L?.DomEvent?.stop(e);
 }
 
+function hasBuildupIcon(root) {
+  return !!root.querySelector('.pp-buildup-btn, a[data-lot-buildup-run]');
+}
+
 export function attachLotBuildup(popup, lot) {
   const arm = () => {
     const root = popup.getElement();
@@ -279,8 +456,8 @@ export function attachLotBuildup(popup, lot) {
       el.setAttribute('data-lot-buildup', '');
       root.querySelector('.pp, .qhc-pop')?.appendChild(el) || root.appendChild(el);
     }
-    // Popup không có icon hàng công cụ (QHCT tĩnh): giữ nút chữ trong khung kết quả.
-    if (!root.querySelector('[data-lot-buildup-run]')) el.innerHTML = lotBuildupButtonHtml();
+    // Chỉ popup không có hàng icon (QHCT tĩnh) mới cần nút chữ.
+    if (!hasBuildupIcon(root)) el.innerHTML = lotBuildupButtonHtml();
     const run = (e) => {
       const btn = e.target.closest?.('[data-lot-buildup-run]');
       if (!btn || !root.contains(btn)) return;
@@ -290,24 +467,29 @@ export function attachLotBuildup(popup, lot) {
       const token = `${Date.now()}-${Math.random()}`;
       el.dataset.token = token;
       el.textContent = LOADING;
+      clearLotBuildupMap();
       relayout(popup);
       const alive = () => popup.isOpen?.() !== false && el.dataset.token === token;
-      compute(lot).then((html) => {
+      compute(lot).then((result) => {
         if (!alive()) return;
-        el.innerHTML = html;
+        el.innerHTML = typeof result === 'string' ? result : result.html;
         delete el.dataset.running;
         relayout(popup);
       }).catch(() => {
         if (!alive()) return;
         el.dataset.running = '';
-        el.innerHTML = `<span class="is-miss">Chưa đối chiếu được dấu chân công trình.</span>${lotBuildupButtonHtml()}`;
+        const retry = hasBuildupIcon(root) ? '' : lotBuildupButtonHtml();
+        el.innerHTML = `<span class="is-miss">Chưa đối chiếu được dấu chân công trình.</span>${retry}`;
         relayout(popup);
       });
     };
     root.addEventListener('click', run);
+    popup.on?.('remove', clearLotBuildupMap);
   };
-  if (popup.getElement()) arm();
-  else popup.once('add', arm);
+  // Đợi hàng icon gắn xong rồi mới quyết định có cần nút chữ không.
+  const schedule = () => requestAnimationFrame(arm);
+  if (popup.getElement()) schedule();
+  else popup.once('add', schedule);
 }
 
 export function initLotBuildup() {

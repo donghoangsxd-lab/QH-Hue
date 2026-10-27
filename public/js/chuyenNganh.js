@@ -34,11 +34,9 @@ import {
 } from './capNuocQhc.js';
 
 const STORE_KEY = 'qh_axes_v1';
-// Không ghi, không khôi phục. Bản lưu cũ có id này bị gỡ khi đọc, để mở trang không tự bật lớp.
-const NO_PERSIST = new Set(['base-violate']);
+// Không còn lưu / khôi phục lớp trên máy. Xóa khóa cũ khi mở trang.
+try { localStorage.removeItem(STORE_KEY); } catch (e) { /* chế độ riêng tư */ }
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
-// Ô cấp quy hoạch do mapLevel giữ. Khôi phục chúng từ bản lưu sẽ tắt QHC 1/25.000 rồi bật QHPK.
-const LEVEL_BINDS = new Set(['chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct']);
 const SHARE_KEYS = ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'];
 const KIND_LABEL = { 'hien-trang': 'Hiện trạng khi lập đồ án', 'quy-hoach': 'Quy hoạch' };
 
@@ -88,7 +86,6 @@ let layerQuery = '';
 let applying = false;
 let booted = false;
 let ready = false;
-let saveTimer = 0;
 let kienTruc = null;
 const archHidden = new Set();
 const archOpen = new Set();
@@ -236,37 +233,8 @@ function seedFromDom() {
   getLayers().forEach(l => { if (l.bind) setLayerFlag(l.id, !!document.getElementById(l.bind)?.checked); });
 }
 
-function readSaved() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (!raw || raw.v !== 1 || typeof raw !== 'object') return null;
-    if (Array.isArray(raw.on) && raw.on.some((id) => NO_PERSIST.has(id))) {
-      raw.on = raw.on.filter((id) => !NO_PERSIST.has(id));
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(raw)); } catch (e) { /* chế độ riêng tư */ }
-    }
-    return raw;
-  } catch (e) {
-    return null;
-  }
-}
-
 function scheduleSave() {
-  if (!ready) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 200);
-}
-
-function saveNow() {
-  if (!ready) return;
-  const on = getLayers().filter(l => isLayerOn(l.id) && !NO_PERSIST.has(l.id)).map(l => l.id);
-  const extra = EXTRA_CHECKS.filter(id => document.getElementById(id)?.checked);
-  const b = browseState();
-  const area = getAreaFilter();
-  const data = {
-    v: 1, axis: b.axis, sector: b.sector, level: b.level, mapLevel: getLevel(),
-    kv: area ? formatKv(area) : 'TP', on, extra
-  };
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* chế độ riêng tư */ }
+  // Không ghi trạng thái lớp / trục lên máy — mỗi lần mở trang về mặc định.
 }
 
 function searchParams() {
@@ -1426,37 +1394,6 @@ function paintMatrix() {
   box.innerHTML = `<div class="cn-matrix-wrap"><table class="cn-matrix"><thead><tr><th>Cấp</th><th>Đồ án</th>${head}</tr></thead><tbody>${body || '<tr><td colspan="9">Chưa có đồ án</td></tr>'}</tbody></table></div>`;
 }
 
-function applyExtra(saved) {
-  const want = new Set(saved.extra || []);
-  EXTRA_CHECKS.forEach(id => {
-    if (LEVEL_BINDS.has(id)) return;
-    const el = document.getElementById(id);
-    if (!el) return;
-    const on = want.has(id);
-    if (el.checked === on) return;
-    applying = true;
-    el.checked = on;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    applying = false;
-  });
-}
-
-function applySavedLayers(saved) {
-  const want = new Set(saved.on || []);
-  getLayers().forEach(l => {
-    if (NO_PERSIST.has(l.id)) return;
-    const on = want.has(l.id);
-    if (l.bind) {
-      if (LEVEL_BINDS.has(l.bind)) return;
-      setLayerFlag(l.id, on);
-      reflectBind(l.bind, on);
-      return;
-    }
-    if (on) setLayerOn(l, true);
-    else setLayerFlag(l.id, false);
-  });
-}
-
 async function loadSynth() {
   try {
     const res = await fetch(withAssetVersion('data/htkt/synth.json'));
@@ -1518,16 +1455,14 @@ export function initChuyenNganh() {
   initDauTuTabs();
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));
-  const facetLink = ['kv', 'nganh', 'truc', 'tt'].some(k => q.has(k));
   const openDeep = q.has('nganh') || q.has('truc');
-  const saved = !shareView && !facetLink ? readSaved() : null;
   const deep = readFacetUrl();
 
   // Không có link chia sẻ hay link sâu: trục Quy hoạch, QHC 1/25.000, phạm vi cả thành phố.
-  // Lớp đã bật lần trước vẫn khôi phục ở applySavedLayers, trừ base-violate. Trục và cấp không bị bản lưu kéo đi.
+  // Không khôi phục lớp / ảnh nền từ lần trước — HTML mặc định (chk_bound + QHC 1/25.000).
   if (!shareView && !openDeep) {
     setAreaFilter({ ...AREA_TP }, 'startup', { url: false });
-    setBrowseState({ axis: 'quyhoach', sector: saved?.sector || browseState().sector, level: 'QHC25' }, { url: false });
+    setBrowseState({ axis: 'quyhoach', sector: browseState().sector, level: 'QHC25' }, { url: false });
     setLevel('qhc25', { keepView: true });
     showPlanPane();
     openQhc25Layers();
@@ -1900,12 +1835,7 @@ export function initChuyenNganh() {
   initCapNuocMap();
   Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii(), loadCongSuat(), loadCapNuocDoc()]).then(() => {
     seedFromDom();
-    if (saved) {
-      applyExtra(saved);
-      applySavedLayers(saved);
-      seedFromDom();
-    }
-    // Bản lưu chạy sau setLevel đầu tiên. Gọi lại để cấp không bị ô QHPK kéo đi.
+    // Cấp mặc định sau khi catalog gắn ô lớp (tránh bị ô QHPK / lớp cũ kéo đi).
     if (!shareView && !openDeep) setLevel('qhc25', { keepView: true });
     ready = true;
     mountCapacityHosts();

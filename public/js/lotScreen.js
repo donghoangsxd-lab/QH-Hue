@@ -49,7 +49,8 @@ function num(value, digits) {
 }
 
 /**
- * stats: { lotM2, footM2, count }
+ * stats: { lotM2, footM2, count, outM2? }
+ * footM2 chỉ phần trong ranh. outM2 = phần chân công trình ngoài ranh (đã gạch đỏ, không tính mật độ).
  * Không ghi chiều cao ảnh vệ tinh (sai số lớn).
  */
 export function buildupHtml(stats) {
@@ -57,11 +58,16 @@ export function buildupHtml(stats) {
   if (!(lot > 1)) return '<span>Không tính được diện tích lô.</span>';
   const count = Number(stats.count) || 0;
   const foot = Number(stats.footM2) || 0;
+  const out = Number(stats.outM2) || 0;
   const cover = lot > 0 ? (100 * foot) / lot : 0;
   const line = (label, value) => `<span class="lot-line"><span>${label}</span><b>${value}</b></span>`;
-  return [
+  const rows = [
     line('Số công trình trên đất', `${num(count, 0)} công trình`),
     line('Diện tích xây dựng', `${num(Math.round(foot), 0)} m²`),
     line('Mật độ xây dựng', `${num(cover, 1)}%`)
-  ].join('');
+  ];
+  if (out >= 0.5) {
+    rows.push(`<span class="lot-line is-out"><span>Ngoài ranh (không tính)</span><b>${num(Math.round(out), 0)} m²</b></span>`);
+  }
+  return rows.join('');
 }

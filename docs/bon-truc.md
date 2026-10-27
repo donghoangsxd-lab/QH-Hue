@@ -19,8 +19,8 @@ Phạm vi hẹp vẫn hiện lớp gắn thành phố. Không suy ra xã nằm t
 - `?truc=` = `hanhchinh` | `hatang` | `kientruc` | `xahoi` | `dautu` (quy hoạch là mặc định, không ghi).
 - `?nganh=` khi đang ở hạ tầng.
 - `?tt=` bị xóa. Không còn công tắc trạng thái toàn cục.
-- Mở trang không có link chia sẻ: phạm vi Toàn thành phố, bản đồ khít TP Huế, 40 ranh phường nét sẵn có và nhãn bật, trục Quy hoạch, cấp QHC 1/25.000, sơ đồ phát triển không gian (`chk_qhc25`) bật, nền Google vệ tinh nếu máy chưa lưu ảnh nền. Sidebar thu. Ô cấp (`chk_projects`, `chk_qhc25`, `chk_qhc10`, `chk_qhct`, `chk_urban`) không lấy từ bản lưu, nên lần mở không bị kéo sang QHPK 1/2.000.
-- Link chia sẻ khôi phục đúng tham số của link. Máy đã dùng khôi phục `localStorage` khóa `qh_axes_v1` cho lớp khác khi URL không có tham số chia sẻ hay `kv` / `nganh` / `truc`. Trục và cấp không lấy từ bản lưu. Link thắng localStorage. Ảnh nền vẫn nhớ riêng (`qhhue.basemap`); link không mang ảnh nền. Công trình vi phạm (`base-violate`, ô `chk_violate`) không ghi vào khóa này; bản lưu cũ bị gỡ id đó khi đọc. Mở trang không tự bật lớp và không tải `bank-forest.json` hay nét hành lang sông — chỉ tải khi người dùng bật ô ở Lớp nền.
+- Mở trang không có link chia sẻ: phạm vi Toàn thành phố, bản đồ khít TP Huế, ranh 40 phường/xã (`chk_bound`) và nhãn tên bật, trục Quy hoạch, đúng một cấp QHC 1/25.000 (`chk_qhc25`), nền Google vệ tinh. Sidebar thu. Không khôi phục lớp, trục, cấp hay ảnh nền từ lần trước (`qh_axes_v1`, `qhhue.basemap`, `qh_ward_names` bị xóa khi mở).
+- Link chia sẻ khôi phục đúng tham số của link (thắng mặc định). Link không mang ảnh nền. Mở trang không tự bật lớp môi trường / thửa / đường và không tải `bank-forest.json` hay nét hành lang sông — chỉ tải khi người dùng bật ô ở Lớp nền.
 
 ## PDF trên bucket
 

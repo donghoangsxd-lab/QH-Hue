@@ -1163,13 +1163,16 @@ body.right-collapsed .right-panel {
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
 @media (min-width: 841px) {
+  /* Brief luôn trên vùng danh sách / bảng lô — không để absolute của #planInfoSlot đè lên. */
   body.plan-brief-open #planBriefSlot {
     display: block;
-    flex: 0 1 auto;
+    position: relative;
+    z-index: 4;
+    flex: 0 0 auto;
     max-height: min(42%, 280px);
     min-height: 0;
     overflow: auto;
-    margin: 2px 0 4px;
+    margin: 2px 0 6px;
   }
   body.plan-brief-open #planBriefSlot > .project-brief {
     position: relative !important;
@@ -1184,6 +1187,9 @@ body.right-collapsed .right-panel {
     margin: 0;
     z-index: auto;
   }
+  body.plan-info-open #planListPane {
+    z-index: 1;
+  }
   body.plan-info-open #planListPane > :not(#planInfoSlot) {
     visibility: hidden;
     pointer-events: none;
@@ -1195,8 +1201,11 @@ body.right-collapsed .right-panel {
     inset: 0;
     z-index: 3;
     overflow: hidden;
-    background: var(--bg-panel);
+    padding: 2px;
+    box-sizing: border-box;
+    background: transparent;
   }
+  /* Đồng bộ khung bảng đồ án: viền cam, bo 4 góc, nền tối. */
   body.plan-info-open #planInfoSlot > .cad-card,
   body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
     position: relative !important;
@@ -1213,11 +1222,12 @@ body.right-collapsed .right-panel {
     min-height: 0;
     margin: 0 !important;
     transform: none !important;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: transparent;
+    border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
+    border-radius: var(--r-lg) !important;
+    box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--orange-rgb)) !important;
+    background: var(--bg-dark) !important;
     z-index: auto;
+    overflow: hidden;
   }
   body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
     flex: 1 1 auto;
@@ -1225,9 +1235,9 @@ body.right-collapsed .right-panel {
     display: flex;
     flex-direction: column;
     background: transparent !important;
-    border: 0;
+    border: 0 !important;
     border-radius: 0 !important;
-    box-shadow: none;
+    box-shadow: none !important;
   }
   body.plan-info-open #planInfoSlot .cad-page,
   body.plan-info-open #planInfoSlot .leaflet-popup-content {
@@ -6391,6 +6401,7 @@ body.project-review.la-page #projectReviewHost {
 .lot-buildup { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-family: var(--axis-font); font-size: 12px; line-height: 1.35; }
 .lot-buildup .lot-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; white-space: nowrap; }
 .lot-buildup .lot-line b { font-weight: 600; }
+.lot-buildup .lot-line.is-out b { color: var(--accent-red); }
 .lot-buildup .is-over { color: var(--accent-red); }
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }
@@ -7420,7 +7431,8 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
     max-height: 46%;
   }
   body.phone-info-dock .phone-info-slot .project-brief,
-  body.phone-info-dock .phone-info-slot .cad-card {
+  body.phone-info-dock .phone-info-slot .cad-card,
+  body.phone-info-dock .phone-info-slot .leaflet-popup.dock-card {
     position: static !important;
     inset: auto !important;
     left: auto !important;
@@ -7431,10 +7443,12 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
     max-width: none !important;
     height: auto !important;
     max-height: none !important;
-    margin: 0;
+    margin: 0 0 6px;
     flex: 0 0 auto;
-    border-radius: 0;
-    box-shadow: none;
+    border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
+    border-radius: var(--r-lg) !important;
+    box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--orange-rgb)) !important;
+    background: var(--bg-dark) !important;
     transform: none !important;
   }
 }

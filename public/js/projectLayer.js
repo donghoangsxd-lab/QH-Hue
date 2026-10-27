@@ -10,7 +10,8 @@
 // Mũi tên cuối tên đồ án mở bốn dòng hồ sơ. Dòng bản vẽ mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng.
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
 // Điều chỉnh cục bộ: tóm tắt làm nhãn, xem quyết định và bản vẽ scan. Ranh bật trong danh sách con.
-// Mỗi đồ án một màu viền, nhãn tên ở giữa ranh. Nền polygon ranh trong suốt: nội (lô) chỉ khi tick hoặc đang mở đúng đồ án.
+// Mỗi đồ án một màu viền + nền mờ nhẹ (cùng kiểu wash vùng trung tâm QHC), nhãn tên ở giữa ranh.
+// Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
 // QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
 // bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn.
 // Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
@@ -60,17 +61,22 @@ const GAP_M = 15;
 const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
-// Màu viền do assignColors. fillOpacity 0: vùng trong suốt vẫn nhận chuột, không tô như lớp sử dụng đất.
+// Màu viền do assignColors. Nền mờ OUTLINE_FILL (khớp wash trung tâm ~0.2) khi chỉ hiện ranh; đang mở lô thì 0.
 // nonzero: ranh có mảnh trùng nhau vẫn là một vùng (evenodd mặc định khoét thành lỗ, rê / bấm bên trong không trúng)
 const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0, fillRule: 'nonzero' };
 const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
-// Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm
+// Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm (cùng kiểu CORE_WASH vùng trung tâm)
 const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0 };
+// Nền mờ theo cấp: QHC bằng wash trung tâm; QHPK / QHCT nhẹ hơn để phân biệt trên ảnh vệ tinh
+const OUTLINE_FILL = { QHC: 0.2, QHPK: 0.14, QHCT: 0.14 };
 // Họ màu theo cấp, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a) và đô thị loại I (#facc15).
-// QHC lạnh, QHPK ấm (cam / hồng), QHCT tím. Đồ án cùng cấp có khung bao giao nhau không trùng màu.
+// QHC lạnh rộng: xanh da trời → cyan → teal → xanh lá. QHPK ấm (cam / hồng), QHCT tím. Cùng cấp kề nhau không trùng màu.
 const PALETTES = {
-  QHC: ['#38bdf8', '#0ea5e9', '#22d3ee', '#06b6d4', '#2dd4bf', '#14b8a6', '#60a5fa', '#818cf8'],
+  QHC: [
+    '#38bdf8', '#0ea5e9', '#0284c7', '#22d3ee', '#06b6d4', '#67e8f9',
+    '#2dd4bf', '#14b8a6', '#0d9488', '#34d399', '#10b981', '#22c55e', '#4ade80', '#86efac'
+  ],
   QHPK: ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#f43f5e', '#e11d48', '#fb7185', '#be123c'],
   QHCT: ['#c084fc', '#a855f7', '#8b5cf6', '#d946ef', '#e879f9', '#a78bfa', '#f0abfc', '#7c3aed', '#c026d3']
 };
@@ -2226,7 +2232,7 @@ function drawOutlinesOn(m, list, below) {
   const group = L.featureGroup();
   const shapes = [];
   const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
-  // Đồ án đã hiện lô: ranh không bắt chuột để click rơi xuống lô. Nền ranh luôn trong suốt.
+  // Đồ án đã hiện lô: ranh không bắt chuột để click rơi xuống lô; bỏ nền mờ để không che lô TT16.
   const lotsOpen = (p) => {
     if (p.level === 'QHPK' || p.level === 'QHCT') {
       return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
@@ -2239,9 +2245,16 @@ function drawOutlinesOn(m, list, below) {
     const geom = shownOutline(p);
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
-    const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color, fillOpacity: 0 };
     const open = lotsOpen(p);
-    const shown = open && quietOutline ? { ...style, opacity: 0 } : style;
+    const fillOp = open ? 0 : (OUTLINE_FILL[p.level] ?? 0.14);
+    const style = {
+      ...base,
+      ...(p.level === 'QHC' ? OUTLINE_QHC : null),
+      color: p.color,
+      fillColor: p.color,
+      fillOpacity: fillOp
+    };
+    const shown = open && quietOutline ? { ...style, opacity: 0, fillOpacity: 0 } : style;
     // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
     if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
       const shape = L.geoJSON(geom, { style: shown, interactive: false });

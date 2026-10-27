@@ -34,6 +34,13 @@ for (const rel of ['../public/js/mapEngine.js', '../public/js/qhctLayer.js']) {
 const engine = src('../public/js/mapEngine.js');
 if (!engine.includes('if (lotGeom) html += lotBuildupSlotHtml()')) throw new Error('lô hạ tầng thiếu khung mật độ');
 if (!engine.includes('if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom })')) throw new Error('lô hạ tầng không gắn phép tính mật độ');
+{
+  const toolsAt = engine.indexOf('buildup: !!lotGeom');
+  const fillAt = engine.lastIndexOf('if (lotGeom) fillLotBuildup(popup, { geometry: lotGeom })');
+  if (toolsAt < 0 || fillAt < 0 || toolsAt > fillAt) {
+    throw new Error('icon mật độ phải gắn trước fillLotBuildup (tránh nút chữ trùng)');
+  }
+}
 if (!engine.includes('pp-radius-btn') || !engine.includes('pp-buildup-btn')) {
   throw new Error('thiếu icon bán kính / mật độ trên bảng lô');
 }
@@ -45,16 +52,26 @@ if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (n�
 const infraTools = engine.includes('onAnalyze: canAnalyze ? runAnalysis : null')
   && engine.includes('buildup: !!lotGeom');
 if (!infraTools) throw new Error('lô hạ tầng chưa gắn icon bán kính / mật độ');
-const attach = src('../public/js/lotBuildup.js').split('export function attachLotBuildup')[1] || '';
+const buildupSrc = src('../public/js/lotBuildup.js');
+const attach = buildupSrc.split('export function attachLotBuildup')[1] || '';
 const armBody = attach.split('const arm = ')[1] || attach;
 const beforeRun = armBody.split('const run =')[0];
 if (beforeRun.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');
 if (!attach.includes('el.textContent = LOADING')) throw new Error('thiếu trạng thái đang kiểm tra');
-if (!src('../public/js/lotBuildup.js').includes("const LOADING = 'Đang đối chiếu dấu chân công trình…'")) {
+if (!attach.includes('hasBuildupIcon')) throw new Error('thiếu chặn nút chữ khi đã có icon mật độ');
+if (!buildupSrc.includes("const LOADING = 'Đang đối chiếu dấu chân công trình…'")) {
   throw new Error('thiếu câu đang đối chiếu');
 }
+if (!buildupSrc.includes('turf.difference') || !buildupSrc.includes('paintBuildup')) {
+  throw new Error('thiếu cắt phần ngoài ranh và vẽ dấu chân / gạch đỏ');
+}
+const outNote = buildupHtml({ lotM2: 1000, footM2: 200, count: 2, outM2: 40 });
+if (!outNote.includes('Ngoài ranh') || !outNote.includes('40')) throw new Error('thiếu dòng diện tích ngoài ranh');
 const ui = src('../docs/ui-spec.md');
 if (!ui.includes('không nút «Xem 3D»') || !ui.includes('bán kính phục vụ › mật độ xây dựng')) {
   throw new Error('ui-spec thiếu mô tả hàng icon bảng lô');
+}
+if (!ui.includes('gạch chéo đỏ') || !ui.includes('không tính vào mật độ')) {
+  throw new Error('ui-spec thiếu mô tả cắt chân công trình ngoài ranh');
 }
 console.log('ok', vin);

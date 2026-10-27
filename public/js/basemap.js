@@ -1,11 +1,16 @@
 // Ảnh nền dùng chung cho bản đồ hiện trạng và quy hoạch.
-// Mặc định Google vệ tinh. Nền đường phố là OpenFreeMap Liberty (MapLibre trong Leaflet).
-// WebGL hoặc kiểu Liberty lỗi thì đổi sang nền xám nhạt Esri. Lựa chọn ghi trên máy (qhhue.basemap).
+// Mặc định Google vệ tinh mỗi lần mở trang. Nền đường phố là OpenFreeMap Liberty (MapLibre trong Leaflet).
+// WebGL hoặc kiểu Liberty lỗi thì đổi sang nền xám nhạt Esri. Không ghi lựa chọn ảnh nền / tên phường lên máy.
 // Lớp cắt nền điều chỉnh cục bộ luôn lấy vệ tinh Google.
 // Mức phóng bản đồ cao hơn ô gốc: Leaflet phóng ô maxNativeZoom, không tắt lớp.
 import { trackJob, watchTiles } from './loadProgress.js';
 
 const STORE_KEY = 'qhhue.basemap';
+const WARD_NAMES_KEY = 'qh_ward_names';
+try {
+  localStorage.removeItem(STORE_KEY);
+  localStorage.removeItem(WARD_NAMES_KEY);
+} catch (e) { /* chế độ riêng tư */ }
 
 /** Mức phóng tối đa của mọi bản đồ Leaflet (hiện trạng, quy hoạch, định vị ảnh). */
 export const MAP_MAX_ZOOM = 22;
@@ -68,11 +73,6 @@ const maps = new Map();   // bản đồ → { layer, pinned }
 const labelLayers = new Map();   // bản đồ → lớp tem đang gắn
 let labelsOn = false;
 let current = 'google';
-try {
-  const saved = localStorage.getItem(STORE_KEY);
-  if (BASEMAPS[saved]) current = saved;
-  else if (saved) localStorage.removeItem(STORE_KEY);
-} catch (e) { /* chế độ riêng tư */ }
 
 // 'ofm' thử Liberty; 'esri' khi phiên này đã lỗi hoặc máy không có WebGL.
 let lightKind = 'ofm';
@@ -338,11 +338,10 @@ function emitBasemap() {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(BASEMAP_EVENT));
 }
 
-/** Đổi ảnh nền và báo các lớp lô vẽ lại viền. id thuộc BASEMAPS. */
+/** Đổi ảnh nền và báo các lớp lô vẽ lại viền. id thuộc BASEMAPS. Chỉ trong phiên; mở lại trang về Google vệ tinh. */
 export function selectBasemap(id) {
   if (!BASEMAPS[id] || id === current) return;
   current = id;
-  try { localStorage.setItem(STORE_KEY, current); } catch (e) { /* chế độ riêng tư */ }
   applyBasemap();
   emitBasemap();
 }
@@ -385,8 +384,6 @@ export function detachBasemap(m) {
 }
 
 // Tên phường xã (nhãn ward-label-icon của mapEngine.js / planMap.js) ẩn bằng class trên body
-const WARD_NAMES_KEY = 'qh_ward_names';
-
 function setWardNames(on) {
   document.body.classList.toggle('ward-names-off', !on);
   const btn = document.getElementById('btnWardNames');
@@ -394,7 +391,6 @@ function setWardNames(on) {
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   }
-  try { localStorage.setItem(WARD_NAMES_KEY, on ? '1' : '0'); } catch (e) { /* chế độ riêng tư */ }
 }
 
 /** Lớp tile GEE: ô gốc tới GEE_NATIVE_ZOOM, mức cao hơn phóng ô đó. */
@@ -413,8 +409,6 @@ export function initBasemapUi() {
     });
   }
   document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));
-  let wardNames = true;
-  try { wardNames = localStorage.getItem(WARD_NAMES_KEY) !== '0'; } catch (e) { /* chế độ riêng tư */ }
-  setWardNames(wardNames);
+  setWardNames(true);
   document.getElementById('btnWardNames')?.addEventListener('click', () => setWardNames(document.body.classList.contains('ward-names-off')));
 }
