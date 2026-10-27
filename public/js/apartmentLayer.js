@@ -6,7 +6,7 @@ import { assignNoxhWards } from './noxhWard.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, ico } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { setWardPopHtml } from './uiComponents.js';
 import {
@@ -33,6 +33,10 @@ let rawPlan = [];
 let popWeights = null;
 let faqQuestions = [];
 let kindFilter = '';
+const aptOpen = new Set();
+const aptHidden = new Set();
+const aptMarkers = new Map();
+let aptPicked = '';
 
 function isAdmin() {
   return state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -206,6 +210,7 @@ function addSite(group, it) {
   marker.on('popupopen', () => showFoot(group, it));
   marker.on('popupclose', () => clearFoot(group));
   group.addLayer(marker);
+  if (group === groupL) aptMarkers.set(it.id, marker);
 }
 
 function draw() {
@@ -215,10 +220,11 @@ function draw() {
   planR?.remove();
   planL = null;
   planR = null;
+  aptMarkers.clear();
   groupL = L.layerGroup();
   groupR = L.layerGroup();
   if (!on) return;
-  [...popItems(), ...planItems].filter(passesKind).forEach(it => {
+  [...popItems(), ...planItems].filter(it => passesKind(it) && !aptHidden.has(it.id)).forEach(it => {
     addSite(groupL, it);
     addSite(groupR, it);
   });
@@ -233,6 +239,92 @@ function summaryText() {
   const tm = ht.filter(it => it.kind === 'thuongmai').length;
   const warns = s.warns.length ? ` Cảnh báo vượt dân số: ${s.warns.join(', ')}.` : '';
   return `${ht.length} hiện trạng (${noxh} NOXH, ${tm} thương mại), ${planItems.length} quy hoạch. Dân hiện trạng khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người. Quy hoạch không tính dân.${warns}`;
+}
+
+function dossierHtml(rows) {
+  const body = rows.filter(([, value]) => String(value || '').trim()).map(([label, value]) =>
+    `<div class="project-dossier-row"><span class="project-dossier-label">${escapeHtml(label)}</span><span class="project-dossier-meta">${escapeHtml(String(value))}</span></div>`
+  ).join('');
+  return body ? `<div class="project-dossier">${body}</div>` : '';
+}
+
+function aptCatalog() {
+  return [...popItems(), ...planItems].filter(passesKind)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+}
+
+function aptDetail(it) {
+  const plan = it.status === 'quy_hoach';
+  const row = apartmentPopulation(it, popConfig());
+  const recorded = Number(it.residents);
+  const dan = plan
+    ? (Number.isFinite(recorded) && recorded > 0 ? Math.round(recorded) : null)
+    : (row.how === 'thieu' ? null : Math.round(row.pop));
+  const scale = [
+    it.units ? `${it.units} căn` : '',
+    it.floors ? `${it.floors} tầng` : '',
+    it.siteHa ? `${it.siteHa} ha` : ''
+  ].filter(Boolean).join(', ');
+  return [
+    ['Địa điểm', it.ward],
+    ['Loại', KIND[it.kind] || it.kindDetail || ''],
+    ['Quy mô', scale],
+    ['Dân số', dan != null ? `${dan.toLocaleString('vi-VN')} người` : ''],
+    ['Năm xây dựng', yearOf(it)],
+    ['Trạng thái', plan ? 'Quy hoạch' : 'Hiện trạng'],
+    ['Độ tin cậy', CONF[it.confidence] || ''],
+    ['Ghi chú', it.locateNote || it.detail || '']
+  ];
+}
+
+function aptRow(it, n) {
+  const id = escapeHtml(it.id);
+  const open = aptOpen.has(it.id);
+  const shown = !aptHidden.has(it.id);
+  const rows = aptDetail(it);
+  const blob = [it.name, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
+  return `<div class="project-row${shown ? '' : ' is-off'}${it.id === aptPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
+      <label class="project-name" title="${escapeHtml(it.name || '')}">
+        <input type="checkbox" data-apt="${id}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-apt-focus="${id}">${n}. ${escapeHtml(it.name || it.id)}</span></label>
+      <span class="project-tools">
+        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-apt-expand="${id}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
+      </span>
+    </div>${open ? dossierHtml(rows) : ''}`;
+}
+
+function paintAptList() {
+  const host = $('aptList');
+  if (!host) return;
+  const scroller = $('dtList');
+  const y = scroller?.scrollTop || 0;
+  const items = aptCatalog();
+  host.innerHTML = items.length
+    ? items.map((it, i) => aptRow(it, i + 1)).join('')
+    : (loaded ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
+  if (scroller) scroller.scrollTop = y;
+}
+
+function focusApt(id) {
+  const it = [...popItems(), ...planItems].find(item => item.id === id);
+  if (!it) return;
+  aptHidden.delete(id);
+  aptOpen.add(id);
+  aptPicked = id;
+  const go = () => {
+    paintAptList();
+    const ll = markerLatLng(it);
+    if (map && ll) map.flyTo(ll, Math.max(map.getZoom(), 17));
+    aptMarkers.get(id)?.openPopup();
+  };
+  const box = $('chk_c14');
+  if (box && !box.checked) {
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    setTimeout(go, 0);
+    return;
+  }
+  if (on) draw();
+  go();
 }
 
 function paintBox() {
@@ -251,6 +343,7 @@ function paintBox() {
   if (hh && document.activeElement !== hh) hh.value = String(c.hhSize);
   if (m2 && document.activeElement !== m2) m2.value = String(c.m2PerPerson);
   if (eff && document.activeElement !== eff) eff.value = String(c.efficiency);
+  paintAptList();
 }
 
 function readCfg() {
@@ -408,6 +501,36 @@ export function initApartmentLayer() {
   }
   $('aptKind')?.addEventListener('change', (e) => {
     kindFilter = e.target.value || '';
+    paintAptList();
+    if (on) draw();
+  });
+  $('aptList')?.addEventListener('click', (e) => {
+    const expand = e.target.closest('[data-apt-expand]');
+    if (expand) {
+      const id = expand.dataset.aptExpand;
+      if (aptOpen.has(id)) aptOpen.delete(id);
+      else aptOpen.add(id);
+      paintAptList();
+      return;
+    }
+    const focus = e.target.closest('[data-apt-focus]');
+    if (focus) {
+      e.preventDefault();
+      focusApt(focus.dataset.aptFocus);
+    }
+  });
+  $('aptList')?.addEventListener('change', (e) => {
+    const box = e.target.closest('[data-apt]');
+    if (!box) return;
+    const id = box.dataset.apt;
+    if (box.checked) aptHidden.delete(id);
+    else aptHidden.add(id);
+    box.closest('.project-row')?.classList.toggle('is-off', !box.checked);
+    if (box.checked && !$('chk_c14')?.checked) {
+      $('chk_c14').checked = true;
+      $('chk_c14').dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
     if (on) draw();
   });
   document.addEventListener('submit', onPopupSubmit);

@@ -6506,13 +6506,20 @@ body.project-review.la-page #projectReviewHost {
 .axis-arch-list small { display: block; color: var(--axis-color-muted); font-size: var(--axis-fs-chip); }
 .axis-arch-list a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 #axisKienTruc .pl-head { text-transform: none; letter-spacing: 0; }
-#axisKienTruc .project-row { align-items: flex-start; }
-#axisKienTruc .project-name { align-items: flex-start; }
-#axisKienTruc .project-name input { margin-top: 3px; }
-#axisKienTruc .project-name span { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-#axisKienTruc .project-tools { margin-top: 1px; }
-#axisKienTruc .project-dossier-row { align-items: flex-start; }
-#axisKienTruc .project-dossier-meta { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+#axisKienTruc .project-row,
+#dtList .project-row { align-items: flex-start; }
+#axisKienTruc .project-name,
+#dtList .project-name { align-items: flex-start; }
+#axisKienTruc .project-name input,
+#dtList .project-name input { margin-top: 3px; }
+#axisKienTruc .project-name span,
+#dtList .project-name span { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+#axisKienTruc .project-tools,
+#dtList .project-tools { margin-top: 1px; }
+#axisKienTruc .project-dossier-row,
+#dtList .project-dossier-row { align-items: flex-start; }
+#axisKienTruc .project-dossier-meta,
+#dtList .project-dossier-meta { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 .arch-tabs { display: flex; gap: 4px; margin: 4px 6px 6px; }
 .arch-tab {
   flex: 1 1 0; min-width: 0; min-height: var(--axis-chip-h); padding: 4px 8px;

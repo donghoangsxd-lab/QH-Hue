@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261090">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261091">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261090">
+  <link rel="stylesheet" href="css/style.css?v=20261091">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -728,12 +728,14 @@
                     </label>
                     <p id="aptStatus" class="apt-status"></p>
                   </div>
+                  <div id="aptList" class="project-list"></div>
                 </div>
                 <div data-dt-pane="dien" hidden><div class="project-empty">Chưa có đồ án.</div></div>
                 <div data-dt-pane="khudothi" hidden><div class="project-empty">Chưa có đồ án.</div></div>
                 <div data-dt-pane="dulich" hidden><div class="project-empty">Chưa có đồ án.</div></div>
                 <div data-dt-pane="khac" hidden>
                   <div class="layer-row infra-point"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
+                  <div id="investList" class="project-list"></div>
                 </div>
               </div>
             </div>
@@ -1669,6 +1671,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261090"></script>
+  <script type="module" src="./js/app.js?v=20261091"></script>
 </body>
 </html>

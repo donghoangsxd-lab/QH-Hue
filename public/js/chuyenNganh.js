@@ -1108,10 +1108,18 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
+  document.querySelectorAll('#dtList .project-row').forEach(el => {
+    const blob = el.getAttribute('data-dt-text') || el.textContent;
+    const hide = !!q && !foldQuery(blob).includes(q);
+    el.classList.toggle('is-filter-hide', hide);
+    const next = el.nextElementSibling;
+    if (next?.classList.contains('project-dossier')) next.classList.toggle('is-filter-hide', hide);
+  });
   if (q && browseState().axis === 'dautu') {
     const hit = [...document.querySelectorAll('#axisDauTu [data-dt-pane]')].find(pane => {
-      const row = pane.querySelector('.layer-row');
-      return row && foldQuery(row.textContent).includes(q);
+      const blob = [...pane.querySelectorAll('.layer-row, .project-row')]
+        .map(el => el.getAttribute('data-dt-text') || el.textContent).join(' ');
+      return foldQuery(blob).includes(q);
     });
     if (hit) document.querySelector(`#levelPickDt [data-dt-tab="${hit.dataset.dtPane}"]`)?.click();
   }
@@ -1402,6 +1410,7 @@ function showDauTuTab(id) {
     pane.hidden = pane.dataset.dtPane !== id;
   });
   paintAxisAll();
+  document.dispatchEvent(new CustomEvent('qh:dt-tab', { detail: { id } }));
 }
 
 function initDauTuTabs() {

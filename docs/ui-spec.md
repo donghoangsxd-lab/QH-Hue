@@ -54,7 +54,7 @@ Hai tab: Quy chế kiến trúc và Công trình có giá trị. Tab công trìn
 
 ### Dự án đầu tư
 
-Ngay sau Kiến trúc. Tiêu đề droplist `F. Dự án đầu tư`, cùng cỡ chữ 12px với các trục kia. Ngay dưới hàng tìm kiếm, một hàng tab cùng kiểu cấp quy hoạch (`.level-pick-btn`, nền cam `--accent-orange` khi đang chọn, không viền chọn). Đúng năm tab, mỗi lúc một tab: Nhà chung cư, Nhà máy điện, Khu đô thị, Du lịch dịch vụ, Dự án khác. Danh sách phía dưới chỉ của tab đang chọn. Nhà chung cư giữ lớp `chk_c14` (giọt nước NOXH, lọc loại, dân số phường không đổi khi tắt lớp). Dự án khác giữ lớp `chk_invest` (ranh KML, bấm mở thông tin). Ba tab còn lại để trống, dòng «Chưa có đồ án.» như danh sách đồ án quy hoạch khi chưa có dữ liệu. Không lặp hai lớp này ở Hạ tầng xã hội.
+Ngay sau Kiến trúc. Tiêu đề droplist `F. Dự án đầu tư`, cùng cỡ chữ 12px với các trục kia. Ngay dưới hàng tìm kiếm, một hàng tab cùng kiểu cấp quy hoạch (`.level-pick-btn`, nền cam `--accent-orange` khi đang chọn, không viền chọn). Đúng năm tab, mỗi lúc một tab: Nhà chung cư, Nhà máy điện, Khu đô thị, Du lịch dịch vụ, Dự án khác. Danh sách phía dưới chỉ của tab đang chọn. Nhà chung cư giữ lớp `chk_c14` (giọt nước NOXH, lọc loại, dân số phường không đổi khi tắt lớp). Dự án khác giữ lớp `chk_invest` (ranh KML, bấm mở thông tin). Dưới ô lớp, mỗi công trình hoặc dự án là một dòng danh sách cùng kiểu công trình kiến trúc Pháp: số thứ tự và tên, ô hiện trên bản đồ, nút mũi tên «Xem thông tin». Bấm mũi tên mở khối thông tin (nhãn và giá trị); bấm tên thì phóng tới điểm hoặc ranh. Ba tab còn lại để trống, dòng «Chưa có đồ án.» như danh sách đồ án quy hoạch khi chưa có dữ liệu. Khi các tab đó có dữ liệu thì dùng cùng danh sách này. Không lặp hai lớp này ở Hạ tầng xã hội.
 
 ## Đổi trục
 
