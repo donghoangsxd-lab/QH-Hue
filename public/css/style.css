@@ -1791,8 +1791,15 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-net-note { margin: 4px 0 2px; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-assign [data-proposal-note] { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-assign [data-proposal-reject]:hover:not(:disabled) { border-color: var(--accent-red); color: var(--accent-red); }
-/* Nửa phải màn hình: bản đồ bên trái vẫn nhìn được khi đọc PDF quyết định */
-.decision-view { position: fixed; top: 8px; right: 8px; bottom: 8px; left: 50%; z-index: 2800; display: flex; flex-direction: column; background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+/* Khung PDF neo phải, rộng vừa trang A4 đứng (210 mm) — bản đồ bên trái còn chỗ xem */
+.decision-view {
+  position: fixed; top: 8px; right: 8px; bottom: 8px; left: auto;
+  width: min(210mm, calc(100vw - 16px));
+  z-index: 2800; display: flex; flex-direction: column;
+  background: var(--bg-panel); color: var(--text-main);
+  border: 1px solid var(--border-color); border-radius: var(--r-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
 .decision-view[hidden] { display: none; }
 .decision-bar { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--border-color); }
 .decision-bar b { flex: 0 1 42%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
@@ -1814,7 +1821,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .decision-note[hidden] { display: none; }
 .decision-view iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .decision-view iframe[hidden] { display: none; }
-@media (max-width: 640px) { .decision-view { inset: 0; left: 0; border-radius: 0; } }
+@media (max-width: 640px) { .decision-view { inset: 0; left: 0; width: auto; border-radius: 0; } }
 .project-expand .ico { transition: transform var(--ease); }
 .project-expand.open { color: var(--accent-cyan); }
 .project-expand.open .ico { transform: rotate(180deg); }
@@ -4094,9 +4101,9 @@ table.ward-table th {
 .pls-table .pls-stt { width: 1.6em; text-align: center; color: var(--text-muted); }
 .pls-table .pls-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pls-table .pls-type {
-  display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 9.5em;
+  display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 12em;
 }
-.pls-table td.pls-type { max-width: 9.5em; }
+.pls-table td.pls-type { max-width: 12em; }
 .pls-table .pls-type span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -4364,13 +4371,53 @@ table.ward-table th {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cad-qh { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0 0 2px; }
+.cad-qh > .pls-head { flex: none; padding: 6px 8px 2px; margin: 0; }
 .cad-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
   flex: none;
-  padding: 5px 26px 0 6px;
+  padding: 2px 8px 0;
 }
+.cad-card.pp-located {
+  --cad-tools: 118px;
+}
+.cad-card.pp-located .cad-id .lp-head { padding-right: var(--cad-tools); }
+.cad-card.pp-located .pp-buildup-btn,
+.cad-card.pp-located .pp-share-btn,
+.cad-card.pp-located .pp-route-btn,
+.cad-card.pp-located .pp-collapse-btn {
+  position: absolute; top: 4px; z-index: 2;
+  width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
+}
+.cad-card.pp-located .pp-buildup-btn:hover,
+.cad-card.pp-located .pp-share-btn:hover,
+.cad-card.pp-located .pp-route-btn:hover,
+.cad-card.pp-located .pp-collapse-btn:hover { color: var(--accent-cyan); background: rgba(255, 255, 255, 0.08); }
+.cad-card.pp-located .pp-collapse-btn { right: 28px; }
+.cad-card.pp-located .pp-route-btn { right: 52px; }
+.cad-card.pp-located .pp-share-btn { right: 76px; }
+.cad-card.pp-located .pp-buildup-btn { right: 100px; }
+.cad-card.pp-located .pp-buildup-btn .ico,
+.cad-card.pp-located .pp-share-btn .ico,
+.cad-card.pp-located .pp-route-btn .ico,
+.cad-card.pp-located .pp-collapse-btn .ico { width: 14px; height: 14px; margin: 0; }
+.cad-card.pp-collapsed { cursor: pointer; }
+.cad-card.pp-collapsed .cad-qh,
+.cad-card.pp-collapsed .lp-info,
+.cad-card.pp-collapsed .ht-assign,
+.cad-card.pp-collapsed .lot-buildup,
+.cad-card.pp-collapsed .pp-buildup-btn,
+.cad-card.pp-collapsed .pp-share-btn,
+.cad-card.pp-collapsed .pp-route-btn,
+.cad-card.pp-collapsed .pp-collapse-btn,
+.cad-card.pp-collapsed .cad-card-x { display: none !important; }
+.cad-card.pp-collapsed .cad-id { padding: 6px 10px; }
+.cad-card.pp-collapsed .lp-head { padding-right: 0; border-bottom: 0; }
+.cad-card.pp-collapsed .lp-sub,
+.cad-card.pp-collapsed .lp-phase { display: none; }
 .cad-tab {
   display: flex;
   flex-direction: column;

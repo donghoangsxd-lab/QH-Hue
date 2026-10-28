@@ -28,6 +28,8 @@ import { restoreInspectFocus } from './projectLayer.js';
 import { planLotsIn, lotsRevision, whenCatalogSettled } from './projectFiles.js';
 import { planLevelOf } from './generalPlan.js';
 import { pickPlanningLot } from './qhpkOverlap.js';
+import { attachLotBuildup } from './lotBuildup.js';
+import { lotBuildupSlotHtml } from './lotScreen.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -459,6 +461,7 @@ function parcelInfoHtml(p) {
       </div>
     </div>
     <dl class="lp-info">${rows}</dl>
+    ${lotBuildupSlotHtml()}
     <div class="ht-assign"></div>`;
 }
 
@@ -513,7 +516,12 @@ function closeParcel() {
   clearParcelPies();
   restoreInspectFocus();
   const card = document.getElementById('cadParcelCard');
-  if (card) { card.hidden = true; card.innerHTML = ''; }
+  if (card) {
+    card.hidden = true;
+    card.classList.remove('pp-located', 'pp-has-buildup', 'pp-collapsible', 'pp-collapsed');
+    card.title = '';
+    card.innerHTML = '';
+  }
   if (popup) {
     const p = popup;
     popup = null;
@@ -533,39 +541,120 @@ function ensureCard() {
   (document.getElementById('mapArea') || document.body).appendChild(el);
   el.addEventListener('click', (e) => {
     if (e.target.closest('.pls-comp-fold')) return;
+    if (el.classList.contains('pp-collapsed') && !e.target.closest('.cad-card-x')) {
+      el.classList.remove('pp-collapsed');
+      el.title = '';
+      return;
+    }
     const land = e.target.closest('[data-land]');
     if (land) { toggleLand(land.dataset.land, land.dataset.color); return; }
     const tab = e.target.closest('[data-cad-tab]');
     if (tab) { showTab(tab.dataset.cadTab); return; }
-    if (e.target.closest('.cad-card-x')) closeParcel();
+    if (e.target.closest('.cad-card-x')) { closeParcel(); return; }
+    if (e.target.closest('[data-cad-collapse], .pp-collapse-btn')) {
+      e.preventDefault();
+      el.classList.add('pp-collapsed');
+      el.title = 'Bấm lại để hiện bảng thông tin thửa';
+      return;
+    }
+    if (e.target.closest('[data-cad-route], .pp-route-btn')) {
+      e.preventDefault();
+      const { lat, lng } = cardState || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lng.toFixed(6)}`, '_blank', 'noopener');
+      }
+      return;
+    }
+    if (e.target.closest('[data-cad-share], .pp-share-btn')) {
+      e.preventDefault();
+      const { lat, lng, title } = cardState || {};
+      if (Number.isFinite(lat) && Number.isFinite(lng)) shareCadPoint(lat, lng, title);
+    }
   });
   el.addEventListener('pls-pick', (e) => toggleLand(e.detail?.key, e.detail?.color));
   return el;
 }
 
-function tabsBar(current, label, closeLabel) {
+function tabsBar(current, label) {
   const tabs = PLAN_TABS.map(t => {
     const on = t.id === current;
     return `<button type="button" class="cad-tab${on ? ' is-on' : ''}" role="tab" data-cad-tab="${t.id}" aria-selected="${on}" title="${t.name} ${t.scale}"><b>${t.name}</b><small>${t.scale}</small></button>`;
   }).join('');
-  return `<div class="cad-tabs" role="tablist" aria-label="${label}">${tabs}</div>
+  return `<div class="cad-tabs" role="tablist" aria-label="${label}">${tabs}</div>`;
+}
+
+function cardToolBtns(closeLabel) {
+  return `<a href="#" class="pp-buildup-btn" role="button" data-lot-buildup-run title="Xem mật độ xây dựng thực tế" aria-label="Xem mật độ xây dựng thực tế">${ico('coverage')}</a>
+    <a href="#" class="pp-share-btn" role="button" data-cad-share title="Chia sẻ vị trí" aria-label="Chia sẻ vị trí">${ico('send')}</a>
+    <a href="#" class="pp-route-btn" role="button" data-cad-route title="Chỉ đường" aria-label="Chỉ đường">${ico('road')}</a>
+    <a href="#" class="pp-collapse-btn" role="button" data-cad-collapse title="Ẩn bảng thông tin (giữ viền thửa trên bản đồ)" aria-label="Ẩn bảng thông tin">${ico('eye-off')}</a>
     <button type="button" class="cad-card-x" title="Đóng" aria-label="${closeLabel}">${ico('close')}</button>`;
 }
 
 function cardHtml(p) {
-  return `${tabsBar(getLevel(), 'Lớp quy hoạch trên thửa', 'Đóng bảng thửa')}
-    <div class="cad-id">${parcelInfoHtml(p)}</div>
-    <div class="cad-page" role="tabpanel"></div>`;
+  return `${cardToolBtns('Đóng bảng thửa')}
+    <div class="cad-id pp land-popup">${parcelInfoHtml(p)}</div>
+    <div class="cad-qh">
+      <div class="pls-head">Thông tin quy hoạch:</div>
+      ${tabsBar(getLevel(), 'Lớp quy hoạch trên thửa')}
+      <div class="cad-page" role="tabpanel"></div>
+    </div>`;
 }
 
 function measureCardHtml(tab, areaM2) {
   const area = areaM2 >= 10000 ? `${fmtNum(areaM2 / 10000)} ha` : `${fmtNum(Math.round(areaM2))} m²`;
-  return `${tabsBar(tab, 'Lớp quy hoạch trong vùng đo', 'Đóng bảng vùng đo')}
-    <div class="cad-id"><div class="lp-head"><div class="lp-head-main">
+  return `${cardToolBtns('Đóng bảng vùng đo')}
+    <div class="cad-id pp land-popup"><div class="lp-head"><div class="lp-head-main">
       <div class="lp-title-row"><span class="lp-title">Vùng đo</span></div>
       <div class="lp-sub">${areaM2 > 0 ? area : ''}</div>
-    </div></div></div>
-    <div class="cad-page" role="tabpanel"></div>`;
+    </div></div>${lotBuildupSlotHtml()}</div>
+    <div class="cad-qh">
+      <div class="pls-head">Thông tin quy hoạch:</div>
+      ${tabsBar(tab, 'Lớp quy hoạch trong vùng đo')}
+      <div class="cad-page" role="tabpanel"></div>
+    </div>`;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function shareCadPoint(lat, lng, title) {
+  let link = `${location.origin}${location.pathname}#ll=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
+  try {
+    const mod = await import('./viewLink.js');
+    if (mod.viewUrlWithLot) link = await mod.viewUrlWithLot({ lat, lng });
+  } catch { /* giữ link tối thiểu */ }
+  const data = { title: 'Quy hoạch Huế', text: title || 'Vị trí thửa đất', url: link };
+  if (navigator.share) {
+    try { await navigator.share(data); return; }
+    catch (err) { if (err && err.name === 'AbortError') return; }
+  }
+  const ok = await copyText(link);
+  showToast(ok ? 'Đã chép liên kết tới thửa đất' : 'Không chép được liên kết', ok ? 'success' : 'error');
+}
+
+function mountCadTools(el, { lat, lng, title, geom }) {
+  if (!el) return;
+  el.classList.add('pp-located', 'pp-has-buildup', 'pp-collapsible');
+  el.classList.remove('pp-collapsed');
+  el.title = '';
+  if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+    cardState && (cardState.lat = Number(lat), cardState.lng = Number(lng), cardState.title = title || '');
+  }
+  if (geom) {
+    attachLotBuildup({
+      getElement: () => el,
+      isOpen: () => !el.hidden,
+      on() {},
+      once(_ev, fn) { fn?.(); }
+    }, { geometry: geom });
+  }
 }
 
 // Đẩy bản đồ nếu ranh thửa chui xuống bảng góc trái
@@ -768,13 +857,21 @@ export function openMeasurePlan(ring, targetMap) {
   let bounds = null;
   try { area = turf.area(geom); } catch { area = 0; }
   try { bounds = L.geoJSON(geom).getBounds(); } catch { bounds = null; }
+  let lat = null;
+  let lng = null;
+  try {
+    const c = turf.pointOnFeature(turf.feature(geom)).geometry.coordinates;
+    lng = c[0];
+    lat = c[1];
+  } catch { /* không có tâm */ }
   cardState = {
     kind: 'measure', place: 'measure', tab, cache: new Map(),
-    recorded: 0, geom, map: targetMap, bounds, landKey: null
+    recorded: 0, geom, map: targetMap, bounds, landKey: null, lat, lng, title: 'Vùng đo'
   };
   el.innerHTML = measureCardHtml(tab, area);
   el.hidden = false;
   el.setAttribute('aria-label', 'Quy hoạch sử dụng đất trong vùng đo');
+  mountCadTools(el, { lat, lng, title: 'Vùng đo', geom });
   showTab(tab);
   if (bounds) requestAnimationFrame(() => nudgeParcel(targetMap, bounds));
 }
@@ -983,7 +1080,7 @@ async function openParcel(latlng, targetMap, opts = {}) {
   if (planning) {
     const el = ensureCard();
     const tab = isPlanLevel(planTab) ? planTab : (isPlanLevel(getLevel()) ? getLevel() : 'qhpk');
-    cardState = { kind: 'parcel', tab, cache: new Map(), recorded: Number(props.a), geom: null, map: targetMap, bounds: null, landKey: null };
+    cardState = { kind: 'parcel', tab, cache: new Map(), recorded: Number(props.a), geom: null, map: targetMap, bounds: null, landKey: null, lat: latlng.lat, lng: latlng.lng, title: `Thửa ${props.s} · Tờ ${props.t}` };
     el.setAttribute('aria-label', 'Thông tin thửa đất');
     el.innerHTML = cardHtml(props);
     el.hidden = false;
@@ -991,6 +1088,7 @@ async function openParcel(latlng, targetMap, opts = {}) {
     const shape = await shapeP;
     if (mySeq !== clickSeq || !cardState) return true;
     cardState.geom = shape.geometry;
+    mountCadTools(el, { lat: latlng.lat, lng: latlng.lng, title: cardState.title, geom: shape.geometry });
     drawHighlight(shape, targetMap);
     showTab(cardState.tab);
     return true;

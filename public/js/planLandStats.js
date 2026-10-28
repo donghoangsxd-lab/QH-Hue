@@ -539,17 +539,16 @@ function planFieldText(plan, key) {
   return String(hit.text || '—').replace(/\s+/g, ' ').trim();
 }
 
-/** Bảng gọn Stt / Loại đất / Tỷ lệ / Diện tích / MĐXD / Tầng cao / HSSDĐ (một hàng mỗi lô giao thửa). */
+/** Bảng gọn Stt / Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (tỷ lệ xem biểu đồ tròn). */
 function planLotsTable(parts, totalArea) {
   if (!parts?.length) return '';
   const body = parts.map((p, i) => {
     const plan = p.lot && p.lot.plan;
     const swatch = (p.key && tt16SwatchCss(p.key, 0.6)) || `background:${p.color || '#94a3b8'};`;
     const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
-    return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)}">
+    return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))}">
       <td class="pls-stt">${i + 1}</td>
       <td class="pls-type"><i class="pls-swatch" style="${swatch}"></i><span>${escapeHtml(p.label)}</span></td>
-      <td class="pls-num">${escapeHtml(fmtPct(pct))}</td>
       <td class="pls-num">${fmtM2(p.area)}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'floors'))}</td>
@@ -558,7 +557,7 @@ function planLotsTable(parts, totalArea) {
   }).join('');
   return `<div class="pls-table-wrap"><table class="pls-table">
     <thead><tr>
-      <th>Stt</th><th>Loại đất</th><th>Tỷ lệ</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
+      <th>Stt</th><th>Loại đất</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
     </tr></thead>
     <tbody>${body}</tbody>
   </table></div>`;
@@ -586,11 +585,12 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
   const note = opts.note || `Cắt hình học ${w.cut} với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.`;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
   if (compact) {
-    const head = `<div class="pls-head">${escapeHtml(title)}</div>${extra}`;
+    // Tiêu đề «Thông tin quy hoạch:» + 4 tab nằm ngoài .cad-page; đây chỉ pie + bảng (+ extra).
+    const head = extra;
     if (!res.parts?.length && !res.rows.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}</div>`;
+    return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel, w.pie)}${planLotsTable(res.parts, res.area)}</div>`;
   }
   const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
@@ -614,11 +614,11 @@ export function parcelZonesHtml(res, recorded, opts) {
   const covered = res.area - res.none.area;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
   if (compact) {
-    const head = `<div class="pls-head">${escapeHtml(title)}</div>${extra}`;
+    const head = extra;
     if (!res.parts.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}</div>`;
+    return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none, w.pie)}${planLotsTable(res.parts, res.area)}</div>`;
   }
   const head = `<div class="pls-head">${escapeHtml(title)}</div>
     <div class="pp-row pls-sheet"><span>${escapeHtml(w.shape)}</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
