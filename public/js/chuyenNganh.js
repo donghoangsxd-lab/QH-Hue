@@ -1210,7 +1210,14 @@ function applyLayerQuery() {
   }
 }
 
+function syncViewSwitchVisibility() {
+  const sw = document.querySelector('#layerTools .view-switch');
+  // Trục Kiến trúc không dùng HT/QH — chỉ còn ô tìm và nút bật/tắt nhóm.
+  if (sw) sw.hidden = browseState().axis === 'kientruc';
+}
+
 function paintViewSwitch() {
+  syncViewSwitchVisibility();
   const mode = columnMode();
   document.querySelectorAll('#layerTools [data-view-mode]').forEach(btn => {
     const on = btn.dataset.viewMode === mode;
@@ -1277,6 +1284,7 @@ function paint() {
   paintXaHoi();
   paintXahoiList();
   paintAxisAll();
+  syncViewSwitchVisibility();
   const tools = document.getElementById('axisToolsQuyHoach');
   if (tools) tools.hidden = true;
   applyLayerQuery();
@@ -1429,6 +1437,8 @@ async function loadKienTruc() {
 function showDauTuTab(id) {
   const pick = document.getElementById('levelPickDt');
   if (!pick || !id) return;
+  const cur = pick.querySelector('[data-dt-tab].is-on')?.dataset?.dtTab;
+  if (cur === id) return;
   pick.querySelectorAll('[data-dt-tab]').forEach(btn => {
     const on = btn.dataset.dtTab === id;
     btn.classList.toggle('is-on', on);
@@ -1473,6 +1483,7 @@ export function initChuyenNganh() {
   document.getElementById('layerMain')?.addEventListener('click', (e) => {
     const viewBtn = e.target.closest('[data-view-mode]');
     if (viewBtn) {
+      if (browseState().axis === 'kientruc') return;
       const mode = viewBtn.dataset.viewMode === 'HT' ? 'HT' : 'QH';
       if (browseState().axis === 'hanhchinh') {
         adminColumn = mode;

@@ -58,7 +58,10 @@ export function initPlanMap(mainMap, mainLayers) {
     zoomControl: false,
     attributionControl: true,
     renderer: L.canvas(),
+    minZoom: leftMap.getMinZoom(),
     maxZoom: MAP_MAX_ZOOM,
+    maxBounds: leftMap.options.maxBounds,
+    maxBoundsViscosity: leftMap.options.maxBoundsViscosity ?? 1.0,
     touchZoom: true,
     zoomSnap: leftMap.options.zoomSnap
   }).setView(leftMap.getCenter(), leftMap.getZoom());

@@ -3,7 +3,7 @@
 // Bấm ranh: bảng góc trên trái. Nút kiểm tra quy hoạch cắt polygon với 4 cấp như bảng thửa / vùng đo.
 import { map } from './mapEngine.js';
 import { signOutAdmin } from './uiComponents.js';
-import { planMap, onCompareChange } from './planMap.js';
+import { planMap, onCompareChange, isCompareOn, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
 import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
@@ -70,9 +70,11 @@ let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
 let investPicked = '';
-let investDrawQueued = false;
+let investDrawRaf = 0;
 let leftGroup = null;
 let rightGroup = null;
+let projectCache = null;
+const centerMemo = new WeakMap();
 let hovered = null;
 let selected = null;
 let card = null;
@@ -176,24 +178,43 @@ function unionGeom(members) {
 }
 
 function centerOf(geom) {
+  if (!geom) return null;
+  if (centerMemo.has(geom)) return centerMemo.get(geom);
+  let at = null;
   try {
     const p = turf.pointOnFeature(geom);
     const c = p.geometry.coordinates;
-    if (!c || c.length < 2) return null;
-    return L.latLng(c[1], c[0]);
-  } catch { return null; }
+    if (c && c.length >= 2) at = L.latLng(c[1], c[0]);
+  } catch { at = null; }
+  centerMemo.set(geom, at);
+  return at;
+}
+
+function invalidateProjects() {
+  projectCache = null;
 }
 
 function projectList(features) {
+  const src = features || pack || [];
+  const useCache = !features || features === pack;
+  if (useCache && projectCache) return projectCache;
   const seen = new Set();
   const matchedRows = new Set();
   const out = [];
-  (features || []).forEach(feature => {
+  const byGroup = new Map();
+  src.forEach(f => {
+    const gid = f.properties?.groupId;
+    if (!gid) return;
+    let list = byGroup.get(gid);
+    if (!list) byGroup.set(gid, list = []);
+    list.push(f);
+  });
+  src.forEach(feature => {
     const id = feature.properties?.groupId || feature.properties?._key;
     if (!id || seen.has(id)) return;
     seen.add(id);
     const members = feature.properties?.groupId
-      ? features.filter(f => f.properties?.groupId === feature.properties.groupId)
+      ? (byGroup.get(feature.properties.groupId) || [feature])
       : [feature];
     const sheet = sheetOf(members, feature);
     if (sheet) matchedRows.add(sheet);
@@ -222,12 +243,17 @@ function projectList(features) {
     seen.add(id);
     out.push(p);
   });
+  if (useCache) projectCache = out;
   return out;
 }
 
 function projectsForTab(tab) {
   const id = tab || activeDtTab();
-  return projectList(pack || []).filter(p => p.dtGroup === id);
+  return projectList().filter(p => p.dtGroup === id);
+}
+
+function planMapLive() {
+  return !!(planMap && (isCompareOn() || isSplitOn()));
 }
 
 function readStore() {
@@ -259,6 +285,7 @@ function stampGroups() {
   (pack || []).forEach(f => {
     f.properties.groupId = mapKey.get(f.properties._key) || '';
   });
+  invalidateProjects();
 }
 
 function commitGroups(keys, clear) {
@@ -539,6 +566,7 @@ function attachAdminBoundaries(features, rows, boundaries) {
 }
 
 function rebuildSheetOnly(features, rows) {
+  invalidateProjects();
   const used = new Set();
   (features || []).forEach(f => {
     const sheet = f.properties?.sheet;
@@ -1062,8 +1090,8 @@ function redrawMaps() {
   rightGroup?.remove();
   rightGroup = null;
   if (visible && pack && map) leftGroup = drawOn(map, pack);
-  if (visible && pack && planMap) rightGroup = drawOn(planMap, pack);
-  refreshHint();
+  // Chỉ vẽ bản đồ phải khi đang so sánh / chia đôi — tránh dựng đôi lớp mỗi lần đổi tab.
+  if (visible && pack && planMapLive()) rightGroup = drawOn(planMap, pack);
   if (feature && host && card) selectLayer(findLayer(feature, host), host, geom);
 }
 
@@ -1428,11 +1456,13 @@ function investRow(p, n) {
     </div>${open ? investDossierHtml(rows) : ''}`;
 }
 
-function paintInvestList() {
+function paintInvestList(opts = {}) {
+  const onlyTab = opts.tab || '';
   const scroller = $('dtList');
   const y = scroller?.scrollTop || 0;
-  const all = projectList(pack || []);
-  INVEST_GROUPS.forEach(g => {
+  const all = projectList();
+  const groups = onlyTab ? INVEST_GROUPS.filter(g => g.id === onlyTab) : INVEST_GROUPS;
+  groups.forEach(g => {
     const host = $(`investList-${g.id}`);
     if (!host) return;
     const items = all.filter(p => p.dtGroup === g.id).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
@@ -1441,14 +1471,14 @@ function paintInvestList() {
       : (pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
   });
   if (scroller) scroller.scrollTop = y;
-  refreshHint();
+  if (opts.counts !== false) refreshHint();
 }
 
+/** Gộp nhiều lần đổi tab / tick ẩn hiện thành một lần vẽ lớp trong khung hình kế tiếp. */
 function queueInvestDraw() {
-  if (investDrawQueued) return;
-  investDrawQueued = true;
-  queueMicrotask(() => {
-    investDrawQueued = false;
+  if (investDrawRaf) return;
+  investDrawRaf = requestAnimationFrame(() => {
+    investDrawRaf = 0;
     if (visible && pack) redrawMaps();
   });
 }
@@ -1506,7 +1536,7 @@ async function setVisible(on) {
   if (!visible || token !== drawToken || !features) return;
   paintInvestList();
   if (!leftGroup) leftGroup = drawOn(map, features);
-  if (planMap && !rightGroup) rightGroup = drawOn(planMap, features);
+  if (planMapLive() && !rightGroup) rightGroup = drawOn(planMap, features);
 }
 
 export function initInvestLayer() {
@@ -1533,7 +1563,19 @@ export function initInvestLayer() {
     if (card.grouping) { cancelGroup(); return; }
     closeCard();
   });
-  onCompareChange(() => { if (visible && planMap && !rightGroup && ready) loadPack().then(features => { if (visible && planMap && !rightGroup) rightGroup = drawOn(planMap, features); }); });
+  onCompareChange(() => {
+    if (!visible || !ready) return;
+    if (!planMapLive()) {
+      rightGroup?.remove();
+      rightGroup = null;
+      return;
+    }
+    if (planMap && !rightGroup) {
+      loadPack().then(features => {
+        if (visible && planMapLive() && !rightGroup) rightGroup = drawOn(planMap, features);
+      });
+    }
+  });
   $('chk_invest')?.addEventListener('change', (e) => setVisible(e.target.checked));
   const listHost = $('dtList');
   listHost?.addEventListener('click', (e) => {
@@ -1543,7 +1585,7 @@ export function initInvestLayer() {
       const id = expand.dataset.investExpand;
       if (investOpen.has(id)) investOpen.delete(id);
       else investOpen.add(id);
-      paintInvestList();
+      paintInvestList({ tab: activeDtTab(), counts: false });
       return;
     }
     const focus = e.target.closest('[data-invest-focus]');
@@ -1568,8 +1610,9 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:dt-tab', () => {
     ensureInvestOn();
-    ensureInvestList();
-    if (visible) redrawMaps();
+    // Danh sách HTML theo từng pane đã dựng sẵn — đổi tab chỉ cần vẽ lại ranh nhóm đang chọn.
+    if (!pack) void ensureInvestList();
+    else queueInvestDraw();
   });
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id === 'dautu') {

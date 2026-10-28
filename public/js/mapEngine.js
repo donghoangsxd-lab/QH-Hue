@@ -27,7 +27,7 @@ import {
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
-import { planLevelOf } from './generalPlan.js';
+import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { touchPrimary } from './touchGroups.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -72,6 +72,9 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 10;
 // Bao ranh 40 phường xã (ward-boundary.json). Không thu về nội đô.
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
+// Khung Việt Nam (lục địa + Hoàng Sa, Trường Sa). Cấm kéo/phóng ra ngoài.
+const VN_BOUNDS = [[5.5, 100.5], [24.5, 119.0]];
+const MAP_MIN_ZOOM = 5;
 // Khoảng trống hai bên ranh: thành phố chiếm khoảng 84% cạnh hạn chế của khung nhìn.
 // Mức phóng nguyên bỏ qua khoảng giữa 10 và 11, khung không vừa vành thành phố.
 const CITY_FRAME_SLACK = 0.16;
@@ -222,7 +225,14 @@ function blockPagePinch() {
 
 export function initMap() {
   const frame = L.latLngBounds(CITY_BOUNDS);
-  map = L.map('map', { renderer: L.canvas(), maxZoom: MAP_MAX_ZOOM, touchZoom: true }).setView(frame.getCenter(), CITY_ZOOM);
+  map = L.map('map', {
+    renderer: L.canvas(),
+    minZoom: MAP_MIN_ZOOM,
+    maxZoom: MAP_MAX_ZOOM,
+    maxBounds: L.latLngBounds(VN_BOUNDS),
+    maxBoundsViscosity: 1.0,
+    touchZoom: true
+  }).setView(frame.getCenter(), CITY_ZOOM);
   bindNotchZoom(map);
   blockPagePinch();
 
@@ -2449,6 +2459,13 @@ function decisionFile(d, fallbackName) {
   };
 }
 
+/** Bấm ô đất: bảng đồ án (brief + hồ sơ dưới) theo đúng đồ án của lô, không phóng khung. */
+function syncFocusedProjectToLot(projectName) {
+  const name = String(projectName || '').trim();
+  if (!name || state.focusedProject === name) return;
+  document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: { name, keepView: true } }));
+}
+
 function bindDossier(popup, projectName) {
   const name = String(projectName || '').trim();
   if (!name) return;
@@ -2491,6 +2508,8 @@ function bindDossier(popup, projectName) {
 }
 
 function openLandPopup(p, m, opts) {
+  // hideProject (menu «Xem thông tin lô»): chỉ thẻ lô, không đổi bảng đồ án (ui-spec).
+  if (!opts?.hideProject) syncFocusedProjectToLot(p.file);
   if (reuseLandInfo(p, m, opts)) return;
   const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
   attachSelectionOutline(m, p.geometry, popup);

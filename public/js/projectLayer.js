@@ -2891,9 +2891,14 @@ export function initProjectLayer(opts = {}) {
   });
   document.addEventListener('cadparcels:loaded', rebuild);
   document.addEventListener(OPEN_PROJECT_EVENT, (e) => {
-    const p = projects.find(x => x.name === e.detail);
+    const raw = e.detail;
+    const name = typeof raw === 'string' ? raw : raw && raw.name;
+    const keepView = !!(raw && typeof raw === 'object' && raw.keepView);
+    const p = projects.find(x => x.name === name);
     if (!p) return;
-    openProject(p);
+    // keepView: bấm ô đất đồ án khác — đổi brief/hồ sơ theo lô, không zoomTo cả đồ án.
+    if (keepView) shareOpenProject(p.name);
+    else openProject(p);
     revealInList(p);
   });
   document.addEventListener('auth:change', renderList);
