@@ -1670,8 +1670,16 @@ export function initChuyenNganh() {
     if (!id || openingAxis) return;
     levelTab = false;
     axisBeforeUrban = null;
-    if (browseState().axis === id) return;
-    showAxis(id);
+    const openPanel = !!e.detail?.openPanel;
+    const keepCamera = e.detail?.keepCamera !== false;
+    // Đã đúng trục: vẫn mở panel lớp nếu menu chuột phải yêu cầu.
+    if (browseState().axis === id) {
+      if (openPanel) {
+        document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
+      }
+      return;
+    }
+    showAxis(id, { openPanel, url: true, keepCamera });
   });
   document.addEventListener(LEVEL_EVENT, (e) => {
     if (!listenLevel) return;

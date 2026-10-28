@@ -327,7 +327,7 @@ function openMenu(ev, latlng, targetMap) {
     if (!act) return;
     closeMenu();
     if (act === 'parcel') {
-      openParcelAt(latlng, targetMap).then(ok => {
+      openParcelAt(latlng, targetMap, { revealPlan: true }).then(ok => {
         if (ok === false) showToast('Không có thửa đất tại vị trí này.', 'info');
       });
     } else if (act === 'plan') {

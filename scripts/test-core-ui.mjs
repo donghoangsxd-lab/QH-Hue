@@ -349,8 +349,13 @@ assert.match(read('public/js/cadastreLayer.js'), /QHC 1\/25\.000/);
 assert.match(read('public/js/cadastreLayer.js'), /QHC 1\/10\.000/);
 assert.match(read('public/js/cadastreLayer.js'), /QHPK 1\/2\.000/);
 assert.match(read('public/js/cadastreLayer.js'), /QHCT 1\/500/);
-assert.match(read('public/js/cadastreLayer.js'), /hideProject: true/);
-// Bấm ô đất đồ án khác: brief/hồ sơ theo đúng đồ án của lô (keepView), không mở bảng khi hideProject.
+// Menu thửa / lô QH: sang trục B, bật cấp, mở brief đồ án + thẻ.
+assert.match(read('public/js/cadastreLayer.js'), /goPlanAxis/);
+assert.match(read('public/js/cadastreLayer.js'), /revealPlan/);
+assert.match(read('public/js/cadastreLayer.js'), /applyInspectLevel/);
+assert.match(ctx, /revealPlan:\s*true/);
+assert.match(read('docs/ui-spec.md'), /chuyển droplist sang B/);
+// Bấm ô đất đồ án khác: brief/hồ sơ theo đúng đồ án của lô (keepView).
 assert.match(read('public/js/mapEngine.js'), /syncFocusedProjectToLot/);
 assert.match(read('public/js/mapEngine.js'), /keepView:\s*true/);
 assert.match(read('public/js/projectLayer.js'), /keepView/);
