@@ -32,7 +32,7 @@ export function openLayerTab({ main, pane, dt } = {}) {
     const fold = document.getElementById(home.fold);
     if (fold) fold.open = true;
   }
-  if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiTabs')?.scrollIntoView({ block: 'nearest' });
+  if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiPicks')?.scrollIntoView({ block: 'nearest' });
   if (main === 'quyhoach') document.getElementById('planPoints')?.scrollIntoView({ block: 'nearest' });
   if (dt) document.querySelector(`#levelPickDt [data-dt-tab="${dt}"]`)?.click();
 }

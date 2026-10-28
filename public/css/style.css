@@ -6556,7 +6556,11 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-dt .ua-legend-pane,
 #tabLegend.is-dt #legendSector,
 #tabLegend.is-dt .legend-extra { display: none !important; }
-.xh-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.xh-picks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#legendXh .htkt-legend-buf-slot { flex: 0 0 16px; width: 16px; height: 16px; }
+#legendXh .btn-dot-buffer { flex: 0 0 16px; }
+#legendXh #xahoiHeat { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--axis-line); }
+#legendXh .heat-legend { margin: 4px 0 2px; }
 .xh-table { margin: 0 6px 6px; }
 .xh-table td:nth-child(2), .xh-table td.is-miss { text-align: left; color: var(--axis-color-muted); }
 .xh-table td.is-miss { text-align: right; }

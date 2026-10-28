@@ -608,51 +608,25 @@
                   <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>Tất cả
                 </button>
               </div>
-              <div id="xahoiTabs" role="tablist" aria-label="Tám loại hạ tầng xã hội">
-                <div class="xh-tab is-on" data-xh-tab="1-CV">
-                  <input type="checkbox" id="chk_c1" aria-label="Công viên, điểm xanh">
-                  <button type="button" class="xh-tab-btn" aria-selected="true" title="Công viên, điểm xanh">Công viên</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="3-MN">
-                  <input type="checkbox" id="chk_c3" aria-label="Trường mầm non">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Trường mầm non">Mầm non</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="4-TH">
-                  <input type="checkbox" id="chk_c4" aria-label="Trường tiểu học">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Trường tiểu học">Tiểu học</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b4" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="5-THCS">
-                  <input type="checkbox" id="chk_c5" aria-label="Trường THCS">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Trường THCS">THCS</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b5" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="6-THPT">
-                  <input type="checkbox" id="chk_c10" aria-label="Trường THPT">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Trường THPT">THPT</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b10" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="7-YT">
-                  <input type="checkbox" id="chk_c6" aria-label="Bệnh viện, trạm y tế">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Bệnh viện, trạm y tế">Y tế</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="8-VH">
-                  <input type="checkbox" id="chk_c7" aria-label="Nhà văn hóa, thể thao">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Nhà văn hóa, thể thao">Văn hóa</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
-                <div class="xh-tab" data-xh-tab="9-TM">
-                  <input type="checkbox" id="chk_c8" aria-label="Chợ, trung tâm thương mại">
-                  <button type="button" class="xh-tab-btn" aria-selected="false" title="Chợ, trung tâm thương mại">Chợ</button>
-                  <button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button>
-                </div>
+              <!-- Ô lớp ẩn: bật/tắt qua Chú giải (checkbox + ● vùng phủ); giữ id cho mapEngine / viewLink -->
+              <div id="xahoiLayerSource" hidden aria-hidden="true">
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c1"><label for="chk_c1"><img src="./icons/Park.png" class="layer-type-icon" alt="" width="14" height="16">Công viên</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">Bãi đỗ xe</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c3"><label for="chk_c3"><img src="./icons/Mamnon.png" class="layer-type-icon" alt="" width="14" height="16">Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c4"><label for="chk_c4"><img src="./icons/Tieuhoc.png" class="layer-type-icon" alt="" width="14" height="16">Tiểu học</label></div><button type="button" class="btn-dot-buffer" data-buffer="b4" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c5"><label for="chk_c5"><img src="./icons/THCS.png" class="layer-type-icon" alt="" width="14" height="16">THCS</label></div><button type="button" class="btn-dot-buffer" data-buffer="b5" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c10"><label for="chk_c10"><img src="./icons/THPT.png" class="layer-type-icon" alt="" width="14" height="16">THPT</label></div><button type="button" class="btn-dot-buffer" data-buffer="b10" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c6"><label for="chk_c6"><img src="./icons/Yte.png" class="layer-type-icon" alt="" width="14" height="16">Y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c7"><label for="chk_c7"><img src="./icons/Vanhoa.png" class="layer-type-icon" alt="" width="14" height="16">Văn hóa</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c8"><label for="chk_c8"><img src="./icons/Cho.png" class="layer-type-icon" alt="" width="14" height="16">Chợ</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3)"><label for="chk_c11"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">Trạm xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1)"><label for="chk_c12"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">Trụ sở PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_funeral" title="Nhà tang lễ và cơ sở hỏa táng. QCVN 01:2026 Bảng 23."><label for="chk_nt_funeral"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nhà tang lễ</label></div></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_grave" title="Nghĩa trang. QCVN 01:2026 Bảng 23."><label for="chk_nt_grave"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" aria-pressed="false">●</button></div>
+                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">Cơ sở chưa sử dụng</label></div><button type="button" class="btn-dot-buffer" data-buffer="b9" aria-pressed="false">●</button></div>
               </div>
               <div id="xahoiPicks"></div>
               <div id="xahoiList"></div>
-              <div class="layer-row infra-point" id="funeralRow"><div><input type="checkbox" id="chk_nt_funeral"><label for="chk_nt_funeral" title="Nhà tang lễ và cơ sở hỏa táng. Khoảng cách an toàn theo QCVN 01:2026 Bảng 23."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nhà tang lễ</label></div></div>
               <div hidden id="eduLegacy">
                 <input type="checkbox" id="chk_edu" aria-label="Giáo dục">
                 <div class="edu-levels" role="group" aria-label="Cấp học">
@@ -664,39 +638,12 @@
                 </div>
                 <input type="checkbox" id="chk_c13" aria-label="Nhà tang lễ, nghĩa trang">
               </div>
-              <div id="xahoiHeat">
-                <div class="layer-row">
-                  <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
-                  <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
-                </div>
-                <div class="heat-legend" id="heatLegend" hidden>
-                  <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
-                  <div class="heat-legend-bar"></div>
-                  <div class="heat-legend-ticks">
-                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-                  </div>
-                </div>
-              </div>
-              <section class="axis-group" id="xahoiRadiusOverlay">
-                <h3 class="axis-group-title">Bán kính phục vụ</h3>
-                <p class="cn-empty">Bốn lớp điểm hạ tầng kỹ thuật, dùng chung một lớp. Bán kính theo cấu hình Sheet. Công trình quy hoạch chưa khai báo thì để —.</p>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">Bãi đỗ xe</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">Trạm xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">Trụ sở PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_grave"><label for="chk_nt_grave" title="Nghĩa trang cát táng, hung táng và chôn cất một lần. Vùng đệm là khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
-              </section>
               <section class="axis-group" id="planPoints">
                 <h3 class="axis-group-title">Quỹ đất và công trình</h3>
                 <div class="layer-pane-tools"><label class="layer-eye-btn layer-lot-btn" title="Ranh lô theo lớp công trình: bật lớp nào hiện ranh lô lớp đó (hiện trạng vẽ lô hiện trạng, so sánh bên quy hoạch vẽ lô quy hoạch). Hiện từ zoom 15; chỉ bật 1–3 nhóm thì hiện từ zoom 13. Tắt để chỉ xem biểu tượng">
                     <input type="checkbox" id="chk_parcel" checked aria-label="Ranh lô theo lớp công trình"><svg class="ico"><use href="#i-parcel"/></svg>Ranh lô
                   </label></div>
-                <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">Cơ sở chưa sử dụng</label></div></div>
               </section>
-              <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
-                <span class="layer-status-title">Ghi chú:</span>
-                <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
-                <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
-              </div>
             </div>
             <section class="axis-base" id="baseXaHoi"></section>
           </div>
@@ -782,7 +729,22 @@
             <label class="htkt-legend-row"><i class="htkt-mark is-polygon"></i><span>Vùng</span><input type="checkbox" data-cn-form="polygon" checked aria-label="Hiện vùng"></label>
             <p id="legendHtktNote" class="cn-empty" hidden>Tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc.</p>
           </div>
-          <div id="legendXh" hidden></div>
+          <div id="legendXh" hidden>
+            <div id="legendXhRows"></div>
+            <div id="xahoiHeat">
+              <div class="layer-row">
+                <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
+                <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
+              </div>
+              <div class="heat-legend" id="heatLegend" hidden>
+                <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
+                <div class="heat-legend-bar"></div>
+                <div class="heat-legend-ticks">
+                  <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="legendDauTu" hidden></div>
           <div class="layer-map legend-display">
             <div class="layer-map-tabs">

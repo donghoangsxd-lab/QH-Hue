@@ -1128,11 +1128,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
   initLayerGroups();
 
-  document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const bufferKey = btn.getAttribute('data-buffer');
-      if (bufferKey) toggleBuffer(bufferKey, btn);
-    });
+  // Ủy quyền: nút ● trong Chú giải HTXH được vẽ lại mỗi lần syncLegend
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('.btn-dot-buffer');
+    if (!btn) return;
+    const bufferKey = btn.getAttribute('data-buffer');
+    if (bufferKey) toggleBuffer(bufferKey, btn);
   });
 
   document.getElementById('wardSelector')?.addEventListener('change', (e) => chooseWard(e.target.value || CITY_NAME));

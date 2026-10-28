@@ -9,6 +9,7 @@ import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './t
 import { LEVEL_EVENT } from './mapLevel.js';
 import { renderRoadSections } from './roadSections.js';
 import { renderTrafficLegend } from './qhcRoads.js';
+import { BUFFER_COLORS, BUFFER_KEYS } from './state.js';
 
 const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
@@ -17,21 +18,22 @@ const OPACITY_DELAY_MS = 80;
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 
+// [chkId, icon, label, bufferType|null] — ● vùng phủ theo BUFFER_KEYS; nhà tang lễ không có bán kính
 const SOCIAL_LEGEND = [
-  ['chk_c1', 'Park.png', 'Công viên'],
-  ['chk_c3', 'Mamnon.png', 'Mầm non'],
-  ['chk_c4', 'Tieuhoc.png', 'Tiểu học'],
-  ['chk_c5', 'THCS.png', 'THCS'],
-  ['chk_c10', 'THPT.png', 'THPT'],
-  ['chk_c6', 'Yte.png', 'Y tế'],
-  ['chk_c7', 'Vanhoa.png', 'Văn hóa'],
-  ['chk_c8', 'Cho.png', 'Chợ'],
-  ['chk_nt_funeral', 'Nghiatrang.svg', 'Nhà tang lễ'],
-  ['chk_c2', 'Parking.png', 'Bãi đỗ xe'],
-  ['chk_c11', 'Bus.svg', 'Trạm xe buýt'],
-  ['chk_c12', 'Pccc.svg', 'Trụ sở PCCC'],
-  ['chk_nt_grave', 'Nghiatrang.svg', 'Nghĩa trang'],
-  ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng']
+  ['chk_c1', 'Park.png', 'Công viên', '1-CV'],
+  ['chk_c3', 'Mamnon.png', 'Mầm non', '3-MN'],
+  ['chk_c4', 'Tieuhoc.png', 'Tiểu học', '4-TH'],
+  ['chk_c5', 'THCS.png', 'THCS', '5-THCS'],
+  ['chk_c10', 'THPT.png', 'THPT', '6-THPT'],
+  ['chk_c6', 'Yte.png', 'Y tế', '7-YT'],
+  ['chk_c7', 'Vanhoa.png', 'Văn hóa', '8-VH'],
+  ['chk_c8', 'Cho.png', 'Chợ', '9-TM'],
+  ['chk_nt_funeral', 'Nghiatrang.svg', 'Nhà tang lễ', null],
+  ['chk_c2', 'Parking.png', 'Bãi đỗ xe', '2-BDX'],
+  ['chk_c11', 'Bus.svg', 'Trạm xe buýt', '13-BUS'],
+  ['chk_c12', 'Pccc.svg', 'Trụ sở PCCC', '10-PCCC'],
+  ['chk_nt_grave', 'Nghiatrang.svg', 'Nghĩa trang', '11-NT'],
+  ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng', '12-CSD']
 ];
 
 const DAU_TU_LEGEND = [
@@ -53,13 +55,23 @@ function dauTuLegendHtml() {
   return rows + apt;
 }
 
+function bufferPressed(bufKey) {
+  const src = document.querySelector(`#xahoiLayerSource .btn-dot-buffer[data-buffer="${bufKey}"]`);
+  return src?.classList.contains('active') || src?.getAttribute('aria-pressed') === 'true';
+}
+
 function socialLegendHtml() {
-  const rows = SOCIAL_LEGEND.map(([id, file, label]) => {
+  const rows = SOCIAL_LEGEND.map(([id, file, label, type]) => {
     const on = !!document.getElementById(id)?.checked;
     const mark = file
       ? `<img class="layer-type-icon" src="./icons/${file}" alt="" width="14" height="16">`
       : `<svg class="ico" aria-hidden="true"><use href="#i-coverage"/></svg>`;
-    return `<label class="htkt-legend-row">${mark}<span>${label}</span><input type="checkbox" data-xh-mirror="${id}"${on ? ' checked' : ''} aria-label="${label}"></label>`;
+    const bufKey = type ? BUFFER_KEYS[type] : '';
+    const bufOn = bufKey && bufferPressed(bufKey);
+    const buf = bufKey
+      ? `<button type="button" class="btn-dot-buffer${bufOn ? ' active' : ''}" data-buffer="${bufKey}" style="--buf:${BUFFER_COLORS[type]}" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ ${label}" aria-pressed="${bufOn ? 'true' : 'false'}">●</button>`
+      : '<span class="htkt-legend-buf-slot" aria-hidden="true"></span>';
+    return `<div class="htkt-legend-row">${mark}<span>${label}</span>${buf}<input type="checkbox" data-xh-mirror="${id}"${on ? ' checked' : ''} aria-label="${label}"></div>`;
   }).join('');
   const status = `<div class="legend-status"><span><img class="layer-type-icon" src="./icons/Park.png" alt="" width="14" height="16">Đã phê duyệt</span><span><img class="layer-type-icon" src="./icons/Park2.png" alt="" width="14" height="16">Chờ duyệt</span></div>`;
   return rows + status;
@@ -257,7 +269,8 @@ export function initLegendPanel() {
     const xhLegend = document.getElementById('legendXh');
     if (xhLegend) {
       xhLegend.hidden = !xahoi;
-      if (xahoi) xhLegend.innerHTML = socialLegendHtml();
+      const rows = document.getElementById('legendXhRows');
+      if (xahoi && rows) rows.innerHTML = socialLegendHtml();
     }
     const dtLegend = document.getElementById('legendDauTu');
     if (dtLegend) {

@@ -46,7 +46,7 @@ Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoá
 
 ### Hạ tầng xã hội
 
-Tám tab theo mã Sheet: công viên, mầm non, tiểu học, THCS, THPT, y tế, văn hóa, chợ. Bảng dữ liệu phía dưới có hai droplist Loại công trình và Phạm vi, rồi một bảng Công trình / Phường, xã / Diện tích; thiếu số thì «—». Bấm một dòng phóng tới công trình. Chú giải của trục này chỉ có biểu tượng công trình và dấu tích cuối dòng; không ký hiệu chức năng sử dụng đất. Nhà tang lễ ở lại panel này. Mục Quỹ đất và công trình (ranh lô, cơ sở chưa sử dụng) ở đây. Chung cư và dự án kêu gọi đầu tư nằm ở trục Dự án đầu tư. Bản đồ độ phủ hạ tầng bật tại panel này. Bốn lớp điểm hạ tầng kỹ thuật bật bán kính tại đây, cùng một lớp với panel kỹ thuật: bãi đỗ xe, trạm xe buýt, trụ sở PCCC, nghĩa trang. Ô giả lập bán kính giữ nguyên.
+Ba droplist cùng kiểu HTKT: Loại công trình (đủ loại điểm gồm bãi đỗ xe, PCCC, xe buýt, nghĩa trang, nhà tang lễ), Cấp phục vụ (Tất cả / vùng / đô thị / đơn vị ở / nhóm nhà ở — chỉ hiện cấp có dữ liệu của loại đang chọn; lọc danh sách khi chọn), Phạm vi (Thành phố Huế và đủ 40 phường/xã). Bảng Công trình / Phường, xã / Diện tích; thiếu số thì «—». Bấm một dòng phóng tới công trình. Chú giải: mỗi loại một hàng biểu tượng + nút ● vùng phủ + checkbox bật lớp; cuối danh sách là Bản đồ độ phủ hạ tầng (`#chk_heat`, thanh độ trong suốt, `#heatLegend`). không ký hiệu chức năng sử dụng đất. Ô lớp điểm ẩn trong panel (`#xahoiLayerSource`); bật/tắt qua Chú giải. Mục Quỹ đất và công trình (ranh lô) ở đây; cơ sở chưa sử dụng bật trong Chú giải. Chung cư và dự án kêu gọi đầu tư nằm ở trục Dự án đầu tư. Ô giả lập bán kính giữ nguyên.
 
 ### Kiến trúc
 

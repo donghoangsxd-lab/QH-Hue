@@ -724,7 +724,11 @@ export function toggleBuffer(bufferKey, el) {
   const on = !map.hasLayer(layers[bufferKey]);
   if (on) map.addLayer(layers[bufferKey]);
   else map.removeLayer(layers[bufferKey]);
-  if (el) {
+  document.querySelectorAll(`.btn-dot-buffer[data-buffer="${bufferKey}"]`).forEach(btn => {
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+  if (el && !el.matches?.(`.btn-dot-buffer[data-buffer="${bufferKey}"]`)) {
     el.classList.toggle('active', on);
     el.setAttribute('aria-pressed', String(on));
   }
