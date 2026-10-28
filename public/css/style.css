@@ -1239,6 +1239,42 @@ body.plan-info-open #planInfoSlot {
   box-sizing: border-box;
   background: transparent;
 }
+/* Panel trái hẹp: hàng icon công cụ nằm trên tiêu đề (không padding-right 150px cắt chữ). */
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-collapse-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-route-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-share-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-radius-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-buildup-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-edit-btn,
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-del-btn {
+  top: 4px;
+}
+body.plan-info-open #planInfoSlot > .dock-card a.leaflet-popup-close-button { top: 4px; right: 4px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-collapse-btn { right: 28px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-del-btn { right: 52px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-edit-btn { right: 76px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-route-btn { right: 100px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-share-btn { right: 124px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-buildup-btn { right: 148px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located a.pp-radius-btn { right: 172px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable) a.pp-route-btn { right: 52px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable) a.pp-share-btn { right: 76px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable) a.pp-buildup-btn { right: 100px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable) a.pp-radius-btn { right: 124px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-buildup) a.pp-radius-btn { right: 148px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-buildup) a.pp-radius-btn { right: 100px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-radius) a.pp-buildup-btn { right: 148px; }
+body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-radius) a.pp-buildup-btn { right: 100px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-editable.pp-has-buildup .lp-head,
+body.plan-info-open #planInfoSlot > .infra-popup.pp-located .pp-title.lp-head,
+body.plan-info-open #planInfoSlot > .infra-popup.pp-located.pp-editable .pp-title.lp-head,
+body.plan-info-open #planInfoSlot > .qhc-popup.pp-located .lp-head {
+  padding: 28px 0 5px !important;
+}
 /* Đồng bộ khung brief: viền cam đều 4 cạnh, bo góc; full bề ngang slot (không dải tối mép). */
 body.plan-info-open #planInfoSlot > .cad-card,
 body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
@@ -5174,12 +5210,21 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-head-main { flex: 1 1 auto; min-width: 0; }
 .lp-eyebrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-bottom: 2px; min-width: 0; }
 .lp-eyebrow-label {
-  flex: 1 1 auto; min-width: 0; color: var(--accent-cyan); font-size: 9px; font-weight: 700;
+  flex: 0 1 auto; min-width: 0; color: var(--accent-cyan); font-size: 9px; font-weight: 700;
   letter-spacing: 0.04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.lp-title-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; min-width: 0; }
-.lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.land-popup .lp-title { font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.2; }
+.lp-title-row { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 5px; min-width: 0; }
+.lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Thẻ lô trong panel: tiêu đề tối đa 2 dòng, không cắt còn vài chữ khi còn chỗ */
+.land-popup-card .lp-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.land-popup .lp-title { font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; }
 .lp-sub { margin-top: 1px; color: var(--text-muted); font-size: var(--fs-sm); }
 .land-popup .lp-kind { margin-top: 1px; color: var(--accent-orange); font-size: 11px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lp-phase { flex: none; padding: 0 5px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; line-height: 1.4; }

@@ -2231,6 +2231,12 @@ function ntPointVisible(p) {
   return !box || box.checked;
 }
 
+const LAND_LEVEL_EYEBROW = {
+  QHC: 'Quy hoạch chung',
+  QHPK: 'Quy hoạch phân khu',
+  QHCT: 'Quy hoạch chi tiết'
+};
+
 function landPopupHtml(p, opts) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
@@ -2239,7 +2245,9 @@ function landPopupHtml(p, opts) {
   const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
   const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
-  const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
+  // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
+  const phase = p.phase === 'QH' ? (stage || '') : 'Hiện trạng';
+  const eyebrow = LAND_LEVEL_EYEBROW[planLevelOf(p.file)] || 'Quy hoạch';
   const title = lotHeading(p.name || p.layer || type, code, type) || type;
   const place = placeField(p.ward);
   const entry = opts?.hideProject ? null : catalogEntry(p.file);
@@ -2254,13 +2262,19 @@ function landPopupHtml(p, opts) {
     project ? metaRow('Đồ án', project, 'lp-project-row') : '',
     place.name ? metaRow(place.label, escapeHtml(place.name)) : ''
   ].filter(Boolean).join('');
+  // Banner chức năng: bỏ khi trùng tiêu đề (tránh «Đất ở» hai lần).
+  const banner = type && title.trim().toLowerCase() !== type.trim().toLowerCase()
+    ? landUseBannerHtml(type) : '';
   const tip = [p.name, p.layer].filter(Boolean).join(' · ');
+  const phaseHtml = phase
+    ? `<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>`
+    : '';
   return `<div class="pp land-popup land-popup-card">
     <div class="pp-title lp-head" title="${escapeHtml(tip)}">
       <div class="lp-head-main">
         <div class="lp-eyebrow">
-          <span class="lp-eyebrow-label">Quy hoạch chi tiết</span>
-          <span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>
+          <span class="lp-eyebrow-label">${escapeHtml(eyebrow)}</span>
+          ${phaseHtml}
         </div>
         <div class="lp-title-row">
           <i class="lp-swatch" style="${swatch}"></i>
@@ -2272,7 +2286,7 @@ function landPopupHtml(p, opts) {
     <div class="lp-pane is-on" data-lp-pane="chi-tieu" role="tabpanel">
       ${metricGridHtml(areaText, p.plan)}
       ${stamp}
-      ${landUseBannerHtml(type)}
+      ${banner}
       ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
       ${lotBuildupSlotHtml()}
     </div>
