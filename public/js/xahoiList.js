@@ -54,7 +54,7 @@ function areaOf(item, qh) {
 }
 
 function areaText(n) {
-  if (n == null) return '—';
+  if (n == null) return '-';
   return `${AREA.format(n)} m²`;
 }
 
@@ -166,22 +166,30 @@ export function paintXahoiList() {
     host.innerHTML = `<p class="cn-empty">Không có công trình tại ${escapeHtml(ward)}.</p>`;
     return;
   }
-  const body = shown.map(name => {
+  const all = [];
+  shown.forEach(name => {
     const items = groups.get(name).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
-    return items.map(item => {
-      const lat = Number(item.lat);
-      const lng = Number(item.lng);
-      const ok = Number.isFinite(lat) && Number.isFinite(lng);
-      const title = item.name || '—';
-      const area = areaOf(item, qh);
-      const pending = item.status === false ? '<small class="xh-pending">Chờ duyệt</small>' : '';
-      return `<tr><td><button type="button" class="xh-item" data-xh-chk="${escapeHtml(tab.chk)}" ${ok ? `data-lat="${lat}" data-lng="${lng}"` : 'disabled'} data-name="${escapeHtml(title)}"><span class="xh-item-name">${escapeHtml(title)}</span>${pending}</button></td><td>${escapeHtml(name)}</td><td class="${area == null ? 'is-miss' : ''}">${escapeHtml(areaText(area))}</td></tr>`;
-    }).join('');
+    items.forEach(item => all.push({ item, wardName: name }));
+  });
+  let stt = 0;
+  const body = all.map(({ item, wardName }) => {
+    stt += 1;
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    const ok = Number.isFinite(lat) && Number.isFinite(lng);
+    const title = item.name || '-';
+    const area = areaOf(item, qh);
+    const pending = item.status === false ? ' · Chờ duyệt' : '';
+    const tip = [title, wardName, areaText(area)].filter(Boolean).join(' — ');
+    return `<button type="button" class="project-row xh-item"${ok ? '' : ' disabled'} data-xh-chk="${escapeHtml(tab.chk)}" ${ok ? `data-lat="${lat}" data-lng="${lng}"` : ''} data-name="${escapeHtml(title)}" title="${escapeHtml(tip)}">
+      <span class="project-name"><span class="xh-item-name">${stt}. ${escapeHtml(title)}${pending ? `<small class="xh-pending">${escapeHtml(pending)}</small>` : ''}</span></span>
+      <span class="project-meta xh-ward">${escapeHtml(wardName)}</span>
+      <span class="project-meta xh-area${area == null ? ' is-miss' : ''}">${escapeHtml(areaText(area))}</span>
+    </button>`;
   }).join('');
-  const all = shown.flatMap(name => groups.get(name));
-  const areas = all.map(item => areaOf(item, qh));
+  const areas = all.map(({ item }) => areaOf(item, qh));
   const sum = areas.every(n => n != null) ? areas.reduce((s, n) => s + n, 0) : null;
-  host.innerHTML = `<table class="cnu-table xh-table"><caption>${escapeHtml(tab.title)} · ${all.length} công trình · ${escapeHtml(areaText(sum))}</caption><thead><tr><th>Công trình</th><th>Phường, xã</th><th>Diện tích</th></tr></thead><tbody>${body}</tbody></table>`;
+  host.innerHTML = `<div class="project-list xh-list"><p class="xh-list-head">${escapeHtml(tab.title)} · ${all.length} công trình · ${escapeHtml(areaText(sum))}</p>${body}</div>`;
 }
 
 function ensureLayer(chkId) {

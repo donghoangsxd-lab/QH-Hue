@@ -705,6 +705,8 @@ assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.match(read('public/js/legendPanel.js'), /data-buffer/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
+assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
+assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
 assert.match(html, /css\/style\.css\?v=20261091/);
 assert.match(html, /js\/app\.js\?v=20261091/);
