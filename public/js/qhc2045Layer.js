@@ -14,7 +14,7 @@
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
-import { map, wardNameAt, outerWardLines, openOutlinedPopup, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
+import { map, wardNameAt, outerWardLines, openOutlinedPopup, openDockPopup, attachSelectionOutline, ensureQuyHoachPane, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
@@ -27,11 +27,12 @@ import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import { withAssetVersion } from './gbaVersion.js';
 import {
   QHC2045, QHC_CENTER_INFO_EVENT, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
-  visionColor, visionLineStyle, zoneAreaHtml, WATER_KINDS, GREEN_COLOR
+  visionColor, visionLineStyle, zoneAreaHa, WATER_KINDS, GREEN_COLOR
 } from './qhc2045.js';
 import {
   loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
 } from './qhcRoads.js';
+import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs } from './lotPopup.js';
 
 export { isCoreWard };
 
@@ -773,40 +774,74 @@ function swatchHtml(land) {
 
 let qhcLotPop = null;
 
-function openLotPopup(f, latlng, opts) {
-  const host = active?.m || target();
-  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
+function qhcMetaLine(parts) {
+  const bits = parts.filter(Boolean);
+  return bits.length ? `<div class="lp-meta">${bits.join('<span class="lp-dot">·</span>')}</div>` : '';
+}
+
+function qhcLotCardHtml(f, latlng, opts) {
   const p = f.properties;
   const zone = data.land.zones[p.z];
   const land = landOf(zone, p.c);
   const ward = wardNameAt(latlng.lat, latlng.lng);
   const tv = tvAt(latlng.lng, latlng.lat);
   const note = p.n != null ? data.land.notes[p.n] : '';
+  const stage = STAGE_NAMES[p.t] || 'Quy hoạch';
+  const zoneLabel = ZONE_NAMES[zone] || zone || '—';
   const projects = opts?.hideProject ? [] : qhpkAt(latlng.lng, latlng.lat);
-  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
   const projectHtml = projects.length
-    ? projects.map(x => `<button type="button" class="qhc-pop-link" data-qhc-open="${escapeHtml(x.tenQH)}">${ico('file')}${escapeHtml(x.tenQH)}</button>`).join('')
-    : '<span class="ua-tip-muted">Chưa có đồ án QHPK 1/2.000 tại vị trí này</span>';
-  const projectBlock = opts?.hideProject ? '' : `<div class="qhc-pop-sec">QHPK 1/2.000 tại vị trí</div>
-      <div class="qhc-pop-projects">${projectHtml}</div>`;
-  const html = `<div class="qhc-pop">
-      <div class="qhc-pop-head">${swatchHtml(land)}<b>${escapeHtml(land.label)}</b></div>
-      <table class="qhc-pop-table">
-        ${row('Khu', escapeHtml(ZONE_NAMES[zone] || zone))}
-        ${row('Giai đoạn', escapeHtml(STAGE_NAMES[p.t] || ''))}
-        ${row('Diện tích', `${fmtNum(p.a)} ha`)}
-        ${note ? row('Ghi chú', escapeHtml(note)) : ''}
-        ${tv ? row('Tiểu vùng', `${escapeHtml(tv.tv)} · ${escapeHtml(tv.ten)}`) : ''}
-        ${ward ? row('Phường, xã', escapeHtml(ward)) : ''}
-      </table>
-      ${projectBlock}
+    ? `<div class="lp-regs">${projects.map(x => `<button type="button" class="lp-reg-btn qhc-pop-link" data-qhc-open="${escapeHtml(x.tenQH)}">
+        <span class="lp-reg-ico">${ico('file')}</span>
+        <span class="lp-reg-label">${escapeHtml(x.tenQH)}</span>
+        <span class="lp-reg-go" aria-hidden="true">→</span>
+      </button>`).join('')}</div>`
+    : '<div class="lp-regs"><p class="lp-reg-empty">Chưa có đồ án QHPK 1/2.000 tại vị trí này.</p></div>';
+  const regsPane = opts?.hideProject
+    ? '<div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>'
+    : projectHtml;
+  return `<div class="pp land-popup land-popup-card qhc-pop">
+    <div class="pp-title lp-head">
+      <div class="lp-head-main">
+        <div class="lp-eyebrow">
+          <span class="lp-eyebrow-label">Quy hoạch chung 1/10.000</span>
+          <span class="lp-phase lp-phase-qh">${escapeHtml(stage)}</span>
+        </div>
+        <div class="lp-title-row">${swatchHtml(land)}<span class="lp-title">${escapeHtml(land.label)}</span></div>
+      </div>
+    </div>
+    ${landCardTabsHtml()}
+    <div class="lp-pane is-on" data-lp-pane="chi-tieu">
+      ${metricCellsHtml([
+        { tone: 'area', icon: 'ruler', label: 'Diện tích', value: `${fmtNum(p.a)} ha` },
+        { tone: 'cover', icon: 'layers', label: 'Khu', value: zoneLabel },
+        { tone: 'floors', icon: 'floors', label: 'Giai đoạn', value: stage },
+        { tone: 'far', icon: 'map', label: 'Tiểu vùng', value: tv ? `${tv.tv}` : '—' }
+      ])}
+      ${landUseBannerHtml(land.label)}
+      ${qhcMetaLine([
+        ward ? escapeHtml(ward) : '',
+        tv ? escapeHtml(tv.ten) : '',
+        note ? escapeHtml(note) : ''
+      ])}
       ${ward ? `<button type="button" class="bp-btn qhc-pop-ward" data-qhc-ward="${escapeHtml(ward)}">${ico('map')}Xem ${escapeHtml(ward)}</button>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
-    </div>`;
-  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html);
+    </div>
+    <div class="lp-pane" data-lp-pane="quy-dinh" hidden>
+      ${regsPane}
+      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
+    </div>
+  </div>`;
+}
+
+function openLotPopup(f, latlng, opts) {
+  const host = active?.m || target();
+  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
+  ensureQuyHoachPane();
+  const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcLotCardHtml(f, latlng, opts));
+  attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
-  openOutlinedPopup(host, f.geometry, popup, latlng);
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  bindLandCardTabs(popup.getElement());
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 
@@ -865,27 +900,56 @@ function drawVision() {
   restack();
 }
 
-function openVisionPopup(f, latlng) {
-  const host = active?.m || target();
-  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
+function qhcVisionCardHtml(f, latlng) {
   const cats = data.vision.cats;
   const zone = cats.zones[f.properties.k] || 'Khác';
   const desc = cats.funcs[f.properties.f] || '';
+  const name = f.properties.n ? String(f.properties.n).trim() : '';
   let areaM2 = null;
   if (typeof turf !== 'undefined' && f.geometry) {
     try { areaM2 = turf.area(f); } catch (e) { areaM2 = null; }
   }
-  const html = `<div class="qhc-pop">
-      <div class="qhc-pop-head"><i class="qhc-sw" style="background:${visionColor(zone)}"></i><b>${escapeHtml(zone)}</b></div>
-      ${f.properties.n ? `<div>${escapeHtml(f.properties.n)}</div>` : ''}
-      ${zoneAreaHtml(f.properties, areaM2)}
-      ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
+  const ha = zoneAreaHa(f.properties, areaM2);
+  const areaText = ha > 0 ? `${fmtNum(ha)} ha` : '—';
+  const ward = wardNameAt(latlng.lat, latlng.lng);
+  return `<div class="pp land-popup land-popup-card qhc-pop">
+    <div class="pp-title lp-head">
+      <div class="lp-head-main">
+        <div class="lp-eyebrow">
+          <span class="lp-eyebrow-label">Quy hoạch chung 1/25.000</span>
+          <span class="lp-phase lp-phase-qh">Tổ chức không gian</span>
+        </div>
+        <div class="lp-title-row"><i class="qhc-sw" style="background:${visionColor(zone)}"></i><span class="lp-title">${escapeHtml(zone)}</span></div>
+      </div>
+    </div>
+    ${landCardTabsHtml()}
+    <div class="lp-pane is-on" data-lp-pane="chi-tieu">
+      ${metricCellsHtml([
+        { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaText },
+        { tone: 'cover', icon: 'layers', label: 'Vùng chức năng', value: zone },
+        { tone: 'floors', icon: 'map', label: 'Phường, xã', value: ward || '—' },
+        { tone: 'far', icon: 'file', label: 'Tên vùng', value: name || '—' }
+      ])}
+      ${landUseBannerHtml(zone)}
+      ${desc ? `<p class="qhc-pop-desc lp-meta">${escapeHtml(desc)}</p>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
-    </div>`;
-  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html);
+    </div>
+    <div class="lp-pane" data-lp-pane="quy-dinh" hidden>
+      <div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>
+      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
+    </div>
+  </div>`;
+}
+
+function openVisionPopup(f, latlng) {
+  const host = active?.m || target();
+  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
+  ensureQuyHoachPane();
+  const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcVisionCardHtml(f, latlng));
+  attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
-  openOutlinedPopup(host, f.geometry, popup, latlng);
   addPopupCollapseToggle(popup, 'viền vùng', 'Bấm lại vào vùng chức năng để hiện bảng thông tin');
+  bindLandCardTabs(popup.getElement());
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 

@@ -483,7 +483,7 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
 // Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
 // Lô quy hoạch / lô HT vào #planInfoSlot (phủ #planListPane), dưới brief; giữ droplist B và bốn tab cấp.
 /** Mở trục B để thẻ lô vào #planInfoSlot, không nổi che bản đồ / không ẩn hàng cấp. */
-function ensureQuyHoachPane() {
+export function ensureQuyHoachPane() {
   const pane = document.getElementById('layerPaneQuyHoach');
   if (pane && !pane.hidden) return;
   document.querySelector('#layerMagTrack [data-main-tab="quyhoach"]')?.click();
@@ -491,7 +491,8 @@ function ensureQuyHoachPane() {
 
 function deskPlanSlot(el) {
   if (!el || el.classList.contains('adj-lot-popup')) return null;
-  if (!el.classList.contains('land-lot-popup') && !el.classList.contains('infra-popup')) return null;
+  if (!el.classList.contains('land-lot-popup') && !el.classList.contains('infra-popup')
+    && !el.classList.contains('qhc-popup')) return null;
   const slot = document.getElementById('planInfoSlot');
   const pane = document.getElementById('layerPaneQuyHoach');
   if (!slot || !pane || pane.hidden) return null;
@@ -514,7 +515,8 @@ function pinDock(popup) {
   if (slot) document.dispatchEvent(new CustomEvent('qh-plan-info'));
 }
 
-function openDockPopup(targetMap, className, html) {
+/** Popup ghim panel trái (#planInfoSlot khi trục B). className có land-lot-popup / infra-popup / qhc-popup. */
+export function openDockPopup(targetMap, className, html) {
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'popup' }));
   document.getElementById('cadParcelCard')?.querySelector('.cad-card-x')?.click();
   const popup = L.popup({ className, closeButton: true, autoPan: false, maxWidth: 280, minWidth: 0 }).setContent(html);
@@ -2339,7 +2341,7 @@ function landLotShape(p, m, detailed) {
 }
 
 // Viền sáng lô / vùng đang chọn. Cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ.
-function attachSelectionOutline(m, geometry, popup) {
+export function attachSelectionOutline(m, geometry, popup) {
   (m === map ? planMap : map)?.closePopup();
   clearSingleIsochrone();
   const group = m === planMap ? planLayers.singleIso : layers.singleIso;

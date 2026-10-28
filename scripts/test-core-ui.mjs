@@ -396,11 +396,17 @@ assert.match(read('public/js/mapEngine.js'), /classList\.contains\('infra-popup'
 assert.match(read('public/js/app.js'), /syncPlanBriefDock/);
 assert.match(read('public/js/app.js'), /syncPlanInfoDock/);
 assert.match(read('public/js/app.js'), /dock-card\.infra-popup/);
+assert.match(read('public/js/app.js'), /dock-card\.qhc-popup/);
 assert.match(read('public/js/app.js'), /planningPaneOn\(\) && !!slot && \(cadOn \|\| !!popup\)/);
 assert.doesNotMatch(read('public/js/app.js'), /!PHONE_INFO\.matches && planningPaneOn\(\) && !!slot/);
 assert.match(read('public/js/mapEngine.js'), /ensureQuyHoachPane/);
+assert.match(read('public/js/mapEngine.js'), /qhc-popup/);
+assert.match(read('public/js/qhc2045Layer.js'), /openDockPopup/);
+assert.match(read('public/js/qhc2045Layer.js'), /qhc-popup land-lot-popup/);
+assert.match(read('public/js/qhc2045Layer.js'), /qhcLotCardHtml|qhcVisionCardHtml/);
 assert.doesNotMatch(read('public/js/mapEngine.js'), /phoneInfoSlot/);
 assert.match(read('docs/ui-spec.md'), /không đè droplist B hay bốn tab cấp/);
+assert.match(read('docs/ui-spec.md'), /QHC 1\/25\.000 hoặc 1\/10\.000/);
 assert.match(read('public/js/cadastreLayer.js'), /kind !== 'INFRA'/);
 assert.match(read('docs/ui-spec.md'), /bảng lô thuộc nhóm hạ tầng|ô đất quy hoạch/);
 assert.doesNotMatch(read('public/css/style.css'), /body\.plan-info-open \.right-panel,\s*body\.plan-info-open \.axis-dock/);

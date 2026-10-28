@@ -126,22 +126,28 @@ function planMetricText(plan, icon) {
   return String(raw.text || '').replace(/^≤(?=\S)/, '≤ ');
 }
 
+/** Lưới ô chỉ tiêu tùy chỉnh: [{ tone, icon, label, value }]. */
+export function metricCellsHtml(cells) {
+  const list = Array.isArray(cells) ? cells : [];
+  if (!list.length) return '';
+  return `<div class="lp-metrics" role="list">${list.map(c => `
+    <div class="lp-metric lp-metric-${escapeHtml(c.tone || 'area')}" role="listitem">
+      <span class="lp-metric-ico" aria-hidden="true">${ico(c.icon || 'ruler')}</span>
+      <span class="lp-metric-body"><small>${escapeHtml(c.label || '')}</small><b>${escapeHtml(c.value || '—')}</b></span>
+    </div>`).join('')}</div>`;
+}
+
 /**
  * Lưới 2×2 chỉ tiêu lô (diện tích + mật độ + tầng cao + hệ số).
  * Luôn bốn ô để dễ đọc; thiếu số thì «—».
  */
 export function metricGridHtml(areaText, plan) {
-  const cells = [
+  return metricCellsHtml([
     { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaText || '—' },
     { tone: 'cover', icon: 'coverage', label: 'Mật độ XD', value: planMetricText(plan, 'coverage') },
     { tone: 'floors', icon: 'floors', label: 'Chiều cao tối đa', value: planMetricText(plan, 'floors') },
     { tone: 'far', icon: 'layers', label: 'Hệ số sử dụng', value: planMetricText(plan, 'layers') }
-  ];
-  return `<div class="lp-metrics" role="list">${cells.map(c => `
-    <div class="lp-metric lp-metric-${c.tone}" role="listitem">
-      <span class="lp-metric-ico" aria-hidden="true">${ico(c.icon)}</span>
-      <span class="lp-metric-body"><small>${escapeHtml(c.label)}</small><b>${escapeHtml(c.value)}</b></span>
-    </div>`).join('')}</div>`;
+  ]);
 }
 
 /** Dải chức năng sử dụng đất dưới lưới chỉ tiêu (một hàng gọn). */

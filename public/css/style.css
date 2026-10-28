@@ -3152,17 +3152,25 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .qhc-label-tv { background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(248, 250, 252, 0.7); color: #f8fafc; font-size: var(--fs-sm); }
 .qhc-label-dc { background: rgba(127, 29, 29, 0.85); border: 1px solid #ef4444; color: #fecaca; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; line-height: 1.35; padding: 2px 8px; }
 .qhc-popup .leaflet-popup-content { margin: 10px 12px; }
+/* Thẻ QHC 1/25k · 1/10k trong #planInfoSlot: cùng lề / khung với land-lot-popup */
+.qhc-popup.land-lot-popup .leaflet-popup-content { margin: 8px 10px; }
 .qhc-pop { font-size: var(--fs-sm); line-height: 1.4; min-width: 220px; }
+.qhc-popup.land-lot-popup .qhc-pop.land-popup-card { min-width: 0; font-size: inherit; line-height: inherit; }
+.lp-title-row .qhc-sw { width: 16px; height: 12px; border-radius: 3px; }
+.pp-collapsed .lp-head .qhc-sw { display: none; }
 .qhc-pop-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-size: var(--fs-md); }
 .qhc-popup.pp-collapsible .qhc-pop-head { padding-right: 40px; }
 .leaflet-popup.qhc-popup.pp-collapsed .qhc-pop { min-width: 0; }
-.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop > :not(.qhc-pop-head) { display: none; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop > :not(.qhc-pop-head):not(.pp-title) { display: none; }
 .leaflet-popup.qhc-popup.pp-collapsed .qhc-pop-head { margin: 0; padding-right: 0; }
 .leaflet-popup.qhc-popup.pp-collapsed .qhc-sw { display: none; }
 .leaflet-popup.qhc-popup.pp-collapsed .qhc-pop-head b {
   font-size: var(--fs-sm); font-weight: 700; color: #fff; white-space: nowrap;
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
 }
+.qhc-popup.land-lot-popup .qhc-pop-ward { margin-top: 6px; }
+.qhc-popup.land-lot-popup .qhc-pop-src { margin-top: 6px; padding-top: 4px; }
+.qhc-popup.land-lot-popup .qhc-pop-desc { margin: 4px 0 0; }
 .qhc-pop-table { width: 100%; border-collapse: collapse; }
 .qhc-pop-table th { width: 6.5em; padding: 1px 6px 1px 0; color: var(--text-muted); font-weight: 400; text-align: left; vertical-align: top; }
 .qhc-pop-table td { padding: 1px 0; }

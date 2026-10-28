@@ -907,7 +907,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const host = document.getElementById('mapArea');
     if (el && host && el.parentElement !== host) host.appendChild(el);
   };
-  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup), .leaflet-popup.dock-card.infra-popup');
+  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup), .leaflet-popup.dock-card.infra-popup, .leaflet-popup.dock-card.qhc-popup');
   const planningPaneOn = () => {
     const pane = document.getElementById('layerPaneQuyHoach');
     return !!pane && !pane.hidden;
