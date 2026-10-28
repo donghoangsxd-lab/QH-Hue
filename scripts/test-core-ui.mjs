@@ -255,7 +255,7 @@ assert.match(read('public/js/investLayer.js'), /dt-area|areaTextOf/);
 assert.match(read('public/js/investLayer.js'), /data-dvtm-fold|DVTM_SUBGROUPS/);
 assert.match(read('public/js/investClassify.js'), /classifyDvtmSub/);
 assert.match(read('docs/ui-spec.md'), /cuối dòng hiện diện tích/);
-assert.match(read('docs/ui-spec.md'), /Tab DVTM chia 3 nhóm con/);
+assert.match(read('docs/ui-spec.md'), /Tab DVTM chia 5 nhóm con/);
 assert.match(read('docs/ui-spec.md'), /cùng kiểu công trình kiến trúc Pháp/);
 assert.match(dauTu, /class="level-pick level-pick-dt"/);
 assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);

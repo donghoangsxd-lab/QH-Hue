@@ -72,7 +72,7 @@ let sheetRows = [];
 let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
-/** Nhóm con DVTM đang mở danh sách (mặc định chỉ nhóm khách sạn / du lịch). */
+/** Nhóm con DVTM đang mở danh sách (mặc định chỉ nhóm sân gôn). */
 const dvtmFoldOpen = new Set([DVTM_SUB_DEFAULT]);
 let dvtmMapDefaultDone = false;
 let investPicked = '';

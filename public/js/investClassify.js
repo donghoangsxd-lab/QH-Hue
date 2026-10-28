@@ -1,6 +1,6 @@
 // Phân nhóm dự án kêu gọi đầu tư (sheet 15-DA) theo lĩnh vực / tên.
 // groupId admin (override) luôn thắng quy tắc tự động.
-// Trong DVTM chia thêm 3 nhóm con để danh sách và lớp bản đồ nhẹ hơn.
+// Trong DVTM chia nhóm con để danh sách và lớp bản đồ nhẹ hơn.
 
 export const INVEST_GROUPS = [
   { id: 'dvtm', label: 'DVTM', title: 'Thương mại, dịch vụ và du lịch' },
@@ -13,14 +13,16 @@ export const INVEST_GROUPS = [
   { id: 'khac', label: 'Dự án khác', title: 'Dự án khác' }
 ];
 
-/** Nhóm con trong tab DVTM. Mặc định chỉ bật nhóm 1 trên bản đồ. */
+/** Nhóm con trong tab DVTM. Mặc định chỉ bật nhóm 1 (sân gôn) trên bản đồ. */
 export const DVTM_SUBGROUPS = [
-  { id: 'khachsan', label: 'Khách sạn, khu du lịch', title: 'Dự án khách sạn, khu du lịch', icon: 'tour' },
+  { id: 'sangon', label: 'Sân gôn', title: 'Dự án sân gôn', icon: 'terrain' },
+  { id: 'khachsan', label: 'Khách sạn', title: 'Dự án khách sạn', icon: 'tour' },
+  { id: 'dulich', label: 'Khu du lịch', title: 'Dự án khu du lịch', icon: 'map' },
   { id: 'xang', label: 'Cửa hàng xăng dầu', title: 'Dự án cửa hàng xăng dầu', icon: 'pin' },
   { id: 'dvtm-khac', label: 'Thương mại dịch vụ khác', title: 'Dự án thương mại dịch vụ khác', icon: 'shop' }
 ];
 
-export const DVTM_SUB_DEFAULT = 'khachsan';
+export const DVTM_SUB_DEFAULT = 'sangon';
 
 const GROUP_IDS = new Set(INVEST_GROUPS.map(g => g.id));
 const DVTM_SUB_IDS = new Set(DVTM_SUBGROUPS.map(g => g.id));
@@ -38,7 +40,7 @@ export function investGroupLabel(id) {
 }
 
 export function dvtmSubLabel(id) {
-  return DVTM_SUBGROUPS.find(g => g.id === id)?.label || DVTM_SUBGROUPS[2].label;
+  return DVTM_SUBGROUPS.find(g => g.id === id)?.label || DVTM_SUBGROUPS[DVTM_SUBGROUPS.length - 1].label;
 }
 
 function field(row, re) {
@@ -47,13 +49,18 @@ function field(row, re) {
   return key ? String(row[key] || '').replace(/\s+/g, ' ').trim() : '';
 }
 
-/** Phân loại con trong DVTM theo tên (xăng dầu trước, rồi khách sạn / du lịch). */
+/**
+ * Phân loại con trong DVTM theo tên.
+ * Thứ tự: xăng dầu → sân gôn → khách sạn → khu du lịch → còn lại.
+ */
 export function classifyDvtmSub(row, name) {
   const ten = String(name || field(row, /tên dự án/i) || '').toLowerCase();
   const lv = field(row, /lĩnh vực/i).toLowerCase();
   if (/xăng|petrol|\bgas\b|cửa hàng xăng|kho xăng|trạm[^,]{0,12}xăng|chiết nạp/.test(ten)) return 'xang';
-  if (/khách sạn|resort|nghỉ dưỡng|khu du lịch|du lịch sinh thái|\bhotel\b|ddl\s*\d|\bdu lịch\b/.test(ten)) return 'khachsan';
-  if (/^du lịch$/.test(lv)) return 'khachsan';
+  if (/sân\s*gôn|sân\s*golf|\bgolf\b/.test(ten)) return 'sangon';
+  if (/khách sạn|\bhotel\b/.test(ten)) return 'khachsan';
+  if (/khu du lịch|du lịch sinh thái|ddl\s*\d|\bdu lịch\b|nghỉ dưỡng|\bresort\b/.test(ten)) return 'dulich';
+  if (/^du lịch$/.test(lv)) return 'dulich';
   return 'dvtm-khac';
 }
 

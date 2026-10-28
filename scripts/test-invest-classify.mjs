@@ -9,18 +9,22 @@ assert.equal(INVEST_GROUPS[0].id, 'dvtm');
 assert.equal(INVEST_GROUPS[7].id, 'khac');
 assert.ok(isInvestGroupId('nangluong'));
 assert.equal(isInvestGroupId('dien'), false);
-assert.equal(DVTM_SUBGROUPS.length, 3);
-assert.equal(DVTM_SUB_DEFAULT, 'khachsan');
-assert.deepEqual(DVTM_SUBGROUPS.map(g => g.id), ['khachsan', 'xang', 'dvtm-khac']);
+assert.equal(DVTM_SUBGROUPS.length, 5);
+assert.equal(DVTM_SUB_DEFAULT, 'sangon');
+assert.deepEqual(DVTM_SUBGROUPS.map(g => g.id), ['sangon', 'khachsan', 'dulich', 'xang', 'dvtm-khac']);
 
 const row = (lv, ten) => ({ 'LĨNH VỰC': lv, 'TÊN DỰ ÁN': ten });
 
-assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Khu du lịch nghỉ dưỡng Hồ Châu Sơn')), 'khachsan');
-assert.equal(classifyDvtmSub(row('Du lịch', 'Resort mẫu')), 'khachsan');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Sân gôn Ngũ Hồ')), 'sangon');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Dự án sân Golf Thác Phướn')), 'sangon');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Dự án Khách sạn cao cấp tại Lê Lợi')), 'khachsan');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Khu du lịch nghỉ dưỡng Hồ Châu Sơn')), 'dulich');
+assert.equal(classifyDvtmSub(row('Du lịch', 'Resort mẫu')), 'dulich');
 assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ', 'Cửa hàng xăng dầu phường Hương An')), 'xang');
 assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ', 'Kho xăng dầu, kho gas')), 'xang');
 assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Khu đất TM')), 'dvtm-khac');
 assert.equal(classifyDvtmSub(row('Dịch vụ', 'Bãi đỗ xe')), 'dvtm-khac');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ', 'Khách sạn cạnh sân gôn Kim Long')), 'sangon');
 
 assert.equal(classifyInvestGroup(row('Cảng biển', 'Bến số 7, 8')), 'khac');
 assert.equal(classifyInvestGroup(row('Hạ tầng kỹ thuật', 'HTKT mẫu')), 'khac');
