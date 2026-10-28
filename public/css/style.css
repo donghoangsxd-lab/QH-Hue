@@ -6668,7 +6668,16 @@ body.project-review.la-page #projectReviewHost {
 #axisKienTruc .project-name span,
 #dtList .project-name span { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 #axisKienTruc .project-tools,
+#dtList .dt-area { align-self: center; min-width: 4.5em; text-align: right; }
+#dtList .dt-area.is-miss { color: var(--axis-color-muted); }
 #dtList .project-tools { margin-top: 1px; }
+#dtList .dt-dvtm-sub { margin: 0 0 4px; }
+#dtList .dt-dvtm-sub > .pl-hrow { position: sticky; top: 0; z-index: 1; }
+#dtList .dt-dvtm-sub > .pl-hrow .pl-head {
+  text-transform: none; letter-spacing: 0; font-size: var(--axis-fs-row); cursor: default;
+}
+#dtList .dt-dvtm-sub > .pl-hrow .pl-head .ico { transform: none; }
+#dtList .dt-dvtm-sub > .pl-body { padding-left: 4px; }
 #axisKienTruc .project-dossier-row,
 #dtList .project-dossier-row { align-items: flex-start; }
 #axisKienTruc .project-dossier-meta,

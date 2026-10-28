@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict';
-import { classifyInvestGroup, isInvestGroupId, INVEST_GROUPS } from '../public/js/investClassify.js';
+import {
+  classifyInvestGroup, classifyDvtmSub, isInvestGroupId, INVEST_GROUPS,
+  DVTM_SUBGROUPS, DVTM_SUB_DEFAULT
+} from '../public/js/investClassify.js';
 
 assert.equal(INVEST_GROUPS.length, 8);
 assert.equal(INVEST_GROUPS[0].id, 'dvtm');
 assert.equal(INVEST_GROUPS[7].id, 'khac');
 assert.ok(isInvestGroupId('nangluong'));
 assert.equal(isInvestGroupId('dien'), false);
+assert.equal(DVTM_SUBGROUPS.length, 3);
+assert.equal(DVTM_SUB_DEFAULT, 'khachsan');
+assert.deepEqual(DVTM_SUBGROUPS.map(g => g.id), ['khachsan', 'xang', 'dvtm-khac']);
 
 const row = (lv, ten) => ({ 'LĨNH VỰC': lv, 'TÊN DỰ ÁN': ten });
+
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Khu du lịch nghỉ dưỡng Hồ Châu Sơn')), 'khachsan');
+assert.equal(classifyDvtmSub(row('Du lịch', 'Resort mẫu')), 'khachsan');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ', 'Cửa hàng xăng dầu phường Hương An')), 'xang');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ', 'Kho xăng dầu, kho gas')), 'xang');
+assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Khu đất TM')), 'dvtm-khac');
+assert.equal(classifyDvtmSub(row('Dịch vụ', 'Bãi đỗ xe')), 'dvtm-khac');
 
 assert.equal(classifyInvestGroup(row('Cảng biển', 'Bến số 7, 8')), 'khac');
 assert.equal(classifyInvestGroup(row('Hạ tầng kỹ thuật', 'HTKT mẫu')), 'khac');

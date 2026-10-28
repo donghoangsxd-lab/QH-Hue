@@ -11,7 +11,10 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatch.js';
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
-import { classifyInvestGroup, INVEST_GROUPS, isInvestGroupId, investGroupLabel } from './investClassify.js';
+import {
+  classifyInvestGroup, classifyDvtmSub, INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT,
+  isInvestGroupId, investGroupLabel
+} from './investClassify.js';
 import { readDrawingFile } from './drawingReaders.js';
 import { countApartments } from './apartmentLayer.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
@@ -69,6 +72,9 @@ let sheetRows = [];
 let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
+/** Nhóm con DVTM đang mở danh sách (mặc định chỉ nhóm khách sạn / du lịch). */
+const dvtmFoldOpen = new Set([DVTM_SUB_DEFAULT]);
+let dvtmMapDefaultDone = false;
 let investPicked = '';
 let investDrawRaf = 0;
 let leftGroup = null;
@@ -95,6 +101,35 @@ function rowAlias(row) {
 
 function rowGroupId(row, title) {
   return classifyInvestGroup(row, title, row?._groupId);
+}
+
+function rowDvtmSub(row, title, groupId) {
+  if (groupId !== 'dvtm') return '';
+  return classifyDvtmSub(row, title);
+}
+
+/** Lần đầu có pack: ẩn mọi dự án DVTM không thuộc nhóm 1 để bớt lag khi mở tab. */
+function applyDvtmMapDefault() {
+  if (dvtmMapDefaultDone || !pack) return;
+  dvtmMapDefaultDone = true;
+  projectList().forEach(p => {
+    if (p.dtGroup !== 'dvtm') return;
+    if (p.dvtmSub !== DVTM_SUB_DEFAULT) investHidden.add(projectKey(p));
+  });
+}
+
+function setDvtmSubMap(subId, on) {
+  projectList().forEach(p => {
+    if (p.dtGroup !== 'dvtm' || p.dvtmSub !== subId) return;
+    const id = projectKey(p);
+    if (!id) return;
+    if (on) investHidden.delete(id);
+    else investHidden.add(id);
+  });
+}
+
+function dvtmSubMapOn(subId, items) {
+  return items.some(p => !investHidden.has(projectKey(p)));
 }
 
 function toolBusy() {
@@ -233,14 +268,19 @@ function projectList(features) {
       hasBoundary: !!geom,
       sheetOnly: !!feature.properties?._sheetOnly,
       title,
+      areaText: areaTextOf(sheet, geom),
       dtGroup: rowGroupId(sheet, title)
     });
+    const last = out[out.length - 1];
+    last.dvtmSub = rowDvtmSub(sheet, title, last.dtGroup);
   });
   sheetOnly.forEach(p => {
     if (p.sheet && matchedRows.has(p.sheet)) return;
     const id = projectKey(p);
     if (!id || seen.has(id)) return;
     seen.add(id);
+    if (!p.areaText) p.areaText = areaTextOf(p.sheet, p.geom || null);
+    if (!p.dvtmSub) p.dvtmSub = rowDvtmSub(p.sheet, p.title, p.dtGroup);
     out.push(p);
   });
   if (useCache) projectCache = out;
@@ -383,6 +423,19 @@ function listedArea(row) {
   if (!Number.isFinite(n)) return raw;
   const unit = /m²|m2/i.test(key + raw) && !/ha/i.test(key) ? 'm²' : 'ha';
   return `${fmtNum(n)} ${unit}`;
+}
+
+/** Diện tích hiện trên danh sách: ưu tiên cột sheet, không có thì đo ranh; thiếu thì `-`. */
+function areaTextOf(sheet, geom) {
+  const listed = listedArea(sheet);
+  if (listed) return listed;
+  if (geom) {
+    try {
+      const a = turf.area(geom);
+      if (a > 0) return a >= 10000 ? `${fmtNum(a / 10000)} ha` : `${fmtNum(Math.round(a))} m²`;
+    } catch { /* ranh hỏng thì bỏ */ }
+  }
+  return '-';
 }
 
 function statHtml(label, value, icon, wide) {
@@ -602,8 +655,11 @@ function rebuildSheetOnly(features, rows) {
       hasBoundary: false,
       sheetOnly: true,
       title,
+      areaText: areaTextOf(row, null),
       dtGroup: rowGroupId(row, title)
     });
+    const last = sheetOnly[sheetOnly.length - 1];
+    last.dvtmSub = rowDvtmSub(row, title, last.dtGroup);
   });
 }
 
@@ -1446,26 +1502,58 @@ function investRow(p, n) {
   const shown = !investHidden.has(id);
   const rows = investDossierRows(p);
   const badge = p.hasBoundary ? '' : ' <small class="layer-hint">Chưa có ranh</small>';
-  const blob = [p.title, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
+  const area = p.areaText || areaTextOf(p.sheet, p.geom) || '-';
+  const blob = [p.title, area, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
   return `<div class="project-row${shown ? '' : ' is-off'}${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
       <label class="project-name" title="${escapeHtml(p.title || '')}">
         <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}${badge}</span></label>
+      <span class="project-meta dt-area${area === '-' ? ' is-miss' : ''}">${escapeHtml(area)}</span>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-invest-expand="${safe}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
       </span>
     </div>${open ? investDossierHtml(rows) : ''}`;
 }
 
+function paintDvtmList(host, items) {
+  const empty = pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '';
+  if (!items.length) {
+    host.innerHTML = empty;
+    return;
+  }
+  host.innerHTML = DVTM_SUBGROUPS.map(sub => {
+    const list = items.filter(p => p.dvtmSub === sub.id)
+      .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+    const open = dvtmFoldOpen.has(sub.id);
+    const mapOn = dvtmSubMapOn(sub.id, list);
+    const body = list.length
+      ? list.map((p, i) => investRow(p, i + 1)).join('')
+      : '<div class="project-empty">Chưa có dự án trong nhóm này.</div>';
+    return `<div class="pl-group dt-dvtm-sub${open ? ' open' : ''}" data-dvtm-sub="${escapeHtml(sub.id)}">
+      <div class="pl-hrow dt-sub-row">
+        <span class="pl-head" title="${escapeHtml(sub.title)}">${ico(sub.icon)}<span>${escapeHtml(sub.label)}</span><small>${list.length}</small></span>
+        <button type="button" class="project-btn pl-eye" data-dvtm-eye="${escapeHtml(sub.id)}" aria-pressed="${mapOn}" title="${mapOn ? 'Ẩn nhóm trên bản đồ' : 'Hiện nhóm trên bản đồ'}">${ico(mapOn ? 'eye' : 'eye-off')}</button>
+        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-dvtm-fold="${escapeHtml(sub.id)}" title="${open ? 'Thu danh sách' : 'Mở danh sách'}" aria-expanded="${open}" aria-label="${open ? 'Thu' : 'Mở'} ${escapeHtml(sub.label)}">${ico('chev-down')}</button>
+      </div>
+      <div class="pl-body"${open ? '' : ' hidden'}>${body}</div>
+    </div>`;
+  }).join('');
+}
+
 function paintInvestList(opts = {}) {
   const onlyTab = opts.tab || '';
   const scroller = $('dtList');
   const y = scroller?.scrollTop || 0;
+  applyDvtmMapDefault();
   const all = projectList();
   const groups = onlyTab ? INVEST_GROUPS.filter(g => g.id === onlyTab) : INVEST_GROUPS;
   groups.forEach(g => {
     const host = $(`investList-${g.id}`);
     if (!host) return;
     const items = all.filter(p => p.dtGroup === g.id).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+    if (g.id === 'dvtm') {
+      paintDvtmList(host, items);
+      return;
+    }
     host.innerHTML = items.length
       ? items.map((p, i) => investRow(p, i + 1)).join('')
       : (pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
@@ -1580,6 +1668,28 @@ export function initInvestLayer() {
   const listHost = $('dtList');
   listHost?.addEventListener('click', (e) => {
     if (!e.target.closest('.invest-tab-list')) return;
+    const fold = e.target.closest('[data-dvtm-fold]');
+    if (fold) {
+      const id = fold.dataset.dvtmFold;
+      if (dvtmFoldOpen.has(id)) dvtmFoldOpen.delete(id);
+      else dvtmFoldOpen.add(id);
+      paintInvestList({ tab: 'dvtm', counts: false });
+      return;
+    }
+    const eye = e.target.closest('[data-dvtm-eye]');
+    if (eye) {
+      const id = eye.dataset.dvtmEye;
+      const items = projectList().filter(p => p.dtGroup === 'dvtm' && p.dvtmSub === id);
+      const on = !dvtmSubMapOn(id, items);
+      setDvtmSubMap(id, on);
+      if (on) dvtmFoldOpen.add(id);
+      if (on && !$('chk_invest')?.checked) {
+        $('chk_invest').checked = true;
+        $('chk_invest').dispatchEvent(new Event('change', { bubbles: true }));
+      } else queueInvestDraw();
+      paintInvestList({ tab: 'dvtm', counts: false });
+      return;
+    }
     const expand = e.target.closest('[data-invest-expand]');
     if (expand) {
       const id = expand.dataset.investExpand;
