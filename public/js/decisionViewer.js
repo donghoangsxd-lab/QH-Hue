@@ -162,6 +162,18 @@ function showMode(el, mode) {
   el.querySelector('[data-decision-pending]').hidden = mode !== 'pending';
 }
 
+/** Ép trình xem PDF khớp chiều ngang khung (#view=FitH) — tránh hai dải đen hai bên khi khung cao hơn tỷ lệ trang. */
+function embedSrc(src) {
+  const url = String(src || '').trim();
+  if (!url) return '';
+  if (/^https?:/i.test(url) && !/\.pdf(\?|#|$)/i.test(url) && !/[?&]action=(getProjectDecision|getChoDuyetPdf|getPendingPdf)\b/i.test(url)) {
+    return url;
+  }
+  const hash = url.indexOf('#');
+  const base = hash >= 0 ? url.slice(0, hash) : url;
+  return `${base}#view=FitH`;
+}
+
 function showFrame(el, src, note) {
   const frame = el.querySelector('iframe');
   const box = el.querySelector('[data-decision-note]');
@@ -175,7 +187,7 @@ function showFrame(el, src, note) {
   box.hidden = true;
   box.textContent = '';
   frame.hidden = false;
-  if (src) frame.src = src;
+  if (src) frame.src = embedSrc(src);
   else frame.removeAttribute('src');
 }
 

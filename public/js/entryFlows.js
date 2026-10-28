@@ -14,6 +14,7 @@ import { loadCongSuat } from './congSuat.js';
 import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
 import { pdfProblem, sendAdjustment } from './adjustLayer.js';
 import { focusAdjustSupplement } from './adjustImport.js';
+import { planLevelOf } from './generalPlan.js';
 
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
@@ -411,10 +412,91 @@ function reviewBody(step, bag, tagged) {
   });
 }
 
+function foldName(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+}
+
+function nameHits(names, query) {
+  const words = foldName(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!words.length) return names;
+  return names.filter(n => {
+    const parts = foldName(n).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+function schemeNames() {
+  const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
+  const drawable = all.filter(p => !p.sheetOnly);
+  return [...new Set((drawable.length ? drawable : all).map(p => String(p.tenQH).trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'vi'));
+}
+
+/** Cấp facet từ tên đồ án (QHC mặc định 1/10.000; tên ghi 1/25.000 → QHC25). */
+function facetLevelOf(name) {
+  const kind = planLevelOf(name);
+  if (kind === 'QHCT') return 'QHCT';
+  if (kind === 'QHPK') return 'QHPK';
+  if (/1\s*\/\s*25\.?000\b|25000/.test(String(name || ''))) return 'QHC25';
+  return 'QHC10';
+}
+
+function captureScheme() {
+  const el = $('hoScheme');
+  const neu = $('hoSchemeNew')?.value || '';
+  if (!el) return { pick: '', neu };
+  if (el.tagName === 'SELECT') return { pick: el.value || '', neu };
+  const v = String(el.value || '').trim();
+  if (v && schemeNames().includes(v)) return { pick: v, neu: '' };
+  return { pick: '', neu: v || neu };
+}
+
+function schemeName() {
+  const pick = $('hoScheme')?.value?.trim() || '';
+  if (pick) return pick;
+  return $('hoSchemeNew')?.value?.trim() || '';
+}
+
+function syncSchemeNewRow() {
+  const row = $('hoSchemeNewRow');
+  const pick = $('hoScheme')?.value || '';
+  if (row) row.hidden = !!pick;
+}
+
+function fillHoSchemes(prefer) {
+  const sel = $('hoScheme');
+  if (!sel || sel.tagName !== 'SELECT') return;
+  const names = schemeNames();
+  const cur = prefer != null ? prefer : (sel.value || '');
+  const query = $('hoSchemeSearch')?.value || '';
+  const hits = nameHits(names, query);
+  const shown = cur && names.includes(cur) && !hits.includes(cur) ? [cur, ...hits] : hits;
+  sel.innerHTML = `<option value="">Đồ án mới (nhập tên bên dưới)</option>${
+    shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
+  }`;
+  sel.value = cur && shown.includes(cur) ? cur : '';
+  sel.size = Math.min(6, Math.max(2, shown.length + 1));
+  const count = $('hoSchemeCount');
+  if (count) {
+    count.textContent = names.length
+      ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`)
+      : 'Chưa tải danh mục đồ án';
+  }
+  syncSchemeNewRow();
+}
+
+function onSchemePicked() {
+  syncSchemeNewRow();
+  const name = $('hoScheme')?.value || '';
+  if (!name) return;
+  const level = $('hoLevel');
+  if (level) level.value = facetLevelOf(name);
+}
+
 function hoMeta(step) {
   const area = selectedArea('hoScope', 'hoUnit');
   return {
-    scheme: $('hoScheme')?.value.trim() || '',
+    scheme: schemeName(),
     level: $('hoLevel')?.value || '',
     sector: step.sector || '',
     kind: step.phase || '',
@@ -434,13 +516,13 @@ function renderHoSo() {
   rememberHosoCapacity();
   const allow = allowedKeys();
   const locked = Array.isArray(allow) && allow.length === 1;
-  const scheme = $('hoScheme')?.value || '';
+  const { pick: schemePick, neu: schemeNew } = captureScheme();
   const adjSummary = $('hoAdjSummary')?.value || '';
   const adjNote = $('hoAdjNote')?.value || '';
   const adjId = $('hoAdjId')?.value || '';
   const adjPdfName = held.adjPdf ? held.adjPdf.name : '';
   const adjOpen = !!$('hoAdjust')?.open;
-  const level = $('hoLevel')?.value || 'QHPK';
+  const level = $('hoLevel')?.value || (schemePick ? facetLevelOf(schemePick) : 'QHPK');
   const scope = locked ? scopeOfKey(allow[0]) : ($('hoScope')?.value || 'xa');
   const unit = locked ? allow[0] : ($('hoUnit')?.value || optionsFirst(scope));
   const nav = STEPS.map((s, i) => {
@@ -448,10 +530,19 @@ function renderHoSo() {
     return `<button type="button" class="entry-step-btn${s.id === stepId ? ' on' : ''}" data-step="${s.id}">${i + 1}. ${escapeHtml(s.label)}${done ? ' · có file' : ''}</button>`;
   }).join('');
   const levels = FACET_LEVELS.map(l => `<option value="${l.id}"${l.id === level ? ' selected' : ''}>${escapeHtml(l.label)}</option>`).join('');
-  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Quản trị: sử dụng đất và ranh thành lớp ngay, trừ đồ án đã có lớp đó. Cán bộ: gửi hàng chờ. Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.</p>
+  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Chọn đồ án đã có trong danh sách để bổ sung hồ sơ, hoặc chọn «Đồ án mới» và nhập tên. Quản trị: sử dụng đất và ranh thành lớp ngay, trừ đồ án đã có lớp đó. Cán bộ: gửi hàng chờ. Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.</p>
+    <label class="cad-pair" for="hoSchemeSearch">Đồ án
+      <input type="search" id="hoSchemeSearch" class="cad-pair-search" placeholder="Tìm tên đồ án" autocomplete="off" aria-controls="hoScheme" title="Gõ một phần tên, không phân biệt dấu">
+      <span class="cad-pair-count" id="hoSchemeCount"></span>
+      <select id="hoScheme" class="cad-pair-list" size="6" title="Chọn đồ án đã có để bổ sung hồ sơ. Để trống dòng đầu nếu tạo đồ án mới.">
+        <option value="">Đồ án mới (nhập tên bên dưới)</option>
+      </select>
+    </label>
+    <div class="form-grid" id="hoSchemeNewRow"${schemePick ? ' hidden' : ''}>
+      <label for="hoSchemeNew">Tên đồ án mới</label>
+      <input id="hoSchemeNew" maxlength="120" placeholder="Tên đồ án mới trên bucket" value="${escapeHtml(schemeNew)}">
+    </div>
     <div class="form-grid">
-      <label for="hoScheme">Đồ án</label>
-      <input id="hoScheme" maxlength="120" placeholder="Tên đồ án đã có trên bucket" value="${escapeHtml(scheme)}">
       <label for="hoLevel">Cấp</label>
       <select id="hoLevel">${levels}</select>
       <label for="hoScope">Đơn vị</label>
@@ -490,6 +581,10 @@ function renderHoSo() {
       <button type="button" class="btn-submit btn-secondary" id="hoAdjDraw">Bổ sung bản vẽ</button>
       <div id="hoAdjStatus" class="rp-status" role="status"></div>
     </details>`;
+  fillHoSchemes(schemePick);
+  $('hoSchemeSearch')?.addEventListener('input', () => fillHoSchemes());
+  $('hoScheme')?.addEventListener('focus', () => fillHoSchemes());
+  $('hoScheme')?.addEventListener('change', onSchemePicked);
   $('hoScope')?.addEventListener('change', () => { if ($('hoUnit')) $('hoUnit').innerHTML = optionsHtml($('hoScope').value, ''); renderActive(); });
   $('hoNav')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-step]');
@@ -514,7 +609,7 @@ function renderHoSo() {
   });
   $('hoAdjSave')?.addEventListener('click', saveLocalAdjust);
   $('hoAdjDraw')?.addEventListener('click', () => {
-    const tenQH = $('hoScheme')?.value.trim() || '';
+    const tenQH = schemeName();
     const id = ($('hoAdjId')?.value || '').trim().toLowerCase();
     const status = $('hoAdjStatus');
     if (!tenQH || !/^[a-f0-9]{16}$/.test(id)) {
@@ -528,7 +623,7 @@ function renderHoSo() {
 
 async function saveLocalAdjust() {
   const status = $('hoAdjStatus');
-  const tenQH = $('hoScheme')?.value.trim() || '';
+  const tenQH = schemeName();
   const title = $('hoAdjSummary')?.value.trim() || '';
   const note = $('hoAdjNote')?.value.trim() || '';
   if (!signedIn()) {
@@ -536,7 +631,7 @@ async function saveLocalAdjust() {
     return;
   }
   if (!tenQH) {
-    if (status) status.textContent = 'Nhập tên đồ án ở ô Đồ án phía trên.';
+    if (status) status.textContent = 'Chọn đồ án đã có hoặc nhập tên đồ án mới.';
     return;
   }
   if (!title) {
@@ -756,11 +851,13 @@ async function savePdf(step, tenQH, unitKey) {
 
 async function saveHoSo() {
   const status = $('hoStatus');
-  const tenQH = $('hoScheme')?.value.trim() || '';
+  const tenQH = schemeName();
   const features = taggedCollections();
   const notes = [];
   if (!tenQH) {
-    if (status) status.textContent = features.length ? 'Đã có bản vẽ trên máy. Nhập tên đồ án khi cần ghi bucket.' : 'Chọn ít nhất một file.';
+    if (status) status.textContent = features.length
+      ? 'Đã có bản vẽ trên máy. Chọn đồ án đã có hoặc nhập tên đồ án mới khi cần ghi bucket.'
+      : 'Chọn ít nhất một file.';
     if (features.length) downloadHoSo();
     return;
   }
@@ -994,6 +1091,7 @@ export function openEntryFlow(id, opts = {}) {
     state.pickTarget = 'infra';
   }
   if (id !== 'flowHoSo') clearPreview();
+  else fillHoSchemes();
   if (opts.legacy) $('entryLegacy')?.setAttribute('open', '');
 }
 
