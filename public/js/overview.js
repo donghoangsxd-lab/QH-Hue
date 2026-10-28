@@ -360,7 +360,7 @@ const SECTIONS = [
           'Khung <b>Chú giải</b> nổi trên bản đồ khi có lớp đang bật. Chỉ hiện bộ ký hiệu của lớp đó.',
           'Chọn bộ ký hiệu: <b>Đô thị</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>.',
           'Gõ vào ô <b>Tìm loại đất, tên layer CAD...</b> để lọc. Nút mũi tên kép <b>Thu gọn / mở mọi nhóm ký hiệu</b> đóng hoặc mở các nhóm.',
-          'Phần <b>Hiển thị lô đất</b>: kéo thanh <b>Độ trong suốt</b> (bấm số % để trả về 100%). Bảng <b>Viền lô theo giai đoạn</b> gồm Hiện trạng, QH đợt đầu, Chờ duyệt và QH dài hạn.'
+          'Kéo thanh <b>Độ trong suốt</b> ở cuối Chú giải (bấm số % để trả về 100%). Bảng <b>Viền lô theo giai đoạn</b> gồm Hiện trạng, QH đợt đầu, Chờ duyệt và QH dài hạn.'
         ],
         facts: [
           'QHPK 1/2.000 là bộ đang dùng cho các đồ án đã nạp. Thu nhỏ thì lô tô màu; phóng từ mức 17 thì hiện hoa văn Thông tư 16/2025/TT-BXD.',

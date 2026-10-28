@@ -532,6 +532,38 @@ function lotBlock(p, scheme) {
     </div>`;
 }
 
+function planFieldText(plan, key) {
+  const icon = key === 'far' ? 'layers' : key;
+  const hit = planItems(plan).find(s => s.icon === icon);
+  if (!hit) return '—';
+  return String(hit.text || '—').replace(/\s+/g, ' ').trim();
+}
+
+/** Bảng gọn Stt / Loại đất / Tỷ lệ / Diện tích / MĐXD / Tầng cao / HSSDĐ (một hàng mỗi lô giao thửa). */
+function planLotsTable(parts, totalArea) {
+  if (!parts?.length) return '';
+  const body = parts.map((p, i) => {
+    const plan = p.lot && p.lot.plan;
+    const swatch = (p.key && tt16SwatchCss(p.key, 0.6)) || `background:${p.color || '#94a3b8'};`;
+    const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
+    return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)}">
+      <td class="pls-stt">${i + 1}</td>
+      <td class="pls-type"><i class="pls-swatch" style="${swatch}"></i><span>${escapeHtml(p.label)}</span></td>
+      <td class="pls-num">${escapeHtml(fmtPct(pct))}</td>
+      <td class="pls-num">${fmtM2(p.area)}</td>
+      <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
+      <td class="pls-num">${escapeHtml(planFieldText(plan, 'floors'))}</td>
+      <td class="pls-num">${escapeHtml(planFieldText(plan, 'far'))}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="pls-table-wrap"><table class="pls-table">
+    <thead><tr>
+      <th>Stt</th><th>Loại đất</th><th>Tỷ lệ</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+
 function schemeLots(parts, area) {
   const groups = schemeGroups(parts);
   const named = groups.filter(g => g.file).length;
@@ -542,15 +574,24 @@ function schemeLots(parts, area) {
     </section>`).join('');
 }
 
-/** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place, extra */
+/** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place, extra, compact */
 export function parcelPlanHtml(res, recorded, opts = {}) {
   if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
   const w = planPlace(opts.place);
-  const title = opts.title || `Quy hoạch ${w.on}`;
+  const compact = opts.compact === true
+    || (opts.compact !== false && opts.place !== 'measure' && opts.place !== 'invest');
+  const title = opts.title || (compact ? 'Thông tin quy hoạch:' : `Quy hoạch ${w.on}`);
   const noneLabel = opts.noneLabel || 'Chưa có lô quy hoạch';
   const empty = opts.empty || `${w.it} chưa nằm trong lô quy hoạch của đồ án nào đã nhập.`;
   const note = opts.note || `Cắt hình học ${w.cut} với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.`;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
+  if (compact) {
+    const head = `<div class="pls-head">${escapeHtml(title)}</div>${extra}`;
+    if (!res.parts?.length && !res.rows.length) {
+      return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div></div>`;
+    }
+    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}</div>`;
+  }
   const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
   if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
@@ -567,9 +608,19 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
  */
 export function parcelZonesHtml(res, recorded, opts) {
   const w = planPlace(opts.place);
+  const compact = opts.compact === true
+    || (opts.compact !== false && opts.place !== 'measure' && opts.place !== 'invest');
+  const title = opts.title || (compact ? 'Thông tin quy hoạch:' : `Quy hoạch ${w.on}`);
   const covered = res.area - res.none.area;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
-  const head = `<div class="pls-head">${escapeHtml(opts.title)}</div>
+  if (compact) {
+    const head = `<div class="pls-head">${escapeHtml(title)}</div>${extra}`;
+    if (!res.parts.length) {
+      return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div></div>`;
+    }
+    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}</div>`;
+  }
+  const head = `<div class="pls-head">${escapeHtml(title)}</div>
     <div class="pp-row pls-sheet"><span>${escapeHtml(w.shape)}</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
     <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
   const note = opts.note ? `<div class="pp-sub" title="${escapeHtml(opts.note)}">${escapeHtml(opts.note)}</div>` : '';

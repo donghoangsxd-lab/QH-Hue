@@ -799,6 +799,7 @@ function qhcLotCardHtml(f, latlng, opts) {
   const regsPane = opts?.hideProject
     ? '<div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>'
     : projectHtml;
+  // Không lặp tên loại đất ở tiêu đề — chỉ eyebrow + badge; hatch nằm cuối dòng Chức năng SDĐ.
   return `<div class="pp land-popup land-popup-card qhc-pop">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
@@ -806,7 +807,6 @@ function qhcLotCardHtml(f, latlng, opts) {
           <span class="lp-eyebrow-label">Quy hoạch chung 1/10.000</span>
           <span class="lp-phase lp-phase-qh">${escapeHtml(stage)}</span>
         </div>
-        <div class="lp-title-row">${swatchHtml(land)}<span class="lp-title">${escapeHtml(land.label)}</span></div>
       </div>
     </div>
     ${landCardTabsHtml()}
@@ -817,7 +817,7 @@ function qhcLotCardHtml(f, latlng, opts) {
         { tone: 'floors', icon: 'floors', label: 'Giai đoạn', value: stage },
         { tone: 'far', icon: 'map', label: 'Tiểu vùng', value: tv ? `${tv.tv}` : '—' }
       ])}
-      ${landUseBannerHtml(land.label)}
+      ${landUseBannerHtml(land.label, swatchHtml(land))}
       ${qhcMetaLine([
         ward ? escapeHtml(ward) : '',
         tv ? escapeHtml(tv.ten) : '',
@@ -912,6 +912,7 @@ function qhcVisionCardHtml(f, latlng) {
   const ha = zoneAreaHa(f.properties, areaM2);
   const areaText = ha > 0 ? `${fmtNum(ha)} ha` : '—';
   const ward = wardNameAt(latlng.lat, latlng.lng);
+  const zoneSwatch = `<i class="qhc-sw" style="background:${visionColor(zone)}"></i>`;
   return `<div class="pp land-popup land-popup-card qhc-pop">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
@@ -919,7 +920,6 @@ function qhcVisionCardHtml(f, latlng) {
           <span class="lp-eyebrow-label">Quy hoạch chung 1/25.000</span>
           <span class="lp-phase lp-phase-qh">Tổ chức không gian</span>
         </div>
-        <div class="lp-title-row"><i class="qhc-sw" style="background:${visionColor(zone)}"></i><span class="lp-title">${escapeHtml(zone)}</span></div>
       </div>
     </div>
     ${landCardTabsHtml()}
@@ -930,7 +930,7 @@ function qhcVisionCardHtml(f, latlng) {
         { tone: 'floors', icon: 'map', label: 'Phường, xã', value: ward || '—' },
         { tone: 'far', icon: 'file', label: 'Tên vùng', value: name || '—' }
       ])}
-      ${landUseBannerHtml(zone)}
+      ${landUseBannerHtml(zone, zoneSwatch)}
       ${desc ? `<p class="qhc-pop-desc lp-meta">${escapeHtml(desc)}</p>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
@@ -1079,9 +1079,10 @@ async function parcelVisionHtml(geometry, recorded, place) {
   });
   return {
     html: parcelZonesHtml(res, recorded, {
-      title: `QHC 1/25.000 ${w.on}`, unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
+      title: 'Thông tin quy hoạch:', unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
       empty: `${w.it} nằm ngoài các vùng của sơ đồ tổ chức không gian 1/25.000.`, partsHead: 'Vùng chức năng và định hướng',
       place,
+      compact: place !== 'measure' && place !== 'invest',
       note: `${QHC2045.short} · Sơ đồ tổ chức không gian 1/25.000 · ${QHC2045.status}. Đối chiếu cả khi lớp đang tắt.`
     }),
     shapes: res.shapes
@@ -1134,11 +1135,12 @@ async function parcelLandHtml(geometry, recorded, place) {
     : `${w.it} không nằm trong đồ án QHC 1/10.000 nào.`;
   return {
     html: parcelPlanHtml(res, recorded, {
-      title: `QHC 1/10.000 ${w.on}`,
+      title: 'Thông tin quy hoạch:',
       noneLabel: 'Chưa có lô QHC',
       empty,
       extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
       place,
+      compact: place !== 'measure' && place !== 'invest',
       note: `Mọi đồ án QHC 1/10.000 đã nhập và lô vùng lõi ${QHC2045.short}. Đồ án phạm vi nhỏ hơn được ưu tiên; phần còn lại lấy lô vùng lõi. Gồm mọi giai đoạn, kể cả khi lớp đang tắt.`
     }),
     shapes: res.shapes

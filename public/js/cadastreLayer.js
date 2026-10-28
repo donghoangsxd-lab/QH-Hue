@@ -3,10 +3,10 @@
 // Chọn một phường/xã trên droplist: chỉ vẽ phần nền thửa nằm trong ranh phường hiện nay (sau sáp nhập), không theo mã xã cũ.
 // Bấm vào thửa khi không bật công cụ nào: tra trong tile z16 đã tải, không gọi máy chủ. Tìm tờ/thửa qua chỉ mục từng xã.
 // Menu «Xem thông tin lô đất quy hoạch»: các cấp có lô tại điểm bấm; bấm thẳng mục mở cấp chi tiết nhất.
-// Menu thửa / lô QH: chuyển droplist sang B. Quy hoạch, bật đúng cấp, mở brief đồ án + thẻ thửa/lô.
+// Menu thửa / lô QH: chuyển sang B. Quy hoạch, bật đúng cấp, thẻ thửa/lô (thửa không mở brief đồ án — một thửa có thể giao nhiều đồ án).
 // Tra lô trước khi đóng bảng thửa: đóng bảng trả lớp đang xem lúc trước và có thể gỡ đúng lô dưới điểm bấm.
 // Droplist đang ở lớp quy hoạch: bảng thửa đặt góc trái (4 trang QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500).
-// Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; QHPK/QHCT mở đồ án chứa thửa.
+// Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; không gắn brief một đồ án.
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
 import { map, WARD_BOUNDS_EVENT, openLotPopup } from './mapEngine.js';
@@ -638,11 +638,12 @@ function planPage(id, geometry, recorded, place) {
     await annotateCompliance('QHPK', geometry, res.parts);
     return {
       html: parcelPlanHtml(res, recorded, {
-        title: `QHPK 1/2.000 ${w.on}`,
+        title: 'Thông tin quy hoạch:',
         noneLabel: 'Đất khác',
         empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
         place,
-        note
+        note,
+        compact: place !== 'measure' && place !== 'invest'
       }),
       shapes: res.shapes
     };
@@ -695,7 +696,9 @@ async function showTab(id, { syncMap = true } = {}) {
   if (!st || !isPlanLevel(id)) return;
   st.tab = id;
   if (syncMap) {
-    applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom);
+    applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom, {
+      skipProjects: st.kind === 'parcel' || st.kind === 'measure'
+    });
     const shown = planMap && !isSplitOn() && getViewMode() === 'QH' ? planMap : st.map;
     if (shown && st.map && shown !== st.map && st.geom) {
       st.map = shown;
@@ -898,6 +901,8 @@ export function planLevelsAt(latlng) {
 
 /** Chuyển droplist sang B. Quy hoạch, mở panel lớp, bật chế độ xem QH (giữ khung nhìn). */
 function goPlanAxis() {
+  const mag = document.getElementById('layerMagMenu');
+  if (mag) mag.hidden = true;
   document.dispatchEvent(new CustomEvent('qh:axis-tab', {
     detail: { id: 'quyhoach', openPanel: true, keepCamera: true }
   }));
@@ -940,7 +945,7 @@ export async function openPlanAt(latlng, targetMap, levelId) {
 }
 
 /** Cùng lối với bấm thửa: mở bảng thửa (hoặc popup) tại điểm, kể cả khi lớp đang tắt.
- *  revealPlan (menu chuột phải): sang B. Quy hoạch, cấp chi tiết nhất tại điểm, thẻ kèm trang QH. */
+ *  revealPlan (menu chuột phải): sang B. Quy hoạch (không xổ mag A–F), cấp chi tiết nhất, thẻ thửa — không brief đồ án. */
 export function openParcelAt(latlng, targetMap, opts = {}) {
   return openParcel(latlng, targetMap, opts);
 }

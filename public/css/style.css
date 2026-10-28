@@ -2147,7 +2147,10 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .legend-display { flex: 0 0 auto; }
 .legend-display .layer-map-tab { justify-content: flex-start; padding-left: 10px; }
 .legend-sub { margin: 4px 0 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--axis-color-muted); }
-.lot-opacity-row { gap: 8px; }
+.lot-opacity-row {
+  flex: 0 0 auto; gap: 8px; margin-top: 6px; padding: 6px 8px 4px;
+  border-top: 1px solid var(--border-soft);
+}
 .lot-opacity-row label { flex-shrink: 0; white-space: nowrap; }
 .lot-opacity-row .opacity-slider { flex: 1 1 auto; min-width: 60px; margin: 0; }
 .lot-opacity-value { min-width: 38px; padding: 1px 4px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--accent-cyan); font: inherit; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; cursor: pointer; }
@@ -4076,6 +4079,33 @@ table.ward-table th {
 /* Phân tích sử dụng đất quy hoạch trong vùng đo diện tích */
 .plan-land-stats { display: flex; flex-direction: column; gap: 4px; }
 .plan-land-stats .pls-head { font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px; }
+.pls-table-wrap { width: 100%; overflow-x: auto; margin-top: 2px; }
+.pls-table {
+  width: 100%; border-collapse: collapse; font-size: 10px; line-height: 1.25;
+  color: var(--text-main);
+}
+.pls-table th, .pls-table td {
+  padding: 3px 4px; border-bottom: 1px solid var(--border-soft); vertical-align: middle;
+}
+.pls-table th {
+  color: var(--text-muted); font-weight: 700; text-align: left; white-space: nowrap;
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.02em;
+}
+.pls-table .pls-stt { width: 1.6em; text-align: center; color: var(--text-muted); }
+.pls-table .pls-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pls-table .pls-type {
+  display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 9.5em;
+}
+.pls-table td.pls-type { max-width: 9.5em; }
+.pls-table .pls-type span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pls-table .pls-swatch {
+  flex: none; width: 12px; height: 9px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.35);
+}
+.pls-table tr.pls-tr { cursor: pointer; }
+.pls-table tr.pls-tr:hover td { background: rgba(255, 255, 255, 0.04); }
+.pls-table tr.pls-tr.is-on td { background: rgba(var(--cyan-rgb), 0.14); }
 .pls-list { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 4px; max-height: 300px; overflow-y: auto; padding-right: 2px; }
 .pls-row {
   display: grid;
@@ -5292,6 +5322,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
   background: rgba(var(--cyan-rgb), 0.12);
 }
 .land-popup .lp-landuse-ico .ico { width: 11px; height: 11px; margin: 0; }
+.land-popup .lp-landuse-swatch {
+  flex: none; margin-left: auto; display: inline-flex; align-items: center;
+}
+.land-popup .lp-landuse-swatch .lp-swatch {
+  width: 22px; height: 14px; border-radius: 2px;
+}
+.land-popup .lp-landuse-swatch .qhc-sw {
+  width: 22px; height: 14px; border-radius: 2px;
+}
 .land-popup .lp-regs { display: flex; flex-direction: column; gap: 4px; }
 .land-popup .lp-reg-btn {
   display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 5px 8px;
@@ -6061,7 +6100,7 @@ body.project-review.la-page #projectReviewHost {
   #tabLayers .layer-map-pane[hidden] { display: none; }
   .legend-display { max-height: none; flex: 0 1 auto; min-height: 0; overflow: visible; }
   /* Chú giải: .legend-main là flex 1 1 0 + min-height 0. Khi #tabLegend cao theo nội dung, mục đó co về 0
-     và chỉ còn khối "Hiển thị lô đất". Thả flex như tab Lớp dữ liệu để tab con, ô tìm và ký hiệu nằm trong vùng cuộn. */
+     và chỉ còn khối viền lô / độ trong suốt. Thả flex như tab Lớp dữ liệu để tab con, ô tìm và ký hiệu nằm trong vùng cuộn. */
   #tabLegend .layer-tree,
   #tabLegend .legend-main,
   #tabLegend .layer-main-pane,
@@ -6687,7 +6726,8 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-htkt .road-net,
 #tabLegend.is-htkt .road-sections,
 #tabLegend.is-htkt .ua-legend-pane,
-#tabLegend.is-htkt .legend-extra { display: none !important; }
+#tabLegend.is-htkt .legend-extra,
+#tabLegend.is-htkt .lot-opacity-row { display: none !important; }
 #tabLegend.is-htkt #legendSector { display: block !important; }
 #legendXh { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 2px; }
 #legendXh[hidden] { display: none !important; }
@@ -6702,7 +6742,8 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-xh .road-sections,
 #tabLegend.is-xh .ua-legend-pane,
 #tabLegend.is-xh #legendSector,
-#tabLegend.is-xh .legend-extra { display: none !important; }
+#tabLegend.is-xh .legend-extra,
+#tabLegend.is-xh .lot-opacity-row { display: none !important; }
 #legendDauTu { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 2px; }
 #legendDauTu[hidden] { display: none !important; }
 #legendDauTu .layer-type-icon,
@@ -6716,7 +6757,8 @@ body.project-review.la-page #projectReviewHost {
 #tabLegend.is-dt .road-sections,
 #tabLegend.is-dt .ua-legend-pane,
 #tabLegend.is-dt #legendSector,
-#tabLegend.is-dt .legend-extra { display: none !important; }
+#tabLegend.is-dt .legend-extra,
+#tabLegend.is-dt .lot-opacity-row { display: none !important; }
 .xh-picks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 #legendXh .htkt-legend-buf-slot { flex: 0 0 16px; width: 16px; height: 16px; }
 #legendXh .btn-dot-buffer { flex: 0 0 16px; }

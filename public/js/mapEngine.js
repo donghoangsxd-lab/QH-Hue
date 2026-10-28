@@ -482,11 +482,13 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
 
 // Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
 // Lô quy hoạch / lô HT vào #planInfoSlot (phủ #planListPane), dưới brief; giữ droplist B và bốn tab cấp.
-/** Mở trục B để thẻ lô vào #planInfoSlot, không nổi che bản đồ / không ẩn hàng cấp. */
+/** Mở trục B để thẻ lô vào #planInfoSlot. Không .click() tiêu đề mag (sẽ xổ droplist A–F). */
 export function ensureQuyHoachPane() {
   const pane = document.getElementById('layerPaneQuyHoach');
   if (pane && !pane.hidden) return;
-  document.querySelector('#layerMagTrack [data-main-tab="quyhoach"]')?.click();
+  document.dispatchEvent(new CustomEvent('qh:axis-tab', {
+    detail: { id: 'quyhoach', openPanel: true, keepCamera: true }
+  }));
 }
 
 function deskPlanSlot(el) {
@@ -2262,9 +2264,11 @@ function landPopupHtml(p, opts) {
     project ? metaRow('Đồ án', project, 'lp-project-row') : '',
     place.name ? metaRow(place.label, escapeHtml(place.name)) : ''
   ].filter(Boolean).join('');
-  // Banner chức năng: bỏ khi trùng tiêu đề (tránh «Đất ở» hai lần).
-  const banner = type && title.trim().toLowerCase() !== type.trim().toLowerCase()
-    ? landUseBannerHtml(type) : '';
+  const swatchEl = `<i class="lp-swatch" style="${swatch}"></i>`;
+  const sameAsType = !!(type && title.trim().toLowerCase() === type.trim().toLowerCase());
+  // Trùng loại đất: không lặp tiêu đề; hatch nằm cuối dòng Chức năng SDĐ.
+  const titleRow = sameAsType ? '' : `<div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span></div>`;
+  const banner = landUseBannerHtml(type || title, swatchEl);
   const tip = [p.name, p.layer].filter(Boolean).join(' · ');
   const phaseHtml = phase
     ? `<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>`
@@ -2276,10 +2280,7 @@ function landPopupHtml(p, opts) {
           <span class="lp-eyebrow-label">${escapeHtml(eyebrow)}</span>
           ${phaseHtml}
         </div>
-        <div class="lp-title-row">
-          <i class="lp-swatch" style="${swatch}"></i>
-          <span class="lp-title">${escapeHtml(title)}</span>
-        </div>
+        ${titleRow}
       </div>
     </div>
     ${landCardTabsHtml('chi-tieu')}

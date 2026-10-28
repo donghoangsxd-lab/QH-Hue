@@ -150,13 +150,20 @@ export function metricGridHtml(areaText, plan) {
   ]);
 }
 
-/** Dải chức năng sử dụng đất dưới lưới chỉ tiêu (một hàng gọn). */
-export function landUseBannerHtml(type) {
+/**
+ * Dải chức năng sử dụng đất dưới lưới chỉ tiêu.
+ * swatchHtml (ô hatch TT16 / màu vùng) đặt cuối hàng khi có.
+ */
+export function landUseBannerHtml(type, swatchHtml = '') {
   const label = String(type || '').trim();
   if (!label) return '';
+  const sw = String(swatchHtml || '').trim()
+    ? `<span class="lp-landuse-swatch" aria-hidden="true">${swatchHtml}</span>`
+    : '';
   return `<div class="lp-landuse">
     <span class="lp-landuse-ico" aria-hidden="true">${ico('home')}</span>
     <span class="lp-landuse-text"><small>Chức năng SDĐ</small><b>${escapeHtml(label)}</b></span>
+    ${sw}
   </div>`;
 }
 

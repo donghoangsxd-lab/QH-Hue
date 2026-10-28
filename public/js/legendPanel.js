@@ -4,7 +4,7 @@
 // thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Chỉ hiện bộ của lớp đang bật. Mọi phần tử [data-legend-pane] hiện theo bộ đang xem.
 // Chọn lớp ở panel phải (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
 // (qhcRoads.js); 1/10.000 thêm nhóm mặt cắt ngang đường (roadSections.js).
-// + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
+// + Viền lô theo giai đoạn; thanh Độ trong suốt ở cuối khung Chú giải.
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';
 import { LEVEL_EVENT } from './mapLevel.js';
 import { renderRoadSections } from './roadSections.js';

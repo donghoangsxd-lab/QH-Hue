@@ -80,7 +80,8 @@ function setChecked(id, on) {
 
 function showLayersTab() {
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: false } }));
-  document.querySelector('[data-main-tab="quyhoach"]')?.click();
+  // Không .click() tiêu đề mag — đang đúng trục B sẽ xổ droplist A–F.
+  document.dispatchEvent(new CustomEvent('qh:axis-tab', { detail: { id: 'quyhoach', keepCamera: true } }));
 }
 
 // ---------- Lớp quy hoạch ----------
@@ -146,7 +147,10 @@ const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT', qhc10: 'QHC' };
  * QHPK / QHCT / QHC 1/10.000: lô của mọi đồ án giao vùng; thẻ liệt kê đồ án đúng cấp đó.
  * QHC 1/25.000 vẽ vùng tại khung nhìn, không giữ thẻ đồ án cấp khác.
  */
-export function applyInspectLevel(id, latlng, geom) {
+/**
+ * opts.skipProjects: bảng thửa (một thửa có thể giao nhiều đồ án) — chỉ bật cấp, không mở brief đồ án.
+ */
+export function applyInspectLevel(id, latlng, geom, opts = {}) {
   if (!id) return;
   const kind = PROJECT_KIND[id];
   if (kind || id === 'qhc25') stashInspectView();
@@ -155,7 +159,10 @@ export function applyInspectLevel(id, latlng, geom) {
     inspectSync++;
     try {
       setLevel(id, { keepView: true, fromHold: true });
-      if (id === 'qhc25') {
+      if (opts.skipProjects) {
+        setPreferPlace(id === 'qhc10' || id === 'qhc25');
+        clearProjectFocus();
+      } else if (id === 'qhc25') {
         setPreferPlace(true);
         clearProjectFocus();
       } else if (kind) {

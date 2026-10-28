@@ -753,15 +753,7 @@
           </div>
           <div id="legendDauTu" hidden></div>
           <div class="layer-map legend-display">
-            <div class="layer-map-tabs">
-              <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
-            </div>
             <div class="layer-map-pane">
-              <div class="layer-row lot-opacity-row">
-                <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
-                <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
-                <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
-              </div>
               <div class="legend-sub">Viền lô theo giai đoạn</div>
               <div class="tt16-frames">
                 <div class="tt16-row"><i class="tt16-frame tt16-frame-ht"></i><span>Hiện trạng</span></div>
@@ -821,6 +813,11 @@
               <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
             </div>
           </div>
+        </div>
+        <div class="layer-row lot-opacity-row">
+          <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
+          <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
+          <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
         </div>
         </div>
       </div>

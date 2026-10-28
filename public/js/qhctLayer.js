@@ -159,10 +159,11 @@ export async function parcelQhctHtml(geometry, recorded, place) {
   const slip = place === 'measure' || place === 'invest' || place === 'lot' ? '' : ' Sai số ranh khoảng 0,5 m.';
   return {
     html: parcelPlanHtml(res, recorded, {
-      title: `QHCT 1/500 ${w.on}`,
+      title: 'Thông tin quy hoạch:',
       noneLabel: 'Chưa có lô QHCT',
       empty: `${w.it} chưa nằm trong lô QHCT 1/500 (lô tĩnh hoặc đồ án đã nạp).`,
       place,
+      compact: place !== 'measure' && place !== 'invest',
       note: `Cắt hình học ${w.cut} với lô QHCT 1/500, kể cả khi lớp QHCT hoặc đồ án đang tắt. Đồ án nhập giữ phần chồng lên lô tĩnh.${slip}`
     }),
     shapes: res.shapes
