@@ -15,16 +15,16 @@ const cases = [
   [{ deltaMode: 0, deltaY: -39 }, 0],
   [{ deltaMode: 0, deltaY: -40 }, 1],
   [{ deltaMode: 0, deltaY: -149 }, 1],
-  [{ deltaMode: 0, deltaY: -150 }, 2],
-  [{ deltaMode: 0, deltaY: -240 }, 2],
-  [{ deltaMode: 0, deltaY: 240 }, -2],
+  [{ deltaMode: 0, deltaY: -150 }, 1],
+  [{ deltaMode: 0, deltaY: -240 }, 1],
+  [{ deltaMode: 0, deltaY: 240 }, -1],
   [{ deltaMode: 0, deltaY: -10 }, 0],
   [{ deltaMode: 1, deltaY: -1 }, 1],
   [{ deltaMode: 1, deltaY: -3 }, 1],
-  [{ deltaMode: 1, deltaY: -6 }, 2],
+  [{ deltaMode: 1, deltaY: -6 }, 1],
   [{ deltaMode: 1, deltaY: 3 }, -1],
   [{ deltaMode: 2, deltaY: -1 }, 1],
-  [{ deltaMode: 2, deltaY: 2 }, -2]
+  [{ deltaMode: 2, deltaY: 2 }, -1]
 ];
 for (const [e, n] of cases) {
   const got = wheelNotches(e);

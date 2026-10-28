@@ -164,7 +164,7 @@
         <button type="button" class="map-title-x" id="btnTitleDismiss" title="Ẩn tiêu đề" aria-label="Ẩn tiêu đề"><svg class="ico"><use href="#i-close"/></svg></button>
       </div>
       <div class="map-title-split" role="radiogroup" aria-label="Kiểu so sánh">
-        <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Cùng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Cùng tâm</button>
+        <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Đồng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Đồng tâm</button>
         <button type="button" class="map-title-seg" data-split-kind="offset" role="radio" aria-checked="false" title="Lệch tâm: hiện trạng ở giữa nửa trái, quy hoạch ở giữa nửa phải"><svg class="ico"><use href="#i-split-offset"/></svg>Lệch tâm</button>
       </div>
       <div class="map-title-progress done" id="titleProgress" role="progressbar" aria-hidden="true" aria-label="Tiến độ tải bản đồ" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
@@ -293,7 +293,13 @@
           </div>
         </div>
       </div>
-      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="Chia đôi màn hình. Bật rồi chọn từng bên: hiện trạng, quy hoạch, hoặc một cấp quy hoạch" aria-label="Chia đôi màn hình so sánh" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
+      <div class="tb-compare-pick" id="tbComparePick">
+        <button type="button" class="ui-btn-format" id="btnToggleCompare" title="Chia đôi màn hình: chọn Đồng tâm hoặc Lệch tâm. Đang bật thì bấm lại để tắt" aria-label="Chia đôi màn hình so sánh" aria-haspopup="menu" aria-expanded="false" aria-controls="compareChooser" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
+        <div class="tb-chooser tb-compare-chooser" id="compareChooser" role="menu" hidden>
+          <button type="button" role="menuitemradio" data-split-kind="same" aria-checked="true" title="Hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Đồng tâm</button>
+          <button type="button" role="menuitemradio" data-split-kind="offset" aria-checked="false" title="Hiện trạng giữa nửa trái, quy hoạch giữa nửa phải"><svg class="ico"><use href="#i-split-offset"/></svg>Lệch tâm</button>
+        </div>
+      </div>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnPropose" title="Đề xuất điểm mới hoặc nhập dữ liệu" aria-label="Đề xuất" aria-pressed="false" aria-controls="tabAdd"><svg class="ico"><use href="#i-plus"/></svg></button>

@@ -48,6 +48,9 @@ const landChunk = engine.slice(engine.indexOf('function landPopupHtml'), engine.
 if (landChunk.includes('point3dButton') || landChunk.includes('pp-3d') || landChunk.includes('Xem 3D')) {
   throw new Error('thẻ lô đất vẫn còn nút Xem 3D');
 }
+if (!landChunk.includes('metricGridHtml') || !landChunk.includes('landCardTabsHtml') || !landChunk.includes('regulationsPaneHtml')) {
+  throw new Error('thẻ lô đất thiếu lưới 2×2 hoặc tab Chỉ tiêu/Quy định');
+}
 if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (nút chữ bán kính/3D)');
 const infraTools = engine.includes('onAnalyze: canAnalyze ? runAnalysis : null')
   && engine.includes('buildup: !!lotGeom');
@@ -73,5 +76,8 @@ if (!ui.includes('không nút «Xem 3D»') || !ui.includes('bán kính phục v�
 }
 if (!ui.includes('gạch chéo đỏ') || !ui.includes('không tính vào mật độ')) {
   throw new Error('ui-spec thiếu mô tả cắt chân công trình ngoài ranh');
+}
+if (!ui.includes('hai tab «Chỉ tiêu» và «Quy định»') || !ui.includes('lưới 2×2')) {
+  throw new Error('ui-spec thiếu mô tả tab và lưới chỉ tiêu thẻ lô');
 }
 console.log('ok', vin);

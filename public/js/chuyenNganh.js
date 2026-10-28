@@ -2,8 +2,9 @@
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
 import { map, focusWard, clearWardHighlight, centerOnCity, getLeftObstruction, getRightObstruction } from './mapEngine.js';
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
-import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
+import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
+import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
 import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel } from './projectLayer.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -1330,15 +1331,30 @@ function setUrbanLayer(on) {
   urban.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+/** Trục A + chia đôi: lớp Hệ thống đô thị, tắt QHC, cặp HT|QH (trái hiện trạng / phải quy hoạch). */
+function applyAdminUrbanSplit(on) {
+  if (!adminMapOn) return;
+  if (on) {
+    setLevel('urban', { keepView: true });
+    showUrbanPlanOnBase(false);
+    setClassicSplitSides();
+    return;
+  }
+  showUrbanPlanOnBase(adminColumn === 'QH');
+}
+
 function enterAdminMap() {
   if (adminViewHold == null) adminViewHold = getViewMode();
   adminMapOn = true;
   adminColumn = 'HT';
   if (getViewMode() !== 'HT') setViewMode('HT');
-  showUrbanPlanOnBase(false);
   const urban = document.getElementById('chk_urban');
   if (urban && adminUrbanHeld == null) adminUrbanHeld = urban.checked;
-  setUrbanLayer(true);
+  // setLevel('urban') tắt QHC 1/25.000 (và các cấp QH khác) đang bị giữ từ trục B.
+  setLevel('urban', { keepView: true });
+  if (isSplitOn()) applyAdminUrbanSplit(true);
+  else showUrbanPlanOnBase(false);
+  refreshSplitPair();
 }
 
 function leaveAdminMap() {
@@ -1351,6 +1367,7 @@ function leaveAdminMap() {
   adminViewHold = null;
   if (back && back !== getViewMode()) setViewMode(back);
   else paintViewSwitch();
+  refreshSplitPair();
 }
 
 function placeIsoRadius(axis) {
@@ -1488,7 +1505,8 @@ export function initChuyenNganh() {
       if (browseState().axis === 'hanhchinh') {
         adminColumn = mode;
         if (getViewMode() !== 'HT') setViewMode('HT');
-        showUrbanPlanOnBase(mode === 'QH');
+        // Đang chia đôi: giữ cặp đô thị HT|QH trên hai bản đồ; cột HT/QH chỉ đổi danh sách.
+        showUrbanPlanOnBase(mode === 'QH' && !isSplitOn());
         paintViewSwitch();
         return;
       }
@@ -1835,11 +1853,20 @@ export function initChuyenNganh() {
     paintXahoiList();
     applyLayerQuery();
   });
-  onViewChange(({ view }) => {
+  onViewChange(({ view, split }) => {
+    if (adminMapOn && split) {
+      applyAdminUrbanSplit(true);
+      paintViewSwitch();
+      return;
+    }
+    if (adminMapOn && !split) {
+      applyAdminUrbanSplit(false);
+    }
     if (adminMapOn && view === 'QH') {
       adminColumn = 'QH';
       setViewMode('HT');
-      showUrbanPlanOnBase(true);
+      showUrbanPlanOnBase(!isSplitOn());
+      paintViewSwitch();
       return;
     }
     paintViewSwitch();

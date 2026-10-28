@@ -6,7 +6,7 @@
 import { ico, showToast, escapeHtml, fmtNum, fmtPct, detailDisclosure } from './utils.js';
 import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
-import { planMap, getViewMode, isSplitOn } from './planMap.js';
+import { planMap, getViewMode, isSplitOn, setSplit } from './planMap.js';
 import { openIntroTour } from './introTour.js';
 import { qhpkCoverRows } from './qhpkCover.js';
 import { floodReport } from './floodSim.js';
@@ -375,11 +375,11 @@ const SECTIONS = [
         steps: [
           'Nút lật trang ở đầu thanh tiêu đề (giữa phía trên) chuyển <b>BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</b> sang bản đồ hiện trạng và ngược lại.',
           'Mở panel phải, hàng <b>Lớp đang xem</b> chọn: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
-          'Thanh công cụ trái, bấm nút <b>Chia đôi màn hình so sánh</b>. Trên tiêu đề chọn <b>Cùng tâm</b> hoặc <b>Lệch tâm</b>.',
-          '<b>Cùng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Bấm lại nút chia đôi để tắt.'
+          'Thanh công cụ phải, bấm nút <b>Chia đôi màn hình</b> rồi chọn <b>Đồng tâm</b> hoặc <b>Lệch tâm</b>.',
+          '<b>Đồng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Trên trục A, chia đôi tự so sánh hệ thống đô thị hiện trạng và quy hoạch. Bấm lại nút chia đôi để tắt.'
         ],
-        facts: ['Mỗi bên chia đôi chọn được lớp ở hai danh sách trên panel phải.'],
-        actions: [{ label: 'Bật chia đôi màn hình', icon: 'compare', run: () => pressTool('btnToggleCompare', b => b.getAttribute('aria-pressed') === 'true') }]
+        facts: ['Trên trục Quy hoạch, mỗi bên chia đôi chọn được lớp ở hai danh sách trên panel.'],
+        actions: [{ label: 'Bật chia đôi màn hình', icon: 'compare', run: () => { if (!isSplitOn()) setSplit(true); flash($('btnToggleCompare')); } }]
       },
       {
         id: 'tools', btn: 'guide', status: 'trial',

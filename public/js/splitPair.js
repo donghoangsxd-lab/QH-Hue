@@ -2,8 +2,10 @@
 // chia đôi cũ. Hai danh sách trong panel Quy hoạch chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
 // QH (hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên
 // bị loại khỏi danh sách bên kia. Đổi cấp không đụng ô lớp ở panel.
+// Trục A (Quản lý phát triển đô thị): khóa cặp hiện trạng | quy hoạch và nhãn hệ thống đô thị; không chọn cấp QHC.
 import { isSplitOn, onViewChange, planMap } from './planMap.js';
 import { LEVELS } from './mapLevel.js';
+import { browseState } from './facetStore.js';
 
 export const SPLIT_PAIR_EVENT = 'qh:split-pair';
 
@@ -15,6 +17,7 @@ export const PAIR_OPTIONS = [
 
 const KEY = 'qh_split_pair';
 const CLASSIC_TITLE = 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ';
+const ADMIN_URBAN_TITLE = 'SO SÁNH HỆ THỐNG ĐÔ THỊ HIỆN TRẠNG – QUY HOẠCH';
 const byId = new Map(PAIR_OPTIONS.map(o => [o.id, o]));
 let leftMap = null;
 let sides = { left: 'ht', right: 'qh' };
@@ -25,8 +28,14 @@ export const getSplitSides = () => ({ left: sides.left, right: sides.right });
 export const pairOption = (id) => byId.get(id) || null;
 export const pairLabel = (id) => byId.get(id)?.label || '';
 
+/** Trục A đang chia đôi: so sánh phân loại đô thị HT | QH, không chọn cấp QHC. */
+export function isAdminUrbanSplit() {
+  return isSplitOn() && browseState().axis === 'hanhchinh';
+}
+
 /** true khi chia đôi và ít nhất một bên không còn là cặp hiện trạng | quy hoạch công trình */
 export function isLevelPair() {
+  if (isAdminUrbanSplit()) return false;
   return isSplitOn() && (sides.left !== 'ht' || sides.right !== 'qh');
 }
 
@@ -74,6 +83,7 @@ function saveSides() {
 }
 
 export function setSplitSide(which, id) {
+  if (isAdminUrbanSplit()) return;
   const other = which === 'left' ? sides.right : sides.left;
   if ((which !== 'left' && which !== 'right') || !byId.has(id) || id === other || sides[which] === id) return;
   sides = { ...sides, [which]: id };
@@ -82,26 +92,46 @@ export function setSplitSide(which, id) {
   emit();
 }
 
+/** Ép cặp hiện trạng | quy hoạch (dùng khi trục A bật chia đôi). */
+export function setClassicSplitSides() {
+  if (sides.left === 'ht' && sides.right === 'qh') {
+    paint();
+    return;
+  }
+  sides = { left: 'ht', right: 'qh' };
+  saveSides();
+  paint();
+  emit();
+}
+
+export function refreshSplitPair() {
+  paint();
+}
+
 function paint() {
   const box = document.getElementById('levelSplit');
   const on = isSplitOn();
-  if (box) box.hidden = !on;
+  const adminUrban = isAdminUrbanSplit();
+  if (box) box.hidden = !on || adminUrban;
   const label = document.getElementById('levelHostQhLabel');
-  if (label) label.textContent = on ? 'Lớp mỗi bên' : 'Cấp quy hoạch';
+  if (label) label.textContent = on && !adminUrban ? 'Lớp mỗi bên' : 'Cấp quy hoạch';
   document.body.classList.toggle('level-pair', isLevelPair());
+  document.body.classList.toggle('admin-urban-split', adminUrban);
   ['left', 'right'].forEach(which => {
     const sel = document.getElementById(which === 'left' ? 'splitSideLeft' : 'splitSideRight');
     if (sel) fillSelect(sel, which);
   });
   const leftLabel = document.querySelector('.swipe-label-left');
   const rightLabel = document.querySelector('.swipe-label-right');
-  if (leftLabel) leftLabel.textContent = byId.get(sides.left)?.swipe || '';
-  if (rightLabel) rightLabel.textContent = byId.get(sides.right)?.swipe || '';
+  if (leftLabel) leftLabel.textContent = adminUrban ? 'ĐÔ THỊ HIỆN TRẠNG' : (byId.get(sides.left)?.swipe || '');
+  if (rightLabel) rightLabel.textContent = adminUrban ? 'ĐÔ THỊ QUY HOẠCH' : (byId.get(sides.right)?.swipe || '');
   const text = document.getElementById('mapTitleText');
   if (text && on) {
-    const title = isLevelPair()
-      ? `SO SÁNH ${pairLabel(sides.left)} – ${pairLabel(sides.right)}`
-      : CLASSIC_TITLE;
+    const title = adminUrban
+      ? ADMIN_URBAN_TITLE
+      : (isLevelPair()
+        ? `SO SÁNH ${pairLabel(sides.left)} – ${pairLabel(sides.right)}`
+        : CLASSIC_TITLE);
     text.textContent = title;
     text.title = title;
   }

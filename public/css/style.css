@@ -929,6 +929,20 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 .tb-phone-pick { display: none; }
+.tb-compare-pick { position: relative; display: flex; flex: 0 0 var(--tb-btn); width: var(--tb-btn); }
+.tb-compare-pick .ui-btn-format { width: 100%; height: var(--tb-btn); }
+.tb-chooser {
+  position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 148px; padding: 4px;
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow);
+}
+.tb-chooser[hidden] { display: none !important; }
+.tb-chooser button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--text-strong); font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer;
+}
+.tb-chooser button .ico { width: 1.1em; height: 1.1em; flex: none; }
+.tb-chooser button:hover, .tb-chooser button:focus-visible { background: var(--bg-hover); outline: none; }
+.tb-chooser button[aria-checked="true"] { color: var(--accent-cyan); font-weight: 700; }
 .tb-rotate { display: none; }
 .tb-scroll { display: contents; }
 .install-app, .install-guide { display: none; }
@@ -1169,99 +1183,107 @@ body.right-collapsed .right-panel {
   flex-direction: column;
   overflow: hidden;
 }
-/* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief phía trên. */
+/* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief / bốn tab cấp / droplist B. */
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
-@media (min-width: 841px) {
-  /* Brief luôn trên vùng danh sách / bảng lô — không để absolute của #planInfoSlot đè lên. */
-  body.plan-brief-open #planBriefSlot {
-    display: block;
-    position: relative;
-    z-index: 4;
-    flex: 0 0 auto;
-    max-height: min(42%, 280px);
-    min-height: 0;
-    overflow: auto;
-    margin: 2px 0 6px;
-  }
-  body.plan-brief-open #planBriefSlot > .project-brief {
-    position: relative !important;
-    inset: auto !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: auto !important;
-    max-width: none !important;
-    max-height: none !important;
-    margin: 0;
-    z-index: auto;
-    box-shadow: var(--panel-shadow);
-  }
-  body.plan-info-open #planListPane {
-    z-index: 1;
-  }
-  body.plan-info-open #planListPane > :not(#planInfoSlot) {
-    visibility: hidden;
-    pointer-events: none;
-  }
-  body.plan-info-open #planInfoSlot {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    overflow: hidden;
-    padding: 0;
-    box-sizing: border-box;
-    background: transparent;
-  }
-  /* Đồng bộ khung brief: viền cam đều 4 cạnh, bo góc; full bề ngang slot (không dải tối mép). */
-  body.plan-info-open #planInfoSlot > .cad-card,
-  body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
-    position: relative !important;
-    inset: auto !important;
-    top: auto !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: auto !important;
-    width: 100% !important;
-    max-width: none !important;
-    max-height: none !important;
-    height: auto;
-    flex: 1 1 auto;
-    align-self: stretch;
-    min-width: 0;
-    min-height: 0;
-    margin: 0 !important;
-    transform: none !important;
-    border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
-    border-radius: var(--r-lg) !important;
-    box-shadow: var(--panel-shadow) !important;
-    background: var(--bg-dark) !important;
-    z-index: auto;
-    overflow: hidden;
-  }
-  body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100% !important;
-    display: flex;
-    flex-direction: column;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-  body.plan-info-open #planInfoSlot .cad-page,
-  body.plan-info-open #planInfoSlot .leaflet-popup-content {
-    max-height: none !important;
-    width: auto !important;
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
+/* Mọi cỡ màn hình: brief + bảng lô trong trục Quy hoạch (không dùng phone-info-dock che hàng cấp). */
+body.plan-brief-open #axisQuyHoach,
+body.plan-info-open #axisQuyHoach,
+body.plan-brief-open #layerPaneQuyHoach,
+body.plan-info-open #layerPaneQuyHoach {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+body.plan-brief-open #planBriefSlot {
+  display: block;
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  max-height: min(42%, 280px);
+  min-height: 0;
+  overflow: auto;
+  margin: 2px 0 6px;
+}
+body.plan-brief-open #planBriefSlot > .project-brief {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0;
+  z-index: auto;
+  box-shadow: var(--panel-shadow);
+}
+body.plan-info-open #planListPane {
+  z-index: 1;
+}
+body.plan-info-open #planListPane > :not(#planInfoSlot) {
+  visibility: hidden;
+  pointer-events: none;
+}
+body.plan-info-open #planInfoSlot {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  padding: 0;
+  box-sizing: border-box;
+  background: transparent;
+}
+/* Đồng bộ khung brief: viền cam đều 4 cạnh, bo góc; full bề ngang slot (không dải tối mép). */
+body.plan-info-open #planInfoSlot > .cad-card,
+body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  height: auto;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  transform: none !important;
+  border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--panel-shadow) !important;
+  background: var(--bg-dark) !important;
+  z-index: auto;
+  overflow: hidden;
+}
+body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100% !important;
+  display: flex;
+  flex-direction: column;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+body.plan-info-open #planInfoSlot .cad-page,
+body.plan-info-open #planInfoSlot .leaflet-popup-content {
+  max-height: none !important;
+  width: auto !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .leaflet-qhpkOverlap-pane,
 .leaflet-qhpkOverlap-pane canvas { pointer-events: none; }
@@ -4239,10 +4261,13 @@ table.ward-table th {
 .dock-card .pp-row > :first-child { white-space: normal; line-height: 1.25; }
 .dock-card .lp-head { gap: 6px; }
 .dock-card .lp-swatch { width: 22px; height: 22px; }
+.dock-card .land-popup-card .lp-swatch { width: 16px; height: 16px; }
 .dock-card .lp-stats { gap: 4px; margin-top: 6px; }
 .dock-card .lp-stat { padding: 4px; }
 .dock-card .lp-stat b { font-size: var(--fs-md); }
 .dock-card .lp-info { margin-top: 6px; gap: 2px 8px; font-size: var(--fs-sm); }
+.dock-card .land-popup-card .lp-info { margin-top: 5px; gap: 2px 8px; font-size: 11px; }
+.dock-card .land-popup-card .lp-title { font-size: 13px; }
 .dock-card .sug-card { padding: 4px 6px; margin-top: 3px; }
 .dock-card .pp-section { margin-top: 6px; font-size: var(--fs-sm); }
 .leaflet-popup.dock-card.pp-collapsed {
@@ -5126,30 +5151,110 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
   outline-offset: 2px;
 }
 
-/* Popup ranh đất đồ án (sheet DXF-NN): đầu = ô ký hiệu + mã lô + loại đất, 3 ô chỉ tiêu tối đa, bảng thông tin */
-.land-lot-popup .leaflet-popup-content { margin: 12px 14px 10px; }
-.land-popup { font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.3; }
-/* Thẻ ghim dùng cỡ --fs-sm; bảng lô trong panel giữ cỡ hàng trục. */
+/* Popup ranh đất đồ án: đầu thẻ + tab + lưới 2×2 — mật độ gần hàng trục / brief */
+.land-lot-popup .leaflet-popup-content { margin: 8px 10px 8px; }
+.land-popup { font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.25; }
 .dock-card .land-popup { font-size: var(--axis-fs-row); }
 .dock-card .land-popup .lp-title { font-size: 13px; }
-.dock-card .land-popup .lp-info { font-size: 12px; }
+.dock-card .land-popup .lp-info { font-size: 11px; }
 .dock-card .land-popup .pp-row > :first-child { white-space: nowrap; }
-.lp-head { display: flex; align-items: center; gap: 8px; padding: 0 22px 6px 0; border-bottom: 1px solid var(--border-soft); }
+.lp-head { display: flex; align-items: center; gap: 6px; padding: 0 22px 5px 0; border-bottom: 1px solid var(--border-soft); }
 .land-lot-popup.pp-editable .lp-head { padding-right: 68px; }
 .land-lot-popup.pp-collapsible .lp-head { padding-right: 46px; }
 .land-lot-popup.pp-collapsible.pp-editable .lp-head { padding-right: 94px; }
-.lp-swatch { flex: none; width: 22px; height: 22px; border-radius: var(--r-sm); border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+.lp-swatch { flex: none; width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
 .lp-head-main { flex: 1 1 auto; min-width: 0; }
-/* Mã lô + nhãn giai đoạn một hàng; tên dài thì cắt, không xuống dòng. */
-.lp-title-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
-.lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.land-popup .lp-title { font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; }
-.lp-sub { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
-.land-popup .lp-kind { margin-top: 1px; color: var(--accent-orange); font-size: 12px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lp-phase { flex: none; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
-.land-popup .lp-phase { padding: 0 6px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.lp-eyebrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-bottom: 2px; min-width: 0; }
+.lp-eyebrow-label {
+  flex: 1 1 auto; min-width: 0; color: var(--accent-cyan); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-title-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; min-width: 0; }
+.lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.land-popup .lp-title { font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.2; }
+.lp-sub { margin-top: 1px; color: var(--text-muted); font-size: var(--fs-sm); }
+.land-popup .lp-kind { margin-top: 1px; color: var(--accent-orange); font-size: 11px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-phase { flex: none; padding: 0 5px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; line-height: 1.4; }
+.land-popup .lp-phase { padding: 0 5px; font-size: 10px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 .lp-phase-qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); border: 1px solid rgba(var(--orange-rgb), 0.4); }
 .lp-phase-ht { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); border: 1px solid rgba(var(--green-rgb), 0.4); }
+.land-popup .lp-tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 5px 0 0; padding: 2px;
+  border-radius: 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-soft);
+}
+.land-popup .lp-tab {
+  margin: 0; padding: 4px 6px; border: 0; border-radius: 4px; background: transparent;
+  color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 600; line-height: 1.2; cursor: pointer;
+}
+.land-popup .lp-tab.is-on {
+  color: #fff; background: rgba(255, 255, 255, 0.1);
+}
+.land-popup .lp-tab:hover:not(.is-on) { color: var(--text-main); }
+.land-popup .lp-pane { margin-top: 6px; }
+.land-popup .lp-pane[hidden] { display: none !important; }
+.land-popup-card .lp-spec { margin-top: 3px; font-size: 10px; line-height: 1.2; }
+.land-popup .lp-metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+}
+.land-popup .lp-metric {
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 6px;
+  border-radius: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft);
+}
+.land-popup .lp-metric-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px;
+}
+.land-popup .lp-metric-ico .ico { width: 12px; height: 12px; margin: 0; }
+.land-popup .lp-metric-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.land-popup .lp-metric-body small {
+  color: var(--text-muted); font-size: 9px; font-weight: 600; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.land-popup .lp-metric-body b {
+  color: #fff; font-size: 12px; font-weight: 700; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.land-popup .lp-metric-area .lp-metric-ico { color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.14); }
+.land-popup .lp-metric-cover .lp-metric-ico { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); }
+.land-popup .lp-metric-floors .lp-metric-ico { color: var(--accent-purple); background: rgba(var(--purple-rgb), 0.14); }
+.land-popup .lp-metric-far .lp-metric-ico { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); }
+.land-popup .lp-landuse {
+  display: flex; align-items: center; gap: 6px; margin-top: 5px; padding: 4px 7px;
+  border-radius: 6px; background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(var(--cyan-rgb), 0.22);
+}
+.land-popup .lp-landuse-text {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; align-items: baseline; gap: 5px;
+}
+.land-popup .lp-landuse-text small {
+  flex: none; color: var(--text-muted); font-size: 9px; font-weight: 600; white-space: nowrap;
+}
+.land-popup .lp-landuse-text b {
+  flex: 1 1 auto; min-width: 0; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.land-popup .lp-landuse-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px; color: var(--accent-cyan);
+  background: rgba(var(--cyan-rgb), 0.12);
+}
+.land-popup .lp-landuse-ico .ico { width: 11px; height: 11px; margin: 0; }
+.land-popup .lp-regs { display: flex; flex-direction: column; gap: 4px; }
+.land-popup .lp-reg-btn {
+  display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 5px 8px;
+  border: 1px solid var(--border-soft); border-radius: 6px; background: rgba(255, 255, 255, 0.04);
+  color: #fff; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer;
+}
+.land-popup .lp-reg-btn:hover { border-color: rgba(var(--orange-rgb), 0.45); background: rgba(var(--orange-rgb), 0.1); }
+.land-popup .lp-reg-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 4px; color: var(--accent-orange);
+  background: rgba(var(--orange-rgb), 0.12);
+}
+.land-popup .lp-reg-ico .ico { width: 12px; height: 12px; margin: 0; }
+.land-popup .lp-reg-label { flex: 1 1 auto; min-width: 0; }
+.land-popup .lp-reg-go { flex: none; color: var(--text-muted); font-weight: 700; font-size: 11px; }
+.land-popup .lp-reg-empty { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.3; }
 .lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
 .lp-stat { padding: 6px 8px; border-radius: var(--r-md); background: rgba(var(--cyan-rgb), 0.07); border: 1px solid rgba(var(--cyan-rgb), 0.22); text-align: center; }
 .lp-stat .ico { display: inline-block; width: 17px; height: 17px; margin-right: 4px; vertical-align: -2px; color: var(--accent-cyan); opacity: 0.9; filter: drop-shadow(0 0 3px rgba(var(--cyan-rgb), 0.45)); }
@@ -5172,8 +5277,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .land-popup .lp-spec-note { font-size: 12px; font-style: normal; font-weight: 600; }
 .land-popup .lp-limits { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
 .land-popup .lp-limit { white-space: nowrap; }
-.land-popup .lp-meta { margin-top: 8px; font-size: 12px; line-height: 1.35; }
+.land-popup .lp-meta { margin-top: 5px; font-size: 11px; line-height: 1.25; }
 .land-popup .lp-meta:empty { display: none; }
+.land-popup-card .lp-info { gap: 2px 8px; margin-top: 5px; }
 .land-popup .lp-project-row > b { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; font-weight: 600; }
 .land-popup .lp-project-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .land-popup .lp-dossier {

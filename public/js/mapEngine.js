@@ -35,6 +35,7 @@ import { bindNotchZoom } from './wheelZoom.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 import {
   expandPlanWords, projectFullName, placeField, lotHeading, limitsHtml, projectValueHtml,
+  metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml, bindLandCardTabs,
   pointToken, landToken, parseLotToken
 } from './lotPopup.js';
 
@@ -72,9 +73,10 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 10;
 // Bao ranh 40 phường xã (ward-boundary.json). Không thu về nội đô.
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
-// Khung Việt Nam (lục địa + Hoàng Sa, Trường Sa). Cấm kéo/phóng ra ngoài.
-const VN_BOUNDS = [[5.5, 100.5], [24.5, 119.0]];
-const MAP_MIN_ZOOM = 5;
+// Khung kéo: Thành phố Huế (khớp HUE_BOUNDS). Không mở ra toàn Việt Nam.
+const MAP_BOUNDS = [[15.9, 106.9], [16.9, 108.3]];
+// Sàn khởi tạo; centerOnCity nâng minZoom lên mức vừa cả thành phố theo kích thước màn hình.
+const MAP_MIN_ZOOM = 8;
 // Khoảng trống hai bên ranh: thành phố chiếm khoảng 84% cạnh hạn chế của khung nhìn.
 // Mức phóng nguyên bỏ qua khoảng giữa 10 và 11, khung không vừa vành thành phố.
 const CITY_FRAME_SLACK = 0.16;
@@ -229,7 +231,7 @@ export function initMap() {
     renderer: L.canvas(),
     minZoom: MAP_MIN_ZOOM,
     maxZoom: MAP_MAX_ZOOM,
-    maxBounds: L.latLngBounds(VN_BOUNDS),
+    maxBounds: L.latLngBounds(MAP_BOUNDS),
     maxBoundsViscosity: 1.0,
     touchZoom: true
   }).setView(frame.getCenter(), CITY_ZOOM);
@@ -479,14 +481,20 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
 }
 
 // Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
-// Lô quy hoạch và lô nhóm hạ tầng trên máy tính vào #planInfoSlot (phủ #planListPane). Còn lại nổi trên bản đồ.
+// Lô quy hoạch / lô HT vào #planInfoSlot (phủ #planListPane), dưới brief; giữ droplist B và bốn tab cấp.
+/** Mở trục B để thẻ lô vào #planInfoSlot, không nổi che bản đồ / không ẩn hàng cấp. */
+function ensureQuyHoachPane() {
+  const pane = document.getElementById('layerPaneQuyHoach');
+  if (pane && !pane.hidden) return;
+  document.querySelector('#layerMagTrack [data-main-tab="quyhoach"]')?.click();
+}
+
 function deskPlanSlot(el) {
   if (!el || el.classList.contains('adj-lot-popup')) return null;
   if (!el.classList.contains('land-lot-popup') && !el.classList.contains('infra-popup')) return null;
   const slot = document.getElementById('planInfoSlot');
   const pane = document.getElementById('layerPaneQuyHoach');
-  const phone = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches;
-  if (phone || !slot || !pane || pane.hidden) return null;
+  if (!slot || !pane || pane.hidden) return null;
   return slot;
 }
 
@@ -555,6 +563,7 @@ function cityFramePadding() {
 }
 
 // Mức phóng lẻ để ranh vừa khung. getBoundsZoom của Leaflet chỉ trả số nguyên.
+// Không kẹp theo getMinZoom() hiện tại để resize màn hình lớn hơn vẫn hạ được sàn phóng.
 function cityFrameZoom(bounds, padding) {
   const size = map.getSize().subtract(padding);
   if (size.x < 32 || size.y < 32) return null;
@@ -565,7 +574,7 @@ function cityFrameZoom(bounds, padding) {
   if (!(bw > 0) || !(bh > 0)) return null;
   const z = Math.min(Math.log2(size.x / bw), Math.log2(size.y / bh));
   if (!Number.isFinite(z)) return null;
-  return Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), z));
+  return Math.max(MAP_MIN_ZOOM, Math.min(map.getMaxZoom(), z));
 }
 
 // Thấy trọn ranh thành phố trong phần bản đồ không bị cột nút che. Bản đồ quy hoạch (đang hiện khi mở trang) nhận cùng khung.
@@ -575,6 +584,9 @@ export function centerOnCity(options = { animate: false }) {
   const { tl, br } = cityFramePadding();
   const zoom = cityFrameZoom(bounds, tl.add(br));
   if (zoom == null) return;
+  // Zoom out tối đa = vừa cả thành phố; đồng bộ bản đồ quy hoạch (so sánh).
+  map.setMinZoom(zoom);
+  if (planMap) planMap.setMinZoom(zoom);
   const offset = br.subtract(tl).divideBy(2);
   const sw = map.project(bounds.getSouthWest(), zoom);
   const ne = map.project(bounds.getNorthEast(), zoom);
@@ -2228,7 +2240,12 @@ function landPopupHtml(p, opts) {
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
   const title = lotHeading(p.name || p.layer || type, code, type) || type;
   const place = placeField(p.ward);
-  const project = opts?.hideProject ? '' : projectValueHtml(p.file, catalogEntry(p.file));
+  const entry = opts?.hideProject ? null : catalogEntry(p.file);
+  const projectName = opts?.hideProject ? '' : projectFullName(p.file);
+  const project = projectName
+    ? `<span class="lp-project-name" title="${escapeHtml(projectName)}">${escapeHtml(projectName)}</span>`
+    : '';
+  const areaText = p.area ? `${fmtNum(Math.round(p.area))} m²` : '';
   const stamp = p.stampArea && p.area && Math.abs(p.stampArea - p.area) / p.area > 0.1
     ? `<div class="lp-spec"><span class="lp-spec-k">Diện tích trên tem</span><b>${fmtNum(Math.round(p.stampArea))} m²</b></div>` : '';
   const rows = [
@@ -2236,17 +2253,30 @@ function landPopupHtml(p, opts) {
     place.name ? metaRow(place.label, escapeHtml(place.name)) : ''
   ].filter(Boolean).join('');
   const tip = [p.name, p.layer].filter(Boolean).join(' · ');
-  return `<div class="pp land-popup">
+  return `<div class="pp land-popup land-popup-card">
     <div class="pp-title lp-head" title="${escapeHtml(tip)}">
-      <i class="lp-swatch" style="${swatch}"></i>
       <div class="lp-head-main">
-        <div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span><span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span></div>
-        ${type ? `<div class="lp-kind">${escapeHtml(type)}</div>` : ''}
+        <div class="lp-eyebrow">
+          <span class="lp-eyebrow-label">Quy hoạch chi tiết</span>
+          <span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>
+        </div>
+        <div class="lp-title-row">
+          <i class="lp-swatch" style="${swatch}"></i>
+          <span class="lp-title">${escapeHtml(title)}</span>
+        </div>
       </div>
     </div>
-    <div class="lp-specs">${areaSpecHtml(p.area ? `${fmtNum(Math.round(p.area))} m²` : '', '', '')}${stamp}${lotStatsHtml(p.plan)}</div>
-    ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
-    ${lotBuildupSlotHtml()}
+    ${landCardTabsHtml('chi-tieu')}
+    <div class="lp-pane is-on" data-lp-pane="chi-tieu" role="tabpanel">
+      ${metricGridHtml(areaText, p.plan)}
+      ${stamp}
+      ${landUseBannerHtml(type)}
+      ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
+      ${lotBuildupSlotHtml()}
+    </div>
+    <div class="lp-pane" data-lp-pane="quy-dinh" role="tabpanel" hidden>
+      ${regulationsPaneHtml(entry)}
+    </div>
   </div>`;
 }
 
@@ -2512,6 +2542,8 @@ function bindDossier(popup, projectName) {
 }
 
 function openLandPopup(p, m, opts) {
+  // Thẻ lô trong panel B (#planInfoSlot dưới brief), giữ bốn tab cấp — mọi cỡ màn hình.
+  ensureQuyHoachPane();
   // hideProject (menu «Xem thông tin lô»): chỉ thẻ lô, không đổi bảng đồ án (ui-spec).
   if (!opts?.hideProject) syncFocusedProjectToLot(p.file);
   if (reuseLandInfo(p, m, opts)) return;
@@ -2526,6 +2558,7 @@ function openLandPopup(p, m, opts) {
     title: lotHeading(p.name || '', p.lotCode || landCode(p), ''),
     buildup: true
   });
+  bindLandCardTabs(popup.getElement());
   if (!opts?.hideProject) bindDossier(popup, p.file);
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   trackLandInfo(popup, p, m, opts);

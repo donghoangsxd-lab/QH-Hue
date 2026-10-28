@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   expandPlanWords, projectFullName, placeField, lotHeading, limitItems, limitsHtml,
+  metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml,
   dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken
 } from '../public/js/lotPopup.js';
 
@@ -41,6 +42,31 @@ assert.equal(limits[1].text, '≤ 5%');
 const html = limitsHtml({ floors: 1, coverage: 5 });
 assert.equal((html.match(/class="lp-limit"/g) || []).length, 2);
 assert.doesNotMatch(html, /Mật độ XD|SDĐ/);
+
+const grid = metricGridHtml('120 m²', { floors: 4, coverage: 60, far: 2.4 });
+assert.equal((grid.match(/class="lp-metric /g) || []).length, 4);
+assert.match(grid, /Diện tích/);
+assert.match(grid, /Mật độ XD/);
+assert.match(grid, /Chiều cao tối đa/);
+assert.match(grid, /Hệ số sử dụng/);
+assert.match(grid, /120 m²/);
+assert.match(grid, /≤ 60%/);
+assert.match(grid, /≤ 4 tầng/);
+assert.match(grid, /≤ 2,4 lần/);
+assert.doesNotMatch(grid, /lp-metric-far[\s\S]*?—/);
+const emptyGrid = metricGridHtml('', null);
+assert.equal((emptyGrid.match(/—/g) || []).length, 4);
+assert.match(landUseBannerHtml('Đất ở đô thị'), /Chức năng SDĐ/);
+assert.match(landUseBannerHtml('Đất ở đô thị'), /Đất ở đô thị/);
+assert.equal(landUseBannerHtml(''), '');
+const tabs = landCardTabsHtml();
+assert.match(tabs, /data-lp-tab="chi-tieu"/);
+assert.match(tabs, /data-lp-tab="quy-dinh"/);
+assert.match(regulationsPaneHtml(null), /Chưa gắn quy định/);
+assert.doesNotMatch(regulationsPaneHtml(null), /Tab này sẽ mở/);
+const regs = regulationsPaneHtml({ slug: 'da', docs: [{ role: 'quy-dinh', id: '1', at: 2 }] });
+assert.match(regs, /data-dossier="quy-dinh"/);
+assert.doesNotMatch(regs, /lp-reg-hint|Tab này sẽ mở/);
 
 assert.deepEqual(dossierButtons(null), []);
 assert.deepEqual(dossierButtons({ proposal: { name: 'chờ' } }), []);

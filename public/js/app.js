@@ -46,7 +46,7 @@ import {
   startBackgroundCoverageFill
 } from './uiComponents.js';
 import {
-  initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
+  initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, setSplit, isSplitOn,
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, announceFloat, FLOAT_OPEN_EVENT, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
@@ -369,7 +369,7 @@ export async function submitInfraPoint(prefix, extra = {}) {
 }
 
 // Thanh tiêu đề gộp một dòng giới thiệu, đóng được. Chọn lớp ở panel phải (mapLevel.js).
-// Nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng; chia đôi thì chọn cùng tâm / lệch tâm.
+// Nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng; chia đôi thì chọn Đồng tâm / Lệch tâm.
 // Lớp đồ án QHPK theo lớp đang chọn: đang xem QHPK thì lật sang hiện trạng tắt, lật về quy hoạch bật lại.
 const VIEW_TITLES = {
   QH: 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ',
@@ -647,7 +647,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initOverview();
   initMobileShell();
   restoreAdminSession();
-  document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
+  initCompareChooser();
   initMapTitle();
   initSplitPair(map);
 
@@ -758,6 +758,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
   initPhoneToolMenus();
 
+  function initCompareChooser() {
+    const btn = document.getElementById('btnToggleCompare');
+    const menu = document.getElementById('compareChooser');
+    if (!btn || !menu) return;
+    const paintKind = () => {
+      const kind = getSplitKind();
+      menu.querySelectorAll('[data-split-kind]').forEach(el => {
+        const on = el.dataset.splitKind === kind;
+        el.setAttribute('aria-checked', String(on));
+      });
+    };
+    const close = () => {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    const open = () => {
+      paintKind();
+      menu.hidden = false;
+      const r = btn.getBoundingClientRect();
+      const top = Math.max(4, Math.min(r.top, window.innerHeight - menu.offsetHeight - 4));
+      menu.style.left = `${Math.round(r.left - menu.offsetWidth - 6)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+      btn.setAttribute('aria-expanded', 'true');
+    };
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isSplitOn()) {
+        setSplit(false);
+        close();
+        return;
+      }
+      if (menu.hidden) open();
+      else close();
+    });
+    menu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-split-kind]');
+      if (!item) return;
+      e.stopPropagation();
+      const kind = item.dataset.splitKind === 'offset' ? 'offset' : 'same';
+      setSplitKind(kind);
+      if (!isSplitOn()) setSplit(true);
+      close();
+    });
+    onViewChange(({ kind }) => {
+      paintKind();
+      if (!isSplitOn()) close();
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#tbComparePick')) return;
+      close();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  }
+
   function initPhoneToolMenus() {
     const menus = [
       { btn: 'btnMeasurePick', menu: 'measureChooser', target: { distance: 'btnMeasureDist', area: 'btnMeasureArea' } },
@@ -853,10 +907,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const host = document.getElementById('mapArea');
     if (el && host && el.parentElement !== host) host.appendChild(el);
   };
+  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup), .leaflet-popup.dock-card.infra-popup');
+  const planningPaneOn = () => {
+    const pane = document.getElementById('layerPaneQuyHoach');
+    return !!pane && !pane.hidden;
+  };
+  // phone-info-dock chỉ khi không ở trục Quy hoạch (tránh ẩn droplist B + bốn tab cấp).
   const syncPhoneInfoDock = () => {
     const brief = document.getElementById('projectBrief');
     const lot = document.getElementById('cadParcelCard');
     const slot = document.getElementById('phoneInfoSlot');
+    if (planningPaneOn()) {
+      if (!phoneInfoOn && !document.body.classList.contains('phone-info-dock')) return;
+      phoneInfoOn = false;
+      document.body.classList.remove('phone-info-dock');
+      if (slot) slot.hidden = true;
+      return;
+    }
     const on = PHONE_INFO.matches && (phoneInfoOpen('projectBrief') || phoneInfoOpen('cadParcelCard'));
     if (on && slot) {
       if (!phoneInfoOn) {
@@ -905,20 +972,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       syncPlanInfoDock();
     }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
   };
-  // Máy tính: thông tin đồ án vào #planBriefSlot (danh sách dịch xuống). Lô/thửa phủ #planListPane.
+  // Brief → #planBriefSlot (dưới bốn tab cấp). Lô/thửa → #planInfoSlot (phủ #planListPane). Mọi cỡ màn hình.
   let planInfoOn = false;
   let panelBeforePlanInfo = false;
-  const planningPaneOn = () => {
-    const pane = document.getElementById('layerPaneQuyHoach');
-    return !!pane && !pane.hidden;
-  };
-  const planLotPopup = () => document.querySelector('.leaflet-popup.dock-card.land-lot-popup:not(.adj-lot-popup), .leaflet-popup.dock-card.infra-popup');
   const syncPlanBriefDock = () => {
     const slot = document.getElementById('planBriefSlot');
     const brief = document.getElementById('projectBrief');
     const host = document.getElementById('mapArea');
     if (!slot || !brief) return;
-    const dock = !PHONE_INFO.matches && planningPaneOn() && !brief.hidden;
+    const dock = planningPaneOn() && !brief.hidden;
     if (dock) {
       document.body.classList.add('plan-brief-open');
       slot.hidden = false;
@@ -935,7 +997,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const popup = planLotPopup();
     const host = document.getElementById('mapArea');
     const cadOn = !!(card && !card.hidden);
-    const on = !PHONE_INFO.matches && planningPaneOn() && !!slot && (cadOn || !!popup);
+    const on = planningPaneOn() && !!slot && (cadOn || !!popup);
     const park = (el) => { if (el && host && el.parentElement !== host) host.appendChild(el); };
     if (on) {
       if (!planInfoOn) {
@@ -943,6 +1005,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         panelBeforePlanInfo = document.body.classList.contains('right-collapsed');
         if (panelBeforePlanInfo) setRightPanelCollapsed(false);
       }
+      document.body.classList.remove('phone-info-dock');
       document.body.classList.add('plan-info-open');
       slot.hidden = false;
       if (cadOn && card.parentElement !== slot) slot.appendChild(card);

@@ -2,8 +2,9 @@
 // wheelPxPerZoomLevel 60, zoomSnap 1, zoomDelta 1. Delta còn bị chia cho wheelPxFactor
 // (Linux Chrome = devicePixelRatio, macOS = 3×, còn lại 2×) rồi đưa qua sigmoid trong
 // _performZoom, nên một nấc lúc +1 lúc +2 và một vòng xoay nhanh bị nén.
-// Ở đây mỗi nấc chuột = đúng zoomDelta. deltaY pixel dưới NOTCH_PX, hoặc ctrl/meta
-// (pinch trackpad), giữ tỉ lệ TRACK_PX_PER_LEVEL px = 1 mức và không làm tròn giữa chừng.
+// Mặc định: mỗi sự kiện nấc chuột = đúng 1 cấp (không nhân theo |deltaY| lớn).
+// deltaY pixel dưới NOTCH_PX, hoặc ctrl/meta (pinch trackpad), giữ tỉ lệ
+// TRACK_PX_PER_LEVEL px = 1 mức và không làm tròn giữa chừng.
 
 export const NOTCH_PX = 40;
 export const TRACK_PX_PER_LEVEL = 100;
@@ -18,21 +19,17 @@ export function wheelPixels(e) {
   return dy;
 }
 
-/** Dương = phóng to. 0 = không phải nấc rời (trackpad). */
+/** Dương = phóng to. 0 = không phải nấc rời (trackpad). Mỗi nấc tối đa ±1 cấp. */
 export function wheelNotches(e) {
   const dy = Number(e && e.deltaY) || 0;
   if (!dy) return 0;
   const sign = dy > 0 ? -1 : 1;
   const mode = (e && e.deltaMode) || 0;
-  if (mode === 1) {
-    const lines = Math.abs(dy);
-    const n = lines >= 2 ? Math.max(1, Math.round(lines / 3)) : 1;
-    return sign * n;
-  }
-  if (mode === 2) return sign * Math.max(1, Math.round(Math.abs(dy)));
+  if (mode === 1) return Math.abs(dy) >= 1 ? sign : 0;
+  if (mode === 2) return Math.abs(dy) >= 1 ? sign : 0;
   const px = Math.abs(dy);
   if (px < NOTCH_PX) return 0;
-  return sign * Math.max(1, Math.round(px / TRACK_PX_PER_LEVEL));
+  return sign;
 }
 
 export function isPinchWheel(e) {
@@ -121,13 +118,14 @@ export function bindNotchZoom(map) {
 
   function flush() {
     flushTimer = 0;
-    const steps = acc;
-    acc = 0;
-    if (!steps) return;
+    if (!acc) return;
+    // Một lần flush = đúng 1 cấp; nấc còn lại xếp hàng để không nhảy nhiều cấp cùng lúc.
+    const steps = acc > 0 ? 1 : -1;
+    acc -= steps;
     const cur = liveZoom(map);
     const next = notchZoom(cur, steps, limitsOf(map));
-    if (Math.abs(next - cur) < 1e-6) return;
-    commitZoom(map, point, next, false);
+    if (Math.abs(next - cur) >= 1e-6) commitZoom(map, point, next, false);
+    if (acc) flushTimer = setTimeout(flush, NOTCH_FLUSH_MS);
   }
 
   function snapIdle() {
@@ -196,16 +194,17 @@ export function bindDeckNotchZoom(el, getState, setZoom) {
     if (kind.kind === 'notch') {
       acc += kind.steps;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
+      const drain = () => {
         timer = 0;
-        const steps = acc;
-        acc = 0;
-        if (!steps) return;
+        if (!acc) return;
+        const steps = acc > 0 ? 1 : -1;
+        acc -= steps;
         const cur = state().zoom;
         const next = notchZoom(cur, steps, limits());
-        if (Math.abs(next - cur) < 1e-6) return;
-        apply(next);
-      }, NOTCH_FLUSH_MS);
+        if (Math.abs(next - cur) >= 1e-6) apply(next);
+        if (acc) timer = setTimeout(drain, NOTCH_FLUSH_MS);
+      };
+      timer = setTimeout(drain, NOTCH_FLUSH_MS);
       return;
     }
     if (kind.kind !== 'track') return;

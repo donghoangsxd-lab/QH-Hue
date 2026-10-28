@@ -158,6 +158,19 @@ assert.match(plan, /id="projectSearch"[^>]*hidden/);
 assert.match(plan, /id="levelSplit"/);
 assert.match(plan, /id="splitSideLeft"/);
 assert.match(plan, /id="splitSideRight"/);
+assert.match(html, /id="tbComparePick"/);
+assert.match(html, /id="compareChooser"/);
+assert.match(html, /data-split-kind="same"/);
+assert.match(html, /data-split-kind="offset"/);
+assert.match(html, />Đồng tâm</);
+assert.match(html, />Lệch tâm</);
+assert.match(read('public/js/app.js'), /function initCompareChooser/);
+assert.match(read('public/js/splitPair.js'), /isAdminUrbanSplit/);
+assert.match(read('public/js/splitPair.js'), /setClassicSplitSides/);
+assert.match(read('public/js/chuyenNganh.js'), /applyAdminUrbanSplit/);
+assert.match(read('public/js/chuyenNganh.js'), /setLevel\('urban'/);
+assert.match(read('docs/ui-spec.md'), /Đồng tâm/);
+assert.match(read('docs/ui-spec.md'), /hệ thống đô thị hiện trạng/);
 
 function projectLayerAround(src, id) {
   const at = src.indexOf(`id="${id}"`);
@@ -383,6 +396,11 @@ assert.match(read('public/js/mapEngine.js'), /classList\.contains\('infra-popup'
 assert.match(read('public/js/app.js'), /syncPlanBriefDock/);
 assert.match(read('public/js/app.js'), /syncPlanInfoDock/);
 assert.match(read('public/js/app.js'), /dock-card\.infra-popup/);
+assert.match(read('public/js/app.js'), /planningPaneOn\(\) && !!slot && \(cadOn \|\| !!popup\)/);
+assert.doesNotMatch(read('public/js/app.js'), /!PHONE_INFO\.matches && planningPaneOn\(\) && !!slot/);
+assert.match(read('public/js/mapEngine.js'), /ensureQuyHoachPane/);
+assert.doesNotMatch(read('public/js/mapEngine.js'), /phoneInfoSlot/);
+assert.match(read('docs/ui-spec.md'), /không đè droplist B hay bốn tab cấp/);
 assert.match(read('public/js/cadastreLayer.js'), /kind !== 'INFRA'/);
 assert.match(read('docs/ui-spec.md'), /bảng lô thuộc nhóm hạ tầng|ô đất quy hoạch/);
 assert.doesNotMatch(read('public/css/style.css'), /body\.plan-info-open \.right-panel,\s*body\.plan-info-open \.axis-dock/);

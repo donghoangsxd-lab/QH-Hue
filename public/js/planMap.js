@@ -422,7 +422,9 @@ function applyState(next) {
   if (btn) {
     btn.classList.toggle('active', split);
     btn.setAttribute('aria-pressed', String(split));
-    btn.title = split ? 'Tắt chia đôi màn hình' : 'Chia đôi màn hình. Bật rồi chọn từng bên trên panel phải: hiện trạng, quy hoạch, hoặc một cấp QH';
+    btn.title = split
+      ? 'Tắt chia đôi màn hình'
+      : 'Chia đôi màn hình: chọn Đồng tâm hoặc Lệch tâm';
   }
   if (planMap && leftMap) {
     // Vào / ra lệch tâm: dời bản đồ hiện trạng 1/4 bề ngang để điểm đang ở giữa màn hình về giữa nửa trái (và ngược lại)

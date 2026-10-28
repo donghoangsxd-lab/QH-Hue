@@ -119,6 +119,91 @@ export function limitsHtml(plan) {
   return `<div class="lp-limits">${items.map(s => `<span class="lp-limit"><span class="lp-limit-k">${escapeHtml(s.label)}</span> <b>${escapeHtml(s.text)}</b></span>`).join('')}</div>`;
 }
 
+/** Giá trị chỉ tiêu theo icon planItems (floors/coverage/layers); trống → «—». */
+function planMetricText(plan, icon) {
+  const raw = planItems(plan).find(s => s.icon === icon);
+  if (!raw) return '—';
+  return String(raw.text || '').replace(/^≤(?=\S)/, '≤ ');
+}
+
+/**
+ * Lưới 2×2 chỉ tiêu lô (diện tích + mật độ + tầng cao + hệ số).
+ * Luôn bốn ô để dễ đọc; thiếu số thì «—».
+ */
+export function metricGridHtml(areaText, plan) {
+  const cells = [
+    { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaText || '—' },
+    { tone: 'cover', icon: 'coverage', label: 'Mật độ XD', value: planMetricText(plan, 'coverage') },
+    { tone: 'floors', icon: 'floors', label: 'Chiều cao tối đa', value: planMetricText(plan, 'floors') },
+    { tone: 'far', icon: 'layers', label: 'Hệ số sử dụng', value: planMetricText(plan, 'layers') }
+  ];
+  return `<div class="lp-metrics" role="list">${cells.map(c => `
+    <div class="lp-metric lp-metric-${c.tone}" role="listitem">
+      <span class="lp-metric-ico" aria-hidden="true">${ico(c.icon)}</span>
+      <span class="lp-metric-body"><small>${escapeHtml(c.label)}</small><b>${escapeHtml(c.value)}</b></span>
+    </div>`).join('')}</div>`;
+}
+
+/** Dải chức năng sử dụng đất dưới lưới chỉ tiêu (một hàng gọn). */
+export function landUseBannerHtml(type) {
+  const label = String(type || '').trim();
+  if (!label) return '';
+  return `<div class="lp-landuse">
+    <span class="lp-landuse-ico" aria-hidden="true">${ico('home')}</span>
+    <span class="lp-landuse-text"><small>Chức năng SDĐ</small><b>${escapeHtml(label)}</b></span>
+  </div>`;
+}
+
+/** Tab Chỉ tiêu / Quy định: gắn quy chế, quyết định sau. */
+export function landCardTabsHtml(active = 'chi-tieu') {
+  const on = (id) => (active === id ? ' is-on' : '');
+  return `<div class="lp-tabs" role="tablist">
+    <button type="button" class="lp-tab${on('chi-tieu')}" role="tab" data-lp-tab="chi-tieu" aria-selected="${active === 'chi-tieu' ? 'true' : 'false'}">Chỉ tiêu</button>
+    <button type="button" class="lp-tab${on('quy-dinh')}" role="tab" data-lp-tab="quy-dinh" aria-selected="${active === 'quy-dinh' ? 'true' : 'false'}">Quy định</button>
+  </div>`;
+}
+
+/** Nội dung tab Quy định: nút hồ sơ đã gắn; chưa có thì một dòng trống ngắn. */
+export function regulationsPaneHtml(entry) {
+  const btns = dossierButtons(entry);
+  const rows = btns.map(b => {
+    const icon = DOSSIER_ICON[b.key] || 'file';
+    return `<button type="button" class="lp-reg-btn lp-dossier" data-dossier="${b.key}">
+      <span class="lp-reg-ico">${ico(icon)}</span>
+      <span class="lp-reg-label">${escapeHtml(b.label)}</span>
+      <span class="lp-reg-go" aria-hidden="true">→</span>
+    </button>`;
+  }).join('');
+  if (rows) return `<div class="lp-regs">${rows}</div>`;
+  return `<div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>`;
+}
+
+/** Gắn chuyển tab Chỉ tiêu / Quy định trên thẻ lô. */
+export function bindLandCardTabs(root) {
+  const el = root?.querySelector?.('.land-popup') || root;
+  if (!el?.querySelector) return;
+  const tabs = el.querySelectorAll('[data-lp-tab]');
+  const panes = el.querySelectorAll('[data-lp-pane]');
+  if (!tabs.length || !panes.length) return;
+  tabs.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-lp-tab');
+      tabs.forEach(t => {
+        const on = t === btn;
+        t.classList.toggle('is-on', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panes.forEach(p => {
+        const show = p.getAttribute('data-lp-pane') === id;
+        p.hidden = !show;
+        p.classList.toggle('is-on', show);
+      });
+    });
+  });
+}
+
 /** Hồ sơ đã gắn: quy chế (role quy-dinh), rồi quyết định phê duyệt. Chưa có file thì mảng rỗng. */
 export function dossierButtons(entry) {
   if (!entry) return [];
