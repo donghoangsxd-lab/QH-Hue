@@ -34,6 +34,7 @@ import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPla
 import { getLevel, setLevel, withLevelLock, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 import { browseState } from './facetStore.js';
+import { pickUrbanFromMap, clearUrbanMapPick } from './generalPlanUi.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Về toàn TP chỉ tắt lớp phụ; ô tùy chọn con (ranh lô công trình, lô hạ tầng đồ án, đổ bóng) không tự vẽ gì nên giữ.
@@ -197,12 +198,17 @@ function urbanBrowse() {
 function onUrbanPick({ id, side } = {}) {
   // Tab ĐVHC: chỉ chọn xã/phường — bỏ qua ký hiệu đô thị (đã chuyển sang qh:dvhc-at).
   if (document.body.classList.contains('dvhc-browse')) return;
-  // Tab Đô thị (hoặc lớp Hệ thống đô thị): chọn đúng đô thị theo ranh, không nhảy QHC 1/10.000.
+  // Tab Đô thị / lớp Hệ thống đô thị: chọn đúng đô thị theo ranh, không nhảy QHC 1/10.000.
   if (document.body.classList.contains('dothi-browse') || getLevel() === 'urban') {
     const load = side === 'QH' || document.body.classList.contains('urban-plan-on-base')
       ? urbanVisionFeature(id)
       : urbanStatusFeature(id);
-    load.then(u => { if (urbanBrowse()) focusOf(u); });
+    load.then(u => {
+      if (!urbanBrowse() || !u) return;
+      // Tab Đô thị: cùng highlight cyan + dòng list như chọn trong panel (paintGeom trên map đang hiện).
+      if (document.body.classList.contains('dothi-browse')) pickUrbanFromMap(u);
+      else focusOf(u);
+    });
     return;
   }
   if (CENTER_URBAN_IDS.has(id)) enterCore();
@@ -217,6 +223,11 @@ async function pickUrbanAt(latlng, m) {
   if (urbanFocusHolds(latlng)) return;
   const u = useVisionUrban(m) ? await urbanVisionAt(latlng) : await urbanStatusAt(latlng);
   if (!urbanBrowse()) return;
+  if (document.body.classList.contains('dothi-browse')) {
+    if (u) pickUrbanFromMap(u);
+    else clearUrbanMapPick();
+    return;
+  }
   if (u) focusOf(u);
   else clearUrbanFocus();
 }

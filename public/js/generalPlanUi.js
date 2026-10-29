@@ -140,7 +140,7 @@ function fitGeom(shown, feature) {
   });
 }
 
-function paintGeom(id, feature) {
+function paintGeom(id, feature, { name = id, city = id === 'hue' } = {}) {
   if (!map || !feature) return;
   const urbanLevel = getLevel() === 'urban';
   scopeLayers = [map, planMap].filter(m => m && !(urbanLevel && m === planMap)).map(m => {
@@ -156,7 +156,7 @@ function paintGeom(id, feature) {
   const shown = planMap && isCompareOn() && !isSplitOn() ? planMap : map;
   fitGeom(shown, feature);
   document.dispatchEvent(new CustomEvent(GP_SCOPE_EVENT, {
-    detail: { id, name: id, geometry: feature.geometry, city: id === 'hue' }
+    detail: { id, name, geometry: feature.geometry, city: !!city }
   }));
 }
 
@@ -236,6 +236,35 @@ function pick(id, { page = false, list = false, geom = null, cityPlan = false } 
   renderPanel();
   if (page) openPage();
   else rerenderPage?.();
+}
+
+/** Bấm đô thị trên bản đồ (tab Đô thị): cùng highlight cyan + đánh dấu dòng như chọn trong danh sách. */
+export function pickUrbanFromMap(u) {
+  if (!u?.id) return;
+  const city = !!u.city || u.id === 'hue';
+  picked = u.id;
+  clearScope();
+  highlightWardBoundary('', { fitView: false });
+  scopeId = u.id;
+  setAreaFilter(city ? { ...AREA_TP } : { type: 'dothi', code: u.id, parent: 'TP' }, 'user');
+  if (city) focusWard(DVHC_CITY.name);
+  else if (u.geometry) {
+    paintGeom(u.id, { type: 'Feature', properties: { id: u.id }, geometry: u.geometry }, {
+      name: u.name || u.id,
+      city
+    });
+  }
+  renderPanel();
+  rerenderPage?.();
+  requestAnimationFrame(() => {
+    document.querySelector('#gpList .axis-area.active')?.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+/** Bấm ngoài mọi đô thị trên tab Đô thị: bỏ chọn như Esc / chọn lại dòng đang active. */
+export function clearUrbanMapPick() {
+  if (!picked && !scopeId) return;
+  pick(null);
 }
 
 /** Mở hồ sơ một QHC ở trang Quy hoạch chung (bảng dưới) và vẽ phạm vi */

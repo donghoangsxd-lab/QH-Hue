@@ -73,10 +73,19 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 10;
 // Bao ranh 40 phường xã (ward-boundary.json). Không thu về nội đô.
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
-// Khung kéo: Thành phố Huế (khớp HUE_BOUNDS). Không mở ra toàn Việt Nam.
-const MAP_BOUNDS = [[15.9, 106.9], [16.9, 108.3]];
-// Sàn khởi tạo; centerOnCity nâng minZoom lên mức vừa cả thành phố theo kích thước màn hình.
-const MAP_MIN_ZOOM = 8;
+// Nới mỗi phía ~100 km để zoom out / kéo xem liên vùng; không mở cả nước.
+const REGION_PAD_KM = 100;
+function padLatLngBounds(swNe, km) {
+  const [[s, w], [n, e]] = swNe;
+  const midLat = (s + n) / 2;
+  const latPad = km / 111.32;
+  const lngPad = km / (111.32 * Math.cos((midLat * Math.PI) / 180));
+  return [[s - latPad, w - lngPad], [n + latPad, e + lngPad]];
+}
+// Khung kéo = HUE_BOUNDS + REGION_PAD_KM (khớp config/constants.js HUE_BOUNDS).
+const MAP_BOUNDS = padLatLngBounds([[15.9, 106.9], [16.9, 108.3]], REGION_PAD_KM);
+// Sàn khởi tạo; centerOnCity nâng minZoom theo khung liên vùng (MAP_BOUNDS).
+const MAP_MIN_ZOOM = 7;
 // Khoảng trống hai bên ranh: thành phố chiếm khoảng 84% cạnh hạn chế của khung nhìn.
 // Mức phóng nguyên bỏ qua khoảng giữa 10 và 11, khung không vừa vành thành phố.
 const CITY_FRAME_SLACK = 0.16;
@@ -582,15 +591,17 @@ function cityFrameZoom(bounds, padding) {
 }
 
 // Thấy trọn ranh thành phố trong phần bản đồ không bị cột nút che. Bản đồ quy hoạch (đang hiện khi mở trang) nhận cùng khung.
+// Zoom out tối đa = MAP_BOUNDS (thành phố + ~100 km mỗi phía) để nhìn liên vùng; khung mở trang vẫn vừa CITY_BOUNDS.
 export function centerOnCity(options = { animate: false }) {
   if (!map) return;
   const bounds = L.latLngBounds(CITY_BOUNDS);
   const { tl, br } = cityFramePadding();
-  const zoom = cityFrameZoom(bounds, tl.add(br));
-  if (zoom == null) return;
-  // Zoom out tối đa = vừa cả thành phố; đồng bộ bản đồ quy hoạch (so sánh).
-  map.setMinZoom(zoom);
-  if (planMap) planMap.setMinZoom(zoom);
+  const pad = tl.add(br);
+  const zoom = cityFrameZoom(bounds, pad);
+  const minZoom = cityFrameZoom(L.latLngBounds(MAP_BOUNDS), pad);
+  if (zoom == null || minZoom == null) return;
+  map.setMinZoom(minZoom);
+  if (planMap) planMap.setMinZoom(minZoom);
   const offset = br.subtract(tl).divideBy(2);
   const sw = map.project(bounds.getSouthWest(), zoom);
   const ne = map.project(bounds.getNorthEast(), zoom);
