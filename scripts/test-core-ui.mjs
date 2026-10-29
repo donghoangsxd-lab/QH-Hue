@@ -212,9 +212,15 @@ for (const [roadId, railId, label] of [
 }
 assert.doesNotMatch(plan, /project-layer-sub/);
 assert.doesNotMatch(plan, /id="gt25RailHint"|id="gt10RailHint"/);
+assert.match(plan, /id="qhc25Htkt"/);
+assert.match(plan, /class="qhc25-htkt"/);
 assert.match(read('public/css/style.css'), /\.project-rail \{[^}]*width: 18px/);
 assert.match(read('public/css/style.css'), /\.project-rail \.ico \{[^}]*width: 13px/);
+assert.match(read('public/css/style.css'), /\.qhc25-htkt \{/);
 assert.match(read('docs/ui-spec.md'), /icon «Đường sắt»/);
+assert.match(read('docs/ui-spec.md'), /#qhc25Htkt/);
+assert.match(read('docs/ui-spec.md'), /Bản đồ hiện trạng tỷ lệ 1\/25\.000/);
+assert.match(read('docs/bon-truc.md'), /#qhc25Htkt/);
 
 const tech = innerById(html, 'layerPaneHaTang');
 const social = innerById(html, 'layerPaneXaHoi');
@@ -1029,6 +1035,10 @@ assert.match(read('public/js/app.js'), /setLevel\(DEFAULT_LEVEL, \{ keepView: tr
 assert.match(read('public/js/qhc2045Layer.js'), /export function initQhc2045Layer\(\)[\s\S]*syncQhc\(\);\s*\}/);
 assert.match(read('public/js/chuyenNganh.js'), /axis: 'quyhoach'/);
 assert.match(read('public/js/chuyenNganh.js'), /setLevel\('qhc25', \{ keepView: true \}\)/);
+assert.match(read('public/js/chuyenNganh.js'), /QHC25_SCHEME = 'qhc-hue-2045'/);
+assert.match(read('public/js/chuyenNganh.js'), /function paintQhc25Htkt\(/);
+assert.match(read('public/js/chuyenNganh.js'), /Bản đồ hiện trạng tỷ lệ 1\/25\.000/);
+assert.match(read('public/js/chuyenNganh.js'), /Bản đồ quy hoạch tỷ lệ 1\/25\.000/);
 assert.match(read('public/js/chuyenNganh.js'), /localStorage\.removeItem\(STORE_KEY\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /function applySavedLayers|function readSaved|localStorage\.setItem\(STORE_KEY/);
 assert.match(read('docs/bon-truc.md'), /Không khôi phục lớp/);

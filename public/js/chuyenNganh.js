@@ -43,6 +43,13 @@ try { localStorage.removeItem(STORE_KEY); } catch (e) { /* chế độ riêng t�
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
 const SHARE_KEYS = ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'];
 const KIND_LABEL = { 'hien-trang': 'Hiện trạng khi lập đồ án', 'quy-hoach': 'Quy hoạch' };
+const QHC25_SCHEME = 'qhc-hue-2045';
+const QHC25_LEVEL = 'QHC25';
+const QHC25_PHASE_TITLE = {
+  'hien-trang': 'Bản đồ hiện trạng tỷ lệ 1/25.000',
+  'quy-hoach': 'Bản đồ quy hoạch tỷ lệ 1/25.000'
+};
+const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe);
 
 const ICONS = {
   'giao-thong': '<path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/>',
@@ -85,6 +92,7 @@ const openSchemes = new Set([
   'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c',
   'qhc-xa-thuong-long-3f2c4da4'
 ]);
+const qhc25OpenSectors = new Set(QHC25_SECTORS.map(s => s.id));
 const capOpen = new Set();
 let layerQuery = '';
 let applying = false;
@@ -380,6 +388,59 @@ function layerRow(layer, synth) {
   if (gcsObjectPath(layer.file)) bits.push('<small>GCS</small>');
   if (synth) bits.push(`<small>${escapeHtml(SYNTH_LABEL)}</small>`);
   return `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(layer.id)}"${isLayerOn(layer.id) ? ' checked' : ''}><span>${escapeHtml(layer.name)}</span>${bits.join('')}</label>`;
+}
+
+function qhc25PhaseKind() {
+  return columnMode() === 'HT' ? 'hien-trang' : 'quy-hoach';
+}
+
+function qhc25SectorLayers(sector, kind) {
+  return layersFor(sector, QHC25_LEVEL, QHC25_SCHEME, { filter: false })
+    .filter(layer => layer.kind === kind)
+    .filter(layer => !isCotDenLayer(layer))
+    .filter(layer => formAllows(layer, geomOn, false));
+}
+
+function qhc25PhaseLayers(kind = qhc25PhaseKind()) {
+  const seen = new Set();
+  return QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind)).filter(layer => {
+    if (seen.has(layer.id)) return false;
+    seen.add(layer.id);
+    return true;
+  });
+}
+
+function qhc25SectorBlock(sec, kind) {
+  const rows = qhc25SectorLayers(sec.id, kind);
+  if (!rows.length) return '';
+  const on = rows.every(layer => isLayerOn(layer.id));
+  const some = rows.some(layer => isLayerOn(layer.id));
+  const open = qhc25OpenSectors.has(sec.id);
+  return `<div class="cn-scheme qhc25-sector" data-qhc25-sector-row="${escapeHtml(sec.id)}">
+    <div class="cn-scheme-row">
+      <label><input type="checkbox" data-qhc25-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(sec.label)}</span></label>
+      <button type="button" class="cn-fold" data-qhc25-fold="${escapeHtml(sec.id)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
+    </div>
+    ${open ? `<div class="cn-groups">${rows.map(layer => layerRow(layer, false)).join('')}</div>` : ''}
+  </div>`;
+}
+
+function paintQhc25Htkt() {
+  const box = document.getElementById('qhc25Htkt');
+  if (!box) return;
+  if (!ready) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const kind = qhc25PhaseKind();
+  const title = QHC25_PHASE_TITLE[kind];
+  const sectors = QHC25_SECTORS.map(sec => qhc25SectorBlock(sec, kind)).filter(Boolean).join('');
+  box.hidden = false;
+  box.innerHTML = `<div class="cn-status qhc25-phase"><b>${escapeHtml(title)}</b>
+    ${sectors || '<p class="cn-empty">Chưa có lớp hạ tầng ở giai đoạn này.</p>'}
+  </div>`;
+  box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
 }
 
 function synthBlock(rows) {
@@ -1248,6 +1309,15 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
+  document.querySelectorAll('#qhc25Htkt .cn-scheme, #qhc25Htkt .cn-layer').forEach(el => {
+    el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
+  });
+  document.querySelectorAll('#qhc25Htkt .cn-scheme').forEach(scheme => {
+    const layers = [...scheme.querySelectorAll('.cn-layer')];
+    if (!layers.length) return;
+    const any = layers.some(row => !row.classList.contains('is-filter-hide'));
+    scheme.classList.toggle('is-filter-hide', !!q && !any);
+  });
   document.querySelectorAll('#dtList .project-row').forEach(el => {
     const blob = el.getAttribute('data-dt-text') || el.textContent;
     const hide = !!q && !foldQuery(blob).includes(q);
@@ -1321,6 +1391,8 @@ function paintViewSwitch() {
     }
   }
   document.dispatchEvent(new CustomEvent('qh:view-column', { detail: { mode } }));
+  paintQhc25Htkt();
+  applyLayerQuery();
 }
 
 function toggleAxisAll() {
@@ -1335,7 +1407,12 @@ function toggleAxisAll() {
   }
   // Quy hoạch: bật/tắt cả lớp + đồ án cấp đang xem; không đổi khung nhìn (setLevelShown + keepView).
   if (browseState().axis === 'quyhoach') {
+    const wasOn = planLevelAllOn();
     toggleActivePlanLevel();
+    if (getLevel() === 'qhc25') {
+      const listed = qhc25PhaseLayers();
+      listed.forEach(l => setLayerOn(l, !wasOn));
+    }
     paintAxisAll();
     return;
   }
@@ -1370,6 +1447,7 @@ function paint() {
   paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
   paintXaHoi();
   paintXahoiList();
+  paintQhc25Htkt();
   paintAxisAll();
   syncViewSwitchVisibility();
   const tools = document.getElementById('axisToolsQuyHoach');
@@ -1710,6 +1788,14 @@ export function initChuyenNganh() {
       paint();
       return;
     }
+    const qhc25Fold = e.target.closest('[data-qhc25-fold]');
+    if (qhc25Fold) {
+      const id = qhc25Fold.dataset.qhc25Fold;
+      if (qhc25OpenSectors.has(id)) qhc25OpenSectors.delete(id); else qhc25OpenSectors.add(id);
+      paintQhc25Htkt();
+      applyLayerQuery();
+      return;
+    }
     const capBtn = e.target.closest('[data-cs-open]');
     if (capBtn) {
       const slug = capBtn.dataset.csOpen;
@@ -1779,6 +1865,15 @@ export function initChuyenNganh() {
       const layer = getLayers().find(l => l.id === layerId);
       if (layer) setLayerOn(layer, e.target.checked, { frame: e.target.checked && !layer.bind });
       if (e.target.checked && layer) publishSectorLegend(true, layer.sector);
+      return;
+    }
+    const qhc25Sector = e.target.closest('[data-qhc25-sector]');
+    if (qhc25Sector) {
+      const id = qhc25Sector.dataset.qhc25Sector;
+      const rows = qhc25SectorLayers(id, qhc25PhaseKind());
+      if (e.target.checked) qhc25OpenSectors.add(id);
+      rows.forEach(l => setLayerOn(l, e.target.checked));
+      if (e.target.checked && rows[0]) publishSectorLegend(true, rows[0].sector);
       return;
     }
     const schemeEl = e.target.closest('[data-cn-scheme]');

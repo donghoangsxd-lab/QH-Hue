@@ -6969,6 +6969,12 @@ body.project-review.la-page #projectReviewHost {
 .cn-groups { margin: 0 0 2px 16px; }
 .cn-status { margin-top: 2px; }
 .cn-status b { display: block; font-family: var(--axis-font); font-size: var(--axis-fs-header); color: var(--axis-color-muted); margin-bottom: 1px; }
+/* HTKT trong đồ án QHC 1/25.000 (panel B): thụt theo .project-layers, cùng token trục */
+.qhc25-htkt { margin: 4px 0 2px; padding-top: 4px; border-top: 1px solid var(--axis-line); }
+.qhc25-htkt[hidden] { display: none; }
+.qhc25-htkt .qhc25-phase > b { color: var(--axis-color-strong); font-weight: 700; }
+.qhc25-htkt .cn-scheme { margin-left: 0; }
+.qhc25-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
 .cn-layer { display: flex; align-items: center; gap: 6px; margin: 0; min-height: var(--axis-row-h); font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); }
 .cn-layer span { flex: 1 1 auto; min-width: 0; }
 .cn-layer small { color: var(--axis-color-muted); font-size: var(--axis-fs-chip); }
