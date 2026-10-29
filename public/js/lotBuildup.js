@@ -444,24 +444,44 @@ function hasBuildupIcon(root) {
   return !!root.querySelector('.pp-buildup-btn, a[data-lot-buildup-run]');
 }
 
+function buildupSlot(root) {
+  let el = root.querySelector('[data-lot-buildup]');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'lot-buildup';
+    el.setAttribute('data-lot-buildup', '');
+    root.querySelector('.pp, .cad-id.pp, .qhc-pop')?.appendChild(el) || root.appendChild(el);
+  }
+  // Chỉ popup không có hàng icon (QHCT tĩnh) mới cần nút chữ.
+  if (!hasBuildupIcon(root) && !el.querySelector('[data-lot-buildup-run]')) {
+    el.innerHTML = lotBuildupButtonHtml();
+  }
+  return el;
+}
+
+/**
+ * Gắn nút mật độ. Thẻ thửa (#cadParcelCard) tái sử dụng DOM: giữ một listener,
+ * mỗi lần mở chỉ cập nhật lot (_qhLotBuildup) — không khóa geometry lần đầu.
+ */
 export function attachLotBuildup(popup, lot) {
   const arm = () => {
     const root = popup.getElement();
-    if (!root || root.dataset.buildupArmed === '1') return;
+    if (!root) return;
+    root._qhLotBuildup = lot;
+    buildupSlot(root);
+    if (root.dataset.buildupArmed === '1') return;
     root.dataset.buildupArmed = '1';
-    let el = root.querySelector('[data-lot-buildup]');
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'lot-buildup';
-      el.setAttribute('data-lot-buildup', '');
-      root.querySelector('.pp, .qhc-pop')?.appendChild(el) || root.appendChild(el);
-    }
-    // Chỉ popup không có hàng icon (QHCT tĩnh) mới cần nút chữ.
-    if (!hasBuildupIcon(root)) el.innerHTML = lotBuildupButtonHtml();
     const run = (e) => {
       const btn = e.target.closest?.('[data-lot-buildup-run]');
       if (!btn || !root.contains(btn)) return;
       stopMapClick(e);
+      const current = root._qhLotBuildup;
+      const el = buildupSlot(root);
+      if (!current?.geometry) {
+        el.textContent = 'Đang tải hình thửa…';
+        relayout(popup);
+        return;
+      }
       if (el.dataset.running === '1') return;
       el.dataset.running = '1';
       const token = `${Date.now()}-${Math.random()}`;
@@ -469,8 +489,8 @@ export function attachLotBuildup(popup, lot) {
       el.textContent = LOADING;
       clearLotBuildupMap();
       relayout(popup);
-      const alive = () => popup.isOpen?.() !== false && el.dataset.token === token;
-      compute(lot).then((result) => {
+      const alive = () => popup.isOpen?.() !== false && el.isConnected && el.dataset.token === token;
+      compute(current).then((result) => {
         if (!alive()) return;
         el.innerHTML = typeof result === 'string' ? result : result.html;
         delete el.dataset.running;
@@ -491,6 +511,8 @@ export function attachLotBuildup(popup, lot) {
   if (popup.getElement()) schedule();
   else popup.once('add', schedule);
 }
+
+export { clearLotBuildupMap };
 
 export function initLotBuildup() {
   setLotBuildup(attachLotBuildup);

@@ -547,14 +547,13 @@ function planFieldText(plan, key) {
   return String(hit.text || '—').replace(/\s+/g, ' ').trim();
 }
 
-/** Bảng gọn Stt / Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (tỷ lệ xem biểu đồ tròn). */
+/** Bảng gọn Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (bỏ Stt để đủ chỗ cột HSSDĐ). */
 function planLotsTable(parts, totalArea) {
   if (!parts?.length) return '';
-  const body = parts.map((p, i) => {
+  const body = parts.map((p) => {
     const plan = p.lot && p.lot.plan;
     const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
     return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))}">
-      <td class="pls-stt">${i + 1}</td>
       <td class="pls-type">${landMarksHtml(p.color, p.key)}<span>${escapeHtml(p.label)}</span></td>
       <td class="pls-num">${fmtM2(p.area)}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
@@ -564,7 +563,7 @@ function planLotsTable(parts, totalArea) {
   }).join('');
   return `<div class="pls-table-wrap"><table class="pls-table">
     <thead><tr>
-      <th>Stt</th><th>Loại đất</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
+      <th>Loại đất</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
     </tr></thead>
     <tbody>${body}</tbody>
   </table></div>`;

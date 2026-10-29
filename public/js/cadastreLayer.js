@@ -28,7 +28,7 @@ import { restoreInspectFocus } from './projectLayer.js';
 import { planLotsIn, lotsRevision, whenCatalogSettled } from './projectFiles.js';
 import { planLevelOf } from './generalPlan.js';
 import { pickPlanningLot } from './qhpkOverlap.js';
-import { attachLotBuildup } from './lotBuildup.js';
+import { attachLotBuildup, clearLotBuildupMap } from './lotBuildup.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 
 const LIBS = {
@@ -514,12 +514,14 @@ function closeParcel() {
   clearHighlight();
   clearLandFill();
   clearParcelPies();
+  clearLotBuildupMap();
   restoreInspectFocus();
   const card = document.getElementById('cadParcelCard');
   if (card) {
     card.hidden = true;
     card.classList.remove('pp-located', 'pp-has-buildup', 'pp-collapsible', 'pp-collapsed');
     card.title = '';
+    if (card._qhLotBuildup) card._qhLotBuildup = null;
     card.innerHTML = '';
   }
   if (popup) {
@@ -569,7 +571,10 @@ function ensureCard() {
       e.preventDefault();
       const { lat, lng, title } = cardState || {};
       if (Number.isFinite(lat) && Number.isFinite(lng)) shareCadPoint(lat, lng, title);
+      return;
     }
+    // preventDefault cho <a href="#">; phép tính do attachLotBuildup (listener cùng phần tử).
+    if (e.target.closest('[data-lot-buildup-run], .pp-buildup-btn')) e.preventDefault();
   });
   el.addEventListener('pls-pick', (e) => toggleLand(e.detail?.key, e.detail?.color));
   return el;
@@ -639,7 +644,14 @@ async function shareCadPoint(lat, lng, title) {
   showToast(ok ? 'Đã chép liên kết tới thửa đất' : 'Không chép được liên kết', ok ? 'success' : 'error');
 }
 
-function mountCadTools(el, { lat, lng, title, geom }) {
+function shapeGeometry(s) {
+  if (!s) return null;
+  if (s.type === 'Feature') return s.geometry || null;
+  if (s.type === 'Polygon' || s.type === 'MultiPolygon') return s;
+  return s.geometry || null;
+}
+
+function mountCadTools(el, { lat, lng, title, geom, geomTask }) {
   if (!el) return;
   el.classList.add('pp-located', 'pp-has-buildup', 'pp-collapsible');
   el.classList.remove('pp-collapsed');
@@ -647,13 +659,21 @@ function mountCadTools(el, { lat, lng, title, geom }) {
   if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
     cardState && (cardState.lat = Number(lat), cardState.lng = Number(lng), cardState.title = title || '');
   }
-  if (geom) {
-    attachLotBuildup({
-      getElement: () => el,
-      isOpen: () => !el.hidden,
-      on() {},
-      once(_ev, fn) { fn?.(); }
-    }, { geometry: geom });
+  // Gán lot lên thẻ ngay (trước rAF của attachLotBuildup) để cập nhật geometry không bị đua.
+  const lot = { geometry: geom || null };
+  el._qhLotBuildup = lot;
+  attachLotBuildup({
+    getElement: () => el,
+    isOpen: () => !el.hidden,
+    on() {},
+    once(_ev, fn) { fn?.(); }
+  }, lot);
+  if (!lot.geometry && geomTask) {
+    Promise.resolve(geomTask).then((s) => {
+      const geometry = shapeGeometry(s);
+      if (!geometry || el._qhLotBuildup !== lot) return;
+      lot.geometry = geometry;
+    }).catch(() => {});
   }
 }
 
@@ -1085,10 +1105,12 @@ async function openParcel(latlng, targetMap, opts = {}) {
     el.innerHTML = cardHtml(props);
     el.hidden = false;
     mountAssign(el, props, latlng, shapeP);
+    // Gắn nút mật độ ngay khi mở bảng; geometry cập nhật khi shapeP xong.
+    mountCadTools(el, { lat: latlng.lat, lng: latlng.lng, title: cardState.title, geomTask: shapeP });
     const shape = await shapeP;
     if (mySeq !== clickSeq || !cardState) return true;
     cardState.geom = shape.geometry;
-    mountCadTools(el, { lat: latlng.lat, lng: latlng.lng, title: cardState.title, geom: shape.geometry });
+    if (el._qhLotBuildup) el._qhLotBuildup.geometry = shape.geometry;
     drawHighlight(shape, targetMap);
     showTab(cardState.tab);
     return true;
