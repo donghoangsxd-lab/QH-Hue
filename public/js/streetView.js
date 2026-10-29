@@ -1,4 +1,4 @@
-// Khung Street View nổi. Menu chuột phải (mapContext.js) mở Google Street View ở thẻ mới.
+// Khung Street View nội bộ bên phải. Menu chuột phải (mapContext.js) gọi openStreetView.
 // Nhúng kiểu cũ output=svembed không cần khóa Maps Embed API (khóa API bị Google giới hạn vùng); kiểu này Google
 // không công bố chính thức, khung trắng thì dùng nút "Mở Google Maps" trên thanh tiêu đề.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
@@ -75,7 +75,7 @@ function enableDrag(el, handle) {
   });
 }
 
-function openStreetView(latlng, targetMap) {
+export function openStreetView(latlng, targetMap) {
   const el = ensurePanel();
   el.querySelector('.sv-frame').src = embedUrl(latlng);
   el.querySelector('.sv-ext').href = panoUrl(latlng);

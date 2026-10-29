@@ -26,11 +26,14 @@ import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
-import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
+import {
+  URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt, urbanStatusFeature, urbanStatusAt
+} from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
 import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, setPreferPlace, QHC_CORE_EVENT } from './qhc2045Layer.js';
 import { getLevel, setLevel, withLevelLock, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
+import { browseState } from './facetStore.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Về toàn TP chỉ tắt lớp phụ; ô tùy chọn con (ranh lô công trình, lô hạ tầng đồ án, đổ bóng) không tự vẽ gì nên giữ.
@@ -187,21 +190,42 @@ function enterCore({ openLots = false } = {}) {
 // ---------- Hệ thống đô thị ----------
 const focusOf = (u) => u && focusUrban({ key: `u:${u.id}`, name: u.name, geometry: u.geometry, city: u.city });
 
+function urbanBrowse() {
+  return document.body.classList.contains('dothi-browse') || getLevel() === 'urban';
+}
+
 function onUrbanPick({ id, side } = {}) {
-  if (side === 'QH' && getLevel() === 'urban') {
-    urbanVisionFeature(id).then(u => { if (getLevel() === 'urban') focusOf(u); });
+  // Tab ĐVHC: chỉ chọn xã/phường — bỏ qua ký hiệu đô thị (đã chuyển sang qh:dvhc-at).
+  if (document.body.classList.contains('dvhc-browse')) return;
+  // Tab Đô thị (hoặc lớp Hệ thống đô thị): chọn đúng đô thị theo ranh, không nhảy QHC 1/10.000.
+  if (document.body.classList.contains('dothi-browse') || getLevel() === 'urban') {
+    const load = side === 'QH' || document.body.classList.contains('urban-plan-on-base')
+      ? urbanVisionFeature(id)
+      : urbanStatusFeature(id);
+    load.then(u => { if (urbanBrowse()) focusOf(u); });
     return;
   }
   if (CENTER_URBAN_IDS.has(id)) enterCore();
 }
 
-// Bấm nền bản đồ quy hoạch ở lớp đô thị: trong đô thị đang chọn thì giữ, trong đô thị khác thì chọn đô thị đó, ngoài mọi đô thị thì bỏ chọn
-async function pickUrbanAt(latlng) {
+function useVisionUrban(m) {
+  return (!!planMap && m === planMap) || document.body.classList.contains('urban-plan-on-base');
+}
+
+// Bấm nền ở lớp / tab đô thị: trong đô thị đang chọn thì giữ, đô thị khác thì chọn, ngoài mọi đô thị thì bỏ chọn
+async function pickUrbanAt(latlng, m) {
   if (urbanFocusHolds(latlng)) return;
-  const u = await urbanVisionAt(latlng);
-  if (getLevel() !== 'urban') return;
+  const u = useVisionUrban(m) ? await urbanVisionAt(latlng) : await urbanStatusAt(latlng);
+  if (!urbanBrowse()) return;
   if (u) focusOf(u);
   else clearUrbanFocus();
+}
+
+/** Tab Đô thị (trục A): bấm nền chỉ chọn theo ranh đô thị, không chọn xã. */
+export async function consumeDothiMapClick(latlng, m) {
+  if (!document.body.classList.contains('dothi-browse') || !latlng) return false;
+  await pickUrbanAt(latlng, m);
+  return true;
 }
 
 // ---------- Địa bàn ----------
@@ -227,6 +251,11 @@ function onWardSelected(name) {
   clearUrbanFocus();
   closeProjectView();
   clearProjectFocus();
+  // Trục A (Hành chính): chọn phường/xã chỉ tô ranh và phóng — không nhảy sang B hay tải QHPK.
+  if (browseState().axis === 'hanhchinh') {
+    syncEscHint();
+    return;
+  }
   if (isCity(name)) enterCity();
   else enterWard(name);
   syncEscHint();
@@ -295,13 +324,22 @@ function wardToPick(latlng, m) {
 
 /**
  * Bấm nền bản đồ (không trúng đối tượng có popup / công cụ đang bật) → tên phường cần chọn, hoặc null.
- * Bản đồ quy hoạch không chọn phường (lớp có cấp đồ án thu gọn đồ án, lớp đô thị chọn đô thị); bản đồ hiện trạng chọn phường.
+ * ĐVHC / Đô thị đã xử lý riêng (consumeDvhcMapClick / consumeDothiMapClick).
+ * Trục Quy hoạch: chỉ đồ án / lô (qhcClick và lớp lô); nền không chọn phường — có cấp đồ án thì thu gọn focus.
+ * Bản đồ hiện trạng (trục khác): chọn phường khi nhìn rộng.
  */
 export function wardFromMapClick(latlng, m) {
+  if (document.body.classList.contains('dvhc-browse') || document.body.classList.contains('dothi-browse')) {
+    return null;
+  }
   const planSide = !!planMap && m === planMap;
+  if (browseState().axis === 'quyhoach') {
+    if (planSide && levelScope()) leaveScopeFocus(latlng);
+    return null;
+  }
   if (!planSide) return wardToPick(latlng, m);
   if (levelScope()) leaveScopeFocus(latlng);
-  if (getLevel() === 'urban') pickUrbanAt(latlng);
+  if (getLevel() === 'urban') pickUrbanAt(latlng, m);
   return null;
 }
 

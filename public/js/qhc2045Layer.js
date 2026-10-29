@@ -32,7 +32,8 @@ import {
 import {
   loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
 } from './qhcRoads.js';
-import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs } from './lotPopup.js';
+import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs, regulationsPaneHtml } from './lotPopup.js';
+import { layerDecisionOf, layerDocsOf } from './layerDecisions.js';
 
 export { isCoreWard };
 
@@ -797,7 +798,7 @@ function qhcLotCardHtml(f, latlng, opts) {
       </button>`).join('')}</div>`
     : '<div class="lp-regs"><p class="lp-reg-empty">Chưa có đồ án QHPK 1/2.000 tại vị trí này.</p></div>';
   const regsPane = opts?.hideProject
-    ? '<div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>'
+    ? regulationsPaneHtml(qhcLayerDossier())
     : projectHtml;
   // Không lặp tên loại đất ở tiêu đề — chỉ eyebrow + badge; hatch nằm cuối dòng Chức năng SDĐ.
   return `<div class="pp land-popup land-popup-card qhc-pop">
@@ -842,6 +843,7 @@ function openLotPopup(f, latlng, opts) {
   qhcLotPop = { popup, f, map: host };
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   bindLandCardTabs(popup.getElement());
+  if (opts?.hideProject) bindQhcDossier(popup);
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 
@@ -935,10 +937,64 @@ function qhcVisionCardHtml(f, latlng) {
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
     <div class="lp-pane" data-lp-pane="quy-dinh" hidden>
-      <div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>
+      ${regulationsPaneHtml(qhcLayerDossier())}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
   </div>`;
+}
+
+function qhcLayerDossier() {
+  return {
+    slug: 'lop-qhc-2045',
+    decision: layerDecisionOf('qhc-2045'),
+    docs: layerDocsOf('qhc-2045')
+  };
+}
+
+function bindQhcDossier(popup) {
+  popup.getElement()?.querySelectorAll('.lp-dossier').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      L.DomEvent.stop(e);
+      const { openDecision } = await import('./decisionViewer.js');
+      const entry = qhcLayerDossier();
+      if (btn.dataset.dossier === 'quy-dinh') {
+        const doc = (entry.docs || []).find(d => d && d.role === 'quy-dinh' && d.id);
+        if (!doc) return;
+        openDecision({
+          key: `layer-doc:qhc-2045:${doc.id}:quy-dinh`,
+          title: QHC2045.short,
+          noun: 'Quy định quản lý',
+          decision: {
+            slug: doc.slug || entry.slug,
+            kind: doc.kind || 'pdf',
+            url: doc.url || '',
+            name: doc.name || 'Quy định quản lý',
+            bytes: doc.bytes || 0,
+            at: doc.at || 0,
+            embed: doc.embed !== false
+          },
+          slug: doc.slug || entry.slug,
+          body: { layer: 'qhc-2045', docRole: 'quy-dinh', docId: String(doc.id) },
+          isBusy: () => false,
+          setBusy() {},
+          onSaved: () => null
+        });
+        return;
+      }
+      if (!entry.decision) return;
+      openDecision({
+        key: 'layer:qhc-2045',
+        title: QHC2045.short,
+        noun: 'lớp',
+        decision: entry.decision,
+        slug: entry.decision.slug || entry.slug,
+        body: { layer: 'qhc-2045' },
+        isBusy: () => false,
+        setBusy() {},
+        onSaved: () => null
+      });
+    });
+  });
 }
 
 function openVisionPopup(f, latlng) {
@@ -950,6 +1006,7 @@ function openVisionPopup(f, latlng) {
   qhcLotPop = { popup, f, map: host };
   addPopupCollapseToggle(popup, 'viền vùng', 'Bấm lại vào vùng chức năng để hiện bảng thông tin');
   bindLandCardTabs(popup.getElement());
+  bindQhcDossier(popup);
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 

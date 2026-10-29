@@ -1,18 +1,18 @@
-// Quyết định phê duyệt của lớp bản đồ dùng chung (Phân loại đô thị hiện trạng / quy hoạch, QHC 2045).
-// QHC 1/25.000 và QHC 1/10.000 dùng chung một quyết định (mã qhc-2045).
-// Nút [data-layer-decision="<mã>"] ở dòng lớp (tab Đô thị, đồ án QHC); mã khớp LAYER_DECISIONS (projectStore.js).
-// Người dùng xem quyết định đã gắn; Admin gắn / thay / gỡ qua decisionViewer.js.
-// data-label: nhãn cố định cạnh biểu tượng; data-label-name: nhãn là tên file / trang quyết định.
+// Quyết định / văn bản hồ sơ của lớp bản đồ dùng chung (Phân loại đô thị, QHC 2045).
+// QHC 1/25.000 và 1/10.000 dùng chung khóa qhc-2045: quyết định phê duyệt + quy định quản lý + thuyết minh (menu 3 lựa chọn).
+// Phân loại đô thị vẫn một nút quyết định (data-layer-decision).
 // QĐ 614 và QĐ 108 nằm trên bucket docs/ (phục vụ /gcs/docs/…). Không đưa PDF vào git hay asset Worker.
-// Bản quyết định admin gắn cùng mã (getLayerDecisions) thắng file docs/.
+// Bản admin gắn cùng mã (getLayerDecisions) thắng file docs/.
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico } from './utils.js';
-import { openOrAssign } from './decisionViewer.js';
+import { openOrAssign, openAssign } from './decisionViewer.js';
+import {
+  dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
+} from './dossierAttach.js';
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
-// kind pdf + url cùng origin: khung xem mở file, không gọi getProjectDecision.
 const BUNDLED = {
   'do-thi-hien-trang': {
     slug: 'lop-do-thi-hien-trang',
@@ -40,17 +40,22 @@ const BUNDLED_TITLE = {
 
 let titles = {};
 let items = {};
+let docsByLayer = {};
 let busyId = null;
 
 function decisionFor(id) {
   return items[id] || BUNDLED[id] || null;
 }
 
+function docsFor(id) {
+  return docsByLayer[id] || [];
+}
+
 function titleFor(id) {
   return titles[id] || BUNDLED_TITLE[id] || '';
 }
 
-function target(id) {
+function decisionTarget(id) {
   return {
     key: `layer:${id}`,
     title: titleFor(id) || id,
@@ -64,9 +69,53 @@ function target(id) {
       if (decision) items[id] = decision;
       else delete items[id];
       paintLayerDecisions();
-      return decision ? target(id) : null;
+      return decision ? decisionTarget(id) : null;
     }
   };
+}
+
+function docTarget(id, doc, role) {
+  const labels = { 'quy-dinh': 'Quy định quản lý', 'thuyet-minh': 'Thuyết minh' };
+  const label = labels[role] || 'Văn bản';
+  const docId = doc && doc.id ? doc.id : '';
+  return {
+    key: `layer-doc:${id}:${docId || 'new'}:${role}`,
+    title: titleFor(id) || id,
+    noun: label,
+    decision: doc || null,
+    slug: `lop-${id}`,
+    body: { layer: id, docRole: role, docId },
+    isBusy: () => !!busyId,
+    setBusy: (on) => { busyId = on ? id : null; paintLayerDecisions(); },
+    onSaved: (saved, data) => {
+      docsByLayer[id] = Array.isArray(data && data.docs) ? data.docs : [];
+      paintLayerDecisions();
+      if (!saved) return null;
+      const fresh = (docsByLayer[id] || []).find(d => d.id === saved.id) || saved;
+      return docTarget(id, fresh, fresh.role || role);
+    }
+  };
+}
+
+function openLayerPick(id, pick) {
+  if (pick === 'phe-duyet') {
+    // QĐ 108 gắn sẵn (BUNDLED): mở xem; Admin bấm «Thay» trong khung để gắn bản khác.
+    openOrAssign(decisionTarget(id));
+    return;
+  }
+  if (pick !== 'quy-dinh' && pick !== 'thuyet-minh') return;
+  const doc = latestDocOf(docsFor(id), pick);
+  if (doc) openOrAssign(docTarget(id, doc, pick));
+  else openAssign(docTarget(id, null, pick));
+}
+
+/** Quyết định / docs đã gắn lớp (thẻ lô QHC đọc). */
+export function layerDecisionOf(id) {
+  return decisionFor(id);
+}
+
+export function layerDocsOf(id) {
+  return docsFor(id).slice();
 }
 
 export function paintLayerDecisions(root = document) {
@@ -88,6 +137,17 @@ export function paintLayerDecisions(root = document) {
       : admin ? `Gắn quyết định phê duyệt${name} (PDF tối đa 10 MB hoặc link)` : `Chưa gắn quyết định phê duyệt${name}`;
     btn.setAttribute('aria-label', d ? 'Xem quyết định phê duyệt' : admin ? 'Gắn quyết định phê duyệt' : 'Chưa gắn quyết định phê duyệt');
   });
+  root.querySelectorAll('[data-dossier-layer-host]').forEach(host => {
+    const id = host.dataset.dossierLayerHost;
+    host.innerHTML = dossierMenuHtml({
+      attrs: `data-dossier-layer="${escapeHtml(id)}"`,
+      decision: decisionFor(id),
+      docs: docsFor(id),
+      admin,
+      busy: busyId === id,
+      ico
+    });
+  });
 }
 
 async function load() {
@@ -97,6 +157,7 @@ async function load() {
     if (!res.ok || !data.success) throw new Error(data.message || `HTTP ${res.status}`);
     titles = data.titles || {};
     items = data.items || {};
+    docsByLayer = data.docs || {};
   } catch (err) {
     console.warn('Không tải được quyết định phê duyệt của lớp bản đồ:', err.message);
   }
@@ -106,13 +167,32 @@ async function load() {
 export function initLayerDecisions() {
   paintLayerDecisions();
   document.addEventListener('click', (e) => {
+    const layerBtn = e.target.closest('[data-dossier-layer]');
+    if (layerBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleDossierMenu(layerBtn);
+      return;
+    }
+    const pick = e.target.closest('[data-dossier-pick]');
+    if (pick && pick.closest('[data-dossier-layer-host]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const wrap = pick.closest('.dossier-menu-wrap');
+      const btn = wrap && wrap.querySelector('[data-dossier-layer]');
+      const id = btn && btn.dataset.dossierLayer;
+      closeAllDossierMenus();
+      if (id) openLayerPick(id, pick.dataset.dossierPick);
+      return;
+    }
+    if (!e.target.closest('.dossier-menu-wrap')) closeAllDossierMenus();
     const btn = e.target.closest('[data-layer-decision]');
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
     const id = btn.dataset.layerDecision;
     if (btn.disabled || (!decisionFor(id) && !isAdmin())) return;
-    openOrAssign(target(id));
+    openOrAssign(decisionTarget(id));
   });
   document.addEventListener('auth:change', () => paintLayerDecisions());
   load();

@@ -6,8 +6,17 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
-import { ico, showToast } from './utils.js';
+import { ico, showToast, loadScript, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { PDF_ADMIN_MAX_BYTES, PDF_INLINE_MAX_BYTES, PDF_USER_MAX_BYTES, pdfSizeError, putSignedPdf } from './pdfLimits.js';
+
+// PDF.js chỉ tải khi mở khung xem (CDN), không nhúng trình xem PDF của Chrome — toolbar + viền đen hai bên.
+const PDFJS_VER = '3.11.174';
+const PDFJS_SRC = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.min.js`;
+const PDFJS_WORKER = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.worker.min.js`;
+let pdfjsReady = null;
+let pdfPaintSeq = 0;
+let pdfResizeObs = null;
+let pdfIo = null;
 
 export const DECISION_MAX_BYTES = PDF_ADMIN_MAX_BYTES;
 export const PROPOSE_MAX_BYTES = PDF_USER_MAX_BYTES;
@@ -21,12 +30,14 @@ function isAttachedDoc(t) {
 }
 
 function kindLabel(t) {
+  if (t && t.readOnly) return t.noun || 'Văn bản';
   if (isAttachedDoc(t)) return t.noun || 'Văn bản';
   return 'Quyết định';
 }
 
 function viewTitle(t) {
   const name = (t && t.title) || '';
+  if (t && t.readOnly) return name || kindLabel(t);
   if (t && t.body && t.body.layer) return name;
   return [kindLabel(t), name].filter(Boolean).join(' · ');
 }
@@ -37,11 +48,25 @@ function commitLabel(t) {
 
 function paintHeading(el, t) {
   const title = viewTitle(t);
-  el.querySelector('[data-decision-title]').textContent = title;
+  const head = el.querySelector('[data-decision-title]');
+  if (head) head.textContent = title;
   const frame = el.querySelector('iframe');
   if (frame) frame.title = title;
+  const pdfHost = el.querySelector('[data-decision-pdf]');
+  if (pdfHost) pdfHost.setAttribute('aria-label', title);
   const close = el.querySelector('[data-decision-close]');
   if (close) close.setAttribute('aria-label', `Đóng ${kindLabel(t).toLowerCase()}`);
+}
+
+function setDecisionFile(el, text) {
+  const label = String(text || '');
+  const file = el.querySelector('[data-decision-file]');
+  if (file) file.textContent = label;
+  const head = el.querySelector('[data-decision-title]');
+  if (head) {
+    const base = head.textContent || '';
+    head.title = label ? `${base} · ${label}` : base;
+  }
 }
 
 let current = null;
@@ -103,7 +128,7 @@ function ensureViewer() {
   el.innerHTML = `<div class="decision-bar">
       <b id="decisionViewTitle" data-decision-title></b>
       <span data-decision-file></span>
-      <a data-decision-open href="#" target="_blank" rel="noopener">Mở tab mới</a>
+      <a data-decision-open href="#" target="_blank" rel="noopener" title="Mở tab mới">Tab</a>
       <span data-decision-admin hidden>
         <button type="button" data-decision-replace>Thay</button>
         <button type="button" data-decision-remove>Gỡ</button>
@@ -128,7 +153,8 @@ function ensureViewer() {
       <button type="button" data-proposal-reject>Từ chối</button>
     </div>
     <div class="decision-note" data-decision-note hidden></div>
-    <iframe title="Quyết định phê duyệt"></iframe>`;
+    <div class="decision-pdf" data-decision-pdf hidden></div>
+    <iframe title="Quyết định phê duyệt" hidden></iframe>`;
   document.body.appendChild(el);
   el.querySelector('[data-decision-close]').addEventListener('click', closeDecision);
   el.querySelector('[data-decision-assign]').addEventListener('submit', (e) => {
@@ -151,7 +177,11 @@ function ensureViewer() {
     if (e.key === 'Escape' && !el.hidden) { e.preventDefault(); closeDecision(); }
   });
   document.addEventListener('auth:change', () => {
-    el.querySelector('[data-decision-admin]').hidden = !isAdmin();
+    if (current && current.readOnly) el.querySelector('[data-decision-admin]').hidden = true;
+    else el.querySelector('[data-decision-admin]').hidden = !isAdmin();
+  });
+  document.addEventListener(FLOAT_OPEN_EVENT, (e) => {
+    if (e.detail !== 'decision' && !el.hidden) closeDecision();
   });
   return el;
 }
@@ -162,33 +192,158 @@ function showMode(el, mode) {
   el.querySelector('[data-decision-pending]').hidden = mode !== 'pending';
 }
 
-/** Ép trình xem PDF khớp chiều ngang khung (#view=FitH) — tránh hai dải đen hai bên khi khung cao hơn tỷ lệ trang. */
-function embedSrc(src) {
+function isPdfSrc(src) {
   const url = String(src || '').trim();
-  if (!url) return '';
-  if (/^https?:/i.test(url) && !/\.pdf(\?|#|$)/i.test(url) && !/[?&]action=(getProjectDecision|getChoDuyetPdf|getPendingPdf)\b/i.test(url)) {
-    return url;
+  if (!url) return false;
+  if (/^blob:|^data:application\/pdf/i.test(url)) return true;
+  if (/\.pdf(\?|#|$)/i.test(url)) return true;
+  return /[?&]action=(getProjectDecision|getChoDuyetPdf|getPendingPdf|getDecisionProposal)\b/i.test(url)
+    || /^\/gcs\/.+\.pdf(\?|#|$)/i.test(url);
+}
+
+function loadPdfJs() {
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = loadScript(PDFJS_SRC).then(() => {
+    const lib = window.pdfjsLib;
+    if (!lib) throw new Error('Không khởi tạo được PDF.js');
+    lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+    return lib;
+  }).catch((err) => {
+    pdfjsReady = null;
+    throw err;
+  });
+  return pdfjsReady;
+}
+
+function clearPdfHost(host) {
+  pdfPaintSeq += 1;
+  if (pdfResizeObs) {
+    pdfResizeObs.disconnect();
+    pdfResizeObs = null;
   }
-  const hash = url.indexOf('#');
-  const base = hash >= 0 ? url.slice(0, hash) : url;
-  return `${base}#view=FitH`;
+  if (pdfIo) {
+    pdfIo.disconnect();
+    pdfIo = null;
+  }
+  if (host) {
+    host.innerHTML = '';
+    host.hidden = true;
+    delete host.dataset.src;
+  }
+}
+
+async function renderPdfPage(doc, slot, pageNo, width) {
+  const page = await doc.getPage(pageNo);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.max(0.5, width / base.width);
+  const viewport = page.getViewport({ scale });
+  let canvas = slot.querySelector('canvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.className = 'decision-pdf-page';
+    slot.appendChild(canvas);
+  }
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  slot.style.aspectRatio = `${base.width} / ${base.height}`;
+  await page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport }).promise;
+}
+
+async function paintPdf(host, src) {
+  const seq = ++pdfPaintSeq;
+  host.hidden = false;
+  host.dataset.src = src;
+  host.innerHTML = '<p class="decision-pdf-wait">Đang tải PDF…</p>';
+  try {
+    const pdfjs = await loadPdfJs();
+    if (seq !== pdfPaintSeq) return;
+    const res = await fetch(src, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`Không tải được PDF (${res.status})`);
+    const data = new Uint8Array(await res.arrayBuffer());
+    if (seq !== pdfPaintSeq) return;
+    const doc = await pdfjs.getDocument({ data }).promise;
+    if (seq !== pdfPaintSeq) return;
+    host.innerHTML = '';
+    const widthOf = () => Math.max(120, Math.floor(host.clientWidth) || 0);
+    const slots = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const slot = document.createElement('div');
+      slot.className = 'decision-pdf-slot';
+      slot.dataset.page = String(n);
+      host.appendChild(slot);
+      slots.push(slot);
+    }
+    const first = await doc.getPage(1);
+    if (seq !== pdfPaintSeq) return;
+    const firstBase = first.getViewport({ scale: 1 });
+    const ratio = `${firstBase.width} / ${firstBase.height}`;
+    slots.forEach((slot) => { slot.style.aspectRatio = ratio; });
+
+    if (pdfIo) pdfIo.disconnect();
+    pdfIo = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting || seq !== pdfPaintSeq) return;
+        const slot = entry.target;
+        if (slot.dataset.ready === '1') return;
+        slot.dataset.ready = '1';
+        renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
+          slot.dataset.ready = '';
+        });
+      });
+    }, { root: host, rootMargin: '240px 0px' });
+    slots.forEach((slot) => pdfIo.observe(slot));
+
+    let resizeTimer = 0;
+    pdfResizeObs = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (seq !== pdfPaintSeq) return;
+        const w = widthOf();
+        slots.forEach((slot) => {
+          if (slot.dataset.ready !== '1') return;
+          slot.dataset.ready = '1';
+          renderPdfPage(doc, slot, Number(slot.dataset.page), w).catch(() => {});
+        });
+      }, 120);
+    });
+    pdfResizeObs.observe(host);
+  } catch (err) {
+    if (seq !== pdfPaintSeq) return;
+    host.innerHTML = `<p class="decision-pdf-wait">${escapeMsg(err.message || 'Không xem được PDF trong khung.')}</p>`;
+  }
+}
+
+function escapeMsg(s) {
+  return String(s || '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
 function showFrame(el, src, note) {
   const frame = el.querySelector('iframe');
+  const pdfHost = el.querySelector('[data-decision-pdf]');
   const box = el.querySelector('[data-decision-note]');
-  if (note) {
+  clearPdfHost(pdfHost);
+  if (frame) {
     frame.hidden = true;
     frame.removeAttribute('src');
+  }
+  if (note) {
     box.hidden = false;
     box.textContent = note;
     return;
   }
   box.hidden = true;
   box.textContent = '';
-  frame.hidden = false;
-  if (src) frame.src = embedSrc(src);
-  else frame.removeAttribute('src');
+  if (!src) return;
+  if (isPdfSrc(src)) {
+    paintPdf(pdfHost, src);
+    return;
+  }
+  if (frame) {
+    frame.hidden = false;
+    frame.src = src;
+  }
 }
 
 export function openDecision(t) {
@@ -206,13 +361,32 @@ export function openDecision(t) {
   paintHeading(el, t);
   const d = t.decision;
   const fallback = isAttachedDoc(t) ? kindLabel(t) : 'Quyết định phê duyệt';
-  el.querySelector('[data-decision-file]').textContent = [d.name || fallback, d.kind === 'link' ? 'link' : 'PDF', fmtBytes(d.bytes)].filter(Boolean).join(' · ');
-  el.querySelector('[data-decision-admin]').hidden = !isAdmin();
+  setDecisionFile(el, [d.name || fallback, d.kind === 'link' ? 'link' : 'PDF', fmtBytes(d.bytes)].filter(Boolean).join(' · '));
+  el.querySelector('[data-decision-admin]').hidden = !!(t && t.readOnly) || !isAdmin();
   const open = el.querySelector('[data-decision-open]');
   open.hidden = false;
   open.href = url;
   const embed = d.kind !== 'link' || d.embed === true;
   showFrame(el, embed ? url : '', embed ? '' : `Trang này không xem được trong khung. Bấm «Mở tab mới» để đọc ${kindLabel(t).toLowerCase()}.`);
+  announceFloat('decision');
+}
+
+/** PDF/link nội bộ chỉ xem (quyết định kiến trúc, quy chế…): không nút Thay/Gỡ. */
+export function openInlinePdf(url, title = '', name = '') {
+  const src = String(url || '').trim();
+  if (!src) return;
+  const label = String(title || 'Văn bản').trim();
+  openDecision({
+    title: label,
+    noun: 'văn bản',
+    readOnly: true,
+    decision: {
+      kind: /\.pdf(\?|#|$)/i.test(src) || /^blob:|^data:application\/pdf/i.test(src) ? 'pdf' : 'link',
+      url: src,
+      name: String(name || label).trim(),
+      embed: true
+    }
+  });
 }
 
 function revokePdfPreview() {
@@ -221,7 +395,11 @@ function revokePdfPreview() {
 }
 
 export function openAssign(t) {
-  if (!isAdmin() || !t) return;
+  if (!t) return;
+  if (!isAdmin()) {
+    showToast('Cần đăng nhập quản trị để gắn PDF.', 'error');
+    return;
+  }
   const el = ensureViewer();
   current = t;
   pendingReview = null;
@@ -229,7 +407,7 @@ export function openAssign(t) {
   el.hidden = false;
   showMode(el, 'assign');
   paintHeading(el, t);
-  el.querySelector('[data-decision-file]').textContent = t.decision ? `Thay ${kindLabel(t).toLowerCase()}` : 'Chưa gán';
+  setDecisionFile(el, t.decision ? `Thay ${kindLabel(t).toLowerCase()}` : 'Chưa gán');
   el.querySelector('[data-decision-admin]').hidden = false;
   const assign = el.querySelector('[data-decision-assign]');
   assign.hidden = false;
@@ -240,7 +418,18 @@ export function openAssign(t) {
   btn.textContent = commitLabel(t);
   el.querySelector('[data-decision-open]').hidden = !t.decision;
   el.querySelector('[data-decision-open]').href = t.decision ? decisionUrl(t) : '#';
-  if (!t.decision) showFrame(el, '', '');
+  if (t.decision) {
+    const url = decisionUrl(t);
+    const embed = t.decision.kind !== 'link' || t.decision.embed === true;
+    showFrame(el, embed && url ? url : '', embed ? '' : `Đang gắn thay thế. Bấm «Chọn PDF» hoặc dán link phía trên.`);
+  } else {
+    showFrame(el, '', `Chọn PDF hoặc dán link ở thanh phía trên để gắn «${kindLabel(t)}», rồi bấm «${commitLabel(t)}».`);
+    // Tự mở hộp chọn file — tránh chỉ thấy khung trống bên phải.
+    requestAnimationFrame(() => {
+      if (current === t && !pendingPdf) pickFile(t);
+    });
+  }
+  announceFloat('decision');
 }
 
 /** Có quyết định thì mở xem, chưa có thì Admin mở khung gắn. */
@@ -263,18 +452,20 @@ export function openPropose(t) {
   el.querySelector('[data-decision-open]').href = '#';
   if (t.proposal) {
     showMode(el, 'view');
-    el.querySelector('[data-decision-file]').textContent = `Chờ duyệt · ${t.proposal.name}`;
+    setDecisionFile(el, `Chờ duyệt · ${t.proposal.name}`);
     showFrame(el, '', `File «${t.proposal.name}» đang chờ admin duyệt nên chưa gắn vào đồ án. Gửi file khác sau khi admin đồng ý hoặc từ chối.`);
+    announceFloat('decision');
     return;
   }
   showMode(el, 'propose');
-  el.querySelector('[data-decision-file]').textContent = 'Gửi chờ duyệt';
+  setDecisionFile(el, 'Gửi chờ duyệt');
   const form = el.querySelector('[data-decision-propose]');
   form.querySelector('[data-propose-review]').textContent = PROPOSE_HINT;
   const btn = form.querySelector('[data-propose-commit]');
   btn.disabled = true;
   btn.textContent = 'Gửi chờ duyệt';
   showFrame(el, '', 'Chọn file PDF quyết định phê duyệt, tối đa 2 MB.');
+  announceFloat('decision');
 }
 
 /** Admin xem file đang chờ, đồng ý thì ghi thành quyết định của đồ án. */
@@ -288,12 +479,13 @@ export async function openProposalReview(t) {
   el.hidden = false;
   showMode(el, 'pending');
   paintHeading(el, t);
-  el.querySelector('[data-decision-file]').textContent = `Chờ duyệt · ${t.proposal.name}`;
+  setDecisionFile(el, `Chờ duyệt · ${t.proposal.name}`);
   el.querySelector('[data-decision-admin]').hidden = true;
   el.querySelector('[data-proposal-note]').textContent = [t.proposal.name, fmtBytes(t.proposal.bytes)].filter(Boolean).join(' · ');
   el.querySelector('[data-decision-open]').hidden = true;
   el.querySelector('[data-decision-open]').href = '#';
   showFrame(el, '', 'Đang tải file chờ duyệt…');
+  announceFloat('decision');
   setBusy(t, true);
   try {
     const res = await fetch(geeApi('action=getDecisionProposal'), {
@@ -328,8 +520,12 @@ export function closeDecision() {
   const el = document.getElementById('decisionView');
   if (!el || el.hidden) return;
   el.hidden = true;
+  clearPdfHost(el.querySelector('[data-decision-pdf]'));
   const frame = el.querySelector('iframe');
-  if (frame) frame.removeAttribute('src');
+  if (frame) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+  }
   current = null;
   revokePdfPreview();
   revokeProposalPreview();

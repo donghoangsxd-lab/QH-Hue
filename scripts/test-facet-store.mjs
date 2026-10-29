@@ -164,7 +164,12 @@ assert.equal(fs.existsSync('public/docs/du-thao-quy-che-quan-ly-kien-truc-2026.p
 assert.doesNotMatch(fs.readFileSync('public/_headers', 'utf8'), /du-thao-quy-che/);
 const kienTrucUi = fs.readFileSync('public/js/chuyenNganh.js', 'utf8');
 assert.match(kienTrucUi, /item\.doc\?\.url/);
-assert.match(kienTrucUi, /target="_blank" rel="noopener"/);
+assert.match(kienTrucUi, /data-arch-doc-open/);
+assert.match(kienTrucUi, /data-arch-photo-open/);
+assert.match(kienTrucUi, /data-arch-pdf-open/);
+assert.match(kienTrucUi, /openMedia/);
+assert.match(kienTrucUi, /openInlinePdf/);
+assert.doesNotMatch(kienTrucUi, /target="_blank"/);
 assert.equal(congTrinh.items.length, 27);
 assert.equal(congTrinh.quyetDinh.so, '1152/QĐ-UBND');
 assert.equal(congTrinh.quyetDinh.ngay, '30/5/2018');

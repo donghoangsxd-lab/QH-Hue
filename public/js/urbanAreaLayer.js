@@ -11,6 +11,7 @@ import { escapeHtml } from './utils.js';
 import { STATUS_REF, URBANS_614, RURAL_RULE, wardLevel614, urbans614Of } from './urbanStatus.js';
 import { VISION_REF, VISION_STAGE, VISION_CLAUSE, URBANS_VISION, visionLevel, visionUrbansOf } from './urbanVision.js';
 import { planUrbanOf } from './urbanClass.js';
+import { DVHC_CITY, dvhcOf } from './dvhcStats.js';
 
 // Bấm ký hiệu / nét ranh đô thị: detail = { id, side } — id trong urbanStatus.js (side 'HT') hoặc urbanVision.js (side 'QH');
 // viewFlow.js quyết định chọn đô thị hay mở view riêng
@@ -68,6 +69,16 @@ const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 const muted = (text) => `<span class="ua-tip-muted">${escapeHtml(text)}</span>`;
 const clsTag = (cls) => `<b class="uc-${cls}">loại ${cls}</b>`;
 const tipOpts = { sticky: true, direction: 'top', offset: [0, -8], className: 'ua-tip', opacity: 1 };
+const POP_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
+const KM_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function dvhcStatLine(name) {
+  const stats = name === DVHC_CITY.name ? DVHC_CITY : dvhcOf(name);
+  if (!stats) return '';
+  const pop = Number.isFinite(Number(stats.pop)) ? POP_FMT.format(Number(stats.pop)) : '—';
+  const km = Number.isFinite(Number(stats.km2)) ? KM_FMT.format(Number(stats.km2)) : '—';
+  return `Dân số: ${escapeHtml(pop)} · ${escapeHtml(km)} km²`;
+}
 
 function ringsOf(geometry) {
   const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
@@ -95,16 +106,15 @@ const statusContent = {
   wardTip(name) {
     const lvl = wardLevel614(name);
     const rows = [`<b class="ua-tip-name">${escapeHtml(name)}</b>`];
+    const stats = dvhcStatLine(name);
+    if (stats) rows.push(stats);
     if (lvl) {
       rows.push(`Trình độ phát triển đô thị ${clsTag(lvl.level)} (trước 01/7/2025: loại ${lvl.before})`);
       rows.push(muted(`Nhập từ: ${lvl.from}`));
       if (lvl.rural) rows.push(muted(RURAL_RULE));
-    } else {
-      rows.push('Đơn vị hành chính nông thôn');
     }
-    const city = URBANS_614.find(u => u.city);
     const own = urbans614Of(name).map(u => `${escapeHtml(u.name)} (${u.cls}${u.part ? `, ${escapeHtml(lowerFirst(u.scope))}` : ''})`);
-    rows.push(`Thuộc: ${escapeHtml(city.name)} (I)${own.length ? ` · ${own.join(' · ')}` : ''}`);
+    if (own.length) rows.push(`Đô thị: ${own.join(' · ')}`);
     return rows.join('<br>');
   }
 };
@@ -126,14 +136,13 @@ const visionContent = {
   wardTip(name) {
     const lvl = visionLevel(name);
     const rows = [`<b class="ua-tip-name">${escapeHtml(name)}</b>`];
+    const stats = dvhcStatLine(name);
+    if (stats) rows.push(stats);
     if (lvl) {
       rows.push(`${VISION_STAGE}: trình độ phát triển đô thị ${clsTag(lvl.level)}`);
-    } else {
-      rows.push('Đơn vị hành chính nông thôn, chưa định hướng đạt trình độ phát triển đô thị');
     }
-    const city = URBANS_VISION.find(u => u.city);
     const own = visionUrbansOf(name).map(u => `${escapeHtml(u.name)} (${u.cls})`);
-    rows.push(`Thuộc: ${escapeHtml(city.name)} (I)${own.length ? ` · ${own.join(' · ')}` : ''}`);
+    if (own.length) rows.push(`Đô thị: ${own.join(' · ')}`);
     rows.push(muted(VISION_REF));
     return rows.join('<br>');
   }
@@ -194,7 +203,12 @@ function createUrbanLayer(content) {
   const overLayer = (ev) => !!ev?.target?.closest?.('.leaflet-interactive');
 
   function onMouseMove(e) {
-    if (!visible || pointerOnUrban || overLayer(e.originalEvent) || m.getZoom() > WARD_HOVER_MAX_ZOOM) { clearWardHover(); return; }
+    // Tab ĐVHC tự hiện tooltip dân số / diện tích (chuyenNganh.js); không chồng tip phân loại đô thị.
+    if (!visible || pointerOnUrban || overLayer(e.originalEvent) || m.getZoom() > WARD_HOVER_MAX_ZOOM
+      || document.body.classList.contains('dvhc-browse')) {
+      clearWardHover();
+      return;
+    }
     const w = wardAt(e.latlng);
     if (!w) { clearWardHover(); return; }
     if (wardHover?.name !== w.name) {
@@ -239,6 +253,14 @@ function createUrbanLayer(content) {
     clearUrbanHover();
     syncFillOpacity();
     const pick = (id) => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: { id, side: content.side } }));
+    // Tab ĐVHC: bấm nét/ký hiệu đô thị vẫn chọn xã dưới điểm (không mở đô thị / QHC).
+    const onUrbanClick = (latlng, id) => {
+      if (document.body.classList.contains('dvhc-browse')) {
+        document.dispatchEvent(new CustomEvent('qh:dvhc-at', { detail: latlng }));
+        return;
+      }
+      pick(id);
+    };
     // Loại I vẽ trước, loại III sau cùng để nét đô thị nhỏ nằm trên
     const rank = (f) => CLS_RANK[byId.get(f.properties.id)?.cls] ?? 3;
     [...fc.features].sort((a, b) => rank(a) - rank(b)).forEach(f => {
@@ -259,7 +281,7 @@ function createUrbanLayer(content) {
         hit.bindTooltip(content.urbanTip(u), tipOpts);
         hit.on('mouseover', () => enterUrban());
         hit.on('mouseout', leaveUrban);
-        hit.on('click', () => pick(u.id));
+        hit.on('click', (e) => onUrbanClick(e.latlng, u.id));
         groups.lines.addLayer(line);
         groups.lines.addLayer(hit);
       }
@@ -274,7 +296,7 @@ function createUrbanLayer(content) {
         .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea }), { ...tipOpts, sticky: false, offset: [0, -16] })
         .on('mouseover', () => enterUrban())
         .on('mouseout', leaveUrban)
-        .on('click', () => pick(u.id))
+        .on('click', (e) => onUrbanClick(e.latlng, u.id))
         .addTo(groups.badges);
     });
   }
@@ -414,6 +436,7 @@ async function setVisible(on, { fit = false } = {}) {
 /** true: phân loại đô thị theo quy hoạch trên bản đồ nền. false: trả về cặp hiện trạng / bản đồ đồ án. */
 export function showUrbanPlanOnBase(on) {
   planOnBase = !!on;
+  document.body.classList.toggle('urban-plan-on-base', planOnBase);
   return applyUrbanVisible(!!$chk()?.checked);
 }
 
@@ -435,6 +458,10 @@ export function refreshUrbanAreaLayer() {
   visionLeft.refresh();
 }
 
+/** Đô thị hiện trạng (QĐ 614) theo id, có ranh; null nếu chỉ có ký hiệu điểm */
+export const urbanStatusFeature = (id) => statusLayer.feature(id).catch(() => null);
+/** Đô thị hiện trạng (QĐ 614) chứa điểm bấm */
+export const urbanStatusAt = (latlng) => statusLayer.at(latlng).catch(() => null);
 /** Đô thị sau 2030 (QĐ 756) theo id, có ranh; null nếu chỉ có ký hiệu điểm */
 export const urbanVisionFeature = (id) => visionLayer.feature(id).catch(() => null);
 /** Đô thị sau 2030 (QĐ 756) chứa điểm bấm trên bản đồ quy hoạch */

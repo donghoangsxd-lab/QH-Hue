@@ -3901,14 +3901,15 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Văn bản kèm hồ sơ đồ án: quyết định phê duyệt thêm, quyết định đính chính, quy chế (role quy-dinh). Không ghi cột LinkQD.
+    // Văn bản kèm hồ sơ đồ án hoặc lớp dùng chung (body.layer): quy chế (quy-dinh), thuyết minh… Không ghi cột LinkQD.
     if (action === 'putProjectDoc') {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const layer = String(body.layer || '').slice(0, 40);
+      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
       const role = String(body.docRole || '').slice(0, 20);
-      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      if (!layer && !tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       const url = String(body.url || '').trim();
       const staged = stagedTokenOf(body);
       let buffer = null;
@@ -3919,8 +3920,8 @@ module.exports = async (req, res) => {
       try {
         const replaceId = String(body.docId || '').slice(0, 16);
         const saved = url
-          ? await projects.saveProjectDoc({ tenQH, role, url, replaceId })
-          : await projects.saveProjectDoc({ tenQH, role, fileName: body.name, buffer, replaceId, stagedToken: staged });
+          ? await projects.saveProjectDoc({ tenQH, layer, role, url, replaceId })
+          : await projects.saveProjectDoc({ tenQH, layer, role, fileName: body.name, buffer, replaceId, stagedToken: staged });
         return res.status(200).json({ success: true, doc: saved.doc, docs: saved.docs, bucket: saved.via });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được văn bản' });
@@ -3931,11 +3932,12 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const layer = String(body.layer || '').slice(0, 40);
+      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
       const id = String(body.docId || '').slice(0, 16);
-      if (!tenQH || !id) return res.status(400).json({ error: true, message: 'Thiếu văn bản cần gỡ' });
+      if ((!layer && !tenQH) || !id) return res.status(400).json({ error: true, message: 'Thiếu văn bản cần gỡ' });
       try {
-        const done = await projects.removeProjectDoc(tenQH, id);
+        const done = await projects.removeProjectDoc(tenQH, id, { layer });
         return res.status(200).json({ success: true, docs: done.docs });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được văn bản' });

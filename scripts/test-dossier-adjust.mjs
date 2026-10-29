@@ -59,7 +59,7 @@ for (const label of ['Quyết định phê duyệt', 'Quy định quản lý', '
   assert.match(layer, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 assert.match(layer, /bản vẽ/);
-assert.match(layer, /\$\{fmtNum\(times\)\} lần/);
+assert.match(layer, /\$\{fmtNum\(sites\)\} vị trí/);
 assert.match(layer, /Xem PDF/);
 assert.match(layer, /Xem QĐ/);
 assert.match(layer, /Bản vẽ scan/);
@@ -67,6 +67,11 @@ assert.match(layer, /function dossierSearchText/);
 assert.match(layer, /it\.title \|\| it\.summary/);
 assert.match(layer, /'quy-dinh': \{ short: 'QC', label: 'Quy chế' \}/);
 assert.match(layer, /<option value="quy-dinh">Quy chế<\/option>/);
+assert.match(layer, /data-dossier-menu/);
+assert.match(layer, /openDossierPick/);
+assert.match(read('public/js/dossierAttach.js'), /DOSSIER_ATTACH/);
+assert.match(read('services/projectStore.js'), /docsView\(d \|\| \{\}\)/);
+assert.match(read('api/gee.js'), /layer, role, url, replaceId/);
 assert.match(layer, /capacityPanelHtml/);
 assert.doesNotMatch(entry, /Quy định quản lý/);
 assert.match(entry, /Ghi bổ sung hồ sơ điều chỉnh cục bộ/);

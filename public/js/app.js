@@ -50,11 +50,11 @@ import {
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, announceFloat, FLOAT_OPEN_EVENT, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
-import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js';
+import { initViewFlow, wardFromMapClick, detailClickLocked, consumeDothiMapClick } from './viewFlow.js';
 import { initMapLevel, getLevel, setLevel, DEFAULT_LEVEL } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
-import { initChuyenNganh } from './chuyenNganh.js';
+import { initChuyenNganh, consumeDvhcMapClick } from './chuyenNganh.js';
 import { initChamDiem } from './chamDiemUi.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
@@ -72,6 +72,7 @@ import { initLotEdit } from './lotEdit.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initStreetView } from './streetView.js';
+import { initMediaViewer } from './mediaViewer.js';
 import { initMapContext } from './mapContext.js';
 import { initView3d } from './view3dPanel.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
@@ -725,8 +726,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!detailLocked && cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
-    if (!detailLocked && qhcClick(e, targetMap)) return;
-    // Bấm nền: chọn phường hay không do lớp quy hoạch đang xem quyết định (viewFlow.js)
+    // ĐVHC / Đô thị: nền chỉ chọn xã hoặc ranh đô thị (khi chưa mở thửa / công trình — đã ưu tiên ở trên).
+    const adminBrowse = document.body.classList.contains('dvhc-browse')
+      || document.body.classList.contains('dothi-browse');
+    if (!adminBrowse && !detailLocked && qhcClick(e, targetMap)) return;
+    if (consumeDvhcMapClick(e.latlng)) return;
+    if (await consumeDothiMapClick(e.latlng, targetMap)) return;
+    // Trục Quy hoạch: không chọn phường; nền chỉ thu gọn đồ án (wardFromMapClick). Lô / đồ án qua qhcClick và lớp lô.
     const ward = wardFromMapClick(e.latlng, targetMap);
     if (ward) chooseWard(ward);
   };
@@ -751,6 +757,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   map.on('click', (e) => handleMapClick(e, map));
   planMap?.on('click', (e) => handleMapClick(e, planMap));
   initStreetView();
+  initMediaViewer();
   initMapContext([map, planMap]);
   initView3d([map, planMap]);
 

@@ -793,11 +793,14 @@ function decisionTarget({ tenQH, layer }) {
 async function layerDecisions() {
   const items = (await readDecisions()).data.items || {};
   const out = {};
+  const docs = {};
   Object.keys(LAYER_DECISIONS).forEach(id => {
     const d = items[`lop:${id}`];
     if (d && d.at) out[id] = decisionView(d);
+    const list = docsView(d || {});
+    if (list.length) docs[id] = list;
   });
-  return { titles: LAYER_DECISIONS, items: out };
+  return { titles: LAYER_DECISIONS, items: out, docs };
 }
 
 async function removeLayerDecision(layer) {
@@ -930,12 +933,12 @@ function deliverStoredPdf(objectName, at, fileName, bytes) {
   return fetchStoredPdf(objectName, at, fileName);
 }
 
-async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId, stagedToken, fixedId }) {
+async function saveProjectDoc({ tenQH, layer, role, fileName, buffer, url, replaceId, stagedToken, fixedId }) {
   if (!Object.prototype.hasOwnProperty.call(DOC_ROLES, role)) rejectReview('Loại văn bản không hợp lệ');
   // fixedId giữ cùng mã khi duyệt lại một hồ sơ chờ, không thêm văn bản thứ hai.
   const fixed = DOC_ID_RE.test(String(fixedId || '')) ? String(fixedId) : '';
   const swap = !fixed && DOC_ID_RE.test(String(replaceId || '')) ? String(replaceId) : '';
-  const { name, slug } = await listedProject(tenQH);
+  const { name, slug } = layer ? layerTarget(layer) : await listedProject(tenQH);
   const cur = await readDecisions();
   const prev = cur.data.items && cur.data.items[name];
   const existing = docsView(prev || {});
@@ -983,9 +986,9 @@ async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId, s
   return { doc: docView(meta, slug), docs: docsView(item), via: via || indexed.via };
 }
 
-async function removeProjectDoc(tenQH, id) {
+async function removeProjectDoc(tenQH, id, opts = {}) {
   if (!DOC_ID_RE.test(String(id || ''))) rejectReview('Mã văn bản không hợp lệ');
-  const { name, slug } = await listedProject(tenQH);
+  const { name, slug } = opts.layer ? layerTarget(opts.layer) : await listedProject(tenQH);
   let removed = null;
   const indexed = await updateDecisions(c => {
     const items = { ...(c.items || {}) };

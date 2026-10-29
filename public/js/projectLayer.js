@@ -41,6 +41,9 @@ import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview
 import { dossierAdjustments, adjustmentSiteCount, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
+import {
+  dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
+} from './dossierAttach.js';
 import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
 import { getAreaFilter, onFacet, schemeRecords as catalogSchemeRecords } from './facetStore.js';
 import {
@@ -1066,13 +1069,14 @@ function rowHtml(p, idx, admin, labelNo = null) {
   const dim = detailPick ? state.hiddenProjects.has(p.name) : !on;
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
-  const extraN = (p.docs || []).length;
-  const decisionTitle = p.decision
-    ? `Xem quyết định phê duyệt: ${p.decision.name}${extraN ? ` · ${extraN} văn bản kèm` : ''}`
-    : 'Gắn quyết định phê duyệt (PDF tối đa 10 MB hoặc link)';
-  const decisionBtn = (p.decision || admin)
-    ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
-    : '';
+  const decisionBtn = dossierMenuHtml({
+    attrs: `data-dossier-menu="${idx}"`,
+    decision: p.decision,
+    docs: p.docs,
+    admin,
+    busy: !!busy,
+    ico
+  });
   const waiting = !!p.proposal;
   const proposeTitle = waiting
     ? (admin ? `Duyệt file quyết định đang chờ: ${p.proposal.name}` : `Đang chờ admin duyệt: ${p.proposal.name}`)
@@ -2722,12 +2726,27 @@ function decisionTarget(p) {
   };
 }
 
+function openDossierPick(p, pick) {
+  if (pick === 'phe-duyet') {
+    if (p.decision) openOrAssign(decisionTarget(p));
+    else openAssign(decisionTarget(p));
+    return;
+  }
+  if (pick !== 'quy-dinh' && pick !== 'thuyet-minh') return;
+  const doc = latestDocOf(p.docs, pick);
+  if (doc) openOrAssign(docTarget(p, doc, pick));
+  else openAssign(docTarget(p, null, pick));
+}
+
 // ============================ KHỞI TẠO ============================
 
 /** opts.onDeleted: gọi sau khi xóa đồ án để tải lại dữ liệu bản đồ */
 export function initProjectLayer(opts = {}) {
   onDeleted = opts.onDeleted || null;
   loadHidden();
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dossier-menu-wrap')) closeAllDossierMenus();
+  });
   const master = $('chk_projects');
   if (master) {
     state.showProjects = master.checked;
@@ -2835,10 +2854,24 @@ export function initProjectLayer(opts = {}) {
       if (hit) openLot(p, hit.lot);
       return;
     }
-    const decision = e.target.closest('[data-decision]');
-    if (decision) {
-      const p = projects[Number(decision.dataset.decision)];
-      if (p) openOrAssign(decisionTarget(p));
+    const dossierMenuBtn = e.target.closest('[data-dossier-menu]');
+    if (dossierMenuBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleDossierMenu(dossierMenuBtn);
+      return;
+    }
+    const dossierPick = e.target.closest('[data-dossier-pick]');
+    if (dossierPick) {
+      const wrap = dossierPick.closest('.dossier-menu-wrap');
+      const btn = wrap && wrap.querySelector('[data-dossier-menu]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const p = projects[Number(btn.dataset.dossierMenu)];
+      closeAllDossierMenus();
+      if (!p) return;
+      openDossierPick(p, dossierPick.dataset.dossierPick);
       return;
     }
     const docBtn = e.target.closest('[data-doc]');

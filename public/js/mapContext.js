@@ -6,7 +6,7 @@ import { map, wardNameAt, toggleMeasure, handleMeasureClick, inspectAccessAt, co
 import { planMap } from './planMap.js';
 import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastreLayer.js';
 import { LOTS_PROGRESS_EVENT, lotsRevision } from './projectFiles.js';
-import { streetViewUrl } from './streetView.js';
+import { openStreetView } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 
 const NOTE_KEY = 'qhhue_map_notes';
@@ -343,7 +343,7 @@ function openMenu(ev, latlng, targetMap) {
     } else if (act === 'area') {
       startMeasure('area', latlng, targetMap);
     } else if (act === 'sv') {
-      window.open(streetViewUrl(latlng), '_blank', 'noopener');
+      openStreetView(latlng, targetMap);
     }
   });
 }

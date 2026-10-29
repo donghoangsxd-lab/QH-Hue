@@ -1,6 +1,6 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map, focusWard, clearWardHighlight, centerOnCity, getLeftObstruction, getRightObstruction } from './mapEngine.js';
+import { map, focusWard, clearWardHighlight, centerOnCity, wardNameAt, getLeftObstruction, getRightObstruction } from './mapEngine.js';
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
@@ -10,6 +10,8 @@ import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { geeApi } from './api.js';
 import { PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
+import { openMedia } from './mediaViewer.js';
+import { openInlinePdf } from './decisionViewer.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { toFeatureCollection } from './geoDoc.js';
 import { GP_SCOPE_EVENT, URBAN_FOCUS_EVENT } from './generalPlan.js';
@@ -17,7 +19,8 @@ import { ROAD_CLASSES, RAIL_KINDS, ROAD_STAGES } from './qhcRoads.js';
 import {
   AXES, AREA_TP, SECTORS, FACET_LEVELS, listAreas, areaLabel, formatKv, parseKv, getLayers,
   getAreaFilter, isLayerOn, setLayerFlag, layerPassesFilter, noteUrbanFocus, setBrowseState,
-  setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers, browseState
+  setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers,
+  browseState, areaCodeFromName
 } from './facetStore.js';
 import { DVHC_CITY, dvhcOf, shortPlaceName } from './dvhcStats.js';
 import { wardMarks, PLAN_FOOT } from './doThiQd756.js';
@@ -481,9 +484,89 @@ function paintAdmin() {
 
 const POP_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const KM_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const DVHC_TIP_OPTS = { sticky: true, direction: 'top', offset: [0, -8], className: 'ua-tip', opacity: 1 };
 
 function statText(value, fmt) {
   return value == null || !Number.isFinite(Number(value)) ? '—' : fmt.format(Number(value));
+}
+
+function adminTabId() {
+  return document.querySelector('[data-admin-tab].active')?.dataset.adminTab
+    || document.querySelector('[data-admin-tab][aria-selected="true"]')?.dataset.adminTab
+    || 'dvhc';
+}
+
+/** Tab Đơn vị hành chính đang mở trên trục A — bấm bản đồ chọn xã, không sang B. */
+export function isDvhcBrowse() {
+  return browseState().axis === 'hanhchinh' && adminTabId() === 'dvhc';
+}
+
+/** Tab Đô thị trên trục A — bấm bản đồ chọn theo ranh đô thị. */
+export function isDothiBrowse() {
+  return browseState().axis === 'hanhchinh' && adminTabId() === 'dothi';
+}
+
+function syncAdminBrowseClass() {
+  document.body.classList.toggle('dvhc-browse', isDvhcBrowse());
+  document.body.classList.toggle('dothi-browse', isDothiBrowse());
+  if (!isDvhcBrowse()) hideDvhcTip();
+}
+
+function dvhcTipHtml(name) {
+  const stats = name === DVHC_CITY.name ? DVHC_CITY : dvhcOf(name);
+  const pop = statText(stats && stats.pop, POP_FMT);
+  const km = statText(stats && stats.km2, KM_FMT);
+  return `<b class="ua-tip-name">${escapeHtml(name)}</b><br>Dân số: ${escapeHtml(pop)} · ${escapeHtml(km)} km²`;
+}
+
+let dvhcTip = null;
+
+function showDvhcTip(latlng, name) {
+  if (!map || !latlng || !name || typeof L === 'undefined') return;
+  if (!dvhcTip) dvhcTip = L.tooltip(DVHC_TIP_OPTS);
+  dvhcTip.setContent(dvhcTipHtml(name));
+  dvhcTip.setLatLng(latlng);
+  if (!map.hasLayer(dvhcTip)) map.openTooltip(dvhcTip);
+}
+
+function hideDvhcTip() {
+  if (dvhcTip && map?.hasLayer(dvhcTip)) map.closeTooltip(dvhcTip);
+}
+
+function selectDvhcName(name, { tipAt, zoom = true } = {}) {
+  if (!name) return false;
+  if (name === DVHC_CITY.name) {
+    setAreaFilter({ ...AREA_TP }, 'user');
+    if (zoom) focusWard(DVHC_CITY.name);
+  } else {
+    setAreaFilter({ type: 'xa', code: areaCodeFromName(name), parent: 'TP' }, 'user');
+    if (zoom) focusWard(name);
+  }
+  if (tipAt) showDvhcTip(tipAt, name);
+  requestAnimationFrame(() => {
+    document.querySelector('#axisWardList .axis-area.active')?.scrollIntoView({ block: 'nearest' });
+  });
+  return true;
+}
+
+/** Bấm nền khi đang tab ĐVHC: chọn đơn vị tại điểm, phóng tới, hiện dân số / diện tích. */
+export function consumeDvhcMapClick(latlng) {
+  if (!isDvhcBrowse() || !latlng) return false;
+  const name = wardNameAt(latlng.lat, latlng.lng);
+  if (!name) {
+    selectDvhcName(DVHC_CITY.name, { tipAt: latlng });
+    return true;
+  }
+  selectDvhcName(name, { tipAt: latlng });
+  return true;
+}
+
+function onDvhcMouseMove(e) {
+  if (!isDvhcBrowse()) { hideDvhcTip(); return; }
+  if (e?.originalEvent?.target?.closest?.('.leaflet-interactive')) { hideDvhcTip(); return; }
+  const name = e?.latlng ? wardNameAt(e.latlng.lat, e.latlng.lng) : null;
+  if (!name) { hideDvhcTip(); return; }
+  showDvhcTip(e.latlng, name);
 }
 
 function paintAdminList() {
@@ -649,7 +732,7 @@ function archPhotoStrip(item) {
     const del = archAdmin()
       ? `<button type="button" class="arch-photo-del" data-arch-photo-del="${escapeHtml(item.id)}:${photo.n}" title="Gỡ ảnh" aria-label="Gỡ ảnh">${ico('close')}</button>`
       : '';
-    return `<span class="arch-photo"><a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="${escapeHtml(item.ten || '')}"></a>${del}</span>`;
+    return `<span class="arch-photo"><button type="button" class="arch-photo-open" data-arch-photo-open="${escapeHtml(url)}" data-arch-photo-title="${escapeHtml(item.ten || '')}" title="Xem ảnh"><img src="${escapeHtml(url)}" alt="${escapeHtml(item.ten || '')}"></button>${del}</span>`;
   }).join('');
   return `<div class="arch-photos">${cells}</div>`;
 }
@@ -835,12 +918,15 @@ function paintKienTruc() {
     const title = item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : '';
     const body = `<b>${name}</b>${title}`;
     const href = docHref(item.doc?.url);
-    return href ? `<li><a href="${escapeHtml(href)}" target="_blank" rel="noopener">${body}</a></li>` : `<li>${body}</li>`;
+    const docTitle = escapeHtml(item.doc?.title || item.name || 'Quy chế kiến trúc');
+    return href
+      ? `<li><button type="button" class="arch-doc-open" data-arch-doc-open="${escapeHtml(href)}" data-arch-doc-title="${docTitle}">${body}</button></li>`
+      : `<li>${body}</li>`;
   })}</section>`;
   const groups = kienTruc?.congTrinh?.nhom || [];
   const pdfUrl = archPdfUrl();
   const pdfBtn = pdfUrl
-    ? `<a class="project-btn has-decision" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" title="Mở PDF quyết định" aria-label="Mở PDF quyết định">${ico('file')}</a>`
+    ? `<button type="button" class="project-btn has-decision" data-arch-pdf-open title="Mở PDF quyết định" aria-label="Mở PDF quyết định">${ico('file')}</button>`
     : `<span class="project-btn is-empty" title="Chưa có file PDF" aria-label="Chưa có file PDF">${ico('file')}</span>`;
   const uploadBtn = archAdmin()
     ? `<label class="project-btn" data-arch-pick="pdf" title="Quản trị tải PDF quyết định, tối đa 10 MB">${ico('save')}<input class="arch-file" type="file" accept="application/pdf,.pdf" data-arch-pdf-file tabindex="-1"></label>`
@@ -1400,6 +1486,7 @@ function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}
   if (openPanel) document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
   paint();
   scheduleSave();
+  syncAdminBrowseClass();
   if (id === 'hanhchinh' && !keepCamera) requestAnimationFrame(() => centerOnCity({ animate: false }));
 }
 
@@ -1480,6 +1567,9 @@ export function initChuyenNganh() {
   booted = true;
   document.addEventListener('qh:axis-all-paint', paintAxisAll);
   initDauTuTabs();
+  map?.on('mousemove', onDvhcMouseMove);
+  map?.on('mouseout', hideDvhcTip);
+  document.addEventListener('qh:dvhc-at', (e) => { if (e.detail) consumeDvhcMapClick(e.detail); });
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));
   const openDeep = q.has('nganh') || q.has('truc');
@@ -1528,10 +1618,26 @@ export function initChuyenNganh() {
       return;
     }
     if (isArchFilePick(e.target)) return;
+    const photoOpen = e.target.closest('[data-arch-photo-open]');
+    if (photoOpen) {
+      openMedia(photoOpen.dataset.archPhotoOpen, photoOpen.dataset.archPhotoTitle || '');
+      return;
+    }
     const photoDel = e.target.closest('[data-arch-photo-del]');
     if (photoDel) {
       const [id, slot] = String(photoDel.dataset.archPhotoDel || '').split(':');
       removeArchPhoto(id, Number(slot));
+      return;
+    }
+    const pdfOpen = e.target.closest('[data-arch-pdf-open]');
+    if (pdfOpen) {
+      const url = archPdfUrl();
+      if (url) openInlinePdf(url, 'Quyết định 1152/QĐ-UBND', 'qd-1152.pdf');
+      return;
+    }
+    const docOpen = e.target.closest('[data-arch-doc-open]');
+    if (docOpen) {
+      openInlinePdf(docOpen.dataset.archDocOpen, docOpen.dataset.archDocTitle || 'Quy chế kiến trúc');
       return;
     }
     const archFocus = e.target.closest('[data-arch-focus]');
@@ -1565,6 +1671,7 @@ export function initChuyenNganh() {
         btn.setAttribute('aria-selected', String(on));
       });
       document.querySelectorAll('[data-admin-pane]').forEach(pane => { pane.hidden = pane.dataset.adminPane !== id; });
+      syncAdminBrowseClass();
       if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
       return;
     }
