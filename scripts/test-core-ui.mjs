@@ -395,6 +395,9 @@ assert.match(read('public/css/style.css'), /body\.plan-info-open #planListPane >
 assert.doesNotMatch(read('public/css/style.css'), /planInfoSlot > \.cad-card[\s\S]{0,500}inset 3px 0 0 rgb\(var\(--orange-rgb\)\)/);
 assert.match(read('public/css/style.css'), /#layerPaneQuyHoach,\s*#layerPaneDauTu/);
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot > \.cad-card[\s\S]{0,400}width: 100% !important/);
+assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot > \.land-lot-popup[\s\S]{0,500}padding-top:\s*2px\s*!important/);
+assert.doesNotMatch(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot > \.land-lot-popup[\s\S]{0,500}padding:\s*28px 0 5px/);
+assert.match(read('docs/ui-spec.md'), /lp-eyebrow.*cùng hàng với hàng icon|cùng hàng với hàng icon thao tác/);
 assert.match(read('docs/ui-spec.md'), /không thanh inset \/ dải tối mép trái/);
 assert.match(read('public/css/style.css'), /rgba\(var\(--orange-rgb\), 0\.55\)/);
 assert.match(read('docs/ui-spec.md'), /không bị bảng lô đè/);
