@@ -23,7 +23,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
@@ -146,9 +146,7 @@ const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT', qhc10: 'QHC' };
  * Tab cấp quy hoạch trên bảng kiểm tra: bật đúng lớp, tắt các lớp quy hoạch khác, giữ khung nhìn.
  * QHPK / QHCT / QHC 1/10.000: lô của mọi đồ án giao vùng; thẻ liệt kê đồ án đúng cấp đó.
  * QHC 1/25.000 vẽ vùng tại khung nhìn, không giữ thẻ đồ án cấp khác.
- */
-/**
- * opts.skipProjects: bảng thửa (một thửa có thể giao nhiều đồ án) — chỉ bật cấp, không mở brief đồ án.
+ * opts.skipProjects: bảng thửa / vùng đo — không mở brief; vẫn hiện lô đồ án giao hình (không dừng ở ranh toàn đồ án).
  */
 export function applyInspectLevel(id, latlng, geom, opts = {}) {
   if (!id) return;
@@ -162,6 +160,7 @@ export function applyInspectLevel(id, latlng, geom, opts = {}) {
       if (opts.skipProjects) {
         setPreferPlace(id === 'qhc10' || id === 'qhc25');
         clearProjectFocus();
+        if (kind && geom) revealLotsCovering(kind, geom);
       } else if (id === 'qhc25') {
         setPreferPlace(true);
         clearProjectFocus();

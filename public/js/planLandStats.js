@@ -78,7 +78,8 @@ function lotClass(lot, byId) {
   const key = landPatternKey(lot.layer, lot.name);
   const nhom = lot.nhom || landLabel(lot.layer);
   if (nhom === 'Đất khác' && TT16_STYLES[key]) return { label: TT16_STYLES[key].label, color: TT16_STYLES[key].color, key };
-  return { label: nhom, color: landColor(lot.layer) || (TT16_STYLES[key] || {}).color || '#94a3b8', key: '' };
+  // Giữ key TT16 để ô hatch trong bảng / chú giải pie, dù nhãn đã gom theo nhóm đất.
+  return { label: nhom, color: landColor(lot.layer) || (TT16_STYLES[key] || {}).color || '#94a3b8', key: key || '' };
 }
 
 // Lô QH giao khung box, xếp theo thứ tự ưu tiên (lô đứng trước giữ phần chồng lấn).
@@ -372,9 +373,8 @@ export function planPlace(place) {
 }
 
 function rowHtml(label, color, key, area, pct, sub = '', fmt = fmtArea) {
-  const swatch = (key && tt16SwatchCss(key, 0.6)) || `background:${color};`;
   return `<div class="pls-row" title="${escapeHtml(label)}">
-    <i class="pls-swatch" style="${swatch}"></i>
+    ${landMarksHtml(color, key)}
     <span class="pls-label">${escapeHtml(label)}${sub ? `<small>${sub}</small>` : ''}</span>
     <b>${fmt(area)}</b><em>${fmtPct(pct)}</em>
     <span class="pls-bar"><span style="width:${Math.min(100, pct)}%;background:${color};"></span></span>
@@ -416,11 +416,19 @@ function mixEntries(res, noneLabel, noneSub = '') {
   return presentLandMix(slices);
 }
 
+function landMarksHtml(color, pattern) {
+  const fill = `background:${color || '#94a3b8'};`;
+  const hatch = (pattern && tt16SwatchCss(pattern, 0.55)) || '';
+  return `<span class="pls-marks"><i class="pls-mark pls-mark-fill" style="${fill}" title="Màu"></i>${
+    hatch ? `<i class="pls-mark pls-mark-hatch" style="${hatch}" title="Ký hiệu hatch"></i>` : ''
+  }</span>`;
+}
+
 function pieHtml(res, noneLabel, where = 'trên thửa') {
   const slices = mixEntries(res, noneLabel);
   if (!slices.length) return '';
   const legend = slices.map(s => `<li><button type="button" class="pls-pie-item" data-land="${escapeHtml(s.key)}" data-color="${escapeHtml(s.color)}" title="${escapeHtml(s.label)} · ${fmtM2(s.area)} (${fmtPct(s.rawPct)}) · bấm để tô vùng trên bản đồ">
-    <i style="background:${escapeHtml(s.color)}"></i><span>${escapeHtml(s.label)}</span><em>${escapeHtml(fmtPct(s.pct))}</em>
+    ${landMarksHtml(s.color, s.pattern)}<span>${escapeHtml(s.label)}</span><em>${escapeHtml(fmtPct(s.pct))}</em>
   </button></li>`).join('');
   return `<div class="pls-pie-host">
     <div class="pls-pie-box"><canvas aria-label="Tỷ lệ các loại đất ${escapeHtml(where)}"></canvas></div>
@@ -544,11 +552,10 @@ function planLotsTable(parts, totalArea) {
   if (!parts?.length) return '';
   const body = parts.map((p, i) => {
     const plan = p.lot && p.lot.plan;
-    const swatch = (p.key && tt16SwatchCss(p.key, 0.6)) || `background:${p.color || '#94a3b8'};`;
     const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
     return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))}">
       <td class="pls-stt">${i + 1}</td>
-      <td class="pls-type"><i class="pls-swatch" style="${swatch}"></i><span>${escapeHtml(p.label)}</span></td>
+      <td class="pls-type">${landMarksHtml(p.color, p.key)}<span>${escapeHtml(p.label)}</span></td>
       <td class="pls-num">${fmtM2(p.area)}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'floors'))}</td>
@@ -585,20 +592,20 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
   const note = opts.note || `Cắt hình học ${w.cut} với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.`;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
   if (compact) {
-    // Tiêu đề «Thông tin quy hoạch:» + 4 tab nằm ngoài .cad-page; đây chỉ pie + bảng (+ extra).
+    // Tiêu đề «Thông tin quy hoạch:» + 4 tab nằm ngoài .cad-page; bảng thành phần đất trước, pie sau.
     const head = extra;
     if (!res.parts?.length && !res.rows.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel, w.pie)}${planLotsTable(res.parts, res.area)}</div>`;
+    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}${pieHtml(res, noneLabel, w.pie)}</div>`;
   }
   const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
   if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
   const groups = schemeGroups(res.parts);
-  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}${pieHtml(res, noneLabel, w.pie)}
+  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}
     <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
-    ${schemeLots(res.parts, res.area)}${foot}
+    ${schemeLots(res.parts, res.area)}${pieHtml(res, noneLabel, w.pie)}${foot}
   </div>`;
 }
 
@@ -618,7 +625,7 @@ export function parcelZonesHtml(res, recorded, opts) {
     if (!res.parts.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none, w.pie)}${planLotsTable(res.parts, res.area)}</div>`;
+    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}${pieHtml(res, opts.none, w.pie)}</div>`;
   }
   const head = `<div class="pls-head">${escapeHtml(title)}</div>
     <div class="pp-row pls-sheet"><span>${escapeHtml(w.shape)}</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
@@ -626,8 +633,8 @@ export function parcelZonesHtml(res, recorded, opts) {
   const note = opts.note ? `<div class="pp-sub" title="${escapeHtml(opts.note)}">${escapeHtml(opts.note)}</div>` : '';
   if (!res.parts.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div>${note}</div>`;
   const groups = schemeGroups(res.parts);
-  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}${pieHtml(res, opts.none, w.pie)}
+  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}
     <div class="pls-sub-head">${escapeHtml(opts.partsHead)}</div>
-    ${schemeLots(res.parts, res.area)}${note}
+    ${schemeLots(res.parts, res.area)}${pieHtml(res, opts.none, w.pie)}${note}
   </div>`;
 }

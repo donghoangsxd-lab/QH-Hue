@@ -741,6 +741,37 @@ export function clearProjectFocus() {
 }
 
 /**
+ * Bảng thửa / vùng đo: hiện lô mọi đồ án cấp kind giao hình, không mở brief.
+ * Bỏ qua bước chỉ xem ranh toàn đồ án (tick từng dòng).
+ */
+export function revealLotsCovering(kind, geom) {
+  if (!kind || !geom || typeof turf === 'undefined') return;
+  const same = byOverlap(projectsCovering(kind, geom), geom);
+  if (!same.length) return;
+  const was = state.focusedProject;
+  state.focusedProject = null;
+  focusName = null;
+  focusExtra = null;
+  markPicked(null);
+  if (was) document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+  rememberPeers(same, geom);
+  inspectHostM2 = geomArea(geom);
+  let hiddenChanged = false;
+  projects.forEach(p => { if (p.level === kind) state.lotProjects.delete(p.name); });
+  same.forEach(p => {
+    if (state.hiddenProjects.delete(p.name)) hiddenChanged = true;
+    state.lotProjects.add(p.name);
+    if (p.level === 'QHPK') {
+      if (!state.showProjects) setMaster(true);
+    } else if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
+  });
+  if (hiddenChanged) saveHidden();
+  if (!state.showProjectInfra) ensureFullLots();
+  refreshAll();
+  focusProjectLots(same[0].name);
+}
+
+/**
  * Chọn phường: hiện lại các đồ án của phường đang bị ẩn, bật lớp Quy hoạch, mở và cuộn tới nhóm phường trong danh sách
  * (panel phải giữ nguyên trạng thái ẩn / hiện). Toàn TP: bỏ đánh dấu nhóm.
  * opts.show = false: đang xem lớp quy hoạch khác (mapLevel.js) — chỉ đánh dấu, cuộn danh sách, không bật lớp Quy hoạch.

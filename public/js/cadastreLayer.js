@@ -1042,7 +1042,7 @@ export async function openPlanAt(latlng, targetMap, levelId) {
 }
 
 /** Cùng lối với bấm thửa: mở bảng thửa (hoặc popup) tại điểm, kể cả khi lớp đang tắt.
- *  revealPlan (menu chuột phải): sang B. Quy hoạch (không xổ mag A–F), cấp chi tiết nhất, thẻ thửa — không brief đồ án. */
+ *  revealPlan (menu chuột phải): sang B. Quy hoạch (không xổ mag A–F), cấp chi tiết nhất, hiện lô đồ án giao thửa (không chỉ ranh), thẻ thửa — không brief đồ án. */
 export function openParcelAt(latlng, targetMap, opts = {}) {
   return openParcel(latlng, targetMap, opts);
 }
