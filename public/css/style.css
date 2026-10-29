@@ -167,6 +167,9 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0p
 }
 /* plan-on: bản đồ quy hoạch đang hiện (xem QH thì phủ kín, chia đôi thì cắt theo thanh trượt) */
 body.plan-on #mapPlan, body.compare-on #swipeDivider { display: block; }
+/* Lệch tâm: hai nửa màn hình thật — mỗi bản đồ rộng 50%, cùng tọa độ ở giữa nửa của nó */
+body.split-offset.compare-on #map { right: 50%; }
+body.split-offset.compare-on #mapPlan { left: 50%; clip-path: none !important; }
 body.split-offset #swipeDivider { cursor: default; }
 body.split-offset .swipe-handle { display: none; }
 #swipeDivider::before {

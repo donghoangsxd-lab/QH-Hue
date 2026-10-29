@@ -84,9 +84,10 @@ export function initPlanMap(mainMap, mainLayers) {
   const area = document.getElementById('mapArea');
   if (area && window.ResizeObserver) {
     new ResizeObserver(() => {
+      leftMap?.invalidateSize({ pan: false });
       planMap.invalidateSize({ pan: false });
       updateDivider();
-      if (compareOn && offsetPx()) alignPlanView();
+      if (compareOn && split) alignPlanView();
     }).observe(area);
   }
 
@@ -239,26 +240,15 @@ const applyView = (dst, center, zoom, options) => {
   dst.options.zoomSnap = snap;
 };
 
-// Lệch tâm: điểm giữa nửa trái bản đồ hiện trạng hiện ở giữa nửa phải bản đồ quy hoạch → tâm QH = tâm HT lùi W/2 px
-function offsetPx() {
-  return split && splitKind === 'offset' && leftMap ? leftMap.getSize().x / 2 : 0;
-}
-
-function shiftCenter(m, center, zoom, dx) {
-  if (!dx) return center;
-  return m.unproject(m.project(center, zoom).add([dx, 0]), zoom);
-}
-
-/** Đặt lại khung nhìn bản đồ quy hoạch theo bản đồ hiện trạng (cùng tâm / lệch tâm) */
+/** Đồng bộ khung nhìn bản đồ quy hoạch theo bản đồ hiện trạng (cùng tâm địa lý). */
 export function alignPlanView() {
   if (!planMap || !leftMap) return;
-  const zoom = leftMap.getZoom();
-  applyView(planMap, shiftCenter(leftMap, leftMap.getCenter(), zoom, -offsetPx()), zoom, { animate: false });
+  applyView(planMap, leftMap.getCenter(), leftMap.getZoom(), { animate: false });
 }
 
-// sign: +1 từ HT sang QH (lùi tâm), -1 chiều ngược lại.
-// leader: bản đồ người dùng đang zoom. Bản đồ kia chỉ đi theo, không setView ngược lại — Leaflet nuốt
-// setView khi _animatingZoom, và setView giữa chừng làm canvas bỏ lần vẽ lớp đang tải.
+// Hai bản đồ luôn cùng tâm địa lý và mức phóng.
+// Đồng tâm: chồng full-width + clipPath, thanh kéo. Lệch tâm: mỗi bên nửa màn hình (CSS), tâm mỗi nửa = cùng điểm.
+// leader: bản đồ người dùng đang zoom. Bản đồ kia chỉ đi theo — Leaflet nuốt setView khi _animatingZoom.
 function syncMaps(a, b) {
   let lock = false;
   let leader = null;
@@ -270,8 +260,7 @@ function syncMaps(a, b) {
   };
 
   const sizeMemo = new WeakMap();
-  // invalidateSize({ pan: false }) vẫn phát move và getCenter lệch nửa phần đổi cao (panel dưới mở sau khi tải lô).
-  // Kéo theo lúc đó làm bản đồ đang xem (QH) nhảy xuống, đồ án lệch tâm. Chỉ đồng bộ khi người dùng thực sự dịch khung.
+  // invalidateSize({ pan: false }) vẫn phát move. Chỉ đồng bộ khi người dùng thực sự dịch khung.
   const resized = (m) => {
     const size = m.getSize();
     const prev = sizeMemo.get(m);
@@ -279,18 +268,17 @@ function syncMaps(a, b) {
     return !!(prev && (prev.x !== size.x || prev.y !== size.y));
   };
 
-  const bind = (src, dst, sign) => {
+  const bind = (src, dst) => {
     let zooming = false;
     src.on('zoomanim', (e) => {
       if (lock || !compareOn || (leader && leader !== src)) return;
       leader = src;
       zooming = true;
       lock = true;
-      const center = shiftCenter(src, e.center, e.zoom, -sign * offsetPx());
       if (dst._animatingZoom) {
         stopZoomAnim(dst);
-        applyView(dst, center, e.zoom, { animate: false });
-      } else applyView(dst, center, e.zoom, { animate: true });
+        applyView(dst, e.center, e.zoom, { animate: false });
+      } else applyView(dst, e.center, e.zoom, { animate: true });
       lock = false;
     });
     src.on('zoomend', () => {
@@ -300,16 +288,14 @@ function syncMaps(a, b) {
     src.on('move', () => {
       if (lock || zooming || !compareOn || src._animatingZoom || (leader && leader !== src) || resized(src)) return;
       lock = true;
-      const zoom = src.getZoom();
-      const center = shiftCenter(src, src.getCenter(), zoom, -sign * offsetPx());
       if (dst._animatingZoom) stopZoomAnim(dst);
-      applyView(dst, center, zoom, { animate: false });
+      applyView(dst, src.getCenter(), src.getZoom(), { animate: false });
       lock = false;
     });
   };
 
-  bind(a, b, 1);
-  bind(b, a, -1);
+  bind(a, b);
+  bind(b, a);
 }
 
 // Vẽ vector sau khi hết zoom. Canvas bỏ _update lúc _animatingZoom; nếu zoomend lỗi thì moveend không chạy, lớp không hiện lại.
@@ -344,7 +330,8 @@ export function getCoveredRightWidth() {
   const area = document.getElementById('mapArea');
   if (!area) return 0;
   const w = area.clientWidth;
-  const covered = Math.round(w * (1 - dividerRatio));
+  const ratio = splitKind === 'offset' ? 0.5 : dividerRatio;
+  const covered = Math.round(w * (1 - ratio));
   return (w - covered) < 240 ? 0 : covered;
 }
 
@@ -357,10 +344,16 @@ function updateDivider() {
     planEl.style.clipPath = 'none';
     return;
   }
-  const ratio = splitKind === 'offset' ? 0.5 : dividerRatio;
-  const x = Math.round(area.clientWidth * ratio);
+  // Lệch tâm: hai nửa thật (CSS), không clipPath. Đồng tâm: chồng lớp + thanh kéo.
+  if (splitKind === 'offset') {
+    planEl.style.clipPath = 'none';
+    divider.style.left = '50%';
+    divider.setAttribute('aria-valuenow', '50');
+    return;
+  }
+  const x = Math.round(area.clientWidth * dividerRatio);
   divider.style.left = `${x}px`;
-  divider.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+  divider.setAttribute('aria-valuenow', String(Math.round(dividerRatio * 100)));
   planEl.style.clipPath = `inset(0 0 0 ${x}px)`;
 }
 
@@ -404,9 +397,8 @@ function initDividerDrag() {
   });
 }
 
-// compareOn phải bật SAU khi planMap đã khớp view, nếu không sự kiện move của invalidateSize / panBy sẽ kéo bản đồ kia đi
+// compareOn phải bật SAU khi planMap đã khớp view, nếu không sự kiện move của invalidateSize sẽ kéo bản đồ kia đi
 function applyState(next) {
-  const wasOffset = split && splitKind === 'offset';
   compareOn = false;
   viewMode = next.view === 'HT' ? 'HT' : 'QH';
   split = !!next.split;
@@ -427,14 +419,14 @@ function applyState(next) {
       : 'Chia đôi màn hình: chọn Đồng tâm hoặc Lệch tâm';
   }
   if (planMap && leftMap) {
-    // Vào / ra lệch tâm: dời bản đồ hiện trạng 1/4 bề ngang để điểm đang ở giữa màn hình về giữa nửa trái (và ngược lại)
-    if (offset !== wasOffset) {
-      const q = leftMap.getSize().x / 4;
-      leftMap.panBy([offset ? q : -q, 0], { animate: false });
-    }
+    // Giữ tâm địa lý đang xem; đổi bố cục (full / nửa màn) rồi invalidateSize + setView lại.
+    const focus = leftMap.getCenter();
+    const zoom = leftMap.getZoom();
+    leftMap.invalidateSize({ pan: false });
     if (shown) {
       planMap.invalidateSize({ pan: false });
-      alignPlanView();
+      applyView(leftMap, focus, zoom, { animate: false });
+      applyView(planMap, focus, zoom, { animate: false });
     }
     updateDivider();
   }

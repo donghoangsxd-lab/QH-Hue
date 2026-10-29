@@ -376,7 +376,7 @@ const SECTIONS = [
           'Nút lật trang ở đầu thanh tiêu đề (giữa phía trên) chuyển <b>BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</b> sang bản đồ hiện trạng và ngược lại.',
           'Mở panel phải, hàng <b>Lớp đang xem</b> chọn: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
           'Thanh công cụ phải, bấm nút <b>Chia đôi màn hình</b> rồi chọn <b>Đồng tâm</b> hoặc <b>Lệch tâm</b>.',
-          '<b>Đồng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Trên trục A, chia đôi tự so sánh hệ thống đô thị hiện trạng và quy hoạch. Bấm lại nút chia đôi để tắt.'
+          '<b>Đồng tâm</b>: chồng lớp cùng tọa độ, kéo thanh giữa (hoặc phím ← →) để xem thay đổi. <b>Lệch tâm</b>: hai nửa màn hình cạnh nhau, cùng điểm địa lý ở giữa mỗi nửa; kéo hoặc phóng một bên thì bên kia đi theo. Trên trục A, chia đôi tự so sánh hệ thống đô thị hiện trạng và quy hoạch. Bấm lại nút chia đôi để tắt.'
         ],
         facts: ['Trên trục Quy hoạch, mỗi bên chia đôi chọn được lớp ở hai danh sách trên panel.'],
         actions: [{ label: 'Bật chia đôi màn hình', icon: 'compare', run: () => { if (!isSplitOn()) setSplit(true); flash($('btnToggleCompare')); } }]

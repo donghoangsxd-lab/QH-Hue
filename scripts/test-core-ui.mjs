@@ -171,6 +171,11 @@ assert.match(read('public/js/chuyenNganh.js'), /applyAdminUrbanSplit/);
 assert.match(read('public/js/chuyenNganh.js'), /setLevel\('urban'/);
 assert.match(read('docs/ui-spec.md'), /Đồng tâm/);
 assert.match(read('docs/ui-spec.md'), /hệ thống đô thị hiện trạng/);
+const planMapJs = read('public/js/planMap.js');
+assert.doesNotMatch(planMapJs, /offsetPx|shiftCenter|panBy\(\[offset/);
+assert.match(planMapJs, /splitKind === 'offset'/);
+assert.match(read('public/css/style.css'), /body\.split-offset\.compare-on #map\s*\{[^}]*right:\s*50%/);
+assert.match(read('public/css/style.css'), /body\.split-offset\.compare-on #mapPlan\s*\{[^}]*left:\s*50%/);
 
 function projectLayerAround(src, id) {
   const at = src.indexOf(`id="${id}"`);
