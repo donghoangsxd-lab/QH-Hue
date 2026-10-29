@@ -22,6 +22,10 @@ const NAME_OVERRIDE = {
     tenDayDu: 'Quy hoạch phân khu Khu phi thuế quan Sài Gòn – Chân Mây',
     tenRutGon: 'Phi thuế quan SG–CM'
   },
+  'qhpk tt phía nam': {
+    tenDayDu: 'Trung tâm phía Nam thành phố Huế',
+    tenRutGon: 'TT phía Nam'
+  },
   'qhp~1': { tenDayDu: 'QHP~1', tenRutGon: 'QHP~1' }
 };
 
@@ -253,6 +257,10 @@ export function splitProjectName(raw) {
 export function namesOfProject(entry) {
   const tenQH = squash(entry && (entry.tenQH || entry.name));
   const split = splitProjectName(tenQH);
+  // Override cứng thắng TenDayDu/TenRutGon đã lưu trên catalog (tránh tên cũ lệch).
+  if (NAME_OVERRIDE[foldKey(tenQH)]) {
+    return { tenQH, tenDayDu: split.tenDayDu, tenRutGon: split.tenRutGon };
+  }
   return {
     tenQH,
     tenDayDu: squash(entry && entry.tenDayDu) || split.tenDayDu,

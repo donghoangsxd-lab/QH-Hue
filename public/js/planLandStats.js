@@ -11,7 +11,7 @@ import { escapeHtml, fmtNum, planItems } from './utils.js';
 import { landCode } from './mapEngine.js';
 import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
-import { presentLandMix } from './planMix.js';
+import { MIX_NOISE_PCT, presentLandMix } from './planMix.js';
 
 const SAMPLE_MAX = 40000;
 // Lưới phủ cả khung bao: vùng đo mảnh, chéo thì khung lớn hơn nhiều polygon, giới hạn số ô để không tràn bộ nhớ
@@ -547,12 +547,24 @@ function planFieldText(plan, key) {
   return String(hit.text || '—').replace(/\s+/g, ' ').trim();
 }
 
+/** Bỏ mảnh < MIX_NOISE_PCT % diện tích thửa (lệch ranh địa chính ↔ lô QH); nếu mọi mảnh đều nhiễu thì giữ nguyên. */
+function audibleParts(parts, totalArea) {
+  if (!parts?.length) return [];
+  const list = parts.map(p => ({
+    ...p,
+    pct: totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0
+  }));
+  const kept = list.filter(p => p.pct >= MIX_NOISE_PCT);
+  return kept.length ? kept : list;
+}
+
 /** Bảng gọn Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (bỏ Stt để đủ chỗ cột HSSDĐ). */
 function planLotsTable(parts, totalArea) {
-  if (!parts?.length) return '';
-  const body = parts.map((p) => {
+  const list = audibleParts(parts, totalArea);
+  if (!list.length) return '';
+  const body = list.map((p) => {
     const plan = p.lot && p.lot.plan;
-    const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
+    const pct = p.pct;
     return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))}">
       <td class="pls-type">${landMarksHtml(p.color, p.key)}<span>${escapeHtml(p.label)}</span></td>
       <td class="pls-num">${fmtM2(p.area)}</td>
@@ -570,9 +582,10 @@ function planLotsTable(parts, totalArea) {
 }
 
 function schemeLots(parts, area) {
-  const groups = schemeGroups(parts);
+  const list = audibleParts(parts, area);
+  const groups = schemeGroups(list);
   const named = groups.filter(g => g.file).length;
-  if (!named) return `<div class="pls-lots">${parts.map(p => lotBlock(p, '')).join('')}</div>`;
+  if (!named) return `<div class="pls-lots">${list.map(p => lotBlock(p, '')).join('')}</div>`;
   return groups.map(g => `<section class="pls-scheme">
       <div class="pls-scheme-head"><b>${escapeHtml(g.label || 'Không gắn đồ án')}</b><span>${fmtArea(g.area)} · ${fmtPct(area > 0 ? g.area / area * 100 : 0)}</span></div>
       <div class="pls-lots">${g.list.map(p => lotBlock(p, g.label)).join('')}</div>

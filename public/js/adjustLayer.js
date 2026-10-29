@@ -403,6 +403,19 @@ export function adjustmentsOf(tenQH) {
   return items.filter(x => x.status === 'approved' && x.tenQH === tenQH).sort((a, b) => (b.at || 0) - (a.at || 0));
 }
 
+/** Số vị trí (polygon) trong danh sách hồ sơ. Mỗi quyết định (= 1 hồ sơ) có thể gồm nhiều vị trí. */
+export function adjustmentSiteCount(list) {
+  let n = 0;
+  for (const it of list || []) {
+    const g = it && it.boundary;
+    if (!g) { n += 1; continue; }
+    if (g.type === 'Polygon') n += 1;
+    else if (g.type === 'MultiPolygon' && Array.isArray(g.coordinates)) n += Math.max(1, g.coordinates.length);
+    else n += 1;
+  }
+  return n;
+}
+
 /** Danh sách trong tab hồ sơ: đã duyệt theo thời gian, admin thêm hàng chờ. */
 export function dossierAdjustments(tenQH, includePending) {
   const rows = items.filter(x => x.status === 'approved' && x.tenQH === tenQH);

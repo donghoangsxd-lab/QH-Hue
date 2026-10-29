@@ -4,7 +4,7 @@ import { map, setLotBuildup } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { gbaFootprintsIn } from './gbaLayer.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
-import { buildupHtml, floorsFromHeight, lotBuildupButtonHtml } from './lotScreen.js';
+import { buildupHtml, floorsFromHeight, lotBuildupButtonHtml, LOT_BUILDUP_LABEL } from './lotScreen.js';
 import { withAssetVersion } from './gbaVersion.js';
 
 const MAX_TILES = 48;
@@ -459,9 +459,29 @@ function buildupSlot(root) {
   return el;
 }
 
+function setBuildupPressed(root, on) {
+  root.querySelectorAll('[data-lot-buildup-run]').forEach((b) => {
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const tip = on ? 'Tắt mật độ xây dựng thực tế' : LOT_BUILDUP_LABEL;
+    b.title = tip;
+    b.setAttribute('aria-label', tip);
+  });
+}
+
+function clearBuildupPanel(root, el) {
+  clearLotBuildupMap();
+  delete el.dataset.open;
+  delete el.dataset.running;
+  delete el.dataset.token;
+  el.innerHTML = hasBuildupIcon(root) ? '' : lotBuildupButtonHtml();
+  setBuildupPressed(root, false);
+}
+
 /**
  * Gắn nút mật độ. Thẻ thửa (#cadParcelCard) tái sử dụng DOM: giữ một listener,
  * mỗi lần mở chỉ cập nhật lot (_qhLotBuildup) — không khóa geometry lần đầu.
+ * Bấm lần nữa khi đang mở / đang tải → tắt bảng và lớp bản đồ.
  */
 export function attachLotBuildup(popup, lot) {
   const arm = () => {
@@ -477,34 +497,46 @@ export function attachLotBuildup(popup, lot) {
       stopMapClick(e);
       const current = root._qhLotBuildup;
       const el = buildupSlot(root);
+      if (el.dataset.open === '1' || el.dataset.running === '1') {
+        clearBuildupPanel(root, el);
+        relayout(popup);
+        return;
+      }
       if (!current?.geometry) {
         el.textContent = 'Đang tải hình thửa…';
         relayout(popup);
         return;
       }
-      if (el.dataset.running === '1') return;
       el.dataset.running = '1';
       const token = `${Date.now()}-${Math.random()}`;
       el.dataset.token = token;
       el.textContent = LOADING;
+      setBuildupPressed(root, true);
       clearLotBuildupMap();
       relayout(popup);
       const alive = () => popup.isOpen?.() !== false && el.isConnected && el.dataset.token === token;
       compute(current).then((result) => {
         if (!alive()) return;
         el.innerHTML = typeof result === 'string' ? result : result.html;
+        el.dataset.open = '1';
         delete el.dataset.running;
+        setBuildupPressed(root, true);
         relayout(popup);
       }).catch(() => {
         if (!alive()) return;
-        el.dataset.running = '';
+        delete el.dataset.running;
+        delete el.dataset.open;
         const retry = hasBuildupIcon(root) ? '' : lotBuildupButtonHtml();
-        el.innerHTML = `<span class="is-miss">Chưa đối chiếu được dấu chân công trình.</span>${retry}`;
+        el.innerHTML = `<span class="is-miss pp-sub">Chưa đối chiếu được dấu chân công trình.</span>${retry}`;
+        setBuildupPressed(root, false);
         relayout(popup);
       });
     };
     root.addEventListener('click', run);
-    popup.on?.('remove', clearLotBuildupMap);
+    popup.on?.('remove', () => {
+      clearLotBuildupMap();
+      if (root.isConnected) setBuildupPressed(root, false);
+    });
   };
   // Đợi hàng icon gắn xong rồi mới quyết định có cần nút chữ không.
   const schedule = () => requestAnimationFrame(arm);

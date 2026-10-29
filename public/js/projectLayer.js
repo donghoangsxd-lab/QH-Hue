@@ -38,7 +38,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
-import { dossierAdjustments, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
+import { dossierAdjustments, adjustmentSiteCount, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
 import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
@@ -1181,7 +1181,7 @@ function dossierHtml(p, idx, admin, projectOn) {
   const drawLabel = drawN == null ? 'đang tải' : `${fmtNum(drawN)} bản vẽ`;
   const drawingsOpen = drawOpen.has(p.name);
   const adjusts = dossierAdjustments(p.name, admin);
-  const times = adjusts.filter(it => it.status !== 'pending').length;
+  const sites = adjustmentSiteCount(adjusts.filter(it => it.status !== 'pending'));
   const adjustsOpen = adjOpen.has(p.name);
   const wait = p.proposal
     ? dossierBtn('Chờ duyệt', `data-propose="${idx}"`, true, p.proposal.name || 'Quyết định đang chờ')
@@ -1222,7 +1222,7 @@ function dossierHtml(p, idx, admin, projectOn) {
     ${drawNest}
     <div class="project-dossier-row">
       <span class="project-dossier-label">Điều chỉnh cục bộ</span>
-      <span class="project-dossier-meta">${fmtNum(times)} lần</span>
+      <span class="project-dossier-meta">${fmtNum(sites)} vị trí</span>
       <button type="button" class="project-btn project-expand${adjustsOpen ? ' open' : ''}" data-adj-open="${idx}" title="${adjustsOpen ? 'Ẩn' : 'Mở'} danh sách điều chỉnh cục bộ" aria-expanded="${adjustsOpen}">${ico('chev-down')}</button>
     </div>
     ${adjNest}
@@ -1245,7 +1245,7 @@ function adjustNestHtml(p, idx, projectOn, list) {
       ${dossierBtn('Bản vẽ scan', `data-adj-act="scan" data-adj-id="${escapeHtml(it.id)}"`, !!it.scan, it.scan ? 'Hiện bản vẽ scan' : 'Chưa có bản vẽ scan')}
     </div>`;
   }).join('');
-  const empty = list.length ? '' : '<div class="project-empty">Chưa có lần điều chỉnh cục bộ.</div>';
+  const empty = list.length ? '' : '<div class="project-empty">Chưa có vị trí điều chỉnh cục bộ.</div>';
   return `<label class="project-dossier-check" title="Hiện ranh điều chỉnh cục bộ trên bản đồ">
       <input type="checkbox" data-adj-layer="${idx}"${on && projectOn ? ' checked' : ''}${anyBound ? '' : ' disabled'}>Hiện ranh trên bản đồ</label>
     ${rows}${empty}`;

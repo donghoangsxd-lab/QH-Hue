@@ -417,11 +417,18 @@ body.compare-on .map-title {
   line-height: 1.25;
   color: var(--text-strong);
 }
+.project-brief-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.project-brief-tool,
 .project-brief-close {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  margin-top: 1px;
   padding: 0;
   border: none;
   border-radius: var(--r-sm);
@@ -430,8 +437,18 @@ body.compare-on .map-title {
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+.project-brief-tool .ico { width: 12px; height: 12px; }
+.project-brief-tool:hover,
 .project-brief-close:hover { color: var(--text-strong); background: var(--bg-hover); }
+.project-brief-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.project-brief-tool:disabled:hover { color: var(--text-muted); background: transparent; }
 .project-brief-hero {
   display: flex;
   align-items: baseline;
@@ -1268,7 +1285,7 @@ body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-buildup) a
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-buildup) a.pp-radius-btn { right: 100px; }
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-radius) a.pp-buildup-btn { right: 148px; }
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-radius) a.pp-buildup-btn { right: 100px; }
-/* Dòng cấp QH (lp-eyebrow) sát mép trên, cùng hàng nút thao tác; padding-right giữ chỗ nút (không ghi đè 0). */
+/* Dòng cấp QH (lp-eyebrow) sát mép trên, cùng hàng nút; head không pad-right lớn (chừa chỗ nằm ở .lp-eyebrow). */
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-head,
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible .lp-head,
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head,
@@ -1282,6 +1299,14 @@ body.plan-info-open #planInfoSlot > .qhc-popup.pp-located .lp-head {
   padding-left: 0 !important;
   min-height: 24px;
   align-items: flex-start;
+}
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-editable.pp-has-buildup .lp-head,
+body.plan-info-open #planInfoSlot > .qhc-popup.pp-located .lp-head {
+  padding-right: 4px !important;
 }
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-eyebrow,
 body.plan-info-open #planInfoSlot > .qhc-popup.pp-located .lp-eyebrow,
@@ -3694,7 +3719,9 @@ table.ward-table th {
 .dock-card.pp-located a.pp-radius-btn:hover,
 .dock-card.pp-located a.pp-buildup-btn:hover { color: var(--accent-cyan); }
 .leaflet-container .pp-located a.pp-radius-btn.is-on,
-.dock-card.pp-located a.pp-radius-btn.is-on { color: var(--accent-cyan); }
+.dock-card.pp-located a.pp-radius-btn.is-on,
+.leaflet-container .pp-located a.pp-buildup-btn.is-on,
+.dock-card.pp-located a.pp-buildup-btn.is-on { color: var(--accent-cyan); }
 .pp-share-btn .ico, .pp-route-btn .ico, .pp-radius-btn .ico, .pp-buildup-btn .ico { width: 14px; height: 14px; margin: 0; }
 .dock-card.pp-located a.pp-collapse-btn,
 .leaflet-container .pp-located a.pp-collapse-btn { right: 26px; top: 2px; }
@@ -3719,26 +3746,52 @@ table.ward-table th {
 .pp-located:not(.pp-editable):not(.pp-has-buildup) a.pp-radius-btn { right: 98px; }
 .pp-located:not(.pp-has-radius) a.pp-buildup-btn { right: 146px; }
 .pp-located:not(.pp-editable):not(.pp-has-radius) a.pp-buildup-btn { right: 98px; }
-.pp-located .lp-head,
+/* Infra: tiêu đề cùng hàng icon — chừa padding-right trên cả head. */
 .pp-located .pp-title.lp-head,
-.infra-popup.pp-located .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible .lp-head { padding-right: 150px; }
-.pp-located.pp-has-radius .lp-head,
-.pp-located.pp-has-buildup .lp-head,
+.infra-popup.pp-located .pp-title.lp-head { padding-right: 150px; }
 .pp-located.pp-has-radius .pp-title.lp-head,
 .pp-located.pp-has-buildup .pp-title.lp-head,
 .infra-popup.pp-located.pp-has-radius .pp-title.lp-head,
-.infra-popup.pp-located.pp-has-buildup .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head { padding-right: 200px; }
+.infra-popup.pp-located.pp-has-buildup .pp-title.lp-head { padding-right: 200px; }
 .pp-located.pp-editable .pp-title.lp-head,
-.infra-popup.pp-located.pp-editable .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head { padding-right: 200px; }
+.infra-popup.pp-located.pp-editable .pp-title.lp-head { padding-right: 200px; }
 .pp-located.pp-editable.pp-has-radius .pp-title.lp-head,
 .pp-located.pp-editable.pp-has-buildup .pp-title.lp-head,
 .infra-popup.pp-located.pp-editable.pp-has-radius .pp-title.lp-head,
-.infra-popup.pp-located.pp-editable.pp-has-buildup .pp-title.lp-head,
-.land-lot-popup.pp-located.pp-collapsible.pp-editable.pp-has-buildup .lp-head { padding-right: 250px; }
+.infra-popup.pp-located.pp-editable.pp-has-buildup .pp-title.lp-head { padding-right: 250px; }
 .infra-popup.pp-editable .pp-title { padding-right: 70px; }
+/* Lô QH / QHC: icon chỉ chồng dòng cấp — head không pad lớn (tránh cắt tiêu đề dòng 2). */
+.land-lot-popup.pp-located .lp-head,
+.land-lot-popup.pp-located.pp-collapsible .lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-editable.pp-has-buildup .lp-head,
+.qhc-popup.pp-located .lp-head {
+  padding-right: 4px;
+}
+.land-lot-popup.pp-located .lp-eyebrow,
+.qhc-popup.pp-located .lp-eyebrow { padding-right: 124px; }
+.land-lot-popup.pp-located.pp-has-buildup .lp-eyebrow,
+.land-lot-popup.pp-located.pp-has-radius .lp-eyebrow,
+.qhc-popup.pp-located.pp-has-buildup .lp-eyebrow,
+.qhc-popup.pp-located.pp-has-radius .lp-eyebrow { padding-right: 128px; }
+.land-lot-popup.pp-located.pp-has-buildup.pp-has-radius .lp-eyebrow,
+.qhc-popup.pp-located.pp-has-buildup.pp-has-radius .lp-eyebrow { padding-right: 152px; }
+.land-lot-popup.pp-located.pp-editable .lp-eyebrow { padding-right: 148px; }
+.land-lot-popup.pp-located.pp-editable.pp-has-buildup .lp-eyebrow,
+.land-lot-popup.pp-located.pp-editable.pp-has-radius .lp-eyebrow { padding-right: 172px; }
+.land-lot-popup.pp-located.pp-editable.pp-has-buildup.pp-has-radius .lp-eyebrow { padding-right: 196px; }
+/* #planInfoSlot: icon lệch vài px so với popup nổi — khớp mép trái cụm nút. */
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-eyebrow,
+body.plan-info-open #planInfoSlot > .qhc-popup.pp-located .lp-eyebrow { padding-right: 128px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-has-buildup .lp-eyebrow,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-has-radius .lp-eyebrow,
+body.plan-info-open #planInfoSlot > .qhc-popup.pp-located.pp-has-buildup .lp-eyebrow { padding-right: 128px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-has-buildup.pp-has-radius .lp-eyebrow { padding-right: 152px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable .lp-eyebrow { padding-right: 176px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-has-buildup .lp-eyebrow,
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-has-radius .lp-eyebrow { padding-right: 176px; }
+body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-has-buildup.pp-has-radius .lp-eyebrow { padding-right: 200px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
 .lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 64px; font-weight: 700; }
 .lot-edit-title small { font-weight: 400; color: var(--text-muted); }
@@ -4412,6 +4465,7 @@ table.ward-table th {
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
 }
 .cad-card.pp-located .pp-buildup-btn:hover,
+.cad-card.pp-located .pp-buildup-btn.is-on,
 .cad-card.pp-located .pp-share-btn:hover,
 .cad-card.pp-located .pp-route-btn:hover,
 .cad-card.pp-located .pp-collapse-btn:hover { color: var(--accent-cyan); background: rgba(255, 255, 255, 0.08); }
@@ -5307,12 +5361,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-head-main { flex: 1 1 auto; min-width: 0; }
 .lp-eyebrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-bottom: 2px; min-width: 0; }
 .lp-eyebrow-label {
-  flex: 0 1 auto; min-width: 0; color: var(--accent-cyan); font-size: 9px; font-weight: 700;
+  flex: 1 1 auto; min-width: 0; color: var(--accent-cyan); font-size: 9px; font-weight: 700;
   letter-spacing: 0.04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lp-title-row { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 5px; min-width: 0; }
 .lp-title { flex: 1 1 auto; min-width: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Thẻ lô trong panel: tiêu đề tối đa 2 dòng, không cắt còn vài chữ khi còn chỗ */
+/* Thẻ lô QH: tiêu đề dưới cụm icon — gần hết bề ngang, tối đa 2 dòng */
+.land-lot-popup .land-popup-card .lp-title-row { padding-right: 0; }
 .land-popup-card .lp-title {
   white-space: normal;
   display: -webkit-box;
@@ -6335,6 +6390,7 @@ body.project-review.la-page #projectReviewHost {
     bottom: var(--info-bottom) !important;
     max-height: none;
   }
+  .project-brief-tool,
   .project-brief-close,
   .cad-card-x,
   .dock-card a.leaflet-popup-close-button,
@@ -6681,10 +6737,20 @@ body.project-review.la-page #projectReviewHost {
 .gba-legend i, .gba-cls i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .gba-stats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.35); font-size: 12px; }
 .gba-stats b { font-size: 12px; }
-.lot-buildup { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-family: var(--axis-font); font-size: 12px; line-height: 1.35; }
-.lot-buildup .lot-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; white-space: nowrap; }
-.lot-buildup .lot-line b { font-weight: 600; }
-.lot-buildup .lot-line.is-out b { color: var(--accent-red); }
+/* Kết quả mật độ: cùng .pp-row / font với các dòng thông tin thẻ (không dùng axis-font 12px riêng). */
+.lot-buildup {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.lot-buildup .pp-row.is-out > :last-child,
+.lot-buildup .pp-row.is-out b { color: var(--accent-red); }
 .lot-buildup .is-over { color: var(--accent-red); }
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }

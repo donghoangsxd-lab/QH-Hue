@@ -5,9 +5,10 @@ import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
 import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecision } from './projectLayer.js';
-import { projectPopulation, PROJECT_POP_EVENT } from './projectReview.js';
-import { adjustmentsOf, adjustmentsKnown, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
-import { escapeHtml, fmtNum, fmtPct } from './utils.js';
+import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
+import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
+import { splitProjectName } from './projectNames.js';
+import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const WAIT = '<span class="project-brief-wait">…</span>';
@@ -159,8 +160,20 @@ function shareLabel(share) {
   return `${ha(share.used)} ha · ${fmtPct(share.pct)}`;
 }
 
+/** Tên cạnh tem cấp: bỏ tiền tố trùng QHPK/QHCT; override «QHPK TT phía Nam» → Trung tâm phía Nam TP Huế. */
+function briefTitle(name) {
+  const split = splitProjectName(name);
+  let title = split.tenDayDu || split.tenRutGon || name;
+  title = String(title || '')
+    .replace(/^Quy hoạch\s+(phân khu|chi tiết|chung)(\s+tỷ lệ\s+1\/[\d.]+)?\s+/i, '')
+    .replace(/^(QHPK|QHCT|QHC)\b[\s.:–—-]*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return title || name;
+}
+
 function metersOf(card) {
-  const count = card.adjN == null ? '' : `${fmtNum(card.adjN)} lần · `;
+  const count = card.adjN == null ? '' : `${fmtNum(card.adjN)} vị trí · `;
   const adjustShare = card.adjN == null ? null : shareOf(card.adjM2, card.hostM2);
   const adjustValue = card.adjN == null ? WAIT : `${count}${shareLabel(adjustShare)}`;
   const list = [];
@@ -168,7 +181,13 @@ function metersOf(card) {
     const inside = shareOf(card.overlapM2, card.lookupM2);
     list.push(meterRow('Trong vùng tra cứu', 'Phần diện tích vùng đang tra cứu nằm trong đồ án', shareLabel(inside), inside, 'cover'));
   }
-  list.push(meterRow('Điều chỉnh cục bộ', 'Số lần và tổng diện tích điều chỉnh cục bộ', adjustValue, adjustShare, 'adjust'));
+  list.push(meterRow(
+    'Điều chỉnh cục bộ',
+    'Số vị trí và tổng diện tích điều chỉnh cục bộ. Số lần = số quyết định khác nhau; mỗi quyết định có thể gồm nhiều vị trí.',
+    adjustValue,
+    adjustShare,
+    'adjust'
+  ));
   if (card.level === 'QHC') {
     list.push(meterRow('Đã có QHPK', 'Tổng diện tích khu vực đã có QHPK', shareLabel(shareOf(card.qhpkM2, card.hostM2)), shareOf(card.qhpkM2, card.hostM2), 'cover'));
   }
@@ -178,16 +197,26 @@ function metersOf(card) {
   return list;
 }
 
+function briefTools(card) {
+  const hasDecision = !!(card.entry && card.entry.decision);
+  return `<div class="project-brief-tools">
+      <button type="button" class="project-brief-tool" data-brief-pdf data-brief-name="${escapeHtml(card.name)}"${hasDecision ? '' : ' disabled'} title="${hasDecision ? 'Xem PDF quyết định phê duyệt' : 'Chưa có PDF quyết định'}" aria-label="Xem PDF quyết định">${ico('file')}</button>
+      <button type="button" class="project-brief-tool" data-brief-info data-brief-name="${escapeHtml(card.name)}" title="Xem bảng thông tin đồ án" aria-label="Xem bảng thông tin đồ án">${ico('table')}</button>
+      <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
+    </div>`;
+}
+
 function render(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
   const level = PLAN_LEVELS.find(item => item.key === card.level);
   const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
+  const title = briefTitle(card.name);
   el.dataset.level = card.level || '';
   el.hidden = false;
   el.innerHTML = `<div class="project-brief-head">
-      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(card.name)}</h2>
-      <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
+      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(title)}</h2>
+      ${briefTools(card)}
     </div>
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
     <div class="project-brief-pops"><span>Hiện trạng <b>${peopleHtml(card.pop.ht)}</b></span><span>Quy hoạch <b>${peopleHtml(card.pop.qh)}</b></span></div>
@@ -198,11 +227,12 @@ function render(card) {
 function itemHtml(card) {
   const level = PLAN_LEVELS.find(item => item.key === card.level);
   const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
+  const title = briefTitle(card.name);
   const decision = card.decision
     ? `<button type="button" class="project-brief-decision" data-brief-decision="${escapeHtml(card.name)}">${escapeHtml(card.decision)}</button>`
     : '';
   return `<section class="project-brief-item">
-      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(card.name)}</h2>
+      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(title)}</h2>
       <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
       <div class="project-brief-meters">${metersOf(card).join('')}</div>
       ${decision}
@@ -251,7 +281,7 @@ function cardFromPeer(peer) {
     hostM2: areaM2(entry && entry.boundary),
     lookupM2: inspectHostArea(),
     overlapM2: Number(peer.overlapM2) || 0,
-    adjN: adjs ? adjs.length : null, adjM2: null, qhpkM2: null, qhctM2: null
+    adjN: adjs ? adjustmentSiteCount(adjs) : null, adjM2: null, qhpkM2: null, qhctM2: null
   };
 }
 
@@ -280,7 +310,7 @@ async function show(name) {
   const adjs = known ? adjustmentsOf(project) : null;
   const base = {
     name: project, level, hostM2, pop, entry, adjs,
-    adjN: adjs ? adjs.length : null, adjM2: null, qhpkM2: null, qhctM2: null
+    adjN: adjs ? adjustmentSiteCount(adjs) : null, adjM2: null, qhpkM2: null, qhctM2: null
   };
   render(base);
   await fillCover(base, token);
@@ -300,6 +330,16 @@ export function initProjectBrief() {
   host.appendChild(el);
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-brief-close]')) { hide(); return; }
+    const pdf = e.target.closest('[data-brief-pdf]');
+    if (pdf && !pdf.disabled) {
+      openInspectDecision(pdf.getAttribute('data-brief-name'));
+      return;
+    }
+    const info = e.target.closest('[data-brief-info]');
+    if (info) {
+      openProjectInfo(info.getAttribute('data-brief-name'));
+      return;
+    }
     const decision = e.target.closest('[data-brief-decision]');
     if (decision) openInspectDecision(decision.getAttribute('data-brief-decision'));
   });

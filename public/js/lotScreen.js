@@ -55,19 +55,21 @@ function num(value, digits) {
  */
 export function buildupHtml(stats) {
   const lot = Number(stats.lotM2);
-  if (!(lot > 1)) return '<span>Không tính được diện tích lô.</span>';
+  if (!(lot > 1)) return '<span class="pp-sub">Không tính được diện tích lô.</span>';
   const count = Number(stats.count) || 0;
   const foot = Number(stats.footM2) || 0;
   const out = Number(stats.outM2) || 0;
   const cover = lot > 0 ? (100 * foot) / lot : 0;
-  const line = (label, value) => `<span class="lot-line"><span>${label}</span><b>${value}</b></span>`;
+  // Cùng lưới .pp-row với các dòng thông tin thẻ (font / khoảng cách đồng bộ).
+  const line = (label, value, cls = '') =>
+    `<div class="pp-row${cls ? ` ${cls}` : ''}"><span>${label}</span><b>${value}</b></div>`;
   const rows = [
     line('Số công trình trên đất', `${num(count, 0)} công trình`),
     line('Diện tích xây dựng', `${num(Math.round(foot), 0)} m²`),
     line('Mật độ xây dựng', `${num(cover, 1)}%`)
   ];
   if (out >= 0.5) {
-    rows.push(`<span class="lot-line is-out"><span>Ngoài ranh (không tính)</span><b>${num(Math.round(out), 0)} m²</b></span>`);
+    rows.push(line('Ngoài ranh (không tính)', `${num(Math.round(out), 0)} m²`, 'is-out'));
   }
   return rows.join('');
 }

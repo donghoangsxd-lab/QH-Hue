@@ -19,6 +19,7 @@ const html = buildupHtml({
 });
 if (!html.includes('Số công trình trên đất') || !html.includes('16 công trình')) throw new Error(html);
 if (!html.includes('Mật độ xây dựng') || !html.includes('Diện tích xây dựng')) throw new Error(html);
+if (!html.includes('class="pp-row"') || html.includes('lot-line')) throw new Error('kết quả mật độ phải dùng .pp-row');
 if (html.includes('Chiều cao') || html.includes('ảnh vệ tinh')) throw new Error('không được hiện chiều cao ảnh vệ tinh');
 const slot = lotBuildupSlotHtml();
 if (!slot.includes('data-lot-buildup') || slot.includes('data-lot-buildup-run')) {
@@ -62,6 +63,9 @@ const beforeRun = armBody.split('const run =')[0];
 if (beforeRun.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');
 if (!attach.includes('el.textContent = LOADING')) throw new Error('thiếu trạng thái đang kiểm tra');
 if (!attach.includes('hasBuildupIcon')) throw new Error('thiếu chặn nút chữ khi đã có icon mật độ');
+if (!attach.includes('clearBuildupPanel') || !attach.includes("el.dataset.open === '1'")) {
+  throw new Error('thiếu bấm lại icon mật độ để tắt bảng');
+}
 if (!buildupSrc.includes("const LOADING = 'Đang đối chiếu dấu chân công trình…'")) {
   throw new Error('thiếu câu đang đối chiếu');
 }

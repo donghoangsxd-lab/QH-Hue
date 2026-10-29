@@ -1824,7 +1824,7 @@ async function openQhcCenterInfo() {
 }
 
 // Thông tin đồ án đã lưu: mở dạng gọn trong panel dưới (giữ kiểu xem bản đồ đang dùng, không tự chia đôi)
-async function openProjectInfo(project) {
+export async function openProjectInfo(project) {
   if (!project) return;
   if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
   const seq = ++infoSeq;

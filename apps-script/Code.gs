@@ -1891,6 +1891,10 @@ const NAME_OVERRIDE = {
     tenDayDu: 'Quy hoạch phân khu Khu phi thuế quan Sài Gòn – Chân Mây',
     tenRutGon: 'Phi thuế quan SG–CM'
   },
+  'qhpk tt phía nam': {
+    tenDayDu: 'Trung tâm phía Nam thành phố Huế',
+    tenRutGon: 'TT phía Nam'
+  },
   'qhp~1': { tenDayDu: 'QHP~1', tenRutGon: 'QHP~1' }
 };
 

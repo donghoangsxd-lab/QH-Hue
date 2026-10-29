@@ -37,6 +37,9 @@ assert.equal(noise[0].rawPct, 0.4);
 
 const src = fs.readFileSync(new URL('../public/js/planLandStats.js', import.meta.url), 'utf8');
 assert.match(src, /presentLandMix/);
+assert.match(src, /MIX_NOISE_PCT/);
+assert.match(src, /audibleParts/);
+assert.match(src, /planLotsTable\(res\.parts, res\.area\)/);
 assert.match(src, /mixEntries\(res, noneLabel\)/);
 assert.match(src, /fmtPct\(s\.rawPct\)/);
 assert.match(src, /s\.rawPct != null \? s\.rawPct : s\.pct/);
