@@ -150,9 +150,8 @@ function syncBriefStack() {
     if (h > 2) y += h + 8;
   });
   root.style.setProperty('--brief-stack', `${y}px`);
-  const invest = document.getElementById('investCard');
-  const investOn = !!(invest && !invest.hidden && invest.offsetHeight > 2);
-  const col = PHONE_LAYOUT.matches ? '0px' : (y > 0 || investOn ? (investOn ? '408px' : '336px') : '0px');
+  // Bảng dự án đầu tư gắn #investInfoSlot trong panel F — không chiếm cột nổi trên bản đồ.
+  const col = PHONE_LAYOUT.matches ? '0px' : (y > 0 ? '336px' : '0px');
   root.style.setProperty('--info-col', col);
 }
 

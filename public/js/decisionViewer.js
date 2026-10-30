@@ -226,71 +226,68 @@ function clearPdfHost(host) {
     pdfIo = null;
   }
   if (host) {
-    host.querySelectorAll('.decision-pdf-slot').forEach(cancelPdfTask);
+    host.querySelectorAll('.decision-pdf-slot').forEach((slot) => {
+      const task = slot._pdfTask;
+      if (!task) return;
+      slot._pdfTask = null;
+      try { task.cancel(); } catch (_) { /* đã xong */ }
+    });
     host.innerHTML = '';
     host.hidden = true;
     delete host.dataset.src;
   }
 }
 
-function cancelPdfTask(slot) {
+async function settlePdfTask(slot) {
   const task = slot && slot._pdfTask;
   if (!task) return;
   slot._pdfTask = null;
   try { task.cancel(); } catch (_) { /* đã xong */ }
+  // cancel() bất đồng bộ — phải chờ reject xong mới được render() lại (nếu không trang 1 xoay ngược).
+  try { await task.promise; } catch (_) { /* RenderingCancelledException hoặc lỗi cũ */ }
 }
 
-function blankPdfSlot(slot, width, ratio) {
-  if (!slot) return;
-  cancelPdfTask(slot);
-  const w = Math.max(120, Math.floor(width) || 120);
-  const [aw, ah] = String(ratio || '210 / 297').split('/').map((x) => Number(String(x).trim()) || 0);
-  const h = aw > 0 && ah > 0 ? Math.max(1, Math.round(w * ah / aw)) : Math.round(w * 297 / 210);
-  slot.style.aspectRatio = ratio || '210 / 297';
-  slot.innerHTML = '';
-  const canvas = document.createElement('canvas');
-  canvas.className = 'decision-pdf-page';
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, w, h);
-  slot.appendChild(canvas);
-}
-
-async function renderPdfPage(doc, slot, pageNo, width) {
+async function renderPdfPage(doc, slot, pageNo, cssWidth) {
   const gen = Number(slot.dataset.gen || 0) + 1;
   slot.dataset.gen = String(gen);
-  cancelPdfTask(slot);
-  // Canvas mới mỗi lần — tránh PDF.js chồng render trên cùng context (trang xoay ngược / đen).
-  slot.innerHTML = '';
+  await settlePdfTask(slot);
+  if (Number(slot.dataset.gen) !== gen) return;
+
   const page = await doc.getPage(pageNo);
   if (Number(slot.dataset.gen) !== gen) return;
+
+  // Một lần vẽ theo bề ngang khung; CSS width:100% scale khi đổi kích thước — không ResizeObserver vẽ lại.
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.max(0.5, width / Math.max(1, base.width));
-  const viewport = page.getViewport({ scale });
+  const cssScale = Math.max(0.5, cssWidth / Math.max(1, base.width));
+  const viewport = page.getViewport({ scale: cssScale * dpr });
   const w = Math.max(1, Math.floor(viewport.width));
   const h = Math.max(1, Math.floor(viewport.height));
-  const ratio = `${base.width} / ${base.height}`;
-  slot.style.aspectRatio = ratio;
+
+  slot.innerHTML = '';
+  slot.style.aspectRatio = `${base.width} / ${base.height}`;
   const canvas = document.createElement('canvas');
   canvas.className = 'decision-pdf-page';
   canvas.width = w;
   canvas.height = h;
+  canvas.style.width = '100%';
+  canvas.style.height = 'auto';
   const ctx = canvas.getContext('2d', { alpha: false });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
   slot.appendChild(canvas);
+
   const task = page.render({ canvasContext: ctx, viewport, background: '#ffffff' });
   slot._pdfTask = task;
   try {
     await task.promise;
   } catch (err) {
     if (err && (err.name === 'RenderingCancelledException' || /cancel/i.test(String(err.message || '')))) return;
-    // Lỗi / nửa chừng: bỏ trắng trang, không để nền đen hay ảnh xoay dở.
-    if (Number(slot.dataset.gen) === gen) blankPdfSlot(slot, width, ratio);
+    if (Number(slot.dataset.gen) === gen) {
+      slot.innerHTML = '';
+      slot.style.aspectRatio = `${base.width} / ${base.height}`;
+    }
     throw err;
   } finally {
     if (slot._pdfTask === task) slot._pdfTask = null;
@@ -299,6 +296,10 @@ async function renderPdfPage(doc, slot, pageNo, width) {
 
 async function paintPdf(host, src) {
   const seq = ++pdfPaintSeq;
+  if (pdfResizeObs) {
+    pdfResizeObs.disconnect();
+    pdfResizeObs = null;
+  }
   host.hidden = false;
   host.dataset.src = src;
   host.innerHTML = '<p class="decision-pdf-wait">Đang tải PDF…</p>';
@@ -327,12 +328,10 @@ async function paintPdf(host, src) {
       if (!slot || seq !== pdfPaintSeq || slot.dataset.ready === '1') return;
       slot.dataset.ready = '1';
       renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
-        // Giữ trang trắng nếu vẽ lỗi; cho phép thử lại khi cuộn/resize
         slot.dataset.ready = '';
       });
     };
-    // Trang 1: trắng trước, rồi vẽ — nếu lỗi vẫn trắng, không khung đen
-    blankPdfSlot(slots[0], widthOf(), '210 / 297');
+    // Chỉ vẽ trang 1 một lần — không blank/resize vẽ chồng (nguyên nhân xoay ngược).
     paintSlot(slots[0]);
 
     if (pdfIo) pdfIo.disconnect();
@@ -343,24 +342,6 @@ async function paintPdf(host, src) {
       });
     }, { root: host, rootMargin: '240px 0px' });
     slots.forEach((slot) => pdfIo.observe(slot));
-
-    let resizeTimer = 0;
-    let resizeReady = false;
-    // Chờ trang 1 xong mới bắt resize — tránh vẽ chồng (PDF.js xoay ngược / đen).
-    requestAnimationFrame(() => { resizeReady = true; });
-    pdfResizeObs = new ResizeObserver(() => {
-      if (!resizeReady || seq !== pdfPaintSeq) return;
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (seq !== pdfPaintSeq) return;
-        const w = widthOf();
-        slots.forEach((slot) => {
-          if (slot.dataset.ready !== '1') return;
-          renderPdfPage(doc, slot, Number(slot.dataset.page), w).catch(() => {});
-        });
-      }, 180);
-    });
-    pdfResizeObs.observe(host);
   } catch (err) {
     if (seq !== pdfPaintSeq) return;
     host.innerHTML = `<p class="decision-pdf-wait">${escapeMsg(err.message || 'Không xem được PDF trong khung.')}</p>`;

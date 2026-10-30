@@ -979,11 +979,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       syncPlanBriefDock();
       syncPhoneInfoDock();
       syncPlanInfoDock();
+      syncInvestInfoDock();
     }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
   };
-  // Brief → #planBriefSlot (dưới bốn tab cấp). Lô/thửa → #planInfoSlot (phủ #planListPane). Mọi cỡ màn hình.
+  // Brief → #planBriefSlot (dưới bốn tab cấp). Lô/thửa → #planInfoSlot (phủ #planListPane).
+  // Dự án đầu tư → #investInfoSlot (phủ #dtList). Mọi cỡ màn hình.
   let planInfoOn = false;
   let panelBeforePlanInfo = false;
+  let investInfoOn = false;
+  let panelBeforeInvestInfo = false;
+  const dauTuPaneOn = () => {
+    const pane = document.getElementById('layerPaneDauTu');
+    return !!pane && !pane.hidden;
+  };
+  const syncInvestInfoDock = () => {
+    const slot = document.getElementById('investInfoSlot');
+    const card = document.getElementById('investCard');
+    const host = document.getElementById('mapArea');
+    const cardOn = !!(card && !card.hidden);
+    const on = dauTuPaneOn() && !!slot && cardOn;
+    const park = (el) => { if (el && host && el.parentElement !== host) host.appendChild(el); };
+    if (on) {
+      if (!investInfoOn) {
+        investInfoOn = true;
+        panelBeforeInvestInfo = document.body.classList.contains('right-collapsed');
+        if (panelBeforeInvestInfo) setRightPanelCollapsed(false);
+      }
+      document.body.classList.remove('phone-info-dock');
+      document.body.classList.add('invest-info-open');
+      slot.hidden = false;
+      if (card.parentElement !== slot) slot.appendChild(card);
+      return;
+    }
+    if (!investInfoOn && !document.body.classList.contains('invest-info-open')) return;
+    investInfoOn = false;
+    document.body.classList.remove('invest-info-open');
+    if (slot) {
+      [...slot.children].forEach(park);
+      slot.hidden = true;
+    }
+    if (panelBeforeInvestInfo) setRightPanelCollapsed(true);
+    panelBeforeInvestInfo = false;
+  };
   const syncPlanBriefDock = () => {
     const slot = document.getElementById('planBriefSlot');
     const brief = document.getElementById('projectBrief');
@@ -1037,27 +1074,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     new MutationObserver(() => {
       watchPhoneInfo(document.getElementById('projectBrief'));
       watchPhoneInfo(document.getElementById('cadParcelCard'));
+      watchPhoneInfo(document.getElementById('investCard'));
       syncPlanBriefDock();
       syncPhoneInfoDock();
       syncPlanInfoDock();
+      syncInvestInfoDock();
     }).observe(mapHost, { childList: true });
     watchPhoneInfo(document.getElementById('projectBrief'));
     watchPhoneInfo(document.getElementById('cadParcelCard'));
+    watchPhoneInfo(document.getElementById('investCard'));
   }
   const briefSlot = document.getElementById('planBriefSlot');
   if (briefSlot) new MutationObserver(syncPlanBriefDock).observe(briefSlot, { childList: true });
   const planSlot = document.getElementById('planInfoSlot');
   if (planSlot) new MutationObserver(syncPlanInfoDock).observe(planSlot, { childList: true });
+  const investSlot = document.getElementById('investInfoSlot');
+  if (investSlot) new MutationObserver(syncInvestInfoDock).observe(investSlot, { childList: true });
   const planPane = document.getElementById('layerPaneQuyHoach');
   if (planPane) {
     new MutationObserver(() => { syncPlanBriefDock(); syncPlanInfoDock(); })
       .observe(planPane, { attributes: true, attributeFilter: ['hidden'] });
   }
+  const dauTuPane = document.getElementById('layerPaneDauTu');
+  if (dauTuPane) {
+    new MutationObserver(syncInvestInfoDock)
+      .observe(dauTuPane, { attributes: true, attributeFilter: ['hidden'] });
+  }
   document.addEventListener('qh-plan-info', syncPlanInfoDock);
+  document.addEventListener('qh-invest-info', syncInvestInfoDock);
   PHONE_INFO.addEventListener('change', () => {
     syncPlanBriefDock();
     syncPhoneInfoDock();
     syncPlanInfoDock();
+    syncInvestInfoDock();
   });
   const proposeBtn = document.getElementById('btnPropose');
   const setPropose = (on) => {

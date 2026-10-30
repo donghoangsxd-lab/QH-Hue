@@ -678,36 +678,40 @@
                 </div>
               </div>
               <input type="checkbox" id="chk_invest" class="dt-invest-check" hidden aria-hidden="true" tabindex="-1">
-              <div id="dtList" class="project-list">
-                <div data-dt-pane="dvtm"><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="nangluong" hidden><div id="investList-nangluong" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="khudothi" hidden><div id="investList-khudothi" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="chungcu" hidden>
-                  <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
-                  <div class="flood-box" id="aptBox" style="display:none;">
-                    <div class="apt-legend" aria-label="Chú giải chung cư">
-                      <span><i class="apt-mark" data-kind="noxh"></i>NOXH</span>
-                      <span><i class="apt-mark" data-kind="thuongmai"></i>Thương mại</span>
-                      <span><i class="apt-mark" data-kind="noxh" data-plan="1"></i>NOXH, quy hoạch</span>
-                      <span><i class="apt-mark" data-kind="thuongmai" data-plan="1"></i>Thương mại, quy hoạch</span>
+              <!-- Vùng danh sách: bảng thông tin dự án (#investInfoSlot) phủ lên vùng này khi mở — cùng logic #planInfoSlot -->
+              <div id="dtListPane" class="dt-list-pane">
+                <div id="investInfoSlot" class="invest-info-slot" hidden></div>
+                <div id="dtList" class="project-list">
+                  <div data-dt-pane="dvtm"><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="nangluong" hidden><div id="investList-nangluong" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="khudothi" hidden><div id="investList-khudothi" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="chungcu" hidden>
+                    <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
+                    <div class="flood-box" id="aptBox" style="display:none;">
+                      <div class="apt-legend" aria-label="Chú giải chung cư">
+                        <span><i class="apt-mark" data-kind="noxh"></i>NOXH</span>
+                        <span><i class="apt-mark" data-kind="thuongmai"></i>Thương mại</span>
+                        <span><i class="apt-mark" data-kind="noxh" data-plan="1"></i>NOXH, quy hoạch</span>
+                        <span><i class="apt-mark" data-kind="thuongmai" data-plan="1"></i>Thương mại, quy hoạch</span>
+                      </div>
+                      <p class="apt-summary" id="aptSummary"></p>
+                      <label class="apt-kind">Lọc loại
+                        <select id="aptKind" aria-label="Lọc chung cư theo loại">
+                          <option value="">Tất cả</option>
+                          <option value="noxh">NOXH</option>
+                          <option value="thuongmai">Thương mại</option>
+                        </select>
+                      </label>
+                      <p id="aptStatus" class="apt-status"></p>
                     </div>
-                    <p class="apt-summary" id="aptSummary"></p>
-                    <label class="apt-kind">Lọc loại
-                      <select id="aptKind" aria-label="Lọc chung cư theo loại">
-                        <option value="">Tất cả</option>
-                        <option value="noxh">NOXH</option>
-                        <option value="thuongmai">Thương mại</option>
-                      </select>
-                    </label>
-                    <p id="aptStatus" class="apt-status"></p>
+                    <div id="aptList" class="project-list"></div>
+                    <div id="investList-chungcu" class="project-list invest-tab-list"></div>
                   </div>
-                  <div id="aptList" class="project-list"></div>
-                  <div id="investList-chungcu" class="project-list invest-tab-list"></div>
+                  <div data-dt-pane="nongnghiep" hidden><div id="investList-nongnghiep" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="vanhoaxahoi" hidden><div id="investList-vanhoaxahoi" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="khac" hidden><div id="investList-khac" class="project-list invest-tab-list"></div></div>
                 </div>
-                <div data-dt-pane="nongnghiep" hidden><div id="investList-nongnghiep" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="vanhoaxahoi" hidden><div id="investList-vanhoaxahoi" class="project-list invest-tab-list"></div></div>
-                <div data-dt-pane="khac" hidden><div id="investList-khac" class="project-list invest-tab-list"></div></div>
               </div>
             </div>
           </div>

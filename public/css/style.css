@@ -617,12 +617,12 @@ body:not(.bottom-collapsed) #mapArea > .cad-card,
 body:not(.bottom-collapsed) #mapArea > .leaflet-popup.dock-card {
   display: none !important;
 }
-/* Bảng dự án kêu gọi đầu tư chiếm cột trái: các bảng nổi trên bản đồ sang phải bảng đó. */
-body:has(#investCard:not([hidden])) #mapArea > .project-brief,
-body:has(#investCard:not([hidden])) .urban-focus-bar,
-body:has(#investCard:not([hidden])) .ovd-card,
-body:has(#investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
-body:has(#investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
+/* Bảng dự án gắn panel F (#investInfoSlot). Chỉ khi thẻ còn nổi trên #mapArea (fallback) mới đẩy cột trái. */
+body:has(#mapArea > #investCard:not([hidden])) #mapArea > .project-brief,
+body:has(#mapArea > #investCard:not([hidden])) .urban-focus-bar,
+body:has(#mapArea > #investCard:not([hidden])) .ovd-card,
+body:has(#mapArea > #investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
+body:has(#mapArea > #investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
   left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px)) + 8px);
   width: min(276px, calc(100vw - var(--info-left) - var(--tb-btn) - 380px - 56px));
 }
@@ -1270,6 +1270,73 @@ body.right-collapsed .right-panel {
 /* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief / bốn tab cấp / droplist B. */
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
+/* Bảng dự án đầu tư phủ vùng danh sách (#dtListPane), không đè tám tab nhóm / droplist F. */
+.dt-list-pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#investInfoSlot { display: none; }
+#investInfoSlot[hidden] { display: none !important; }
+body.invest-info-open #axisDauTu,
+body.invest-info-open #layerPaneDauTu {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+body.invest-info-open #dtListPane {
+  z-index: 1;
+}
+body.invest-info-open #dtListPane > :not(#investInfoSlot) {
+  visibility: hidden;
+  pointer-events: none;
+}
+body.invest-info-open #investInfoSlot {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  padding: 0;
+  box-sizing: border-box;
+  background: transparent;
+}
+body.invest-info-open #investInfoSlot > .cad-card.invest-card {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  height: auto;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  transform: none !important;
+  border: 1px solid rgba(var(--orange-rgb), 0.55) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--panel-shadow) !important;
+  background: var(--bg-dark) !important;
+  z-index: auto;
+  overflow: hidden;
+}
+body.invest-info-open #investInfoSlot > .invest-card .invest-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 /* Mọi cỡ màn hình: brief + bảng lô trong trục Quy hoạch (không dùng phone-info-dock che hàng cấp). */
 body.plan-brief-open #axisQuyHoach,
 body.plan-info-open #axisQuyHoach,
@@ -6538,11 +6605,11 @@ body.project-review.la-page #projectReviewHost {
     height: auto;
     overflow: auto;
   }
-  body:has(#investCard:not([hidden])) #mapArea > .project-brief,
-  body:has(#investCard:not([hidden])) .urban-focus-bar,
-  body:has(#investCard:not([hidden])) .ovd-card,
-  body:has(#investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
-  body:has(#investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
+  body:has(#mapArea > #investCard:not([hidden])) #mapArea > .project-brief,
+  body:has(#mapArea > #investCard:not([hidden])) .urban-focus-bar,
+  body:has(#mapArea > #investCard:not([hidden])) .ovd-card,
+  body:has(#mapArea > #investCard:not([hidden])) #mapArea > .cad-card:not(.invest-card),
+  body:has(#mapArea > #investCard:not([hidden])) #mapArea > .leaflet-popup.dock-card {
     display: none !important;
   }
   body .project-brief,
@@ -7776,12 +7843,18 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   .axis-area-list,
   #gpList,
   #projectList,
+  #dtListPane,
   #dtList,
   .cn-body,
   #xahoiList {
     flex: 1 1 auto;
     min-height: 0;
     max-height: none;
+    overflow: auto;
+  }
+  #dtListPane > #dtList {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
   }
   #browseNganh .cn-schemes {

@@ -53,8 +53,13 @@ const BASE = {
   fillColor: MAGENTA, fillOpacity: 0.14, fillRule: 'nonzero', lineJoin: 'round'
 };
 const HOVER = { ...BASE, weight: 2.8, fillOpacity: 0.24 };
-const HALO = { color: '#ffffff', weight: 7, opacity: 1, fill: false, lineJoin: 'round' };
-const LINE = { ...BASE, fill: false };
+// Viền chọn rõ như thửa đất: quầng tối + nét vàng đặc (không trùng nét đứt magenta của lớp nền).
+const HALO = { color: '#111827', weight: 8, opacity: 0.75, fill: false, lineJoin: 'round' };
+const LINE = { color: '#fde047', weight: 3.5, opacity: 1, fill: false, dashArray: null, lineJoin: 'round' };
+const SELECTED = {
+  color: '#fde047', weight: 3, opacity: 1, dashArray: null,
+  fillColor: '#fde047', fillOpacity: 0.22, fillRule: 'nonzero', lineJoin: 'round'
+};
 const PLAN_TABS = [
   { id: 'qhc25', name: 'QHC', scale: '1/25.000' },
   { id: 'qhc10', name: 'QHC', scale: '1/10.000' },
@@ -349,9 +354,18 @@ function planInspecting() {
   return !!(card && box && !box.hidden);
 }
 
+function isSelectedFeature(feature) {
+  if (!feature) return false;
+  if (selected?.feature === feature) return true;
+  if (!card?.members?.length) return false;
+  return card.members.includes(feature)
+    || card.members.some(m => m?.properties?._key && m.properties._key === feature.properties?._key);
+}
+
 function styleFor(feature) {
   if (card?.grouping && card.picks?.has(feature?.properties?._key)) return PICK;
-  if (planInspecting() && card.members?.includes(feature)) return LINE;
+  if (planInspecting() && isSelectedFeature(feature)) return LINE;
+  if (isSelectedFeature(feature)) return SELECTED;
   return BASE;
 }
 
@@ -364,7 +378,15 @@ function eachPoly(fn) {
 function findLayer(feature, host) {
   const group = host === planMap ? rightGroup : leftGroup;
   let found = null;
-  group?.eachLayer(layer => { if (layer.feature === feature) found = layer; });
+  const key = feature?.properties?._key;
+  const gid = feature?.properties?.groupId;
+  group?.eachLayer(layer => {
+    if (!layer.feature?.geometry) return;
+    if (layer.feature === feature) { found = layer; return; }
+    const p = layer.feature.properties || {};
+    if (key && p._key === key) found = layer;
+    else if (!found && gid && p.groupId === gid) found = layer;
+  });
   return found;
 }
 
@@ -875,7 +897,13 @@ function toggleLand(key, color) {
   markLand(key);
 }
 
+function investCardDocked() {
+  return document.body.classList.contains('invest-info-open');
+}
+
 function nudge(targetMap, bounds) {
+  // Bảng đã gắn panel trái — không cần đẩy khung nhìn khỏi thẻ nổi trên bản đồ.
+  if (investCardDocked()) return;
   const el = $('investCard');
   if (!el || el.hidden || !targetMap || !bounds?.isValid?.()) return;
   const sw = targetMap.latLngToContainerPoint(bounds.getSouthWest());
@@ -893,7 +921,8 @@ function nudge(targetMap, bounds) {
 function frameProject(targetMap, bounds) {
   if (!targetMap || !bounds?.isValid?.()) return;
   const el = $('investCard');
-  const cardW = el && !el.hidden ? el.getBoundingClientRect().width + 28 : 48;
+  const docked = investCardDocked();
+  const cardW = !docked && el && !el.hidden ? el.getBoundingClientRect().width + 28 : 48;
   const padTL = L.point(cardW, 80);
   const padBR = L.point(40, 40);
   const fitZ = targetMap.getBoundsZoom(bounds, false, padTL.add(padBR));
@@ -907,11 +936,24 @@ function frameProject(targetMap, bounds) {
 }
 
 function selectLayer(layer, targetMap, geom) {
-  if (selected && selected !== layer) selected.setStyle(styleFor(selected.feature));
+  if (selected && selected !== layer) {
+    const prev = selected.feature;
+    selected = null;
+    if (prev) {
+      const old = findLayer(prev, targetMap);
+      if (old) old.setStyle(styleFor(prev));
+    }
+  }
   selected = layer || null;
   if (layer) {
-    layer.setStyle(styleFor(layer.feature));
+    layer.setStyle(SELECTED);
     layer.bringToFront();
+  }
+  // Thành viên cùng nhóm (nhiều mảnh): tô SELECTED, không chỉ mảnh được click.
+  if (card?.members?.length) {
+    eachPoly(ly => {
+      if (isSelectedFeature(ly.feature) && ly !== layer) ly.setStyle(SELECTED);
+    });
   }
   clearHighlight();
   if (!geom || !targetMap) return;
@@ -934,11 +976,24 @@ function closeCard() {
   card = null;
   selected = null;
   hovered = null;
+  investPicked = '';
   eachPoly(layer => layer.setStyle(BASE));
   clearHighlight();
   clearParcelPies();
   const el = $('investCard');
   if (el) { el.hidden = true; el.innerHTML = ''; }
+  document.dispatchEvent(new CustomEvent('qh-invest-info'));
+  paintInvestList({ counts: false });
+}
+
+function ensureDauTuPane() {
+  const pane = document.getElementById('layerPaneDauTu');
+  if (pane && !pane.hidden) return;
+  const mag = document.getElementById('layerMagMenu');
+  if (mag) mag.hidden = true;
+  document.dispatchEvent(new CustomEvent('qh:axis-tab', {
+    detail: { id: 'dautu', openPanel: true, keepCamera: true }
+  }));
 }
 
 function ensureCard() {
@@ -1113,6 +1168,7 @@ function paintCard() {
       </div>
     </div>`;
   el.hidden = false;
+  document.dispatchEvent(new CustomEvent('qh-invest-info'));
   if (planOpen && info === 'overview') showTab(st.tab, { syncMap: false });
 }
 
@@ -1434,6 +1490,7 @@ async function ungroup(all) {
 
 function openCard(feature, layer, targetMap) {
   if (!feature) return;
+  ensureDauTuPane();
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'invest' }));
   clearParcelPies();
   const seq = ++openSeq;
@@ -1449,6 +1506,7 @@ function openCard(feature, layer, targetMap) {
   const areaText = area > 0
     ? (area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`)
     : '';
+  investPicked = feature.properties?.groupId || feature.properties?._key || investPicked;
   card = {
     seq, tab, infoTab: 'overview', cache: new Map(), map: targetMap || map, feature, members, geom, sheet,
     areaText, pieces: members.filter(m => m.geometry).length || 1, recorded: recordedM2(sheet), bounds: null,
@@ -1456,7 +1514,10 @@ function openCard(feature, layer, targetMap) {
     dtGroup: rowGroupId(sheet, title)
   };
   paintCard();
-  if (geom) selectLayer(layer, targetMap || map, geom);
+  document.dispatchEvent(new CustomEvent('qh-invest-info'));
+  const host = targetMap || map;
+  const live = layer || findLayer(feature, host);
+  if (geom) selectLayer(live, host, geom);
   else {
     selected = null;
     clearHighlight();
@@ -1469,7 +1530,15 @@ function openCard(feature, layer, targetMap) {
   }
   card.bounds = bounds;
   if (seq !== openSeq) return;
-  if (bounds) requestAnimationFrame(() => { if (card && card.seq === seq) frameProject(targetMap || map, bounds); });
+  paintInvestList({ counts: false });
+  if (bounds) {
+    requestAnimationFrame(() => {
+      if (!card || card.seq !== seq) return;
+      // Đợi panel gắn xong rồi mới fit (padding không trừ bề rộng thẻ nổi).
+      document.dispatchEvent(new CustomEvent('qh-invest-info'));
+      frameProject(host, bounds);
+    });
+  }
 }
 
 function investDossierRows(p) {
@@ -1509,9 +1578,9 @@ function investRow(p, n) {
         <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}${badge}</span></label>
       <span class="project-meta dt-area${area === '-' ? ' is-miss' : ''}">${escapeHtml(area)}</span>
       <span class="project-tools">
-        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-invest-expand="${safe}" title="${open ? 'Ẩn' : 'Xem'} thông tin công trình" aria-label="Thông tin công trình" aria-expanded="${open}">${ico('chev-down')}</button>
+        <button type="button" class="project-btn project-expand${open || id === investPicked ? ' open' : ''}" data-invest-expand="${safe}" title="Xem thông tin dự án" aria-label="Thông tin dự án" aria-expanded="${open || id === investPicked}">${ico('info')}</button>
       </span>
-    </div>${open ? investDossierHtml(rows) : ''}`;
+    </div>`;
 }
 
 function paintDvtmList(host, items) {
@@ -1599,12 +1668,16 @@ async function focusInvest(id) {
   if (p.dtGroup && p.dtGroup !== activeDtTab()) {
     document.querySelector(`#levelPickDt [data-dt-tab="${p.dtGroup}"]`)?.click();
   }
+  if (p.dtGroup === 'dvtm' && p.dvtmSub) dvtmFoldOpen.add(p.dvtmSub);
   const box = $('chk_invest');
   if (box && !box.checked) {
     box.checked = true;
     await setVisible(true);
   } else if (visible) redrawMaps();
-  openCard(p.feature, findLayer(p.feature, map), map);
+  else await setVisible(true);
+  // Vẽ lại xong mới tìm layer — tránh zoom mà không có viền chọn.
+  const live = findLayer(p.feature, map);
+  openCard(p.feature, live, map);
 }
 
 async function setVisible(on) {
@@ -1692,10 +1765,8 @@ export function initInvestLayer() {
     }
     const expand = e.target.closest('[data-invest-expand]');
     if (expand) {
-      const id = expand.dataset.investExpand;
-      if (investOpen.has(id)) investOpen.delete(id);
-      else investOpen.add(id);
-      paintInvestList({ tab: activeDtTab(), counts: false });
+      e.preventDefault();
+      focusInvest(expand.dataset.investExpand);
       return;
     }
     const focus = e.target.closest('[data-invest-focus]');
@@ -1728,7 +1799,10 @@ export function initInvestLayer() {
     if (e.detail?.id === 'dautu') {
       ensureInvestOn();
       ensureInvestList();
+      return;
     }
+    // Bảng thông tin chỉ gắn panel F — đổi trục thì đóng.
+    if (card) closeCard();
   });
   document.addEventListener('qh:dt-counts', () => paintDtCounts());
   if (document.querySelector('#layerPaneDauTu:not([hidden])')) {
