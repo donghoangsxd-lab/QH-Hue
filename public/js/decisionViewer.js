@@ -46,7 +46,8 @@ function paintHeading(el, t) {
   const title = viewTitle(t);
   const head = el.querySelector('[data-decision-title]');
   if (head) head.textContent = title;
-  const frame = el.querySelector('iframe');
+  // Chỉ iframe khung xem (không đụng iframe con khác nếu có)
+  const frame = el.querySelector('[data-decision-frame]');
   if (frame) frame.title = title;
   const pdfHost = el.querySelector('[data-decision-pdf]');
   if (pdfHost) pdfHost.setAttribute('aria-label', title);
@@ -113,6 +114,11 @@ async function postJson(action, body, auth = true) {
 
 function ensureViewer() {
   let el = document.getElementById('decisionView');
+  // Khung cũ (thiếu data-decision-frame) phải tạo lại — tránh PDF dính DOM lỗi.
+  if (el && !el.querySelector('[data-decision-frame]')) {
+    el.remove();
+    el = null;
+  }
   if (el) return el;
   el = document.createElement('div');
   el.id = 'decisionView';
@@ -149,8 +155,10 @@ function ensureViewer() {
       <button type="button" data-proposal-reject>Từ chối</button>
     </div>
     <div class="decision-note" data-decision-note hidden></div>
-    <div class="decision-pdf" data-decision-pdf hidden></div>
-    <iframe title="Quyết định phê duyệt" hidden></iframe>`;
+    <div class="decision-pdf" data-decision-pdf hidden>
+      <p class="decision-pdf-wait" data-decision-pdf-wait hidden>Đang tải PDF…</p>
+    </div>
+    <iframe data-decision-frame title="Quyết định phê duyệt" hidden></iframe>`;
   document.body.appendChild(el);
   el.querySelector('[data-decision-close]').addEventListener('click', closeDecision);
   el.querySelector('[data-decision-assign]').addEventListener('submit', (e) => {
@@ -203,26 +211,50 @@ function revokeViewerPdfBlob() {
   viewerPdfBlob = '';
 }
 
-function clearPdfHost(host) {
+function clearViewerMedia(el) {
   pdfPaintSeq += 1;
   revokeViewerPdfBlob();
+  const host = el && el.querySelector('[data-decision-pdf]');
+  const wait = el && el.querySelector('[data-decision-pdf-wait]');
+  const frame = el && el.querySelector('[data-decision-frame]');
   if (host) {
-    host.innerHTML = '';
     host.hidden = true;
     delete host.dataset.src;
   }
+  if (wait) {
+    wait.hidden = true;
+    wait.textContent = 'Đang tải PDF…';
+  }
+  if (frame) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+  }
 }
 
-async function paintPdf(host, src) {
+/** PDF và HTML đều qua một iframe cố định (cùng kiểu adjustLayer) — không tạo/hủy iframe con. */
+async function paintPdf(el, src) {
   const seq = ++pdfPaintSeq;
   revokeViewerPdfBlob();
-  host.hidden = false;
-  host.dataset.src = src;
-  host.innerHTML = '<p class="decision-pdf-wait">Đang tải PDF…</p>';
+  const host = el.querySelector('[data-decision-pdf]');
+  const wait = el.querySelector('[data-decision-pdf-wait]');
+  const frame = el.querySelector('[data-decision-frame]');
+  const box = el.querySelector('[data-decision-note]');
+  if (box) { box.hidden = true; box.textContent = ''; }
+  if (frame) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+  }
+  if (host) {
+    host.hidden = false;
+    host.dataset.src = src;
+  }
+  if (wait) {
+    wait.hidden = false;
+    wait.textContent = 'Đang tải PDF…';
+  }
   try {
     let url = String(src || '').trim();
     if (!url) throw new Error('Thiếu đường dẫn PDF.');
-    // Blob xem trước (chọn file) giữ nguyên; còn lại tải về blob cùng nguồn để iframe mở ổn định.
     if (!/^blob:/i.test(url)) {
       const res = await fetch(url, { credentials: 'same-origin' });
       if (!res.ok) throw new Error(`Không tải được PDF (${res.status})`);
@@ -232,46 +264,46 @@ async function paintPdf(host, src) {
       url = viewerPdfBlob;
     }
     if (seq !== pdfPaintSeq) return;
-    host.innerHTML = '';
-    const frame = document.createElement('iframe');
-    frame.className = 'decision-pdf-frame';
-    frame.title = host.getAttribute('aria-label') || 'PDF';
-    frame.setAttribute('aria-label', frame.title);
+    if (wait) wait.hidden = true;
+    if (host) host.hidden = true;
+    if (!frame) throw new Error('Thiếu khung xem PDF.');
+    frame.hidden = false;
     frame.src = url;
-    host.appendChild(frame);
   } catch (err) {
     if (seq !== pdfPaintSeq) return;
-    host.innerHTML = `<p class="decision-pdf-wait">${escapeMsg(err.message || 'Không xem được PDF trong khung.')}</p>`;
+    if (wait) {
+      wait.hidden = false;
+      wait.textContent = err.message || 'Không xem được PDF trong khung.';
+    }
+    if (host) host.hidden = false;
+    if (frame) {
+      frame.hidden = true;
+      frame.removeAttribute('src');
+    }
   }
-}
-
-function escapeMsg(s) {
-  return String(s || '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
 }
 
 function showFrame(el, src, note) {
-  const frame = el.querySelector('iframe');
-  const pdfHost = el.querySelector('[data-decision-pdf]');
+  const frame = el.querySelector('[data-decision-frame]');
+  const host = el.querySelector('[data-decision-pdf]');
+  const wait = el.querySelector('[data-decision-pdf-wait]');
   const box = el.querySelector('[data-decision-note]');
-  clearPdfHost(pdfHost);
-  if (frame) {
-    frame.hidden = true;
-    frame.removeAttribute('src');
-  }
+  clearViewerMedia(el);
   if (note) {
-    box.hidden = false;
-    box.textContent = note;
+    if (box) {
+      box.hidden = false;
+      box.textContent = note;
+    }
     return;
   }
-  box.hidden = true;
-  box.textContent = '';
+  if (box) { box.hidden = true; box.textContent = ''; }
   if (!src) return;
   if (isPdfSrc(src)) {
-    paintPdf(pdfHost, src);
+    paintPdf(el, src);
     return;
   }
+  if (host) host.hidden = true;
+  if (wait) wait.hidden = true;
   if (frame) {
     frame.hidden = false;
     frame.src = src;
@@ -452,7 +484,7 @@ export function closeDecision() {
   const el = document.getElementById('decisionView');
   if (!el || el.hidden) return;
   el.hidden = true;
-  clearPdfHost(el.querySelector('[data-decision-pdf]'));
+  clearViewerMedia(el);
   const frame = el.querySelector('iframe');
   if (frame) {
     frame.hidden = true;
