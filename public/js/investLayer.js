@@ -21,6 +21,7 @@ import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearPar
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
+import { startLoadMeter } from './loadProgress.js';
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -94,6 +95,80 @@ let landFill = null;
 let openSeq = 0;
 let drawToken = 0;
 let groups = [];
+/** Meter thanh tiêu đề + panel F khi nạp lần đầu / vẽ lớp. */
+let loadMeter = null;
+let loadGen = 0;
+let loadHideTimer = 0;
+
+const yieldUi = () => new Promise((resolve) => {
+  requestAnimationFrame(() => { setTimeout(resolve, 0); });
+});
+
+function showInvestLoad(pct, label) {
+  const box = $('investLoad');
+  if (!box) return;
+  const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  box.hidden = false;
+  const lab = $('investLoadLabel');
+  const pctEl = $('investLoadPct');
+  const fill = $('investLoadFill');
+  if (lab && label) lab.textContent = label;
+  if (pctEl) pctEl.textContent = `${n}%`;
+  if (fill) fill.style.width = `${n}%`;
+  loadMeter?.set(n < 100 ? n : 99);
+}
+
+function hideInvestLoad() {
+  clearTimeout(loadHideTimer);
+  loadHideTimer = 0;
+  const box = $('investLoad');
+  if (box) box.hidden = true;
+  const fill = $('investLoadFill');
+  if (fill) fill.style.width = '0%';
+}
+
+function finishInvestLoad(ok, gen = loadGen) {
+  if (gen !== loadGen) return;
+  clearTimeout(loadHideTimer);
+  if (ok) {
+    showInvestLoad(100, 'Đã tải xong');
+    loadMeter?.done();
+    loadMeter = null;
+    loadHideTimer = setTimeout(() => {
+      if (gen === loadGen) hideInvestLoad();
+    }, 480);
+    return;
+  }
+  loadMeter?.fail();
+  loadMeter = null;
+  hideInvestLoad();
+}
+
+function beginInvestLoad() {
+  clearTimeout(loadHideTimer);
+  loadHideTimer = 0;
+  const gen = ++loadGen;
+  if (loadMeter) {
+    try { loadMeter.cancel(); } catch { /* meter cũ */ }
+    loadMeter = null;
+  }
+  loadMeter = startLoadMeter('Dự án đầu tư');
+  showInvestLoad(2, 'Đang tải dự án đầu tư…');
+  return {
+    gen,
+    async step(pct, label) {
+      if (gen !== loadGen) return;
+      showInvestLoad(pct, label);
+      await yieldUi();
+    },
+    finish(ok) { finishInvestLoad(ok, gen); }
+  };
+}
+
+function ensureLoadMeter() {
+  if (loadMeter) return;
+  loadMeter = startLoadMeter('Dự án đầu tư');
+}
 
 function activeDtTab() {
   return document.querySelector('#levelPickDt .level-pick-btn.is-on')?.dataset?.dtTab || 'dvtm';
@@ -687,33 +762,48 @@ function rebuildSheetOnly(features, rows) {
 
 async function loadPack() {
   if (!ready) {
-    ready = Promise.all([
-      fetch('./data/invest-boundary.geojson').then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh')))),
-      loadRows()
-    ]).then(async ([fc, loaded]) => {
-      const features = (fc && fc.features) || [];
-      const rows = loaded.rows || [];
-      sheetRows = rows;
-      const detail = matchInvestDetail(features, rows);
-      features.forEach((f, i) => {
-        f.properties = f.properties || {};
-        f.properties._key = featureKey(f);
-        f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
-        f.properties._ambiguous = !!detail[i].ambiguous;
-        f.properties._sheetOnly = false;
-      });
-      attachAdminBoundaries(features, rows, loaded.boundaries);
-      pack = features;
-      adoptGroups(loaded.groups);
-      if (isAdmin()) {
-        try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
+    const ui = beginInvestLoad();
+    ready = (async () => {
+      try {
+        await ui.step(8, 'Đang tải ranh dự án…');
+        const boundP = fetch('./data/invest-boundary.geojson')
+          .then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh'))));
+        await ui.step(18, 'Đang tải danh sách dự án…');
+        const rowsP = loadRows();
+        const [fc, loaded] = await Promise.all([boundP, rowsP]);
+        await ui.step(48, 'Đang ghép ranh với danh sách…');
+        const features = (fc && fc.features) || [];
+        const rows = loaded.rows || [];
+        sheetRows = rows;
+        const detail = matchInvestDetail(features, rows);
+        features.forEach((f, i) => {
+          f.properties = f.properties || {};
+          f.properties._key = featureKey(f);
+          f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
+          f.properties._ambiguous = !!detail[i].ambiguous;
+          f.properties._sheetOnly = false;
+        });
+        await ui.step(62, 'Đang gắn ranh đã tải lên…');
+        attachAdminBoundaries(features, rows, loaded.boundaries);
+        pack = features;
+        adoptGroups(loaded.groups);
+        if (isAdmin()) {
+          try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
+        }
+        await ui.step(72, 'Đang phân nhóm dự án…');
+        stampGroups();
+        rebuildSheetOnly(pack, rows);
+        refreshHint();
+        return features;
+      } catch (err) {
+        ui.finish(false);
+        throw err;
       }
-      stampGroups();
-      rebuildSheetOnly(pack, rows);
-      refreshHint();
-      return features;
+    })();
+    ready.catch(err => {
+      ready = null;
+      showToast(`Chưa tải được dự án kêu gọi đầu tư: ${err.message}`, 'error');
     });
-    ready.catch(err => { ready = null; showToast(`Chưa tải được dự án kêu gọi đầu tư: ${err.message}`, 'error'); });
   }
   return ready;
 }
@@ -1557,13 +1647,6 @@ function investDossierRows(p) {
   return rows;
 }
 
-function investDossierHtml(rows) {
-  const body = rows.map(([label, value]) =>
-    `<div class="project-dossier-row"><span class="project-dossier-label">${escapeHtml(label)}</span><span class="project-dossier-meta">${escapeHtml(String(value))}</span></div>`
-  ).join('');
-  return body ? `<div class="project-dossier">${body}</div>` : '';
-}
-
 function investRow(p, n) {
   const id = projectKey(p);
   const safe = escapeHtml(id);
@@ -1645,6 +1728,7 @@ async function ensureInvestList() {
     const host = $(`investList-${g.id}`);
     if (host && !pack) host.innerHTML = '<div class="project-empty">Đang tải danh sách.</div>';
   });
+  const cold = !pack;
   try { await loadPack(); } catch { /* loadPack đã báo */ }
   if (!pack) {
     INVEST_GROUPS.forEach(g => {
@@ -1652,6 +1736,11 @@ async function ensureInvestList() {
       if (host) host.innerHTML = '<div class="project-empty">Chưa có đồ án.</div>';
     });
     return;
+  }
+  // Chỉ cập nhật % khi meter còn mở (setVisible sẽ đóng sau khi vẽ bản đồ).
+  if (cold && loadMeter) {
+    showInvestLoad(78, 'Đang dựng danh sách…');
+    await yieldUi();
   }
   paintInvestList();
 }
@@ -1692,12 +1781,29 @@ async function setVisible(on) {
     rightGroup = null;
     return;
   }
+  const cold = !pack;
+  const needDraw = !leftGroup;
   let features;
   try { features = await loadPack(); } catch { return; }
   if (!visible || token !== drawToken || !features) return;
+  if (cold || needDraw) {
+    ensureLoadMeter();
+    showInvestLoad(80, 'Đang dựng danh sách…');
+    await yieldUi();
+  }
   paintInvestList();
-  if (!leftGroup) leftGroup = drawOn(map, features);
-  if (planMapLive() && !rightGroup) rightGroup = drawOn(planMap, features);
+  if (!visible || token !== drawToken) return;
+  if (needDraw) {
+    ensureLoadMeter();
+    showInvestLoad(88, 'Đang vẽ ranh trên bản đồ…');
+    await yieldUi();
+    if (!visible || token !== drawToken) return;
+    if (!leftGroup) leftGroup = drawOn(map, features);
+    if (planMapLive() && !rightGroup) rightGroup = drawOn(planMap, features);
+  } else if (planMapLive() && !rightGroup) {
+    rightGroup = drawOn(planMap, features);
+  }
+  if (cold || needDraw) finishInvestLoad(true);
 }
 
 export function initInvestLayer() {

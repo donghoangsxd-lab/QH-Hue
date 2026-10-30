@@ -678,6 +678,13 @@
                 </div>
               </div>
               <input type="checkbox" id="chk_invest" class="dt-invest-check" hidden aria-hidden="true" tabindex="-1">
+              <div id="investLoad" class="invest-load" hidden role="status" aria-live="polite" aria-atomic="true">
+                <div class="invest-load-top">
+                  <span class="invest-load-label" id="investLoadLabel">Đang tải dự án đầu tư…</span>
+                  <span class="invest-load-pct" id="investLoadPct">0%</span>
+                </div>
+                <div class="invest-load-track" aria-hidden="true"><i id="investLoadFill"></i></div>
+              </div>
               <!-- Vùng danh sách: bảng thông tin dự án (#investInfoSlot) phủ lên vùng này khi mở — cùng logic #planInfoSlot -->
               <div id="dtListPane" class="dt-list-pane">
                 <div id="investInfoSlot" class="invest-info-slot" hidden></div>

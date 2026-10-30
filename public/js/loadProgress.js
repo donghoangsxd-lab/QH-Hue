@@ -380,6 +380,61 @@ export function startTaskProgress(label) {
   };
 }
 
+/**
+ * Việc tải có % thật 0–100 (fetch + xử lý + vẽ). Thanh #titleProgress cập nhật theo set().
+ * Khác startTaskProgress (đếm 1 việc xong/hỏng): meter dùng thang 100 để hiện tiến độ giữa chừng.
+ */
+export function startLoadMeter(label) {
+  const name = taskName(label) || 'Tải dữ liệu';
+  const job = slot(name);
+  job.pending = 100;
+  job.done = 0;
+  job.failed = 0;
+  job.dropped = 0;
+  if (job.tiles) job.tiles.clear();
+  if (job.hideTimer) {
+    clearTimeout(job.hideTimer);
+    job.hideTimer = 0;
+  }
+  let state = 'open';
+  paint();
+  return {
+    set(pct) {
+      if (state !== 'open') return;
+      const cur = jobs.get(name);
+      if (!cur) return;
+      cur.pending = 100;
+      cur.done = Math.max(0, Math.min(99, Math.round(Number(pct) || 0)));
+      paint();
+    },
+    done() {
+      if (state !== 'open') return;
+      state = 'done';
+      const cur = jobs.get(name);
+      if (!cur) return;
+      cur.pending = 100;
+      cur.done = 100;
+      paint();
+    },
+    fail() {
+      if (state !== 'open') return;
+      state = 'fail';
+      const cur = jobs.get(name);
+      if (!cur) return;
+      cur.failed = Math.max(1, cur.failed || 0);
+      paint();
+    },
+    cancel() {
+      if (state !== 'open') return;
+      state = 'cancel';
+      clearTimeout(job.hideTimer);
+      jobs.delete(name);
+      dropBadge(name);
+      paint();
+    }
+  };
+}
+
 /** Đếm tileloadstart / tileload. tileerror là ô hỏng, không tính vào phần trăm đã xong. */
 export function watchTiles(layer, name) {
   if (!layer || !name || layer._loadProgressName === name) return layer;

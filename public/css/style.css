@@ -867,6 +867,57 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 #axisDauTu .dt-invest-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
+/* Thanh tiến độ khi mở trục F (tải ranh + sheet + vẽ bản đồ). */
+.invest-load {
+  flex: 0 0 auto;
+  margin: 4px 2px 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--orange-rgb), 0.4);
+  border-radius: var(--r-md);
+  background: rgba(15, 23, 42, 0.72);
+}
+.invest-load[hidden] { display: none !important; }
+.invest-load-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.invest-load-label {
+  min-width: 0;
+  color: var(--text-main);
+  font-family: var(--axis-font);
+  font-size: var(--axis-fs-row);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.invest-load-pct {
+  flex: none;
+  color: var(--accent-orange);
+  font-family: var(--axis-font);
+  font-size: var(--axis-fs-chip);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.invest-load-track {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(var(--orange-rgb), 0.2);
+  overflow: hidden;
+}
+.invest-load-track > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--accent-orange);
+  box-shadow: 0 0 6px rgba(var(--orange-rgb), 0.7);
+  transition: width 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .invest-load-track > i { transition: none; }
+}
 .level-pick-btn.is-on {
   background: var(--accent-orange);
   border-color: var(--accent-orange);
