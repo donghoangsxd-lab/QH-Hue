@@ -867,14 +867,18 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 #axisDauTu .dt-invest-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
-/* Thanh tiến độ khi mở trục F (tải ranh + sheet + vẽ bản đồ). */
+/* Thanh tiến độ khi mở trục F (tải ranh + sheet + vẽ bản đồ) — sticky dưới tab, dễ thấy. */
 .invest-load {
+  position: sticky;
+  top: 0;
+  z-index: 6;
   flex: 0 0 auto;
-  margin: 4px 2px 6px;
-  padding: 8px 10px;
-  border: 1px solid rgba(var(--orange-rgb), 0.4);
+  margin: 4px 2px 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--orange-rgb), 0.65);
   border-radius: var(--r-md);
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 .invest-load[hidden] { display: none !important; }
 .invest-load-top {
@@ -882,41 +886,58 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .invest-load-label {
   min-width: 0;
   color: var(--text-main);
   font-family: var(--axis-font);
-  font-size: var(--axis-fs-row);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.3;
 }
 .invest-load-pct {
   flex: none;
   color: var(--accent-orange);
   font-family: var(--axis-font);
-  font-size: var(--axis-fs-chip);
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   letter-spacing: 0.02em;
 }
 .invest-load-track {
-  height: 4px;
+  height: 6px;
   border-radius: 99px;
-  background: rgba(var(--orange-rgb), 0.2);
+  background: rgba(var(--orange-rgb), 0.22);
   overflow: hidden;
 }
 .invest-load-track > i {
+  position: relative;
   display: block;
   height: 100%;
   width: 0;
   border-radius: inherit;
   background: var(--accent-orange);
-  box-shadow: 0 0 6px rgba(var(--orange-rgb), 0.7);
+  box-shadow: 0 0 8px rgba(var(--orange-rgb), 0.85);
   transition: width 0.25s ease;
+}
+.invest-load-track > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: invest-load-shine 1.1s linear infinite;
+}
+@keyframes invest-load-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+body.invest-loading #titleProgress {
+  opacity: 1 !important;
+}
+body.invest-loading #titleProgress.done {
+  opacity: 1 !important;
+  transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .invest-load-track > i { transition: none; }
+  .invest-load-track > i::after { animation: none; }
 }
 .level-pick-btn.is-on {
   background: var(--accent-orange);

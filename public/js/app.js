@@ -86,7 +86,7 @@ import { initLotOver } from './lotOver.js';
 import { initViolateLayer } from './violateLayer.js';
 import { initApartmentLayer } from './apartmentLayer.js';
 import { initParcelInfra } from './parcelInfra.js';
-import { initInvestLayer } from './investLayer.js';
+import { initInvestLayer, primeInvestLoad } from './investLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initTerrainProfile, syncTerrainProfile } from './terrainProfile.js';
 import { initDrainageLayer } from './drainageLayer.js';
@@ -166,6 +166,8 @@ function initLayerMainTabs() {
   tabs.forEach(btn => btn.addEventListener('click', () => {
     const id = btn.dataset.mainTab;
     show(id);
+    // Hiện thanh tải F ngay khi pane mở (trước sự kiện axis-tab / fetch).
+    if (id === 'dautu') primeInvestLoad();
     if (btn.dataset.axisSync === '0') {
       delete btn.dataset.axisSync;
       return;

@@ -99,9 +99,12 @@ let groups = [];
 let loadMeter = null;
 let loadGen = 0;
 let loadHideTimer = 0;
+let loadStartedAt = 0;
+const LOAD_MIN_MS = 1200;
+const LOAD_DONE_HOLD_MS = 1400;
 
 const yieldUi = () => new Promise((resolve) => {
-  requestAnimationFrame(() => { setTimeout(resolve, 0); });
+  requestAnimationFrame(() => { requestAnimationFrame(() => setTimeout(resolve, 0)); });
 });
 
 function showInvestLoad(pct, label) {
@@ -109,12 +112,16 @@ function showInvestLoad(pct, label) {
   if (!box) return;
   const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
   box.hidden = false;
+  document.body.classList.add('invest-loading');
   const lab = $('investLoadLabel');
   const pctEl = $('investLoadPct');
   const fill = $('investLoadFill');
   if (lab && label) lab.textContent = label;
   if (pctEl) pctEl.textContent = `${n}%`;
   if (fill) fill.style.width = `${n}%`;
+  box.setAttribute('aria-busy', n < 100 ? 'true' : 'false');
+  // Ép layout để trình duyệt vẽ thanh trước khi JS nặng chặn luồng.
+  void box.offsetWidth;
   loadMeter?.set(n < 100 ? n : 99);
 }
 
@@ -122,7 +129,11 @@ function hideInvestLoad() {
   clearTimeout(loadHideTimer);
   loadHideTimer = 0;
   const box = $('investLoad');
-  if (box) box.hidden = true;
+  if (box) {
+    box.hidden = true;
+    box.setAttribute('aria-busy', 'false');
+  }
+  document.body.classList.remove('invest-loading');
   const fill = $('investLoadFill');
   if (fill) fill.style.width = '0%';
 }
@@ -134,9 +145,13 @@ function finishInvestLoad(ok, gen = loadGen) {
     showInvestLoad(100, 'Đã tải xong');
     loadMeter?.done();
     loadMeter = null;
+    const wait = Math.max(
+      LOAD_DONE_HOLD_MS,
+      LOAD_MIN_MS - (Date.now() - (loadStartedAt || Date.now()))
+    );
     loadHideTimer = setTimeout(() => {
       if (gen === loadGen) hideInvestLoad();
-    }, 480);
+    }, wait);
     return;
   }
   loadMeter?.fail();
@@ -148,6 +163,7 @@ function beginInvestLoad() {
   clearTimeout(loadHideTimer);
   loadHideTimer = 0;
   const gen = ++loadGen;
+  loadStartedAt = Date.now();
   if (loadMeter) {
     try { loadMeter.cancel(); } catch { /* meter cũ */ }
     loadMeter = null;
@@ -167,7 +183,18 @@ function beginInvestLoad() {
 
 function ensureLoadMeter() {
   if (loadMeter) return;
+  if (!loadStartedAt) loadStartedAt = Date.now();
   loadMeter = startLoadMeter('Dự án đầu tư');
+}
+
+/** Hiện thanh ngay khi chọn trục F (trước fetch) — tránh panel mở mà chưa có % vì loadPack chưa chạy. */
+export function primeInvestLoad() {
+  if (pack && leftGroup) return;
+  if (loadMeter) {
+    showInvestLoad(Math.max(2, Number(($('investLoadPct')?.textContent || '2').replace(/\D/g, '')) || 2), 'Đang tải dự án đầu tư…');
+    return;
+  }
+  beginInvestLoad();
 }
 
 function activeDtTab() {
@@ -1903,6 +1930,8 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id === 'dautu') {
+      // Hiện % ngay khi chọn F, trước khi fetch/vẽ (tránh “không thấy gì” vì UI bị đóng băng).
+      primeInvestLoad();
       ensureInvestOn();
       ensureInvestList();
       return;
