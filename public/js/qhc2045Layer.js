@@ -1361,7 +1361,7 @@ function initQhcRows() {
       btn.title = open ? 'Ẩn các lớp dữ liệu' : 'Xem các lớp dữ liệu';
     });
   });
-  document.querySelector('[data-qhc-info]')?.addEventListener('click', () => {
+  document.querySelector('[data-qhc-info="10"]')?.addEventListener('click', () => {
     const land = $('chk_qhc10');
     if (land && !land.checked) {
       land.checked = true;

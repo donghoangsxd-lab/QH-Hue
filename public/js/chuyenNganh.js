@@ -5,7 +5,8 @@ import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
-import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel } from './projectLayer.js';
+import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers } from './projectLayer.js';
+import { clearChamDiemMap } from './chamDiemMap.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { geeApi } from './api.js';
@@ -1395,6 +1396,123 @@ function paintViewSwitch() {
   applyLayerQuery();
 }
 
+const AXIS_LETTER = {
+  hanhchinh: 'A', quyhoach: 'B', hatang: 'C', xahoi: 'D', kientruc: 'E', dautu: 'F'
+};
+const XAHOI_LAYER_CHKS = [
+  'chk_c1', 'chk_c2', 'chk_c3', 'chk_c4', 'chk_c5', 'chk_c6', 'chk_c7', 'chk_c8', 'chk_c9',
+  'chk_c10', 'chk_c11', 'chk_c12', 'chk_c13', 'chk_nt_funeral', 'chk_nt_grave', 'chk_edu', 'chk_heat'
+];
+
+function chkOn(id) {
+  return !!document.getElementById(id)?.checked;
+}
+
+function setChk(id, on) {
+  const el = document.getElementById(id);
+  if (!el || el.checked === on) return;
+  el.checked = on;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function paneLayerBoxes(axisId) {
+  const pane = document.querySelector(`#layerMain [data-main-pane="${axisId}"]`);
+  if (!pane) return [];
+  return [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
+    if (el.id === 'chk_parcel') return false;
+    if (el.closest('#xahoiHeat')) return false;
+    if (el.closest('#projectList')) return false;
+    if (el.closest('.is-filter-hide')) return false;
+    // Nguồn lớp XH ẩn vẫn tính; bỏ khối hidden khác (eduLegacy…).
+    if (el.closest('[hidden]') && !el.closest('#xahoiLayerSource')) return false;
+    return true;
+  });
+}
+
+function xahoiBuffersOn() {
+  return !!document.querySelector('.btn-dot-buffer[aria-pressed="true"]');
+}
+
+function axisHasOpenLayers(axisId) {
+  if (axisId === 'hanhchinh') return chkOn('chk_urban');
+  if (axisId === 'quyhoach') return anyPlanLayerOn();
+  if (axisId === 'hatang') return getLayers().some(l => !l.base && isLayerOn(l.id));
+  if (axisId === 'xahoi') {
+    if (XAHOI_LAYER_CHKS.some(chkOn)) return true;
+    return xahoiBuffersOn();
+  }
+  if (axisId === 'kientruc') {
+    // Marker chỉ vẽ khi đang ở trục E; rời E thì clearArchLayers. Chip E gần như không hiện.
+    return browseState().axis === 'kientruc' && archById.size > 0;
+  }
+  if (axisId === 'dautu') return chkOn('chk_invest') || chkOn('chk_c14');
+  return false;
+}
+
+/** Tắt hết lớp của một trục trên bản đồ. Không đổi browseState().axis / droplist. */
+function clearAxisLayers(axisId) {
+  if (axisId === 'hanhchinh') {
+    setChk('chk_urban', false);
+    clearChamDiemMap();
+    return;
+  }
+  if (axisId === 'quyhoach') {
+    clearAllPlanLayers();
+    return;
+  }
+  if (axisId === 'hatang') {
+    getLayers().filter(l => !l.base && isLayerOn(l.id)).forEach(l => setLayerOn(l, false));
+    publishSectorLegend(false);
+    return;
+  }
+  if (axisId === 'xahoi') {
+    XAHOI_LAYER_CHKS.forEach(id => setChk(id, false));
+    // Bấm lại nút ● đang bật để tắt vùng phủ (handler ủy quyền trên document).
+    document.querySelectorAll('.btn-dot-buffer[aria-pressed="true"]').forEach(btn => {
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    return;
+  }
+  if (axisId === 'kientruc') {
+    archHidden.clear();
+    archItems().forEach(it => archHidden.add(it.id));
+    clearArchLayers();
+    if (browseState().axis === 'kientruc') paintKienTruc();
+    return;
+  }
+  if (axisId === 'dautu') {
+    setChk('chk_invest', false);
+    setChk('chk_c14', false);
+  }
+}
+
+function paintForeignAxes() {
+  const strip = document.getElementById('axisForeignStrip');
+  if (!strip) return;
+  const current = browseState().axis;
+  const open = MAG_ORDER.filter(id => id !== current && axisHasOpenLayers(id));
+  if (!open.length) {
+    strip.hidden = true;
+    strip.replaceChildren();
+    return;
+  }
+  strip.hidden = false;
+  const next = open.map(id => {
+    const axis = AXES.find(a => a.id === id);
+    const letter = AXIS_LETTER[id] || '?';
+    const name = axis?.label || letter;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'axis-foreign-chip';
+    btn.dataset.axisForeign = id;
+    btn.textContent = letter;
+    btn.title = `Tắt lớp đang mở · ${name}`;
+    btn.setAttribute('aria-label', `Tắt lớp ${name}`);
+    return btn;
+  });
+  strip.replaceChildren(...next);
+}
+
 function toggleAxisAll() {
   if (browseState().axis === 'hatang') {
     const { sector, level } = browseState();
@@ -1403,6 +1521,7 @@ function toggleAxisAll() {
     const turnOn = listed.some(l => !isLayerOn(l.id));
     listed.forEach(l => setLayerOn(l, turnOn));
     publishSectorLegend(turnOn);
+    paintForeignAxes();
     return;
   }
   // Quy hoạch: bật/tắt cả lớp + đồ án cấp đang xem; không đổi khung nhìn (setLevelShown + keepView).
@@ -1414,17 +1533,10 @@ function toggleAxisAll() {
       listed.forEach(l => setLayerOn(l, !wasOn));
     }
     paintAxisAll();
+    paintForeignAxes();
     return;
   }
-  const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
-  if (!pane) return;
-  const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
-    if (el.id === 'chk_parcel') return false;
-    if (el.closest('#xahoiHeat')) return false;
-    if (el.closest('#projectList')) return false;
-    if (el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
-    return true;
-  });
+  const boxes = paneLayerBoxes(browseState().axis);
   if (!boxes.length) return;
   const turnOn = boxes.some(el => !el.checked);
   boxes.forEach(el => {
@@ -1432,6 +1544,7 @@ function toggleAxisAll() {
     el.checked = turnOn;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  paintForeignAxes();
 }
 
 function paint() {
@@ -1449,6 +1562,7 @@ function paint() {
   paintXahoiList();
   paintQhc25Htkt();
   paintAxisAll();
+  paintForeignAxes();
   syncViewSwitchVisibility();
   const tools = document.getElementById('axisToolsQuyHoach');
   if (tools) tools.hidden = true;
@@ -1643,7 +1757,19 @@ function initDauTuTabs() {
 export function initChuyenNganh() {
   if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
-  document.addEventListener('qh:axis-all-paint', paintAxisAll);
+  document.addEventListener('qh:axis-all-paint', () => {
+    paintAxisAll();
+    paintForeignAxes();
+  });
+  document.getElementById('axisForeignStrip')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-axis-foreign]');
+    if (!btn) return;
+    const id = btn.dataset.axisForeign;
+    if (!AXIS_LETTER[id] || id === browseState().axis) return;
+    clearAxisLayers(id);
+    paintForeignAxes();
+    paintAxisAll();
+  });
   initDauTuTabs();
   map?.on('mousemove', onDvhcMouseMove);
   map?.on('mouseout', hideDvhcTip);
@@ -1902,6 +2028,7 @@ export function initChuyenNganh() {
     showAxis(id, { openPanel, url: true, keepCamera });
   });
   document.addEventListener(LEVEL_EVENT, (e) => {
+    paintForeignAxes();
     if (!listenLevel) return;
     const { level, prev } = e.detail || {};
     if (!level || level === prev) return;
@@ -1932,6 +2059,10 @@ export function initChuyenNganh() {
       paint();
     }
     if (EXTRA_CHECKS.includes(id) || hits.length) scheduleSave();
+    if (id.startsWith('chk_') || e.target.type === 'checkbox') paintForeignAxes();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest?.('.btn-dot-buffer')) queueMicrotask(() => paintForeignAxes());
   });
   document.addEventListener(URBAN_FOCUS_EVENT, (e) => {
     const key = e.detail || null;

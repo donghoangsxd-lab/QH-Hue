@@ -24,6 +24,30 @@ export const ENTRY_FIELDS = [
   { key: 'danSo', label: 'Dân số (thường trú và tạm trú)', unit: 'người', kind: 'num', scopes: ['tp', 'dothi', 'xa'], override: true, code: '2A.II.03' },
   { key: 'danSoTamTru', label: 'Dân số tạm trú cộng thêm', unit: 'người', kind: 'num', scopes: ['tp', 'dothi', 'xa'], override: true, optional: true, code: '' },
   { key: 'dienTich', label: 'Diện tích tự nhiên', unit: 'km²', kind: 'num', scopes: ['tp', 'dothi', 'xa'], override: true, code: '2A.II.04' },
+  { key: 'thangCapNhat', label: 'Thời điểm cập nhật', kind: 'month', scopes: ['tp', 'dothi', 'xa'], override: true, optional: true, code: '' },
+  { key: 'loaiPhuong', label: 'Trình độ phường', kind: 'qual', scopes: ['xa'], override: true, optional: true, code: '', options: [
+    { value: 'iii', label: 'Loại III' },
+    { value: 'ii', label: 'Loại II' },
+    { value: 'len-ii', label: 'Đề xuất nâng lên loại II' },
+    { value: 'len-iii', label: 'Đề xuất lên loại III' }
+  ] },
+  { key: 'xaDatChuan', label: 'Xã đạt chuẩn', kind: 'qual', scopes: ['xa'], override: true, optional: true, code: '', options: [
+    { value: 'chua', label: 'Chưa đạt chuẩn' },
+    { value: 'dat', label: 'Đạt chuẩn' },
+    { value: 'de-xuat', label: 'Đề xuất công nhận đạt chuẩn' }
+  ] },
+  { key: 'loaiDoThi', label: 'Loại đô thị', kind: 'qual', scopes: ['tp', 'dothi'], override: true, optional: true, code: '', options: [
+    { value: 'I', label: 'Loại I' },
+    { value: 'II', label: 'Loại II' },
+    { value: 'III', label: 'Loại III' },
+    { value: 'de-xuat', label: 'Đề xuất đổi loại' }
+  ] },
+  { key: 'hienTrangDoThi', label: 'Hiện trạng đô thị', kind: 'qual', scopes: ['dothi'], override: true, optional: true, code: '', options: [
+    { value: 'hien-huu', label: 'Đô thị hiện hữu' },
+    { value: 'moi', label: 'Đô thị mới' },
+    { value: 'mot-phan', label: 'Một phần xã' },
+    { value: 'du-kien', label: 'Đô thị dự kiến' }
+  ] },
   { key: 'matDoDuong', label: 'Mật độ đường giao thông', unit: 'km/km²', kind: 'num', scopes: ['dothi', 'xa'], override: true, optional: true, code: '2A.III.07' },
   { key: 'ldPhiNong', label: 'Tỷ lệ lao động phi nông nghiệp', unit: '%', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.II.05' },
   { key: 'nuocSach', label: 'Dân số được cấp nước sạch tập trung', unit: '%', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.III.08' },

@@ -240,7 +240,7 @@ function updateAuthUi() {
   const roadModeBtn = document.getElementById('btnAddRoadMode');
   if (roadModeBtn) {
     roadModeBtn.style.display = isAdmin ? '' : 'none';
-    if (!isAdmin && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addSingle"]')?.click();
+    if (!isAdmin && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
   }
   refreshRoadPanel();
   refreshPopPanel();

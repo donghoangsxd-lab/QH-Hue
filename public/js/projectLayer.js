@@ -4,7 +4,7 @@
 // đô thị / xã / tổ dân phố. QHC liệt kê thẳng. Mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
-// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link).
+// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link xem được trong khung).
 // Mở đồ án: bốn dòng hồ sơ — quyết định phê duyệt, quy định quản lý (role quy-dinh), hệ thống bản vẽ, điều chỉnh cục bộ.
 // Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
 // Mũi tên cuối tên đồ án mở bốn dòng hồ sơ. Dòng bản vẽ mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng.
@@ -926,6 +926,23 @@ export function planLevelAllOn() {
 export function planLevelAllTip() {
   const key = activeGroup();
   return key ? eyeState(key).tip : 'Bật hoặc tắt các lớp đang hiện trong nhóm này';
+}
+
+/** Còn lớp / đồ án / GT / đường sắt của trục Quy hoạch đang hiện trên bản đồ (mọi cấp). */
+export function anyPlanLayerOn() {
+  if (LIST_LEVELS.some(l => eyeState(l.key).on)) return true;
+  return !!(document.getElementById('chk_gt25rail')?.checked || document.getElementById('chk_gt10rail')?.checked);
+}
+
+/** Tắt hết lớp và đồ án mọi cấp quy hoạch (kèm GT và đường sắt). Không đổi trục đang chọn. */
+export function clearAllPlanLayers() {
+  LIST_LEVELS.forEach(l => setLevelShown(l.key, false));
+  ['chk_gt25rail', 'chk_gt10rail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || !el.checked) return;
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 }
 
 /** Bật / tắt cả lớp và đồ án của cấp đang xem. Không đổi cấp, không phóng khung nhìn. */

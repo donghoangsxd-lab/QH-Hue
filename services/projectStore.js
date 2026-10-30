@@ -719,7 +719,7 @@ async function probeOnce(url, cookie) {
   return { status: res.status, headers: res.headers || {}, head };
 }
 
-// Mở link (theo tối đa 5 chuyển hướng, vượt 1 lớp cookie chống máy). Chỉ chấp nhận PDF hoặc trang HTML đủ nội dung.
+// Mở link (theo tối đa 5 chuyển hướng, vượt 1 lớp cookie chống máy). Chỉ chấp nhận PDF/HTML xem được trong khung; từ chối XFO/CSP hoặc cookie-challenge (phải mở tab mới).
 async function reviewDecisionLink(raw) {
   let current = await publicUrlOf(raw);
   let cookie = '';
@@ -744,18 +744,21 @@ async function reviewDecisionLink(raw) {
     if (!pdf && !html) rejectReview('Link không phải file PDF hoặc trang xem quyết định');
     const name = nameFrom(got.headers, current) || (pdf ? 'Quyet-dinh.pdf' : 'Quyết định phê duyệt');
     const embed = !challenged && !frameBlocked(got.headers);
-    let note = pdf ? 'File PDF' : 'Trang xem quyết định';
-    if (challenged) note += '. Trang có lớp chặn tự động, chỉ mở được ở tab mới';
-    else if (!embed) note += '. Trang không cho nhúng, mở ở tab mới';
-    else note += '. Xem được ngay trong trang';
+    // Chỉ nhận link xem được trong khung; từ chối link phải mở tab mới (XFO/CSP hoặc lớp chặn cookie).
+    if (!embed) {
+      if (challenged) {
+        rejectReview('Trang có lớp chặn tự động, không xem được trong khung. Hãy tải file PDF lên thay vì dán link.');
+      }
+      rejectReview('Trang không cho nhúng trong khung (phải mở tab mới). Chỉ chấp nhận link xem trực tiếp được hoặc file PDF.');
+    }
     return {
       ok: true,
       url: current.href,
       name,
       bytes: lengthOf(got.headers),
       contentType: type.split(';')[0] || (pdf ? 'application/pdf' : 'text/html'),
-      embed,
-      note
+      embed: true,
+      note: (pdf ? 'File PDF' : 'Trang xem quyết định') + '. Xem được ngay trong trang'
     };
   }
   rejectReview('Link chuyển hướng quá nhiều lần');

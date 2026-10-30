@@ -26,6 +26,8 @@ F. Dự án đầu tư
 
 Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút bật/tắt cả nhóm. Trục Kiến trúc không có nút HT/QH (chỉ ô tìm và nút bật/tắt nhóm). Không ô tìm thứ hai. Panel ẩn khi tải trang. Lúc mở, nếu không có link chia sẻ: trục Quy hoạch, đúng một cấp QHC 1/25.000, ranh giới 40 phường/xã bật, khung vừa cả thành phố, ảnh nền Google vệ tinh. Không khôi phục lớp hay ảnh nền đã chọn lần trước. Không hàng chip «Lớp đang xem», không tab Bản đồ nền / Bản đồ môi trường trên thanh tiêu đề.
 
+Khi đang xem một trục mà lớp của trục khác vẫn còn trên bản đồ, hiện `#axisForeignStrip` ngay dưới `#mapTitle` (cùng mép trái `--info-left`): dãy nút chữ cái nhỏ `A`…`F` đúng thứ tự sáu trục, chỉ các trục khác đang còn lớp bật (ví dụ `[B] [E] [F]`). Bấm một nút thì tắt hết lớp của trục đó trên bản đồ, không đổi droplist / trục đang chọn. Không tính Lớp nền và Lớp môi trường.
+
 ### Hành chính
 
 Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `Chấm điểm`. Không ghi số lượng trên nhãn tab.
@@ -40,7 +42,7 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mỗi tab có `(số)` đồ án nhập của cấp đó khi số > 0 (ví dụ `QHPK 1/2.000 (78)`). Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Bấm QHC 1/10.000 khi đang xem QHC 1/25.000 giữ nguyên khung nhìn, không phóng ra toàn thành phố. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Pane Quy hoạch ít padding ngang (`2px`). Dưới tab: `#planBriefSlot` (thông tin đồ án khi mở) rồi `#planListPane` (danh sách đồ án; bảng lô phủ vùng này khi mở). Brief và bảng lô cùng bề ngang pane: viền cam đều bốn cạnh, bo góc, không thanh inset / dải tối mép trái. Danh sách chỉ gồm đồ án (và dòng lớp tĩnh QHC nếu có) của cấp đang bật; không hàng tiêu đề trùng tên tab, không badge số và không nút mắt trong danh sách. Muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Nút mắt cuối thanh tìm (`#btnAxisAll`) bật hoặc tắt cả lớp và đồ án của cấp đang xem; khi đang xem QHC 1/25.000 còn bật/tắt các lớp HTKT đồ án `qhc-hue-2045` của giai đoạn đang hiện (theo nút HT/QH); không đổi khung nhìn, không phóng toàn thành phố. Không dòng «Phạm vi: Toàn thành phố». Không mục «Dữ liệu hiện trạng» trong danh sách cấp và đồ án. Không dòng «Đồ án QHCT 1/500» riêng dưới tab. Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền. Dòng «QH giao thông» (toàn thành phố và trung tâm) kết thúc bằng icon «Đường sắt» cùng hàng: bật hoặc tắt lớp đường sắt. Không tách thành nút cả dòng hay dòng con. Trong lớp mở rộng của QHC đô thị Huế 2045 (`#qhc25Layers`), sau sơ đồ không gian và QH giao thông là khối `#qhc25Htkt`: chỉ một nhóm theo nút HT/QH — «Bản đồ hiện trạng tỷ lệ 1/25.000» hoặc «Bản đồ quy hoạch tỷ lệ 1/25.000» — rồi bảy ngành hạ tầng kỹ thuật và từng lớp (cùng `layer.id` với trục C, truy cập chiều dọc vẫn ở Hạ tầng kỹ thuật).
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mỗi tab có `(số)` đồ án nhập của cấp đó khi số > 0 (ví dụ `QHPK 1/2.000 (78)`). Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Bấm QHC 1/10.000 khi đang xem QHC 1/25.000 giữ nguyên khung nhìn, không phóng ra toàn thành phố. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Pane Quy hoạch ít padding ngang (`2px`). Dưới tab: `#planBriefSlot` (thông tin đồ án khi mở) rồi `#planListPane` (danh sách đồ án; bảng lô phủ vùng này khi mở). Brief và bảng lô cùng bề ngang pane: viền cam đều bốn cạnh, bo góc, không thanh inset / dải tối mép trái. Danh sách chỉ gồm đồ án (và dòng lớp tĩnh QHC nếu có) của cấp đang bật; không hàng tiêu đề trùng tên tab, không badge số và không nút mắt trong danh sách. Muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Nút mắt cuối thanh tìm (`#btnAxisAll`) bật hoặc tắt cả lớp và đồ án của cấp đang xem; khi đang xem QHC 1/25.000 còn bật/tắt các lớp HTKT đồ án `qhc-hue-2045` của giai đoạn đang hiện (theo nút HT/QH); không đổi khung nhìn, không phóng toàn thành phố. Không dòng «Phạm vi: Toàn thành phố». Không mục «Dữ liệu hiện trạng» trong danh sách cấp và đồ án. Không dòng «Đồ án QHCT 1/500» riêng dưới tab. Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền. Dòng «QH giao thông» (toàn thành phố và trung tâm) kết thúc bằng icon «Đường sắt» cùng hàng: bật hoặc tắt lớp đường sắt. Không tách thành nút cả dòng hay dòng con. Trong lớp mở rộng của QHC đô thị Huế 2045 (`#qhc25Layers`), đầu khối là `#qhc25Scale` (chỉ tiêu quy mô dân số / đô thị hóa / khách du lịch và đất xây dựng theo QĐ 108/QĐ-TTg, số từ `qd-108-htkt.json`); nút bảng trên dòng đồ án (`data-qhc-info="25"`) mở danh sách và cuộn tới khối đó. Sau sơ đồ không gian và QH giao thông là khối `#qhc25Htkt`: chỉ một nhóm theo nút HT/QH — «Bản đồ hiện trạng tỷ lệ 1/25.000» hoặc «Bản đồ quy hoạch tỷ lệ 1/25.000» — rồi bảy ngành hạ tầng kỹ thuật và từng lớp (cùng `layer.id` với trục C, truy cập chiều dọc vẫn ở Hạ tầng kỹ thuật).
 
 ### Hạ tầng kỹ thuật
 
@@ -60,7 +62,7 @@ Ngay sau Kiến trúc. Tiêu đề droplist `F. Dự án đầu tư (N dự án)
 
 ## Đổi trục
 
-Sang Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc hoặc Dự án đầu tư thì phạm vi về toàn thành phố. Xóa lọc phường/xã đang chọn ở Hành chính, xóa tô ranh và khung phóng theo đơn vị đó. Không mang phạm vi đó sang trục khác. Ở lại Hành chính thì giữ đơn vị đang chọn.
+Sang Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc hoặc Dự án đầu tư thì phạm vi về toàn thành phố. Xóa lọc phường/xã đang chọn ở Hành chính, xóa tô ranh và khung phóng theo đơn vị đó. Không mang phạm vi đó sang trục khác. Ở lại Hành chính thì giữ đơn vị đang chọn. Đổi trục không tự tắt lớp trục trước; dùng `#axisForeignStrip` (hoặc nút mắt `#btnAxisAll` trên trục đang xem) để tắt.
 
 ## Chú giải và lớp nền
 
@@ -103,6 +105,10 @@ Không có trong repo, cột để «—»:
 - Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân). Dân số phạm vi đã công nhận của Đô thị Huế hiện trạng không có số riêng.
 - km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).
+
+## Đề xuất
+
+Nút `#btnPropose` mở `#tabAdd`. Sáu trục, mỗi lúc một trục: Phát triển đô thị, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc, Dự án. Trong trục có tab thành phần. Phát triển đô thị: Đơn vị hành chính (dân số, diện tích hiện trạng, tháng cập nhật, trình độ phường loại II/III hoặc xã đạt chuẩn) và Đô thị (chỉ tiêu, hiện trạng, loại đô thị). Quy hoạch: Đồ án mới, Bổ sung hồ sơ, Điều chỉnh cục bộ. Hạ tầng kỹ thuật: bảy ngành, bản vẽ hiện trạng hoặc quy hoạch gắn một đồ án. Hạ tầng xã hội: nhập một điểm (không gồm chung cư). Kiến trúc: Quy chế mới (droplist đô thị) và Công trình có giá trị. Dự án: tên, nhóm, quyết định pháp lý, ranh giới. Nhập hàng loạt và quản trị nằm trong mục thu ở trục Quy hoạch.
 
 ## Bảng nổi
 

@@ -20,7 +20,7 @@ let pdfIo = null;
 
 export const DECISION_MAX_BYTES = PDF_ADMIN_MAX_BYTES;
 export const PROPOSE_MAX_BYTES = PDF_USER_MAX_BYTES;
-const ASSIGN_HINT = 'PDF tối đa 10 MB: chọn file để xem trước. File lớn hơn 2 MB tải thẳng lên bucket. Link: bấm Kiểm tra để webapp mở trang. Chỉ gán sau khi chấp nhận.';
+const ASSIGN_HINT = 'PDF tối đa 10 MB: chọn file để xem trước. Link chỉ nhận trang/PDF mở được ngay trong khung (từ chối link phải mở tab mới). Chỉ gán sau khi chấp nhận.';
 const PROPOSE_HINT = 'Chọn PDF tối đa 2 MB. Xem trước, rồi bấm «Gửi chờ duyệt». Admin đồng ý thì file mới thành quyết định của đồ án.';
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -235,7 +235,7 @@ function clearPdfHost(host) {
 async function renderPdfPage(doc, slot, pageNo, width) {
   const page = await doc.getPage(pageNo);
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.max(0.5, width / base.width);
+  const scale = Math.max(0.5, width / Math.max(1, base.width));
   const viewport = page.getViewport({ scale });
   let canvas = slot.querySelector('canvas');
   if (!canvas) {
@@ -243,10 +243,16 @@ async function renderPdfPage(doc, slot, pageNo, width) {
     canvas.className = 'decision-pdf-page';
     slot.appendChild(canvas);
   }
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
+  const w = Math.max(1, Math.floor(viewport.width));
+  const h = Math.max(1, Math.floor(viewport.height));
+  canvas.width = w;
+  canvas.height = h;
   slot.style.aspectRatio = `${base.width} / ${base.height}`;
-  await page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport }).promise;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  // alpha:false mặc định tô đen — tô trắng trước khi vẽ trang
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  await page.render({ canvasContext: ctx, viewport }).promise;
 }
 
 async function paintPdf(host, src) {
@@ -279,16 +285,21 @@ async function paintPdf(host, src) {
     const ratio = `${firstBase.width} / ${firstBase.height}`;
     slots.forEach((slot) => { slot.style.aspectRatio = ratio; });
 
+    const paintSlot = (slot) => {
+      if (!slot || seq !== pdfPaintSeq || slot.dataset.ready === '1') return;
+      slot.dataset.ready = '1';
+      renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
+        slot.dataset.ready = '';
+      });
+    };
+    // Trang 1 vẽ ngay (không chờ IO) để tránh khung đen / chiều cao 0 không cuộn
+    paintSlot(slots[0]);
+
     if (pdfIo) pdfIo.disconnect();
     pdfIo = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting || seq !== pdfPaintSeq) return;
-        const slot = entry.target;
-        if (slot.dataset.ready === '1') return;
-        slot.dataset.ready = '1';
-        renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
-          slot.dataset.ready = '';
-        });
+        paintSlot(entry.target);
       });
     }, { root: host, rootMargin: '240px 0px' });
     slots.forEach((slot) => pdfIo.observe(slot));
@@ -301,7 +312,6 @@ async function paintPdf(host, src) {
         const w = widthOf();
         slots.forEach((slot) => {
           if (slot.dataset.ready !== '1') return;
-          slot.dataset.ready = '1';
           renderPdfPage(doc, slot, Number(slot.dataset.page), w).catch(() => {});
         });
       }, 120);
@@ -583,14 +593,23 @@ async function checkLink(t) {
   setBusy(t, true);
   try {
     const data = await postJson('reviewProjectDecision', { url });
+    if (data.embed !== true) {
+      pendingReview = null;
+      btn.disabled = true;
+      review.textContent = data.note || 'Link không mở được trong khung (phải mở tab mới). Từ chối — hãy tải PDF lên hoặc dùng link xem trực tiếp được.';
+      showFrame(el, '', review.textContent);
+      return;
+    }
     pendingReview = { key: t.key, url: data.url };
     review.textContent = [data.note, data.name, fmtBytes(data.bytes)].filter(Boolean).join(' · ') + `. Bấm «${commitLabel(t)}» nếu đây đúng ${kindLabel(t).toLowerCase()}.`;
     btn.disabled = false;
     const open = el.querySelector('[data-decision-open]');
     open.hidden = false;
     open.href = data.url;
-    showFrame(el, data.embed ? data.url : '', data.embed ? '' : 'Đã mở được link, nhưng trang không cho nhúng. Bấm «Mở tab mới» để xem trước khi gán.');
+    showFrame(el, data.url, '');
   } catch (err) {
+    pendingReview = null;
+    btn.disabled = true;
     review.textContent = err.message;
     showFrame(el, '', '');
   } finally {

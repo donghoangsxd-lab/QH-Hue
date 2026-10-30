@@ -40,6 +40,26 @@ for (const nhom of ['giao-thong', 'san-nen-thoat-mua', 'thoat-nuoc-thai', 'chat-
   assert.equal(tran[nhom].trangThai, 'chua-du-du-lieu');
   assert.equal(tran[nhom].giaTri, null);
 }
+const danSo = qd.soLieu.find(row => row.id === 'dan-so');
+assert.equal(danSo.moc.find(row => row.nam === 2030).giaTri, 1500000);
+assert.equal(danSo.moc.find(row => row.nam === 2045).giaTri, 1850000);
+assert.equal(danSo.moc.find(row => row.nam === 2065).giaTri, 2300000);
+const doThiHoa = qd.soLieu.find(row => row.id === 'ty-le-do-thi-hoa');
+assert.equal(doThiHoa.moc.find(row => row.nam === 2030).giaTri, 70);
+assert.equal(doThiHoa.moc.find(row => row.nam === 2045).giaTri, 75);
+const duLich = qd.soLieu.find(row => row.id === 'khach-du-lich');
+assert.equal(duLich.moc.find(row => row.nam === 2030).min, 10);
+assert.equal(duLich.moc.find(row => row.nam === 2030).max, 12);
+assert.equal(duLich.moc.find(row => row.nam === 2045).min, 14);
+assert.equal(duLich.moc.find(row => row.nam === 2045).max, 18);
+const datXd = qd.soLieu.find(row => row.id === 'dat-xay-dung');
+assert.equal(datXd.moc.find(row => row.nam === 2030).giaTri, 41500);
+assert.equal(datXd.moc.find(row => row.nam === 2030).danDungHa, 10500);
+assert.equal(datXd.moc.find(row => row.nam === 2045).giaTri, 52600);
+assert.equal(datXd.moc.find(row => row.nam === 2045).danDungHa, 13900);
+assert.match(read('public/js/qhc25Scale.js'), /initQhc25Scale/);
+assert.match(read('public/js/qhc25Scale.js'), /qd-108-htkt\.json/);
+
 const nuocQd = qd.soLieu.find(row => row.id === 'cap-nuoc-nhu-cau');
 assert.equal(nuocQd.moc.find(row => row.nam === 2030).giaTri, 480000);
 assert.equal(nuocQd.moc.find(row => row.nam === 2045).giaTri, 600000);

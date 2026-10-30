@@ -171,6 +171,9 @@
       <p class="esc-hint" id="escHint" hidden>Bấm ESC để thoát</p>
     </header>
 
+    <!-- Chip tắt nhanh lớp trục khác đang còn trên bản đồ (không đổi trục đang chọn). -->
+    <div class="axis-foreign-strip" id="axisForeignStrip" hidden role="toolbar" aria-label="Tắt lớp trục khác đang mở"></div>
+
     <!-- THANH CÔNG CỤ: desktop cột phải, điện thoại cột trái. Giới thiệu là ô đầu, không nút nổi riêng. -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
       <div class="tb-scroll">
@@ -540,10 +543,12 @@
                 <input type="checkbox" id="chk_qhc25head" data-qhc-head="25"><span>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></span></label>
               <span class="project-tools">
                 <button type="button" class="project-btn project-expand" data-qhc-expand="25" aria-expanded="false" aria-controls="qhc25Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                <button type="button" class="project-btn" data-qhc-info="25" title="Chỉ tiêu quy mô dân số và đất đai theo QĐ 108/QĐ-TTg (mở trong danh sách lớp)" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
                 <span data-dossier-layer-host="qhc-2045"></span>
               </span>
             </div>
             <div class="project-layers" id="qhc25Layers" hidden>
+              <div id="qhc25Scale" class="qhc25-scale" aria-label="Chỉ tiêu quy mô QHC 1/25.000"></div>
               <div data-cs-host="qhc-hue-2045" data-cs-cap="QHC25" data-cs-name="QHC đô thị Thừa Thiên Huế 1/25.000"></div>
               <div class="project-layer">
                 <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
@@ -567,7 +572,7 @@
                 <input type="checkbox" id="chk_qhc10head" data-qhc-head="10"><span>QHC đô thị TTHuế 2045 <small class="layer-hint" id="qhc10Hint">(Trung tâm)</small></span></label>
               <span class="project-tools">
                 <button type="button" class="project-btn project-expand" data-qhc-expand="10" aria-expanded="false" aria-controls="qhc10Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
-                <button type="button" class="project-btn" data-qhc-info title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
+                <button type="button" class="project-btn" data-qhc-info="10" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
                 <span data-dossier-layer-host="qhc-2045"></span>
               </span>
             </div>
@@ -1036,80 +1041,37 @@
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form propose-sheet map-float" id="tabAdd" hidden>
         <div class="float-head"><b>Đề xuất</b><button type="button" class="float-close" id="btnProposeClose" aria-label="Đóng đề xuất"><svg class="ico"><use href="#i-close"/></svg></button></div>
-        <div class="add-mode-switch entry-flows" id="entryFlows" role="tablist" aria-label="Luồng nhập thông tin">
-          <button type="button" class="entry-flow-btn active" data-flow="flowHanhChinh" role="tab" aria-selected="true">Hành chính</button>
-          <button type="button" class="entry-flow-btn" data-flow="flowHoSo" role="tab" aria-selected="false">Quy hoạch, hạ tầng</button>
+        <div class="add-mode-switch entry-flows" id="entryFlows" role="tablist" aria-label="Sáu trục đề xuất">
+          <button type="button" class="entry-flow-btn active" data-flow="flowPhatTrien" role="tab" aria-selected="true">Phát triển đô thị</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowQuyHoach" role="tab" aria-selected="false">Quy hoạch</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowHtkt" role="tab" aria-selected="false">Hạ tầng kỹ thuật</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowHtxh" role="tab" aria-selected="false">Hạ tầng xã hội</button>
           <button type="button" class="entry-flow-btn" data-flow="flowKienTruc" role="tab" aria-selected="false">Kiến trúc</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowDuAn" role="tab" aria-selected="false">Dự án</button>
         </div>
         <div id="entryOfficer"></div>
-        <div id="flowHanhChinh"></div>
-        <div id="flowHoSo" hidden>
+        <div id="flowPhatTrien">
+          <div class="add-mode-switch entry-sub" id="ptTabs" role="tablist" aria-label="Thành phần phát triển đô thị">
+            <button type="button" class="entry-sub-btn active" data-pt="dvhc" role="tab" aria-selected="true">Đơn vị hành chính</button>
+            <button type="button" class="entry-sub-btn" data-pt="dothi" role="tab" aria-selected="false">Đô thị</button>
+          </div>
+          <div id="flowPhatTrienBody"></div>
+        </div>
+        <div id="flowQuyHoach" hidden>
+          <div class="add-mode-switch entry-sub" id="qhEntryTabs" role="tablist" aria-label="Thành phần quy hoạch">
+            <button type="button" class="entry-sub-btn active" data-qmode="new" role="tab" aria-selected="true">Đồ án mới</button>
+            <button type="button" class="entry-sub-btn" data-qmode="add" role="tab" aria-selected="false">Bổ sung hồ sơ</button>
+            <button type="button" class="entry-sub-btn" data-qmode="adjust" role="tab" aria-selected="false">Điều chỉnh cục bộ</button>
+          </div>
           <div id="hoSoBox"></div>
           <details class="entry-legacy" id="entryLegacy">
-            <summary>Nhập điểm hạ tầng, nhập hàng loạt, quản trị</summary>
+            <summary>Nhập hàng loạt và quản trị</summary>
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
-          <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
-          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn active" data-mode="addBulk" role="tab" aria-selected="true" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
           <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa hoặc thêm ô dân cư"><svg class="ico"><use href="#i-tool"/></svg>Quản trị</button>
         </div>
 
-        <div id="addSingle">
-        <div class="form-grid">
-        <label for="newType">Loại</label>
-        <select id="newType">
-          <option value="1-CV">1. Công viên, điểm xanh, vườn hoa</option>
-          <option value="2-BDX">2. Bãi đỗ xe, trạm sạc xe điện</option>
-          <option value="3-MN">3. Trường Mầm non</option>
-          <option value="4-TH">4. Trường Tiểu học</option>
-          <option value="5-THCS">5. Trường THCS</option>
-          <option value="6-THPT">6. Trường THPT</option>
-          <option value="7-YT">7. Bệnh viện, Trạm y tế</option>
-          <option value="8-VH">8. Nhà văn hóa, thể thao</option>
-          <option value="9-TM">9. Chợ, Trung tâm thương mại</option>
-          <option value="10-PCCC">10. Trụ sở cảnh sát PCCC</option>
-          <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
-          <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
-          <option value="13-BUS">13. Trạm dừng xe buýt</option>
-          <option value="14-NOXH">14. Chung cư</option>
-        </select>
-
-        <label for="newPhase">Giai đoạn</label>
-        <select id="newPhase">
-          <option value="HT" selected>Hiện trạng (bổ sung điểm)</option>
-          <option value="QH">Quy hoạch mới</option>
-        </select>
-
-        <label for="newNhomHaTang" title="Phân cấp hạ tầng (Cột D)">Phân cấp</label>
-        <select id="newNhomHaTang">
-          <option value="Cấp đô thị">Cấp đô thị</option>
-          <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
-        </select>
-
-        <label for="newName">Tên</label>
-        <input type="text" id="newName" placeholder="Tên khu đất / công trình..." />
-
-        <label for="newLat" title="Vĩ độ / Kinh độ">Tọa độ</label>
-        <div class="rp-coord-row">
-          <input type="text" id="newLat" placeholder="Vĩ độ" />
-          <input type="text" id="newLng" placeholder="Kinh độ" />
-          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
-        </div>
-
-        <label for="newWard">Phường/Xã</label>
-        <input type="text" id="newWard" placeholder="Tự nhận diện theo tọa độ" />
-
-        <label for="newSize">Diện tích</label>
-        <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
-
-        <label for="newRadius" title="Bán kính phục vụ theo QCVN 01:2026/BXD. Giá trị chỉ để xem, không ghi vào bảng dữ liệu.">Bán kính</label>
-        <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
-        </div>
-
-        <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>
-        <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
-        </div>
-
-        <div id="addBulk" style="display:none;">
+        <div id="addBulk">
           <div class="cad-pending" id="cadPendingBox" hidden></div>
           <div class="add-mode-switch bulk-kind" role="radiogroup" aria-label="Loại hồ sơ nhập">
             <label class="bulk-kind-btn"><input type="radio" name="bulkKind" value="plan" checked>Đồ án / hiện trạng</label>
@@ -1406,7 +1368,75 @@
         </div>
           </details>
         </div>
-        <div id="flowKienTruc" hidden></div>
+        <div id="flowHtkt" hidden>
+          <p class="entry-note">Bản vẽ mạng bảy ngành hạ tầng kỹ thuật, gắn vào một đồ án. Chọn ngành rồi tải hiện trạng hoặc quy hoạch.</p>
+          <div id="htktBox"></div>
+        </div>
+        <div id="flowHtxh" hidden>
+          <p class="entry-note">Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án.</p>
+          <div id="addSingle">
+        <div class="form-grid">
+        <label for="newType">Loại</label>
+        <select id="newType">
+          <option value="1-CV">1. Công viên, điểm xanh, vườn hoa</option>
+          <option value="2-BDX">2. Bãi đỗ xe, trạm sạc xe điện</option>
+          <option value="3-MN">3. Trường Mầm non</option>
+          <option value="4-TH">4. Trường Tiểu học</option>
+          <option value="5-THCS">5. Trường THCS</option>
+          <option value="6-THPT">6. Trường THPT</option>
+          <option value="7-YT">7. Bệnh viện, Trạm y tế</option>
+          <option value="8-VH">8. Nhà văn hóa, thể thao</option>
+          <option value="9-TM">9. Chợ, Trung tâm thương mại</option>
+          <option value="10-PCCC">10. Trụ sở cảnh sát PCCC</option>
+          <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
+          <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
+          <option value="13-BUS">13. Trạm dừng xe buýt</option>
+        </select>
+
+        <label for="newPhase">Giai đoạn</label>
+        <select id="newPhase">
+          <option value="HT" selected>Hiện trạng (bổ sung điểm)</option>
+          <option value="QH">Quy hoạch mới</option>
+        </select>
+
+        <label for="newNhomHaTang" title="Phân cấp hạ tầng (Cột D)">Phân cấp</label>
+        <select id="newNhomHaTang">
+          <option value="Cấp đô thị">Cấp đô thị</option>
+          <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
+        </select>
+
+        <label for="newName">Tên</label>
+        <input type="text" id="newName" placeholder="Tên khu đất / công trình..." />
+
+        <label for="newLat" title="Vĩ độ / Kinh độ">Tọa độ</label>
+        <div class="rp-coord-row">
+          <input type="text" id="newLat" placeholder="Vĩ độ" />
+          <input type="text" id="newLng" placeholder="Kinh độ" />
+          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
+        </div>
+
+        <label for="newWard">Phường/Xã</label>
+        <input type="text" id="newWard" placeholder="Tự nhận diện theo tọa độ" />
+
+        <label for="newSize">Diện tích</label>
+        <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
+
+        <label for="newRadius" title="Bán kính phục vụ theo QCVN 01:2026/BXD. Giá trị chỉ để xem, không ghi vào bảng dữ liệu.">Bán kính</label>
+        <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
+        </div>
+
+        <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>
+        <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        <div id="flowKienTruc" hidden>
+          <div class="add-mode-switch entry-sub" id="ktTabs" role="tablist" aria-label="Thành phần kiến trúc">
+            <button type="button" class="entry-sub-btn active" data-kmode="quyche" role="tab" aria-selected="true">Quy chế mới</button>
+            <button type="button" class="entry-sub-btn" data-kmode="congtrinh" role="tab" aria-selected="false">Công trình có giá trị</button>
+          </div>
+          <div id="ktBody"></div>
+        </div>
+        <div id="flowDuAn" hidden></div>
       </div>
 
       <!-- TAB: CHÚ GIẢI -->

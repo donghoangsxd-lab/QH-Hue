@@ -54,6 +54,7 @@ import { initViewFlow, wardFromMapClick, detailClickLocked, consumeDothiMapClick
 import { initMapLevel, getLevel, setLevel, DEFAULT_LEVEL } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
+import { initQhc25Scale } from './qhc25Scale.js';
 import { initChuyenNganh, consumeDvhcMapClick } from './chuyenNganh.js';
 import { initChamDiem } from './chamDiemUi.js';
 import { initQhctLayer } from './qhctLayer.js';
@@ -630,6 +631,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initUrbanAreaLayer();
   initLayerDecisions();
   initQhc2045Layer();
+  initQhc25Scale();
   initQhctLayer();
   document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));
   initBasemapUi();
