@@ -15,6 +15,7 @@
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
 import { map, wardNameAt, outerWardLines, openOutlinedPopup, openDockPopup, attachSelectionOutline, ensureQuyHoachPane, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
+import { PROJECT_INFO_EVENT } from './projectFiles.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
@@ -767,6 +768,15 @@ function qhpkAt(lng, lat) {
   });
 }
 
+/**
+ * Brief khi bấm lô/vùng lớp tĩnh QHC đô thị (1/10.000 trung tâm hoặc 1/25.000):
+ * cùng đồ án với QHC 1/25.000 → chỉ tiêu QĐ 108 trong #planBriefSlot (không đổi cấp bản đồ).
+ */
+function syncQhcCityBrief(opts) {
+  if (opts?.hideProject) return;
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: QHC2045.short }));
+}
+
 function swatchHtml(land) {
   const s = land.key ? TT16_STYLES[land.key] : null;
   const bg = (s && tt16SwatchCss(land.key, 0.7)) || `background:${s ? s.color : land.tone};`;
@@ -838,6 +848,7 @@ function openLotPopup(f, latlng, opts) {
   const host = active?.m || target();
   if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
   ensureQuyHoachPane();
+  syncQhcCityBrief(opts);
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcLotCardHtml(f, latlng, opts));
   attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
@@ -1001,6 +1012,7 @@ function openVisionPopup(f, latlng) {
   const host = active?.m || target();
   if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
   ensureQuyHoachPane();
+  syncQhcCityBrief();
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcVisionCardHtml(f, latlng));
   attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
@@ -1369,6 +1381,8 @@ function initQhcRows() {
     }
     ensurePlanView();
     fitCenter();
+    // Cùng đồ án QHC đô thị với 1/25.000: brief QĐ 108 + bảng cơ cấu đất trung tâm ở panel dưới.
+    syncQhcCityBrief();
     document.dispatchEvent(new Event(QHC_CENTER_INFO_EVENT));
   });
   ['25', '10'].forEach(syncQhcHead);

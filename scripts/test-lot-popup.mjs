@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, limitItems, limitsHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitItems, limitsHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml,
   dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken
 } from '../public/js/lotPopup.js';
@@ -12,6 +12,12 @@ assert.equal(
 );
 assert.equal(lotHeading('Đất cây xanh công viên_thể dục thể thao CX14 – QHPK Khu A #3', '', kind), 'Đất cây xanh CX14');
 assert.equal(lotHeading('Trường tiểu học Nguyễn Du TH.1', 'TH.1', 'Trường tiểu học cấp đơn vị ở'), 'Trường tiểu học Nguyễn Du TH.1');
+assert.equal(
+  lotHeading('QHDD_DAT_HTXH_CayxanhCC CX14 – QHPK Khu A #3', 'CX14', 'Cây xanh sử dụng công cộng'),
+  'Cây xanh sử dụng công cộng CX14'
+);
+assert.equal(shortLandUse('Hỗn hợp (đơn vị ở và dịch vụ công cộng đô thị)'), 'Hỗn hợp');
+assert.match(landUseBannerHtml('Hỗn hợp (đơn vị ở và dịch vụ công cộng đô thị)'), />Hỗn hợp</);
 
 assert.equal(expandPlanWords('Mật độ XD'), 'Mật độ xây dựng');
 assert.equal(expandPlanWords('Diện tích QH'), 'Diện tích quy hoạch');

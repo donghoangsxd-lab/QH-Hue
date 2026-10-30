@@ -125,6 +125,11 @@ function openLayers() {
   }
 }
 
+/** HTML chỉ tiêu QĐ 108 (đã load). Dùng chung brief QHC 1/25.000 và 1/10.000 — cùng một đồ án. */
+export function qhcScaleBriefHtml() {
+  return qhc25ScaleHtml();
+}
+
 export function revealQhc25Scale() {
   setLevel('qhc25', { keepView: true });
   if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');

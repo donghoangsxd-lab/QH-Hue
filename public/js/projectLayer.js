@@ -421,7 +421,7 @@ export function shareOpenProject(name) {
   state.focusedProject = wanted;
   if (state.hiddenProjects.delete(wanted)) saveHidden();
   if (p?.level === 'QHC') soleQhcLots(wanted);
-  else if (!p || p.level === 'QHPK') state.lotProjects.add(wanted);
+  else state.lotProjects.add(wanted);
   if (!p) return false;
   if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
   if (!state.showProjectInfra) ensureFullLots();
@@ -2512,7 +2512,7 @@ function dropSchemeFromFocus(name) {
   if (wasPeer && still) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: state.focusedProject }));
 }
 
-// Tick một đồ án QHPK / QHCT: hiện lô đồ án đó, không phóng khung, không ẩn đồ án khác.
+// Tick một đồ án QHPK / QHCT: hiện lô, brief thông tin đồ án (cùng luật QHC selectQhcScheme), không phóng khung.
 function openSchemeDetail(p) {
   if (state.hiddenProjects.delete(p.name)) saveHidden();
   state.lotProjects.add(p.name);
@@ -2520,7 +2520,11 @@ function openSchemeDetail(p) {
     if (!state.showProjects) setMaster(true);
   } else if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
   ensureFullLots();
+  state.focusedProject = p.name;
+  focusName = p.name;
   refreshAll();
+  drawFocus();
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
 }
 
 // Bỏ tick: tắt lô, giữ đường ranh. Không ghi qh_hidden_projects.

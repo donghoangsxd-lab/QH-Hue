@@ -402,9 +402,16 @@ assert.match(read('public/js/cadastreLayer.js'), /applyInspectLevel/);
 assert.match(ctx, /revealPlan:\s*true/);
 assert.match(read('docs/ui-spec.md'), /chuyển sang B\. Hệ thống bản đồ quy hoạch/);
 // Bấm ô đất đồ án khác: brief/hồ sơ theo đúng đồ án của lô (keepView).
+// QHC / QHPK / QHCT: cùng đồ án vẫn mở lại brief; lớp tĩnh QHC/QHCT cũng gọi sync.
 assert.match(read('public/js/mapEngine.js'), /syncFocusedProjectToLot/);
 assert.match(read('public/js/mapEngine.js'), /keepView:\s*true/);
+assert.match(read('public/js/mapEngine.js'), /PROJECT_INFO_EVENT/);
 assert.match(read('public/js/projectLayer.js'), /keepView/);
+assert.match(read('public/js/projectLayer.js'), /openSchemeDetail[\s\S]*PROJECT_INFO_EVENT/);
+assert.match(read('public/js/qhc2045Layer.js'), /syncQhcCityBrief/);
+assert.match(read('public/js/qhc2045Layer.js'), /QHC2045\.short/);
+assert.match(read('public/js/projectBrief.js'), /qhcScaleBriefHtml|qhcCity/);
+assert.match(read('public/js/qhctLayer.js'), /syncFocusedProjectToLot/);
 assert.match(read('public/js/projectLayer.js'), /shareOpenProject\(p\.name\)/);
 assert.match(ctx, /map-ctx-fly/);
 assert.match(ctx, /data-level/);

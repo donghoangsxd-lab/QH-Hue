@@ -9,6 +9,8 @@ import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './project
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
 import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
+import { QHC2045, QHC_CENTER_INFO_EVENT } from './qhc2045.js';
+import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const WAIT = '<span class="project-brief-wait">…</span>';
@@ -197,18 +199,52 @@ function metersOf(card) {
   return list;
 }
 
-function briefTools(card) {
+function briefTools(card, { pdf = true, info = true } = {}) {
   const hasDecision = !!(card.entry && card.entry.decision);
+  const pdfBtn = pdf
+    ? `<button type="button" class="project-brief-tool" data-brief-pdf data-brief-name="${escapeHtml(card.name)}"${hasDecision ? '' : ' disabled'} title="${hasDecision ? 'Xem PDF quyết định phê duyệt' : 'Chưa có PDF quyết định'}" aria-label="Xem PDF quyết định">${ico('file')}</button>`
+    : '';
+  const infoBtn = info
+    ? `<button type="button" class="project-brief-tool" data-brief-info data-brief-name="${escapeHtml(card.name)}" title="Xem bảng thông tin đồ án" aria-label="Xem bảng thông tin đồ án">${ico('table')}</button>`
+    : '';
   return `<div class="project-brief-tools">
-      <button type="button" class="project-brief-tool" data-brief-pdf data-brief-name="${escapeHtml(card.name)}"${hasDecision ? '' : ' disabled'} title="${hasDecision ? 'Xem PDF quyết định phê duyệt' : 'Chưa có PDF quyết định'}" aria-label="Xem PDF quyết định">${ico('file')}</button>
-      <button type="button" class="project-brief-tool" data-brief-info data-brief-name="${escapeHtml(card.name)}" title="Xem bảng thông tin đồ án" aria-label="Xem bảng thông tin đồ án">${ico('table')}</button>
+      ${pdfBtn}${infoBtn}
       <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
     </div>`;
+}
+
+function popRows(pop) {
+  const htTip = 'Dân số trong phạm vi đồ án ở thời điểm lập / điều chỉnh (số trong danh mục; nếu đã sửa trên máy này thì lấy số máy này).';
+  const qhTip = 'Dân số dự báo theo quy hoạch của đồ án (cơ sở tính nhu cầu hạ tầng và số đơn vị ở).';
+  return `<div class="project-brief-pops">
+      <div class="project-brief-pop" title="${escapeHtml(htTip)}"><span>Dân số hiện trạng</span><b>${peopleHtml(pop.ht)}</b></div>
+      <div class="project-brief-pop" title="${escapeHtml(qhTip)}"><span>Dân số quy hoạch</span><b>${peopleHtml(pop.qh)}</b></div>
+    </div>`;
+}
+
+/** Brief đồ án QHC đô thị (1/25.000 và 1/10.000 trung tâm): chỉ tiêu QĐ 108/QĐ-TTg — cùng một đồ án, hai lớp bản đồ. */
+function renderQhcCity(card) {
+  const el = document.getElementById('projectBrief');
+  if (!el) return;
+  const level = PLAN_LEVELS.find(item => item.key === 'QHC');
+  el.dataset.level = 'QHC';
+  el.hidden = false;
+  el.innerHTML = `<div class="project-brief-head">
+      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : 'QHC')}</span>${escapeHtml(QHC2045.short)}</h2>
+      ${briefTools(card, { pdf: false, info: true })}
+    </div>
+    <p class="project-brief-sub" title="${escapeHtml(QHC2045.name)}">${escapeHtml(QHC2045.status)} · Lớp 1/25.000 và 1/10.000 trung tâm</p>
+    <div class="project-brief-scale">${qhcScaleBriefHtml()}</div>`;
+  syncBriefStack();
 }
 
 function render(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
+  if (card.qhcCity) {
+    renderQhcCity(card);
+    return;
+  }
   const level = PLAN_LEVELS.find(item => item.key === card.level);
   const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
   const title = briefTitle(card.name);
@@ -219,7 +255,7 @@ function render(card) {
       ${briefTools(card)}
     </div>
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
-    <div class="project-brief-pops"><span>Hiện trạng <b>${peopleHtml(card.pop.ht)}</b></span><span>Quy hoạch <b>${peopleHtml(card.pop.qh)}</b></span></div>
+    ${popRows(card.pop)}
     <div class="project-brief-meters">${metersOf(card).join('')}</div>`;
   syncBriefStack();
 }
@@ -295,6 +331,13 @@ async function showStack(peers) {
   renderStack(cards);
 }
 
+function isQhcStaticName(name) {
+  const n = String(name || '').trim();
+  if (!n) return false;
+  if (n === QHC2045.short || n === QHC2045.name) return true;
+  return /qhc đô thị TT\s*Huế 2045/i.test(n) || /qhc đô thị Thừa Thiên Huế/i.test(n);
+}
+
 async function show(name) {
   const project = String(name || '').trim();
   const peers = inspectPeers();
@@ -302,6 +345,15 @@ async function show(name) {
   if (!project) { hide(); return; }
   const token = ++seq;
   openName = project;
+  // QHC đô thị 1/25.000 + 1/10.000 trung tâm: cùng đồ án → brief chỉ tiêu QĐ 108 (không đổi cấp bản đồ).
+  if (isQhcStaticName(project)) {
+    openName = QHC2045.short;
+    render({ name: QHC2045.short, level: 'QHC', qhcCity: true, entry: null });
+    try { await loadQhc25Scale(); } catch (e) { /* lỗi đã hiện trong khối chỉ tiêu */ }
+    if (token !== seq) return;
+    render({ name: QHC2045.short, level: 'QHC', qhcCity: true, entry: null });
+    return;
+  }
   const entry = entryOf(project);
   const level = planLevelOf(project);
   const hostM2 = areaM2(entry && entry.boundary);
@@ -337,7 +389,12 @@ export function initProjectBrief() {
     }
     const info = e.target.closest('[data-brief-info]');
     if (info) {
-      openProjectInfo(info.getAttribute('data-brief-name'));
+      const n = info.getAttribute('data-brief-name');
+      if (isQhcStaticName(n)) {
+        document.dispatchEvent(new Event(QHC_CENTER_INFO_EVENT));
+        return;
+      }
+      openProjectInfo(n);
       return;
     }
     const decision = e.target.closest('[data-brief-decision]');

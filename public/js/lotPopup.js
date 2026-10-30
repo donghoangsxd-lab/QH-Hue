@@ -81,9 +81,18 @@ function dropKindSuffix(head, kind) {
   return words.slice(0, words.length - cut).join(' ');
 }
 
+/** Bỏ ngoặc giải thích dài trong nhãn TT16: «Hỗn hợp (đơn vị ở và …)» → «Hỗn hợp». */
+export function shortLandUse(label) {
+  return String(label || '')
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Tiêu đề lô: loại đất ngắn + mã lô. kind là dòng cam (cấp công trình) để bỏ cụm trùng.
  * "Đất cây xanh công viên_thể dục thể thao" + CX14 + "Công viên khu vực…" → "Đất cây xanh CX14".
+ * Tên CAD/layer còn dài sau khi rút → chỉ giữ loại đất ngắn + mã (hoặc mã).
  */
 export function lotHeading(name, lotCode, kind) {
   let t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
@@ -96,11 +105,20 @@ export function lotHeading(name, lotCode, kind) {
       t = t.slice(0, m.index).trim();
     }
   }
-  const under = t.indexOf('_');
-  if (under > 0) t = t.slice(0, under).trim();
-  t = expandPlanWords(t.replace(/_/g, ' '));
-  t = dropKindSuffix(t, kind);
-  t = t.replace(/[\s,;:–—-]+$/g, '').trim();
+  const kindShort = shortLandUse(String(kind || '').split(/[—(]/)[0]);
+  // Layer CAD QHDD_DAT_… / DAT_HTXH_…: không lấy chuỗi mã làm tiêu đề — dùng loại đất.
+  t = t.replace(/^(HT|QHDD|QHDH|QH)[\s_.-]+/i, '').trim();
+  if (/^DAT[\s_.-]/i.test(t) || /^[A-Z0-9]+(_[A-Z0-9]+)+$/i.test(t)) {
+    t = kindShort || '';
+  } else {
+    const under = t.indexOf('_');
+    if (under > 0) t = t.slice(0, under).trim();
+    t = expandPlanWords(t.replace(/_/g, ' '));
+    t = dropKindSuffix(t, kind);
+    t = shortLandUse(t).replace(/[\s,;:–—-]+$/g, '').trim();
+    // Còn dài (>42 ký tự): ưu tiên loại đất ngắn + mã.
+    if (t.length > 42) t = (kindShort && kindShort.length <= 28) ? kindShort : '';
+  }
   if (code && t && !fold(t).includes(fold(code))) t = `${t} ${code}`;
   else if (code && !t) t = code;
   return t;
@@ -139,7 +157,7 @@ export function metricCellsHtml(cells) {
 
 /**
  * Lưới 2×2 chỉ tiêu lô (diện tích + mật độ + tầng cao + hệ số).
- * Luôn bốn ô để dễ đọc; thiếu số thì «—».
+ * Luôn bốn ô để dễ đọc; thiếu số thì «—». Lô hạ tầng thêm bán kính ở dòng meta (landPopupHtml).
  */
 export function metricGridHtml(areaText, plan) {
   return metricCellsHtml([
@@ -155,14 +173,14 @@ export function metricGridHtml(areaText, plan) {
  * swatchHtml (ô hatch TT16 / màu vùng) đặt cuối hàng khi có.
  */
 export function landUseBannerHtml(type, swatchHtml = '') {
-  const label = String(type || '').trim();
+  const label = shortLandUse(type);
   if (!label) return '';
   const sw = String(swatchHtml || '').trim()
     ? `<span class="lp-landuse-swatch" aria-hidden="true">${swatchHtml}</span>`
     : '';
   return `<div class="lp-landuse">
     <span class="lp-landuse-ico" aria-hidden="true">${ico('home')}</span>
-    <span class="lp-landuse-text"><small>Chức năng SDĐ</small><b>${escapeHtml(label)}</b></span>
+    <span class="lp-landuse-text"><small>Chức năng SDĐ</small><b title="${escapeHtml(String(type || '').trim())}">${escapeHtml(label)}</b></span>
     ${sw}
   </div>`;
 }

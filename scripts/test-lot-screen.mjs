@@ -52,9 +52,15 @@ if (landChunk.includes('point3dButton') || landChunk.includes('pp-3d') || landCh
 if (!landChunk.includes('metricGridHtml') || !landChunk.includes('landCardTabsHtml') || !landChunk.includes('regulationsPaneHtml')) {
   throw new Error('thẻ lô đất thiếu lưới 2×2 hoặc tab Chỉ tiêu/Quy định');
 }
+if (!landChunk.includes('facility') || !landChunk.includes('radiusLabel')) {
+  throw new Error('thẻ lô đất chưa hỗ trợ lô hạ tầng / bán kính phục vụ');
+}
 if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (nút chữ bán kính/3D)');
-const infraTools = engine.includes('onAnalyze: canAnalyze ? runAnalysis : null')
-  && engine.includes('buildup: !!lotGeom');
+const infraLand = engine.includes('openLandPopup(lot, m, { facility: item })')
+  || engine.includes('openLandPopup(lot, m, { ...opts, facility: item })');
+if (!infraLand) throw new Error('lô hạ tầng chưa mở cùng thẻ lô đất');
+const infraTools = engine.includes('facilityAnalyzeOpts')
+  && (engine.includes('onAnalyze: analyze?.onAnalyze') || engine.includes('onAnalyze: canAnalyze ? runAnalysis : null'));
 if (!infraTools) throw new Error('lô hạ tầng chưa gắn icon bán kính / mật độ');
 const buildupSrc = src('../public/js/lotBuildup.js');
 const attach = buildupSrc.split('export function attachLotBuildup')[1] || '';

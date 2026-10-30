@@ -1082,10 +1082,14 @@ function renderHost() {
     ? 'Cấp đô thị (bảng A)'
     : `Cấp đơn vị ở (bảng B${Number(session.popQH) > THPT_POP_MIN ? ' + THPT' : ''}) · <b>${scored.units}</b> đơn vị ở`;
   const fileCell = (name, n) => (name ? `<b title="${escapeHtml(name)}">${escapeHtml(name)}</b><em>${n} lô</em>` : `<i class="c-muted">${session.saved ? 'chưa có lớp' : 'không có file'}</i>`);
-  const popInput = (ph) => `<input type="number" class="review-pop" data-pop="${ph}" min="0" step="100" inputmode="numeric" placeholder="nhập" value="${session[`pop${ph}`] > 0 ? session[`pop${ph}`] : ''}" title="Dân số ${ph === 'HT' ? 'hiện trạng' : 'quy hoạch'} (người)">`;
-  const popCell = session.saved
-    ? `HT ${popInput('HT')} → QH ${popInput('QH')}${session.popQH > 0 ? ` <b class="c-green">(+${fmtNum(scored.control.newPop)})</b>` : ''}`
-    : `HT <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> → QH <b>${fmtNum(session.popQH)}</b> <b class="c-green">(+${fmtNum(scored.control.newPop)})</b>`;
+  const popInput = (ph) => `<input type="number" class="review-pop" data-pop="${ph}" min="0" step="100" inputmode="numeric" placeholder="nhập" value="${session[`pop${ph}`] > 0 ? session[`pop${ph}`] : ''}" title="Dân số ${ph === 'HT' ? 'hiện trạng trong phạm vi đồ án' : 'quy hoạch dự báo của đồ án'} (người)">`;
+  const popHtCell = session.saved
+    ? popInput('HT')
+    : `<b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b>`;
+  const popQhExtra = session.popQH > 0 ? ` <b class="c-green" title="Dân số quy hoạch − hiện trạng">(+${fmtNum(scored.control.newPop)})</b>` : '';
+  const popQhCell = session.saved
+    ? `${popInput('QH')}${popQhExtra}`
+    : `<b>${fmtNum(session.popQH)}</b>${popQhExtra}`;
   const popHint = session.saved && !(session.popQH > 0)
     ? '<small class="review-card-foot c-orange">Nhập dân số quy hoạch để tính tổng nhu cầu, số đơn vị ở và % đạt chỉ tiêu.</small>'
     : '';
@@ -1110,7 +1114,8 @@ function renderHost() {
         <div class="review-kv">
           <span>${session.saved ? 'Lớp HT' : 'File HT'}</span><span class="review-file-cell">${fileCell(session.files.HT, htN)}</span>
           <span>${session.saved ? 'Lớp QH' : 'File QH'}</span><span class="review-file-cell">${fileCell(session.files.QH, qhN)}</span>
-          <span>Dân số</span><span>${popCell}</span>
+          <span title="Dân số trong phạm vi đồ án ở thời điểm lập / điều chỉnh">Dân số hiện trạng</span><span>${popHtCell} <small>người</small></span>
+          <span title="Dân số dự báo theo quy hoạch của đồ án; cơ sở tính nhu cầu hạ tầng">Dân số quy hoạch</span><span>${popQhCell} <small>người</small></span>
           <span>Thẩm định</span><span title="${fmtNum(UNIT_POP)} người / đơn vị ở, làm tròn lên">${level}</span>
         </div>
         ${popHint}<small class="review-card-foot">${housingNote}</small>

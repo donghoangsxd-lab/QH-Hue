@@ -25,7 +25,7 @@ import {
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, onViewChange, onPlanBoundariesPainted,
   getViewMode, setViewMode, passToolClick, shownMaps, alignPlanView
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { touchPrimary } from './touchGroups.js';
@@ -34,7 +34,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { bindNotchZoom } from './wheelZoom.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, limitsHtml, projectValueHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitsHtml, projectValueHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml, bindLandCardTabs,
   pointToken, landToken, parseLotToken
 } from './lotPopup.js';
@@ -2251,39 +2251,63 @@ const LAND_LEVEL_EYEBROW = {
 };
 
 function landPopupHtml(p, opts) {
-  const key = landPatternKey(p.layer, p.name);
+  const facility = opts?.facility || null;
+  const key = landPatternKey(p.layer, p.name) || (facility ? infraStyleKey(layerType(facility), p.layer, facility.name) : null);
   const nhom = p.nhom || landLabel(p.layer);
-  const type = expandPlanWords(nhom === 'Đất khác' && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom);
-  const code = p.lotCode || landCode(p);
+  const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
+  const type = shortLandUse(expandPlanWords(rawType));
+  const code = p.lotCode || facility?.lotCode || landCode(p);
   const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
   const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
   const phase = p.phase === 'QH' ? (stage || '') : 'Hiện trạng';
-  const eyebrow = LAND_LEVEL_EYEBROW[planLevelOf(p.file)] || 'Quy hoạch';
-  const title = lotHeading(p.name || p.layer || type, code, type) || type;
-  const place = placeField(p.ward);
-  const entry = opts?.hideProject ? null : catalogEntry(p.file);
-  const projectName = opts?.hideProject ? '' : projectFullName(p.file);
+  const eyebrow = LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch';
+  const nameSrc = facility ? infraTitle(facility.name) : (p.name || p.layer || type);
+  const title = lotHeading(nameSrc, code, type) || type;
+  const place = placeField(p.ward || facility?.ward);
+  const projectFile = p.file || facility?.tenQH || '';
+  const entry = opts?.hideProject ? null : catalogEntry(projectFile);
+  const projectName = opts?.hideProject ? '' : projectFullName(projectFile);
   const project = projectName
     ? `<span class="lp-project-name" title="${escapeHtml(projectName)}">${escapeHtml(projectName)}</span>`
     : '';
-  const areaText = p.area ? `${fmtNum(Math.round(p.area))} m²` : '';
-  const stamp = p.stampArea && p.area && Math.abs(p.stampArea - p.area) / p.area > 0.1
+  const areaM2 = Number(p.area) || Number(facility?.size) || 0;
+  const areaText = areaM2 > 0 ? `${fmtNum(Math.round(areaM2))} m²` : '';
+  const stamp = p.stampArea && areaM2 && Math.abs(p.stampArea - areaM2) / areaM2 > 0.1
     ? `<div class="lp-spec"><span class="lp-spec-k">Diện tích trên tem</span><b>${fmtNum(Math.round(p.stampArea))} m²</b></div>` : '';
+  const ntKind = facility && facility.type === '11-NT' ? ntKindOf(facility) : null;
+  const itemRadius = facility ? effectiveRadius(facility) : 0;
+  const noZone = facility ? !(itemRadius > 0) : false;
+  const radiusLabel = facility
+    ? (facility.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ')
+    : '';
+  const radiusRef = facility
+    ? (facility.type === '13-BUS' ? 'Mục 2.8.3.3' : facility.type === '10-PCCC' ? 'Mục 2.5.13.1' : ntKind ? 'Bảng 23' : '')
+    : '';
+  const radiusText = facility
+    ? (noZone ? 'không quy định' : `${fmtNum(itemRadius)} m`)
+    : '';
+  const radiusTip = facility && radiusRef ? `${radiusLabel} theo QCVN 01:2026/BXD (${radiusRef})` : radiusLabel;
   const rows = [
     project ? metaRow('Đồ án', project, 'lp-project-row') : '',
-    place.name ? metaRow(place.label, escapeHtml(place.name)) : ''
+    place.name ? metaRow(place.label, escapeHtml(place.name)) : '',
+    facility && radiusText
+      ? metaRow(radiusLabel, `<b class="c-cyan" title="${escapeHtml(radiusTip)}">${escapeHtml(radiusText)}</b>${radiusRef ? ` <span class="pp-sub">(${escapeHtml(radiusRef)})</span>` : ''}`)
+      : ''
   ].filter(Boolean).join('');
   const swatchEl = `<i class="lp-swatch" style="${swatch}"></i>`;
-  const sameAsType = !!(type && title.trim().toLowerCase() === type.trim().toLowerCase());
+  const foldTitle = title.trim().toLowerCase();
+  const foldType = type.trim().toLowerCase();
+  const sameAsType = !!(type && (foldTitle === foldType || foldTitle === `${foldType} ${String(code || '').toLowerCase()}`.trim()));
   // Trùng loại đất: không lặp tiêu đề; hatch nằm cuối dòng Chức năng SDĐ.
   const titleRow = sameAsType ? '' : `<div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span></div>`;
   const banner = landUseBannerHtml(type || title, swatchEl);
-  const tip = [p.name, p.layer].filter(Boolean).join(' · ');
+  const tip = [facility?.name || p.name, p.layer].filter(Boolean).join(' · ');
   const phaseHtml = phase
     ? `<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>`
     : '';
+  const plan = p.plan || facility?.plan;
   return `<div class="pp land-popup land-popup-card">
     <div class="pp-title lp-head" title="${escapeHtml(tip)}">
       <div class="lp-head-main">
@@ -2296,7 +2320,7 @@ function landPopupHtml(p, opts) {
     </div>
     ${landCardTabsHtml('chi-tieu')}
     <div class="lp-pane is-on" data-lp-pane="chi-tieu" role="tabpanel">
-      ${metricGridHtml(areaText, p.plan)}
+      ${metricGridHtml(areaText, plan)}
       ${stamp}
       ${banner}
       ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
@@ -2337,18 +2361,21 @@ function bindLotHover(shape) {
 
 const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool || state.lotShapeEdit;
 
-// Lô hạ tầng của đồ án: tô ký hiệu TT16 theo loại công trình trên Sheet (cùng mã lô), bấm mở popup công trình
+// Lô hạ tầng: cùng kiểu tô landParcelStyle với lô đất; có điểm Sheet thì ưu tiên ký hiệu theo loại công trình.
+// Bấm mở thẻ lô đất (tabs + lưới 2×2) kèm bán kính phục vụ — không dùng layout popup điểm riêng.
 function infraLotShape(lot, item, m, detailed) {
-  const style = item
+  const style = item && !landPatternKey(lot.layer, lot.name)
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name, geometry: lot.geometry })
-    : landParcelStyle(lot.layer, { detailed, phase: lot.phase, name: lot.name, geometry: lot.geometry });
+    : landParcelStyle(lot.layer, {
+      detailed, phase: lot.phase, name: lot.name || item?.name, geometry: lot.geometry
+    });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
   bindLotHover(shape);
-  if (!item) return shape;
-  bindNameTip(shape, item);
+  if (item) bindNameTip(shape, item);
   shape.on('click', (e) => {
     if (passToolClick(m, e)) return;
-    onPointClick(item, m, lot.geometry);
+    if (item) openLandPopup(lot, m, { facility: item });
+    else openLandPopup(lot, m);
   });
   return shape;
 }
@@ -2390,7 +2417,10 @@ export function openOutlinedPopup(m, geometry, popup, latlng) {
 let openLandInfo = null;
 
 function landInfoKey(p, opts) {
-  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || '', opts?.hideProject ? 'lot' : ''].join('|');
+  return [
+    p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || '',
+    opts?.hideProject ? 'lot' : '', opts?.facility?.id || ''
+  ].join('|');
 }
 
 function trackLandInfo(popup, p, m, opts) {
@@ -2521,10 +2551,17 @@ function decisionFile(d, fallbackName) {
   };
 }
 
-/** Bấm ô đất: bảng đồ án (brief + hồ sơ dưới) theo đúng đồ án của lô, không phóng khung. */
-function syncFocusedProjectToLot(projectName) {
+/**
+ * Bấm ô đất: bảng thông tin đồ án (#projectBrief) theo đúng đồ án của lô, không phóng khung.
+ * QHC / QHPK / QHCT cùng luật: đổi đồ án → mở keepView; cùng đồ án (kể cả đã focus) → vẫn mở lại brief.
+ */
+export function syncFocusedProjectToLot(projectName) {
   const name = String(projectName || '').trim();
-  if (!name || state.focusedProject === name) return;
+  if (!name) return;
+  if (state.focusedProject === name) {
+    document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
+    return;
+  }
   document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: { name, keepView: true } }));
 }
 
@@ -2569,38 +2606,126 @@ function bindDossier(popup, projectName) {
   });
 }
 
+function facilityAnalyzeOpts(facility, m, popup) {
+  const itemRadius = effectiveRadius(facility);
+  if (!(itemRadius > 0) || facility.type === '12-CSD') return null;
+  const isPlanScenario = facility.scenario === 'QH';
+  const groups = isPlanScenario ? planLayers : layers;
+  const ntKind = facility.type === '11-NT' ? ntKindOf(facility) : null;
+  const roadArea = !(facility.type === '10-PCCC' || facility.type === '11-NT');
+  const radiusLabel = facility.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ';
+  const radiusRef = facility.type === '13-BUS' ? 'Mục 2.8.3.3' : facility.type === '10-PCCC' ? 'Mục 2.5.13.1' : ntKind ? 'Bảng 23' : '';
+  const geoWardNow = resolveWardNameFromCoords(Number(facility.lat), Number(facility.lng));
+  const clip = serviceClipFor(facility, geoWardNow);
+  const selType = layerType(facility);
+  const inViewPoints = getWardFilteredList(isPlanScenario ? getPlanScenarioList() : state.rawDataList)
+    .filter(q => layerType(q) === selType && (q.type !== '12-CSD' || q === facility) && hasValidCoord(q)
+      && m.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
+  let analysisDone = false;
+  const runAnalysis = () => {
+    if (!popup.isOpen() || analysisDone) return;
+    analysisDone = true;
+    popup.getElement()?.querySelector('.pp-radius-btn')?.classList.add('is-on');
+    const showArea = roadArea;
+    const showServed = facility.type !== '12-CSD';
+    const servedLabel = ntKind ? 'Dân số trong vùng cách ly' : `Dân số phục vụ${isApproved(facility.status) ? '' : ' dự kiến'}`;
+    const servedCls = isApproved(facility.status) ? 'c-orange' : 'c-red';
+    let rows = '';
+    if (showArea) rows += `<div class="pp-row js-area"><span>Phạm vi thực tế</span><span class="pp-loading">${ico('clock')}đang dựng theo mạng đường...</span></div>`;
+    if (showServed) rows += `<div class="pp-row pp-served js-served"><span>${servedLabel}</span><span class="pp-loading">${ico('clock')}đang tính...</span></div>`;
+    const info = popup.getElement()?.querySelector('.lp-info');
+    if (info && rows) info.insertAdjacentHTML('beforeend', rows);
+    popup._updateLayout?.();
+    popup._updatePosition?.();
+    const fill = (selector, content) => {
+      if (!popup.isOpen()) return;
+      const el = popup.getElement()?.querySelector(selector);
+      if (!el) return;
+      el.innerHTML = content;
+      popup._updateLayout?.();
+      popup._updatePosition?.();
+    };
+    const areaPromise = showArea
+      ? highlightSingleIsochrone(facility.lat, facility.lng, itemRadius, groups.singleIso, inViewPoints, clip, true)
+      : null;
+    if (!showArea) highlightSingleIsochrone(facility.lat, facility.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
+    focusServiceRadius(m, facility.lat, facility.lng, itemRadius);
+    if (areaPromise) {
+      areaPromise.then(r => {
+        if (!r || r.plain) return;
+        if (r.area) fill('.js-area', `<span>Phạm vi thực tế</span><b class="c-green">${r.area.areaKm2.toFixed(2)} km²</b>`);
+        else fill('.js-area', `<span>Phạm vi thực tế</span><span class="pp-sub">máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính.</span>`);
+      });
+    }
+    if (showServed) {
+      const scope = clip ? `, nội bộ ${escapeHtml(clip.name)}` : ', kể cả phường lân cận';
+      Promise.resolve(areaPromise)
+        .then(r => {
+          const polygon = r ? r.polygon : turf.circle([Number(facility.lng), Number(facility.lat)], itemRadius / 1000, { steps: 64 });
+          return fetchServedPop(facility, itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
+        })
+        .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${ntKind && res.servedPop > 0 ? 'c-red' : servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span></div>`))
+        .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
+    }
+  };
+  const refNote = radiusRef ? `, ${radiusRef}` : '';
+  return {
+    analyzeLabel: `Xem ${radiusLabel.toLowerCase()}`,
+    analyzeTip: `Phóng tới toàn ${radiusLabel.toLowerCase()}, bật chế độ âm bản và tính dân số phục vụ (${fmtNum(itemRadius)} m${refNote})`,
+    onAnalyze: runAnalysis
+  };
+}
+
 function openLandPopup(p, m, opts) {
   // Thẻ lô trong panel B (#planInfoSlot dưới brief), giữ bốn tab cấp — mọi cỡ màn hình.
   ensureQuyHoachPane();
+  const facility = opts?.facility || null;
+  const projectName = p.file || facility?.tenQH || '';
   // hideProject (menu «Xem thông tin lô»): chỉ thẻ lô, không đổi bảng đồ án (ui-spec).
-  if (!opts?.hideProject) syncFocusedProjectToLot(p.file);
+  if (!opts?.hideProject) syncFocusedProjectToLot(projectName);
   if (reuseLandInfo(p, m, opts)) return;
+  if (map) map.closePopup();
+  if (planMap) planMap.closePopup();
   const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
   attachSelectionOutline(m, p.geometry, popup);
-  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
-  const center = geometryCenter(p.geometry);
+  addPopupCollapseToggle(popup, facility ? 'ranh khu đất và vùng phục vụ' : 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  const center = lotCenterOf(p.geometry, facility?.lat, facility?.lng);
+  const analyze = facility ? facilityAnalyzeOpts(facility, m, popup) : null;
   addLotLocateTools(popup, {
     lat: center?.lat, lng: center?.lng,
-    token: landToken(p.phase, p.file, p.id || p.lotCode || landCode(p)),
-    project: p.file || '',
-    title: lotHeading(p.name || '', p.lotCode || landCode(p), ''),
+    token: facility?.id
+      ? pointToken(facility.scenario, facility.id)
+      : landToken(p.phase, p.file, p.id || p.lotCode || landCode(p)),
+    project: projectName,
+    title: lotHeading(facility ? infraTitle(facility.name) : (p.name || ''), p.lotCode || facility?.lotCode || landCode(p), ''),
+    analyzeLabel: analyze?.analyzeLabel || '',
+    analyzeTip: analyze?.analyzeTip || '',
+    onAnalyze: analyze?.onAnalyze || null,
     buildup: true
   });
   bindLandCardTabs(popup.getElement());
-  if (!opts?.hideProject) bindDossier(popup, p.file);
-  addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+  if (!opts?.hideProject) bindDossier(popup, projectName);
+  if (facility) {
+    addLotEditButton(popup, { kind: 'INFRA', item: facility });
+    pointPopup = { popup, id: facility.id, scenario: facility.scenario };
+    popup.on('remove', () => {
+      if (pointPopup?.popup === popup) pointPopup = null;
+    });
+  } else {
+    addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+  }
   trackLandInfo(popup, p, m, opts);
   fillLotBuildup(popup, p);
 }
 
-/** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */
+/** Popup lô đồ án: lô đất và lô hạ tầng cùng thẻ sử dụng đất; lô hạ tầng kèm bán kính phục vụ. */
 export function openLotPopup(p, m, latlng, opts) {
   if (!p || !m || !latlng) return;
   const facilityId = touchPrimary(p.id) || p.id;
   const item = p.kind === 'DXF' ? null
     : (m === planMap && getPlanScenarioList().find(it => it.id === facilityId))
       || state.rawDataList.find(it => it.id === facilityId) || state.planDataList.find(it => it.id === facilityId);
-  if (item) onPointClick(item, m, p.geometry);
+  if (item) openLandPopup(p, m, { ...opts, facility: item });
   else openLandPopup(p, m, opts);
 }
 
@@ -2930,7 +3055,8 @@ export function showProjectLot(lot) {
   const list = qh ? getPlanScenarioList() : state.rawDataList;
   const facilityId = touchPrimary(lot.id) || lot.id;
   const item = list.find(it => it.id === facilityId) || state.rawDataList.find(it => it.id === facilityId);
-  if (item) onPointClick(item, m, lot.geometry);
+  if (item) openLandPopup(lot, m, { facility: item });
+  else openLandPopup(lot, m);
 }
 
 /** Mở lô từ tham số `lo` trên link chia sẻ. Chưa có dữ liệu thì trả về false để gọi lại. */
@@ -3511,9 +3637,25 @@ function infraTitle(name) {
   return String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim() || String(name || '');
 }
 
-// Click chỉ mở bảng thông tin (mở từ ranh lô đất thì kèm viền khu đất); âm bản, zoom bán kính,
-// phạm vi thực tế theo mạng đường và dân số chỉ chạy khi bấm nút phân tích trong popup
+// Click điểm: bảng công trình. Có ranh lô (bấm lô / mở từ lô) → cùng thẻ lô đất + bán kính phục vụ.
 export function onPointClick(p, targetMap = map, parcelGeometry = null) {
+  if (parcelGeometry) {
+    const lot = parcelFor(p) || {
+      geometry: parcelGeometry,
+      name: p.name,
+      layer: '',
+      lotCode: p.lotCode || '',
+      file: p.tenQH || '',
+      phase: p.scenario === 'QH' ? 'QH' : 'HT',
+      area: Number(p.size) || 0,
+      plan: p.plan,
+      id: p.id,
+      ward: p.ward
+    };
+    if (!lot.geometry) lot.geometry = parcelGeometry;
+    openLandPopup(lot, targetMap, { facility: p });
+    return;
+  }
   if (pointPopup && pointPopup.id === p.id && pointPopup.scenario === p.scenario && pointPopup.popup._map === targetMap
     && expandCollapsedPopup(pointPopup.popup)) return;
   const approved = isApproved(p.status);

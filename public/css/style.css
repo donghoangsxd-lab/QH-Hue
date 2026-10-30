@@ -490,6 +490,21 @@ body.compare-on .map-title {
   cursor: default;
 }
 .project-brief-tool:disabled:hover { color: var(--text-muted); background: transparent; }
+.project-brief-sub {
+  margin: 2px 0 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+.project-brief-scale {
+  margin-top: 4px;
+  max-height: min(42vh, 360px);
+  overflow: auto;
+}
+.project-brief-scale .qhc25-scale-card {
+  margin: 0;
+}
 .project-brief-hero {
   display: flex;
   align-items: baseline;
@@ -520,18 +535,26 @@ body.compare-on .map-title {
 }
 .project-brief-pops {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  margin-top: 2px;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.project-brief-pop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
-.project-brief-pops b {
+.project-brief-pop span { font-weight: 600; }
+.project-brief-pop b {
   font-weight: 800;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.project-brief-pops small {
+.project-brief-pop small {
   margin-left: 2px;
   font-size: var(--fs-xs);
   font-weight: 600;

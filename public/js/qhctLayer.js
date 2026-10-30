@@ -5,7 +5,7 @@
 // Tổng quan QHPK 1/2.000 (chỉ ranh các đồ án) và chọn phường không vẽ các ranh này.
 // Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ tím / cyan.
 import { state } from './state.js';
-import { map, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
+import { map, addPopupCollapseToggle, expandCollapsedPopup, syncFocusedProjectToLot, openDockPopup, attachSelectionOutline, ensureQuyHoachPane } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -15,6 +15,10 @@ import { annotateCompliance } from './planCompliance.js';
 import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { attachLotBuildup } from './lotBuildup.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
+import {
+  lotHeading, shortLandUse, metricGridHtml, landUseBannerHtml, landCardTabsHtml,
+  regulationsPaneHtml, bindLandCardTabs
+} from './lotPopup.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
@@ -171,16 +175,43 @@ export async function parcelQhctHtml(geometry, recorded, place) {
 }
 
 function popupHtml(p, opts) {
+  const type = shortLandUse(p.chucNang || 'Lô đất QHCT 1/500');
+  const code = String(p.kyHieu || '').trim();
+  const title = lotHeading(type, code, type) || type;
+  const areaText = p.dienTich ? `${fmtNum(Math.round(p.dienTich))} m²` : '';
+  const key = landPatternKey([p.chucNang, p.kyHieu].filter(Boolean).join(' '));
+  const tone = (key && TT16_STYLES[key]?.color) || p.mau || DEFAULT_COLOR;
+  const swatch = `<i class="lp-swatch" style="background:${tone};"></i>`;
+  const project = !opts?.hideProject && p.tenQH
+    ? `<span class="lp-project-name" title="${escapeHtml(p.tenQH)}">${escapeHtml(p.tenQH)}</span>`
+    : '';
   const rows = [
-    opts?.hideProject ? null : ['Đồ án', p.tenQH],
-    ['Ký hiệu lô', p.kyHieu],
-    ['Chức năng', p.chucNang],
-    ['Diện tích', p.dienTich ? `${fmtNum(Math.round(p.dienTich))} m²` : '']
-  ].filter(pair => pair && pair[1]);
-  return `<div class="qhc-pop"><div class="qhc-pop-head"><b>${escapeHtml(p.chucNang || 'Lô đất QHCT 1/500')}</b></div>
-    <table class="qhc-pop-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>
-    ${lotBuildupSlotHtml()}
-    <div class="qhc-pop-src">QHCT 1/500</div></div>`;
+    project ? `<div class="pp-row lp-project-row"><span>Đồ án</span><b>${project}</b></div>` : '',
+    code && title !== code ? `<div class="pp-row"><span>Ký hiệu lô</span><b>${escapeHtml(code)}</b></div>` : ''
+  ].filter(Boolean).join('');
+  const sameAsType = !!(type && title.trim().toLowerCase() === type.trim().toLowerCase());
+  const titleRow = sameAsType ? '' : `<div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span></div>`;
+  return `<div class="pp land-popup land-popup-card">
+    <div class="pp-title lp-head" title="${escapeHtml([p.chucNang, code].filter(Boolean).join(' · '))}">
+      <div class="lp-head-main">
+        <div class="lp-eyebrow">
+          <span class="lp-eyebrow-label">Quy hoạch chi tiết</span>
+          <span class="lp-phase lp-phase-qh">Quy hoạch</span>
+        </div>
+        ${titleRow}
+      </div>
+    </div>
+    ${landCardTabsHtml('chi-tieu')}
+    <div class="lp-pane is-on" data-lp-pane="chi-tieu" role="tabpanel">
+      ${metricGridHtml(areaText, null)}
+      ${landUseBannerHtml(type, swatch)}
+      ${rows ? `<div class="lp-meta lp-info">${rows}</div>` : ''}
+      ${lotBuildupSlotHtml()}
+    </div>
+    <div class="lp-pane" data-lp-pane="quy-dinh" role="tabpanel" hidden>
+      ${regulationsPaneHtml(null)}
+    </div>
+  </div>`;
 }
 
 const drawn = new WeakMap();
@@ -240,19 +271,23 @@ export function showQhctLot(m, f, latlng, opts) {
 
 function openQhctPopup(m, f, latlng, opts) {
   if (qhctLotPop && qhctLotPop.f === f && qhctLotPop.map === m && expandCollapsedPopup(qhctLotPop.popup)) return;
-  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setLatLng(latlng).setContent(popupHtml(f.properties || {}, opts));
+  const props = f.properties || {};
+  if (!opts?.hideProject && props.tenQH) syncFocusedProjectToLot(props.tenQH);
+  ensureQuyHoachPane();
+  const popup = openDockPopup(m, 'qhct-popup land-lot-popup', popupHtml(props, opts));
+  attachSelectionOutline(m, f.geometry, popup);
   qhctLotPop = { popup, f, map: m };
-  popup.openOn(m);
   attachLotBuildup(popup, {
     geometry: f.geometry,
     plan: null,
     phase: 'QH',
-    file: (f.properties || {}).tenQH || '',
-    id: (f.properties || {}).kyHieu || '',
-    layer: (f.properties || {}).chucNang || '',
-    name: (f.properties || {}).chucNang || ''
+    file: props.tenQH || '',
+    id: props.kyHieu || '',
+    layer: props.chucNang || '',
+    name: props.chucNang || ''
   });
-  addPopupCollapseToggle(popup, 'nhãn tên lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  bindLandCardTabs(popup.getElement());
+  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   popup.on('remove', () => { if (qhctLotPop?.popup === popup) qhctLotPop = null; });
 }
 

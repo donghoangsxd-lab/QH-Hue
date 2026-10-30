@@ -226,33 +226,75 @@ function clearPdfHost(host) {
     pdfIo = null;
   }
   if (host) {
+    host.querySelectorAll('.decision-pdf-slot').forEach(cancelPdfTask);
     host.innerHTML = '';
     host.hidden = true;
     delete host.dataset.src;
   }
 }
 
+function cancelPdfTask(slot) {
+  const task = slot && slot._pdfTask;
+  if (!task) return;
+  slot._pdfTask = null;
+  try { task.cancel(); } catch (_) { /* đã xong */ }
+}
+
+function blankPdfSlot(slot, width, ratio) {
+  if (!slot) return;
+  cancelPdfTask(slot);
+  const w = Math.max(120, Math.floor(width) || 120);
+  const [aw, ah] = String(ratio || '210 / 297').split('/').map((x) => Number(String(x).trim()) || 0);
+  const h = aw > 0 && ah > 0 ? Math.max(1, Math.round(w * ah / aw)) : Math.round(w * 297 / 210);
+  slot.style.aspectRatio = ratio || '210 / 297';
+  slot.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.className = 'decision-pdf-page';
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  slot.appendChild(canvas);
+}
+
 async function renderPdfPage(doc, slot, pageNo, width) {
+  const gen = Number(slot.dataset.gen || 0) + 1;
+  slot.dataset.gen = String(gen);
+  cancelPdfTask(slot);
+  // Canvas mới mỗi lần — tránh PDF.js chồng render trên cùng context (trang xoay ngược / đen).
+  slot.innerHTML = '';
   const page = await doc.getPage(pageNo);
+  if (Number(slot.dataset.gen) !== gen) return;
   const base = page.getViewport({ scale: 1 });
   const scale = Math.max(0.5, width / Math.max(1, base.width));
   const viewport = page.getViewport({ scale });
-  let canvas = slot.querySelector('canvas');
-  if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.className = 'decision-pdf-page';
-    slot.appendChild(canvas);
-  }
   const w = Math.max(1, Math.floor(viewport.width));
   const h = Math.max(1, Math.floor(viewport.height));
+  const ratio = `${base.width} / ${base.height}`;
+  slot.style.aspectRatio = ratio;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'decision-pdf-page';
   canvas.width = w;
   canvas.height = h;
-  slot.style.aspectRatio = `${base.width} / ${base.height}`;
   const ctx = canvas.getContext('2d', { alpha: false });
-  // alpha:false mặc định tô đen — tô trắng trước khi vẽ trang
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  slot.appendChild(canvas);
+  const task = page.render({ canvasContext: ctx, viewport, background: '#ffffff' });
+  slot._pdfTask = task;
+  try {
+    await task.promise;
+  } catch (err) {
+    if (err && (err.name === 'RenderingCancelledException' || /cancel/i.test(String(err.message || '')))) return;
+    // Lỗi / nửa chừng: bỏ trắng trang, không để nền đen hay ảnh xoay dở.
+    if (Number(slot.dataset.gen) === gen) blankPdfSlot(slot, width, ratio);
+    throw err;
+  } finally {
+    if (slot._pdfTask === task) slot._pdfTask = null;
+  }
 }
 
 async function paintPdf(host, src) {
@@ -276,23 +318,21 @@ async function paintPdf(host, src) {
       const slot = document.createElement('div');
       slot.className = 'decision-pdf-slot';
       slot.dataset.page = String(n);
+      slot.style.aspectRatio = '210 / 297';
       host.appendChild(slot);
       slots.push(slot);
     }
-    const first = await doc.getPage(1);
-    if (seq !== pdfPaintSeq) return;
-    const firstBase = first.getViewport({ scale: 1 });
-    const ratio = `${firstBase.width} / ${firstBase.height}`;
-    slots.forEach((slot) => { slot.style.aspectRatio = ratio; });
 
     const paintSlot = (slot) => {
       if (!slot || seq !== pdfPaintSeq || slot.dataset.ready === '1') return;
       slot.dataset.ready = '1';
       renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
+        // Giữ trang trắng nếu vẽ lỗi; cho phép thử lại khi cuộn/resize
         slot.dataset.ready = '';
       });
     };
-    // Trang 1 vẽ ngay (không chờ IO) để tránh khung đen / chiều cao 0 không cuộn
+    // Trang 1: trắng trước, rồi vẽ — nếu lỗi vẫn trắng, không khung đen
+    blankPdfSlot(slots[0], widthOf(), '210 / 297');
     paintSlot(slots[0]);
 
     if (pdfIo) pdfIo.disconnect();
@@ -305,7 +345,11 @@ async function paintPdf(host, src) {
     slots.forEach((slot) => pdfIo.observe(slot));
 
     let resizeTimer = 0;
+    let resizeReady = false;
+    // Chờ trang 1 xong mới bắt resize — tránh vẽ chồng (PDF.js xoay ngược / đen).
+    requestAnimationFrame(() => { resizeReady = true; });
     pdfResizeObs = new ResizeObserver(() => {
+      if (!resizeReady || seq !== pdfPaintSeq) return;
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         if (seq !== pdfPaintSeq) return;
@@ -314,7 +358,7 @@ async function paintPdf(host, src) {
           if (slot.dataset.ready !== '1') return;
           renderPdfPage(doc, slot, Number(slot.dataset.page), w).catch(() => {});
         });
-      }, 120);
+      }, 180);
     });
     pdfResizeObs.observe(host);
   } catch (err) {
