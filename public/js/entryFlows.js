@@ -9,7 +9,7 @@ import { EVAL_URBANS, fieldsForScope, gapRows } from './urbanEntrySchema.js';
 import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
 import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
 import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from './schemeLotClip.js';
-import { putSignedPdf, PDF_INLINE_MAX_BYTES } from './pdfLimits.js';
+import { PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
 import { loadCongSuat } from './congSuat.js';
 import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
 import { pdfProblem, sendAdjustment } from './adjustLayer.js';
@@ -838,14 +838,8 @@ async function savePdf(step, tenQH, unitKey) {
     });
     return `${step.label} (chờ duyệt)`;
   }
-  const body = { tenQH, docRole: step.docRole, name: file.name };
-  if (file.size > PDF_INLINE_MAX_BYTES) {
-    const sign = await postJson('signProjectPdf', { purpose: 'doc', bytes: file.size, name: file.name });
-    await putSignedPdf(sign, file);
-    await postJson('putProjectDoc', { ...body, staged: sign.token, bytes: file.size });
-  } else {
-    await postJson('putProjectDoc', { ...body, pdf: await fileBase64(file) });
-  }
+  if (file.size > PDF_ADMIN_MAX_BYTES) return 'File PDF tối đa 10 MB.';
+  await postJson('putProjectDoc', { tenQH, docRole: step.docRole, name: file.name, pdf: await fileBase64(file) });
   return step.label;
 }
 
@@ -1062,14 +1056,11 @@ async function saveKtPdf() {
     return;
   }
   try {
-    const body = { unitKey, name: file.name };
-    if (file.size > PDF_INLINE_MAX_BYTES) {
-      const sign = await postJson('signProjectPdf', { purpose: 'doc', bytes: file.size, name: file.name });
-      await putSignedPdf(sign, file);
-      body.staged = sign.token;
-      body.bytes = file.size;
-    } else body.pdf = await fileBase64(file);
-    const saved = await postJson('putKienTrucPdf', body);
+    if (file.size > PDF_ADMIN_MAX_BYTES) {
+      if (note) note.textContent = 'File PDF tối đa 10 MB.';
+      return;
+    }
+    const saved = await postJson('putKienTrucPdf', { unitKey, name: file.name, pdf: await fileBase64(file) });
     if (note) note.textContent = saved.url ? `Đã ghi quy chế: ${saved.url}` : 'Đã ghi quy chế.';
   } catch (err) {
     if (note) note.textContent = err.message;

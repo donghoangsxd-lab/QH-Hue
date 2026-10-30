@@ -45,17 +45,20 @@ const exact = Buffer.alloc(limits.PDF_USER_MAX_BYTES, 0x20);
 exact.write('%PDF', 0);
 assert.strictEqual(limits.inlineBuffer(exact.toString('base64'), false).length, limits.PDF_USER_MAX_BYTES);
 
-const over = Buffer.alloc(limits.PDF_INLINE_MAX_BYTES + 1, 0x20);
-over.write('%PDF', 0);
-assert.throws(() => limits.inlineBuffer(over.toString('base64'), false), (err) => {
+const overUser = Buffer.alloc(limits.PDF_USER_MAX_BYTES + 1, 0x20);
+overUser.write('%PDF', 0);
+assert.throws(() => limits.inlineBuffer(overUser.toString('base64'), false), (err) => {
   assert.strictEqual(err.status, 413);
   assert.strictEqual(err.message, 'File PDF tối đa 2 MB.');
   return true;
 });
-assert.throws(() => limits.inlineBuffer(over.toString('base64'), true), (err) => {
+// Admin gửi base64 qua Cloud Run tới 10 MB; vượt 2 MB vẫn hợp lệ.
+assert.doesNotThrow(() => limits.inlineBuffer(overUser.toString('base64'), true));
+const overAdmin = Buffer.alloc(limits.PDF_ADMIN_MAX_BYTES + 1, 0x20);
+overAdmin.write('%PDF', 0);
+assert.throws(() => limits.inlineBuffer(overAdmin.toString('base64'), true), (err) => {
   assert.strictEqual(err.status, 413);
-  assert.ok(err.message.includes('tối đa 10 MB'));
-  assert.ok(err.message.includes('2 MB'));
+  assert.strictEqual(err.message, 'File PDF tối đa 10 MB.');
   return true;
 });
 assert.throws(() => limits.inlineBuffer('', false), (err) => err.message === 'File PDF rỗng.' && err.status === 400);
@@ -64,11 +67,14 @@ assert.strictEqual(limits.tooBigMessage(false), 'File PDF tối đa 2 MB.');
 assert.strictEqual(limits.PDF_ADMIN_MAX_BYTES, 10 * 1024 * 1024);
 assert.strictEqual(limits.PDF_USER_MAX_BYTES, 2 * 1024 * 1024);
 assert.ok(limits.PDF_PROXY_MAX_BYTES < 4.5 * 1024 * 1024);
-assert.ok(limits.b64MaxChars(limits.PDF_INLINE_MAX_BYTES) < 4.5 * 1024 * 1024);
+assert.ok(limits.b64MaxChars(limits.PDF_ADMIN_MAX_BYTES) < 15 * 1024 * 1024);
 
 const client = fs.readFileSync(path.join(__dirname, '../public/js/pdfLimits.js'), 'utf8');
 assert.ok(client.includes('2 * 1024 * 1024'));
 assert.ok(client.includes('10 * 1024 * 1024'));
-assert.ok(client.includes('x-goog-content-length-range'));
+assert.ok(client.includes('Failed to fetch'));
+assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../public/js/entryFlows.js'), 'utf8'), /putSignedPdf/);
+assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../public/js/decisionViewer.js'), 'utf8'), /putSignedPdf/);
+assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../public/js/adjustLayer.js'), 'utf8'), /putSignedPdf/);
 
 console.log('test-pdf-limits: ok');

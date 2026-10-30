@@ -3829,7 +3829,8 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Admin xin URL PUT (PDF lớn hơn 2 MB, tối đa 10 MB). Content-Type và đúng số byte nằm trong chữ ký.
+    // Giữ endpoint cũ (URL PUT thẳng bucket). Admin hiện gửi PDF ≤ 10 MB base64 qua putProjectDoc / putProjectDecision
+    // vì bucket không mở CORS trình duyệt (PUT → Failed to fetch).
     if (action === 'signProjectPdf') {
       requirePostFromApp(req);
       await requireAdmin(req);
@@ -3860,7 +3861,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Admin gắn PDF tối đa 10 MB hoặc link đã kiểm tra. File trên 2 MB đã PUT lên bucket (staged).
+    // Admin gắn PDF tối đa 10 MB (base64 trong thân) hoặc link đã kiểm tra. stagedToken còn nhận nếu client cũ đã PUT.
     // body.layer: gắn cho lớp bản đồ dùng chung, không ghi cột LinkQD trên sheet DS_DoAn.
     if (action === 'putProjectDecision') {
       requirePostFromApp(req);

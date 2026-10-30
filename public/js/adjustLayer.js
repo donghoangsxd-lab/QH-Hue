@@ -18,7 +18,7 @@ import { tt16SymbolStyle, landPatternKey, landLabel, layerForPattern, tt16Swatch
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
 import { savedLandTag } from './projectReviewCore.js';
 import { planLevelOf } from './generalPlan.js';
-import { pdfLimitText, pdfMaxBytes, pdfSizeError, putSignedPdf } from './pdfLimits.js';
+import { pdfLimitText, pdfMaxBytes, pdfSizeError, fileToPdfBase64 } from './pdfLimits.js';
 
 const CYAN = '#22d3ee';
 // Trên ranh đồ án QHPK (overlay 400) và viền sáng đồ án (445), dưới tem đường (450).
@@ -107,16 +107,7 @@ export async function putScan(id, scan) {
  */
 async function attachPdfBody(id, pdfFile) {
   const admin = isAdmin();
-  const body = { id, name: pdfFile.name };
-  if (admin && pdfFile.size > pdfMaxBytes(false)) {
-    const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
-      method: 'POST', headers: headers(true),
-      body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name, id })
-    }));
-    await putSignedPdf(sign, pdfFile);
-    body.staged = sign.token;
-    body.bytes = pdfFile.size;
-  } else body.pdf = await fileBase64(pdfFile);
+  const body = { id, name: pdfFile.name, pdf: await fileToPdfBase64(pdfFile) };
   const out = await readJsonResponse(await fetch(geeApi('action=putAdjustPdf'), {
     method: 'POST', headers: headers(admin), body: JSON.stringify(body)
   }));
@@ -146,15 +137,7 @@ export async function sendAdjustment(payload, pdfFile, scan) {
     const bad = pdfProblem(pdfFile, admin);
     if (bad) throw new Error(bad);
     body.name = pdfFile.name;
-    if (admin && pdfFile.size > pdfMaxBytes(false)) {
-      const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
-        method: 'POST', headers: headers(true),
-        body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name })
-      }));
-      await putSignedPdf(sign, pdfFile);
-      body.staged = sign.token;
-      body.bytes = pdfFile.size;
-    } else body.pdf = await fileBase64(pdfFile);
+    body.pdf = await fileToPdfBase64(pdfFile);
   }
   const data = await readJsonResponse(await fetch(geeApi('action=submitAdjust'), {
     method: 'POST', headers: headers(admin), body: JSON.stringify(body)

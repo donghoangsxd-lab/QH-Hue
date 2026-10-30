@@ -1,6 +1,7 @@
-// Hạn mức PDF đính kèm (quyết định, văn bản kèm, PDF hồ sơ điều chỉnh).
-// Người dùng tối đa 2 MB, gửi base64 trong thân request.
-// Admin tối đa 10 MB: phần trên 2 MB tải PUT thẳng lên bucket bằng URL ký, không đi qua thân hàm.
+// Hạn mức PDF đính kèm (quyết định, quy định quản lý, thuyết minh, PDF điều chỉnh).
+// Người dùng tối đa 2 MB; admin tối đa 10 MB. Cả hai gửi base64 trong thân request qua Cloud Run
+// (MAX_BODY 15 MB đủ chứa ~13,3 MB base64 của file 10 MB). Không PUT thẳng bucket từ trình duyệt:
+// bucket không mở CORS → Failed to fetch.
 const PDF_USER_MAX_BYTES = 2 * 1024 * 1024;
 const PDF_ADMIN_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_INLINE_MAX_BYTES = PDF_USER_MAX_BYTES;
@@ -15,9 +16,11 @@ function tooBigMessage(admin) {
 }
 
 function inlineTooBigMessage(admin) {
-  return admin
-    ? 'File PDF lớn hơn 2 MB không gửi kèm yêu cầu. Dùng đường tải trực tiếp, tối đa 10 MB.'
-    : tooBigMessage(false);
+  return tooBigMessage(!!admin);
+}
+
+function inlineMaxBytes(admin) {
+  return admin ? PDF_ADMIN_MAX_BYTES : PDF_USER_MAX_BYTES;
 }
 
 function b64MaxChars(bytes) {
@@ -31,13 +34,14 @@ function fail(message, status) {
 }
 
 function inlineBuffer(raw, admin) {
+  const max = inlineMaxBytes(!!admin);
   const clean = String(raw || '').replace(/\s+/g, '');
   if (!clean) throw fail('File PDF rỗng.', 400);
-  if (clean.length > b64MaxChars(PDF_INLINE_MAX_BYTES)) throw fail(inlineTooBigMessage(!!admin), 413);
+  if (clean.length > b64MaxChars(max)) throw fail(inlineTooBigMessage(!!admin), 413);
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) throw fail('File PDF không hợp lệ.', 400);
   const buffer = Buffer.from(clean, 'base64');
   if (buffer.length < 5) throw fail('File PDF rỗng.', 400);
-  if (buffer.length > PDF_INLINE_MAX_BYTES) throw fail(inlineTooBigMessage(!!admin), 413);
+  if (buffer.length > max) throw fail(inlineTooBigMessage(!!admin), 413);
   return buffer;
 }
 
@@ -49,6 +53,7 @@ module.exports = {
   limitLabel,
   tooBigMessage,
   inlineTooBigMessage,
+  inlineMaxBytes,
   b64MaxChars,
   inlineBuffer
 };

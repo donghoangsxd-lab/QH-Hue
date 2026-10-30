@@ -1,5 +1,5 @@
 // Khung xem / gắn quyết định phê duyệt dùng chung cho đồ án (projectLayer.js) và lớp bản đồ (layerDecisions.js).
-// Admin: PDF tối đa 10 MB hoặc link đã kiểm tra ghi thẳng (putProjectDecision). Trên 2 MB tải PUT thẳng bucket.
+// Admin: PDF tối đa 10 MB hoặc link đã kiểm tra ghi thẳng (putProjectDecision / putProjectDoc) qua máy chủ.
 // Người dùng: PDF tối đa 2 MB gửi chờ duyệt (submitDecisionProposal); admin mở file, đồng ý thì mới thành quyết định.
 // target: { key, title, noun, decision, proposal, slug, body: { tenQH } | { layer }, isBusy(), setBusy(on),
 //           onSaved(decision | null, data), onProposed(proposal), onResolved(decision | null, data) }
@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { geeApi } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { ico, showToast, loadScript, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
-import { PDF_ADMIN_MAX_BYTES, PDF_INLINE_MAX_BYTES, PDF_USER_MAX_BYTES, pdfSizeError, putSignedPdf } from './pdfLimits.js';
+import { PDF_ADMIN_MAX_BYTES, PDF_USER_MAX_BYTES, fileToPdfBase64, pdfSizeError } from './pdfLimits.js';
 
 // PDF.js chỉ tải khi mở khung xem (CDN), không nhúng trình xem PDF của Chrome — toolbar + viền đen hai bên.
 const PDFJS_VER = '3.11.174';
@@ -765,20 +765,11 @@ async function uploadPdf(t, file) {
   if (bad) { alert(bad); return; }
   setBusy(t, true);
   try {
-    let data;
-    if (file.size > PDF_INLINE_MAX_BYTES) {
-      const sign = await postJson('signProjectPdf', {
-        ...t.body,
-        purpose: t.body && t.body.docRole ? 'doc' : 'decision',
-        bytes: file.size,
-        name: file.name
-      });
-      await putSignedPdf(sign, file);
-      data = await postJson(writeAction(t), { ...t.body, name: file.name, staged: sign.token, bytes: file.size });
-    } else {
-      const bytes = await readPdfBytes(file);
-      data = await postJson(writeAction(t), { ...t.body, name: file.name, pdf: bytesToBase64(bytes) });
-    }
+    const data = await postJson(writeAction(t), {
+      ...t.body,
+      name: file.name,
+      pdf: await fileToPdfBase64(file)
+    });
     revokePdfPreview();
     const decision = t.body && t.body.docRole
       ? data.doc

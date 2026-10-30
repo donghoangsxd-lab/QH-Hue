@@ -95,7 +95,7 @@ Heatmap GEE dùng buffer tròn. Bám đường là Dijkstra `computeServiceArea`
 
 PR #98: trần đọc công khai, trả 429. Cloud Run và Worker đếm riêng, không dùng chung bộ nhớ.
 
-`api/gee.js`: `isAllowedOrigin`, `applyCors`, `requirePostFromApp`, `checkRate`, `checkAddPointRate`, `checkCadPendingRate`, `checkAdjustRate`, `checkDecisionProposalRate`, `setCdn`, `invalidateAllCaches`. Cổng: `module.exports = async (req, res)` rồi nhánh `action ===`. `services/getRate.js`: `limitPublicGet`, `geeLimitOpts`. `services/rateWindow.js` `allow`. `worker/index.js`: `allow`, `apiMax`. `cloudrun/server.js` `limitFor`. `api/osmClip.js`, `api/pmtilesRange.js`. `services/pdfLimits.js`, `public/js/pdfLimits.js`. `geeTiles.js` `TILE_CONCURRENCY`. `scripts/test-get-rate.mjs`.
+`api/gee.js`: `isAllowedOrigin`, `applyCors`, `requirePostFromApp`, `checkRate`, `checkAddPointRate`, `checkCadPendingRate`, `checkAdjustRate`, `checkDecisionProposalRate`, `setCdn`, `invalidateAllCaches`. Cổng: `module.exports = async (req, res)` rồi nhánh `action ===`. `services/getRate.js`: `limitPublicGet`, `geeLimitOpts`. `services/rateWindow.js` `allow`. `worker/index.js`: `allow`, `apiMax`. `cloudrun/server.js` `limitFor`. `api/osmClip.js`, `api/pmtilesRange.js`. `services/pdfLimits.js`, `public/js/pdfLimits.js`. `geeTiles.js` `TILE_CONCURRENCY`. `scripts/test-get-rate.mjs`, `scripts/test-pdf-limits.mjs` (admin PDF ≤ 10 MB gửi qua máy chủ, không PUT thẳng GCS).
 
 ## MOD-20 Worker + Cloud Run + GCS
 
