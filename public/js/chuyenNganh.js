@@ -1433,10 +1433,19 @@ function xahoiBuffersOn() {
   return !!document.querySelector('.btn-dot-buffer[aria-pressed="true"]');
 }
 
+/** Lớp catalog thuộc trục C (HTKT). Loại SDD / bind QHC·GT — đó là trục B, tránh chip C ảo lúc mở QHC. */
+function isHatangLayerOn(l) {
+  if (!l || l.base || !isLayerOn(l.id)) return false;
+  if (l.sector === 'sdd') return false;
+  if (l.bind && /^(chk_qhc|chk_gt)/.test(l.bind)) return false;
+  if (Array.isArray(l.axes) && l.axes.length) return l.axes.includes('hatang');
+  return true;
+}
+
 function axisHasOpenLayers(axisId) {
   if (axisId === 'hanhchinh') return chkOn('chk_urban');
   if (axisId === 'quyhoach') return anyPlanLayerOn();
-  if (axisId === 'hatang') return getLayers().some(l => !l.base && isLayerOn(l.id));
+  if (axisId === 'hatang') return getLayers().some(isHatangLayerOn);
   if (axisId === 'xahoi') {
     if (XAHOI_LAYER_CHKS.some(chkOn)) return true;
     return xahoiBuffersOn();
@@ -1461,7 +1470,7 @@ function clearAxisLayers(axisId) {
     return;
   }
   if (axisId === 'hatang') {
-    getLayers().filter(l => !l.base && isLayerOn(l.id)).forEach(l => setLayerOn(l, false));
+    getLayers().filter(isHatangLayerOn).forEach(l => setLayerOn(l, false));
     publishSectorLegend(false);
     return;
   }

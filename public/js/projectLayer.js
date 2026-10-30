@@ -928,10 +928,10 @@ export function planLevelAllTip() {
   return key ? eyeState(key).tip : 'Bật hoặc tắt các lớp đang hiện trong nhóm này';
 }
 
-/** Còn lớp / đồ án / GT / đường sắt của trục Quy hoạch đang hiện trên bản đồ (mọi cấp). */
+/** Còn lớp / đồ án / GT của trục Quy hoạch đang hiện trên bản đồ (mọi cấp).
+ *  Không tính riêng ô đường sắt: chk_gt*rail mặc định checked chỉ là tùy chọn kèm GT, không phải lớp đang mở. */
 export function anyPlanLayerOn() {
-  if (LIST_LEVELS.some(l => eyeState(l.key).on)) return true;
-  return !!(document.getElementById('chk_gt25rail')?.checked || document.getElementById('chk_gt10rail')?.checked);
+  return LIST_LEVELS.some(l => eyeState(l.key).on);
 }
 
 /** Tắt hết lớp và đồ án mọi cấp quy hoạch (kèm GT và đường sắt). Không đổi trục đang chọn. */

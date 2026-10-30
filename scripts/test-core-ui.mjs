@@ -356,7 +356,12 @@ assert.match(title, /class="map-intro-line"/);
 assert.match(html, /id="axisForeignStrip"/);
 assert.match(html, /class="axis-foreign-strip"/);
 assert.match(read('public/js/chuyenNganh.js'), /paintForeignAxes|clearAxisLayers|axisHasOpenLayers/);
+assert.match(read('public/js/chuyenNganh.js'), /isHatangLayerOn|sector === 'sdd'/);
 assert.match(read('public/js/projectLayer.js'), /anyPlanLayerOn|clearAllPlanLayers/);
+assert.match(
+  read('public/js/projectLayer.js'),
+  /function anyPlanLayerOn\(\) \{\r?\n  return LIST_LEVELS\.some\(l => eyeState\(l\.key\)\.on\);\r?\n\}/
+);
 assert.match(html, /id="btnOverview"/);
 assert.doesNotMatch(title, /id="btnMapCatalog"/);
 assert.doesNotMatch(title, />Mục lục</);
@@ -628,6 +633,8 @@ assert.match(read('public/js/decisionViewer.js'), /PDFJS_VER = '3\.11\.174'/);
 assert.match(read('public/js/decisionViewer.js'), /cdnjs\.cloudflare\.com\/ajax\/libs\/pdf\.js/);
 assert.match(read('public/js/decisionViewer.js'), /data-decision-pdf/);
 assert.match(read('public/js/decisionViewer.js'), /fillStyle = '#ffffff'/);
+assert.match(read('public/js/decisionViewer.js'), /blankPdfSlot/);
+assert.match(read('public/js/decisionViewer.js'), /RenderingCancelledException/);
 assert.match(read('public/js/decisionViewer.js'), /paintSlot\(slots\[0\]\)/);
 assert.match(read('public/js/decisionViewer.js'), /từ chối link phải mở tab mới/);
 assert.match(read('public/js/decisionViewer.js'), /pickFile\(t\)/);
