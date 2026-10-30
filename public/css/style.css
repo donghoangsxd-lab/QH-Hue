@@ -2068,18 +2068,16 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .decision-assign p { flex: 1 1 100%; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-note { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: var(--text-muted); }
 .decision-note[hidden] { display: none; }
-/* block (không flex): aspect-ratio trang mới tạo đúng chiều cao cuộn; flex column từng làm trang 1 nền đen, không kéo dọc */
+/* PDF: iframe + blob (trình xem trình duyệt) — cuộn trong iframe, khung rộng A4 để bớt dải xám hai bên */
 .decision-pdf {
-  flex: 1; min-height: 0; overflow: auto; overflow-x: hidden; background: #fff;
-  display: block;
+  flex: 1; min-height: 0; overflow: hidden; background: #525659;
+  display: block; position: relative;
 }
 .decision-pdf[hidden] { display: none; }
-.decision-pdf-wait { margin: 24px 12px; text-align: center; color: var(--text-muted); font-size: var(--fs-sm); }
-.decision-pdf-slot { display: block; width: 100%; background: #fff; box-sizing: border-box; }
-.decision-pdf-slot + .decision-pdf-slot { margin-top: 8px; }
-.decision-pdf-page { display: block; width: 100%; height: auto; vertical-align: top; background: #fff; }
-.decision-view iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; }
-.decision-view iframe[hidden] { display: none; }
+.decision-pdf-wait { margin: 24px 12px; text-align: center; color: #e2e8f0; font-size: var(--fs-sm); }
+.decision-pdf-frame { display: block; width: 100%; height: 100%; border: 0; background: #525659; }
+.decision-view > iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; }
+.decision-view > iframe[hidden] { display: none; }
 @media (max-width: 640px) { .decision-view { inset: 0; left: 0; width: auto; border-radius: 0; } }
 /* Ảnh công trình: neo phải, khung ôm sát ảnh (không letterbox đen), chỉ ảnh + nút đóng. */
 .media-view {

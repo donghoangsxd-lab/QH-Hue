@@ -6,17 +6,13 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
-import { ico, showToast, loadScript, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
+import { ico, showToast, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { PDF_ADMIN_MAX_BYTES, PDF_USER_MAX_BYTES, fileToPdfBase64, pdfSizeError } from './pdfLimits.js';
 
-// PDF.js chỉ tải khi mở khung xem (CDN), không nhúng trình xem PDF của Chrome — toolbar + viền đen hai bên.
-const PDFJS_VER = '3.11.174';
-const PDFJS_SRC = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.min.js`;
-const PDFJS_WORKER = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.worker.min.js`;
-let pdfjsReady = null;
+// Xem PDF bằng iframe + blob (trình xem sẵn của trình duyệt). Không dùng PDF.js canvas —
+// vẽ nhiều trang / hủy / resize chồng nhau từng làm xoay ngược hoặc mất trang.
 let pdfPaintSeq = 0;
-let pdfResizeObs = null;
-let pdfIo = null;
+let viewerPdfBlob = '';
 
 export const DECISION_MAX_BYTES = PDF_ADMIN_MAX_BYTES;
 export const PROPOSE_MAX_BYTES = PDF_USER_MAX_BYTES;
@@ -201,147 +197,48 @@ function isPdfSrc(src) {
     || /^\/gcs\/.+\.pdf(\?|#|$)/i.test(url);
 }
 
-function loadPdfJs() {
-  if (pdfjsReady) return pdfjsReady;
-  pdfjsReady = loadScript(PDFJS_SRC).then(() => {
-    const lib = window.pdfjsLib;
-    if (!lib) throw new Error('Không khởi tạo được PDF.js');
-    lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-    return lib;
-  }).catch((err) => {
-    pdfjsReady = null;
-    throw err;
-  });
-  return pdfjsReady;
+function revokeViewerPdfBlob() {
+  if (!viewerPdfBlob) return;
+  URL.revokeObjectURL(viewerPdfBlob);
+  viewerPdfBlob = '';
 }
 
 function clearPdfHost(host) {
   pdfPaintSeq += 1;
-  if (pdfResizeObs) {
-    pdfResizeObs.disconnect();
-    pdfResizeObs = null;
-  }
-  if (pdfIo) {
-    pdfIo.disconnect();
-    pdfIo = null;
-  }
+  revokeViewerPdfBlob();
   if (host) {
-    host.querySelectorAll('.decision-pdf-slot').forEach((slot) => {
-      const task = slot._pdfTask;
-      if (!task) return;
-      slot._pdfTask = null;
-      try { task.cancel(); } catch (_) { /* đã xong */ }
-    });
     host.innerHTML = '';
     host.hidden = true;
     delete host.dataset.src;
   }
 }
 
-async function settlePdfTask(slot) {
-  const task = slot && slot._pdfTask;
-  if (!task) return;
-  slot._pdfTask = null;
-  try { task.cancel(); } catch (_) { /* đã xong */ }
-  // cancel() bất đồng bộ — phải chờ reject xong mới được render() lại (nếu không trang 1 xoay ngược).
-  try { await task.promise; } catch (_) { /* RenderingCancelledException hoặc lỗi cũ */ }
-}
-
-async function renderPdfPage(doc, slot, pageNo, cssWidth) {
-  const gen = Number(slot.dataset.gen || 0) + 1;
-  slot.dataset.gen = String(gen);
-  await settlePdfTask(slot);
-  if (Number(slot.dataset.gen) !== gen) return;
-
-  const page = await doc.getPage(pageNo);
-  if (Number(slot.dataset.gen) !== gen) return;
-
-  // Một lần vẽ theo bề ngang khung; CSS width:100% scale khi đổi kích thước — không ResizeObserver vẽ lại.
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const base = page.getViewport({ scale: 1 });
-  const cssScale = Math.max(0.5, cssWidth / Math.max(1, base.width));
-  const viewport = page.getViewport({ scale: cssScale * dpr });
-  const w = Math.max(1, Math.floor(viewport.width));
-  const h = Math.max(1, Math.floor(viewport.height));
-
-  slot.innerHTML = '';
-  slot.style.aspectRatio = `${base.width} / ${base.height}`;
-  const canvas = document.createElement('canvas');
-  canvas.className = 'decision-pdf-page';
-  canvas.width = w;
-  canvas.height = h;
-  canvas.style.width = '100%';
-  canvas.style.height = 'auto';
-  const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, w, h);
-  slot.appendChild(canvas);
-
-  const task = page.render({ canvasContext: ctx, viewport, background: '#ffffff' });
-  slot._pdfTask = task;
-  try {
-    await task.promise;
-  } catch (err) {
-    if (err && (err.name === 'RenderingCancelledException' || /cancel/i.test(String(err.message || '')))) return;
-    if (Number(slot.dataset.gen) === gen) {
-      slot.innerHTML = '';
-      slot.style.aspectRatio = `${base.width} / ${base.height}`;
-    }
-    throw err;
-  } finally {
-    if (slot._pdfTask === task) slot._pdfTask = null;
-  }
-}
-
 async function paintPdf(host, src) {
   const seq = ++pdfPaintSeq;
-  if (pdfResizeObs) {
-    pdfResizeObs.disconnect();
-    pdfResizeObs = null;
-  }
+  revokeViewerPdfBlob();
   host.hidden = false;
   host.dataset.src = src;
   host.innerHTML = '<p class="decision-pdf-wait">Đang tải PDF…</p>';
   try {
-    const pdfjs = await loadPdfJs();
-    if (seq !== pdfPaintSeq) return;
-    const res = await fetch(src, { credentials: 'same-origin' });
-    if (!res.ok) throw new Error(`Không tải được PDF (${res.status})`);
-    const data = new Uint8Array(await res.arrayBuffer());
-    if (seq !== pdfPaintSeq) return;
-    const doc = await pdfjs.getDocument({ data }).promise;
+    let url = String(src || '').trim();
+    if (!url) throw new Error('Thiếu đường dẫn PDF.');
+    // Blob xem trước (chọn file) giữ nguyên; còn lại tải về blob cùng nguồn để iframe mở ổn định.
+    if (!/^blob:/i.test(url)) {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`Không tải được PDF (${res.status})`);
+      const buf = await res.arrayBuffer();
+      if (seq !== pdfPaintSeq) return;
+      viewerPdfBlob = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }));
+      url = viewerPdfBlob;
+    }
     if (seq !== pdfPaintSeq) return;
     host.innerHTML = '';
-    const widthOf = () => Math.max(120, Math.floor(host.clientWidth) || 0);
-    const slots = [];
-    for (let n = 1; n <= doc.numPages; n++) {
-      const slot = document.createElement('div');
-      slot.className = 'decision-pdf-slot';
-      slot.dataset.page = String(n);
-      slot.style.aspectRatio = '210 / 297';
-      host.appendChild(slot);
-      slots.push(slot);
-    }
-
-    const paintSlot = (slot) => {
-      if (!slot || seq !== pdfPaintSeq || slot.dataset.ready === '1') return;
-      slot.dataset.ready = '1';
-      renderPdfPage(doc, slot, Number(slot.dataset.page), widthOf()).catch(() => {
-        slot.dataset.ready = '';
-      });
-    };
-    // Chỉ vẽ trang 1 một lần — không blank/resize vẽ chồng (nguyên nhân xoay ngược).
-    paintSlot(slots[0]);
-
-    if (pdfIo) pdfIo.disconnect();
-    pdfIo = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting || seq !== pdfPaintSeq) return;
-        paintSlot(entry.target);
-      });
-    }, { root: host, rootMargin: '240px 0px' });
-    slots.forEach((slot) => pdfIo.observe(slot));
+    const frame = document.createElement('iframe');
+    frame.className = 'decision-pdf-frame';
+    frame.title = host.getAttribute('aria-label') || 'PDF';
+    frame.setAttribute('aria-label', frame.title);
+    frame.src = url;
+    host.appendChild(frame);
   } catch (err) {
     if (seq !== pdfPaintSeq) return;
     host.innerHTML = `<p class="decision-pdf-wait">${escapeMsg(err.message || 'Không xem được PDF trong khung.')}</p>`;
