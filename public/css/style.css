@@ -1940,19 +1940,40 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .decision-view iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; }
 .decision-view iframe[hidden] { display: none; }
 @media (max-width: 640px) { .decision-view { inset: 0; left: 0; width: auto; border-radius: 0; } }
-/* Ảnh công trình: cùng neo phải với PDF, không thanh tiêu đề / viền dày — chỉ ảnh + nút đóng. */
+/* Ảnh công trình: neo phải, khung ôm sát ảnh (không letterbox đen), chỉ ảnh + nút đóng. */
 .media-view {
-  position: fixed; top: 8px; right: 8px; bottom: 8px; left: auto;
-  width: min(210mm, calc(100vw - 16px));
-  z-index: 2800; display: flex; align-items: center; justify-content: center;
-  margin: 0; padding: 0; border: 0; border-radius: var(--r-md);
-  background: #0b1220; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  position: fixed;
+  top: 50%;
+  right: 8px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+  width: fit-content;
+  height: fit-content;
+  max-width: min(210mm, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  z-index: 2800;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--r-md);
+  background: transparent;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  line-height: 0;
 }
 .media-view[hidden] { display: none; }
 .media-view .media-img {
-  display: block; max-width: 100%; max-height: 100%; width: auto; height: auto;
-  object-fit: contain; margin: 0; border: 0; background: transparent;
+  display: block;
+  max-width: min(210mm, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  vertical-align: top;
+  background: transparent;
 }
 .media-view .media-close {
   position: absolute; top: 8px; right: 8px; z-index: 1;
@@ -1962,7 +1983,21 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   font: 700 18px/1 sans-serif; cursor: pointer;
 }
 .media-view .media-close:hover { background: rgba(15, 23, 42, 0.8); color: #fff; }
-@media (max-width: 640px) { .media-view { inset: 0; left: 0; width: auto; border-radius: 0; } }
+@media (max-width: 640px) {
+  .media-view {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: var(--r-md);
+  }
+  .media-view .media-img {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+}
 .project-expand .ico { transition: transform var(--ease); }
 .project-expand.open { color: var(--accent-cyan); }
 .project-expand.open .ico { transform: rotate(180deg); }

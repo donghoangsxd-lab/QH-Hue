@@ -382,6 +382,8 @@ assert.doesNotMatch(ctx, /window\.open\(streetViewUrl|window\.open\([^)]*pano/);
 assert.match(read('public/js/streetView.js'), /export function openStreetView/);
 assert.match(read('public/js/mediaViewer.js'), /export function openMedia/);
 assert.match(read('public/css/style.css'), /\.media-view\s*\{/);
+assert.match(read('public/css/style.css'), /\.media-view[\s\S]*?width:\s*fit-content/);
+assert.doesNotMatch(read('public/css/style.css'), /\.media-view\s*\{[^}]*background:\s*#0b1220/);
 assert.doesNotMatch(ctx, /Xem thông tin quy hoạch/);
 assert.match(read('public/js/cadastreLayer.js'), /pickPlanningLot/);
 assert.match(read('public/js/cadastreLayer.js'), /QHC 1\/25\.000/);

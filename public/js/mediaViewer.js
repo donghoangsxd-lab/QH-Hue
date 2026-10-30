@@ -1,4 +1,4 @@
-// Khung xem ảnh nội bộ bên phải (công trình kiến trúc). Chỉ ảnh + nút đóng; không thanh tiêu đề dày.
+// Khung xem ảnh nội bộ bên phải (công trình kiến trúc). Chỉ ảnh + nút đóng; khung ôm sát ảnh, không letterbox.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 
 let panelEl = null;
@@ -30,7 +30,7 @@ function ensurePanel() {
   panelEl.setAttribute('aria-label', 'Xem ảnh');
   panelEl.innerHTML = `
     <button type="button" class="media-close" title="Đóng" aria-label="Đóng">×</button>
-    <img class="media-img" alt="">`;
+    <img class="media-img" alt="" decoding="async">`;
   document.body.appendChild(panelEl);
   panelEl.querySelector('.media-close').addEventListener('click', closeMedia);
   return panelEl;
@@ -53,9 +53,10 @@ export function openMedia(url, title = '') {
   const img = el.querySelector('.media-img');
   const label = String(title || 'Ảnh công trình').trim();
   img.alt = label;
-  img.src = src;
   el.setAttribute('aria-label', label);
+  // Đổi src sau khi hiện khung để kích thước theo ảnh (tránh khung cao full màn hình).
   el.hidden = false;
+  if (img.getAttribute('src') !== src) img.src = src;
   announceFloat('media');
 }
 
