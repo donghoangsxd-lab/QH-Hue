@@ -1433,13 +1433,22 @@ function xahoiBuffersOn() {
   return !!document.querySelector('.btn-dot-buffer[aria-pressed="true"]');
 }
 
-/** Lớp catalog thuộc trục C (HTKT). Loại SDD / bind QHC·GT — đó là trục B, tránh chip C ảo lúc mở QHC. */
+/** Đã gắn GeoJSON lên bản đồ (showFile → drawn), không chỉ cờ visible / JSON đang fetch. */
+function isLayerDrawn(id) {
+  const groups = drawn.get(id);
+  return !!(groups && groups.length);
+}
+
+/**
+ * Lớp trục C (HTKT) đang hiện thật trên bản đồ.
+ * Bỏ: SDD/QHC không gian (trục B), mọi lớp bind (điều khiển bởi ô QHC/GT/lớp nền),
+ * lớp base, và cờ visible khi chưa addTo(map) — tránh chip C ảo lúc mở QHC 1/25.000.
+ */
 function isHatangLayerOn(l) {
-  if (!l || l.base || !isLayerOn(l.id)) return false;
+  if (!l || l.base || l.bind) return false;
   if (l.sector === 'sdd') return false;
-  if (l.bind && /^(chk_qhc|chk_gt)/.test(l.bind)) return false;
-  if (Array.isArray(l.axes) && l.axes.length) return l.axes.includes('hatang');
-  return true;
+  if (Array.isArray(l.axes) && l.axes.length && !l.axes.includes('hatang')) return false;
+  return isLayerDrawn(l.id);
 }
 
 function axisHasOpenLayers(axisId) {
@@ -1470,7 +1479,9 @@ function clearAxisLayers(axisId) {
     return;
   }
   if (axisId === 'hatang') {
-    getLayers().filter(isHatangLayerOn).forEach(l => setLayerOn(l, false));
+    // Tắt cả lớp đang vẽ và cờ visible còn sót (chưa kịp addTo).
+    getLayers().filter(l => !l.base && !l.bind && l.sector !== 'sdd' && (isLayerDrawn(l.id) || isLayerOn(l.id)))
+      .forEach(l => setLayerOn(l, false));
     publishSectorLegend(false);
     return;
   }

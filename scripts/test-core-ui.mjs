@@ -356,7 +356,8 @@ assert.match(title, /class="map-intro-line"/);
 assert.match(html, /id="axisForeignStrip"/);
 assert.match(html, /class="axis-foreign-strip"/);
 assert.match(read('public/js/chuyenNganh.js'), /paintForeignAxes|clearAxisLayers|axisHasOpenLayers/);
-assert.match(read('public/js/chuyenNganh.js'), /isHatangLayerOn|sector === 'sdd'/);
+assert.match(read('public/js/chuyenNganh.js'), /isHatangLayerOn|isLayerDrawn/);
+assert.match(read('public/js/chuyenNganh.js'), /function isHatangLayerOn[\s\S]*?return isLayerDrawn\(l\.id\)/);
 assert.match(read('public/js/projectLayer.js'), /anyPlanLayerOn|clearAllPlanLayers/);
 assert.match(
   read('public/js/projectLayer.js'),
