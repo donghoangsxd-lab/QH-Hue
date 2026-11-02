@@ -620,8 +620,9 @@ function schemeLots(parts, area) {
 export function parcelPlanHtml(res, recorded, opts = {}) {
   if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
   const w = planPlace(opts.place);
+  // compact (bảng loại đất): thửa, dự án đầu tư. measure giữ nhóm theo đồ án.
   const compact = opts.compact === true
-    || (opts.compact !== false && opts.place !== 'measure' && opts.place !== 'invest');
+    || (opts.compact !== false && opts.place !== 'measure');
   const title = opts.title || (compact ? 'Thông tin quy hoạch:' : `Quy hoạch ${w.on}`);
   const noneLabel = opts.noneLabel || 'Chưa có lô quy hoạch';
   const empty = opts.empty || `${w.it} chưa nằm trong lô quy hoạch của đồ án nào đã nhập.`;
@@ -652,7 +653,7 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
 export function parcelZonesHtml(res, recorded, opts) {
   const w = planPlace(opts.place);
   const compact = opts.compact === true
-    || (opts.compact !== false && opts.place !== 'measure' && opts.place !== 'invest');
+    || (opts.compact !== false && opts.place !== 'measure');
   const title = opts.title || (compact ? 'Thông tin quy hoạch:' : `Quy hoạch ${w.on}`);
   const covered = res.area - res.none.area;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');

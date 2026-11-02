@@ -35,19 +35,57 @@ const PICK = {
   fillColor: '#22d3ee', fillOpacity: 0.22, fillRule: 'nonzero', lineJoin: 'round'
 };
 const GROUP_STORE = 'qh_invest_groups';
+// Giọt nước cùng khung 70×96 với Noxh / HTXH; màu tươi theo lĩnh vực / nhóm tab.
+const DROP_PATH = 'M35 2C16.8 2 2 16.8 2 35c0 21 24 41 31 57a2.2 2.2 0 004 0c7-16 31-36 31-57C68 16.8 53.2 2 35 2z';
+// [re, icon, fill, edge]
 const SECTORS = [
-  [/y tế|bệnh viện/i, 'cross', '#f87171'],
-  [/giáo dục|đào tạo|trường học/i, 'book', '#60a5fa'],
-  [/nông nghiệp|trồng trọt/i, 'leaf', '#4ade80'],
-  [/năng lượng|điện|mặt trời/i, 'bolt', '#facc15'],
-  [/công nghiệp/i, 'factory', '#c4b5fd'],
-  [/công nghệ|thông tin/i, 'cpu', '#22d3ee'],
-  [/du lịch|nghỉ dưỡng/i, 'tour', '#fbbf24'],
-  [/thương mại|dịch vụ|chợ|cảng/i, 'shop', '#fb7185'],
-  [/văn h[oó]a|thể thao/i, 'flag', '#f472b6'],
-  [/hạ tầng|giao thông/i, 'road', '#94a3b8'],
-  [/bất động sản|đô thị|dân cư|nhà ở/i, 'home', '#38bdf8']
+  [/y tế|bệnh viện/i, 'cross', '#ef4444', '#991b1b'],
+  [/giáo dục|đào tạo|trường học/i, 'book', '#3b82f6', '#1e40af'],
+  [/nông nghiệp|trồng trọt/i, 'leaf', '#22c55e', '#166534'],
+  [/năng lượng|điện|mặt trời/i, 'bolt', '#f59e0b', '#b45309'],
+  [/công nghiệp/i, 'factory', '#a855f7', '#6b21a8'],
+  [/công nghệ|thông tin/i, 'cpu', '#06b6d4', '#0e7490'],
+  [/du lịch|nghỉ dưỡng/i, 'tour', '#f97316', '#c2410c'],
+  [/thương mại|dịch vụ|chợ|cảng/i, 'shop', '#ec4899', '#9d174d'],
+  [/văn h[oó]a|thể thao/i, 'flag', '#e11d48', '#9f1239'],
+  [/hạ tầng|giao thông/i, 'road', '#64748b', '#334155'],
+  [/bất động sản|đô thị|dân cư|nhà ở|chung cư/i, 'home', '#0ea5e9', '#0369a1']
 ];
+const GROUP_LOOK = {
+  dvtm: { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'DVTM' },
+  congnghiep: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Công nghiệp' },
+  nangluong: { icon: 'bolt', color: '#f59e0b', edge: '#b45309', label: 'Năng lượng' },
+  khudothi: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Đô thị' },
+  chungcu: { icon: 'home', color: '#2563eb', edge: '#1e3a8a', label: 'Chung cư' },
+  nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
+  vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'VHXH' },
+  khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' }
+};
+const DVTM_LOOK = {
+  sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
+  khachsan: { icon: 'tour', color: '#f59e0b', edge: '#b45309', label: 'Khách sạn' },
+  dulich: { icon: 'map', color: '#06b6d4', edge: '#0e7490', label: 'Khu du lịch' },
+  xang: { icon: 'bolt', color: '#ef4444', edge: '#991b1b', label: 'Xăng dầu' },
+  'dvtm-khac': { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'Thương mại dịch vụ' }
+};
+// Glyph trong vòng trắng (viewBox 24×24, đặt tâm giọt): nét màu fill của ngành.
+const DROP_GLYPH = {
+  cross: '<g fill="none" stroke="C" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.5v9M7.5 12h9"/></g>',
+  book: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 5h11v13H6.2A1.2 1.2 0 0 0 5 19.2z"/><path d="M5 19.2A1.2 1.2 0 0 0 6.2 20.5H16M8.5 8h6"/></g>',
+  leaf: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M6 18C6 10 10.5 6 19 5c-1 9-5.5 13.5-13 13z"/><path d="M6 18l7-7"/></g>',
+  bolt: '<path fill="C" stroke="E" stroke-width="1" stroke-linejoin="round" d="M13 2.5 5 13.5h6.2L10.2 21.5 19 10.2h-6.2z"/>',
+  factory: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M4 19.5V10l4.5 2.8V10L14 13.5V8h2l1.4 2.4H20v9.1z"/><path d="M16 8V5"/></g>',
+  cpu: '<g fill="none" stroke="C" stroke-width="1.8" stroke-linejoin="round"><rect x="7.5" y="7.5" width="9" height="9" rx="1.2"/><path d="M9.5 4.5v3M12 4.5v3M14.5 4.5v3M9.5 16.5v3M12 16.5v3M14.5 16.5v3M4.5 9.5h3M4.5 12h3M4.5 14.5h3M16.5 9.5h3M16.5 12h3M16.5 14.5h3"/></g>',
+  tour: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><rect x="4" y="9" width="16" height="10" rx="1.2"/><path d="M9 9V7.2A1.2 1.2 0 0 1 10.2 6h3.6A1.2 1.2 0 0 1 15 7.2V9M4 13.5h16"/></g>',
+  shop: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 10.5 6.8 5.5h10.4L19 10.5"/><path d="M5 10.5h14v8.5H5z"/><path d="M10 19v-4.5h4V19"/><path d="M5 10.5c1 1.1 2 1.1 3 0s2-1.1 3 0 2 1.1 3 0 2-1.1 3 0 1.9-1.1 2.9 0"/></g>',
+  flag: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20.5V5M6 5h10.5l-1.8 3.5 1.8 3.5H6"/></g>',
+  road: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M9 3.5 5.5 20.5M15 3.5l3.5 17"/><path d="M12 5v2.5M12 11v2.5M12 17v2"/></g>',
+  home: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 12 12 5.5 19 12"/><path d="M7 10.8V19h10v-8.2"/><path d="M10.2 19v-4.2h3.6V19"/></g>',
+  terrain: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="m3.5 19 6.2-10.5 3.6 5.6 2.2-3L20.5 19z"/></g>',
+  map: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M9.5 4.5 4 6.2v13.3l5.5-1.8 5.5 1.8 5.5-1.8V4.5l-5.5 1.8z"/><path d="M9.5 4.5v13.2M15 6.3v13.2"/></g>',
+  layers: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="m12 4-8.5 4.5L12 13l8.5-4.5z"/><path d="m3.5 13 8.5 4.5 8.5-4.5"/><path d="m3.5 16.8 8.5 4.2 8.5-4.2"/></g>',
+  pin: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M12 20.5s-6-5.2-6-9.5a6 6 0 0 1 12 0c0 4.3-6 9.5-6 9.5z"/><circle cx="12" cy="11" r="2.2"/></g>'
+};
 const MAGENTA = '#ff00ff';
 const BASE = {
   color: MAGENTA, weight: 2.4, opacity: 1, dashArray: '8 5',
@@ -261,12 +299,37 @@ function featureKey(feature) {
   return `${name}|${Number(pt[0]).toFixed(5)},${Number(pt[1]).toFixed(5)}`;
 }
 
-function sectorOf(text) {
+function lookOf(icon, color, edge, label) {
+  return { icon, color, edge, label: label || 'Dự án' };
+}
+
+function sectorOf(text, groupId, dvtmSub) {
   const label = String(text || '').replace(/\s+/g, ' ').trim().replace(/^lĩnh vực\s+/i, '');
-  for (const [re, icon, color] of SECTORS) {
-    if (re.test(label)) return { icon, color, label: label || 'Dự án' };
+  for (const [re, icon, color, edge] of SECTORS) {
+    if (re.test(label)) return lookOf(icon, color, edge, label || 'Dự án');
   }
-  return { icon: 'layers', color: '#e2e8f0', label: label || 'Dự án' };
+  if (groupId === 'dvtm' && DVTM_LOOK[dvtmSub]) {
+    const d = DVTM_LOOK[dvtmSub];
+    return lookOf(d.icon, d.color, d.edge, label || d.label);
+  }
+  if (GROUP_LOOK[groupId]) {
+    const g = GROUP_LOOK[groupId];
+    return lookOf(g.icon, g.color, g.edge, label || g.label);
+  }
+  return lookOf('layers', '#64748b', '#334155', label || 'Dự án');
+}
+
+/** Giọt nước SVG: thân màu ngành, vòng trắng + glyph (cùng mô típ Noxh / HTXH). */
+function sectorDropSvg(sector) {
+  const fill = sector?.color || '#64748b';
+  const edge = sector?.edge || '#334155';
+  const raw = DROP_GLYPH[sector?.icon] || DROP_GLYPH.layers;
+  const glyph = raw.replaceAll('C', fill).replaceAll('E', edge);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 96" class="invest-drop" aria-hidden="true">
+    <path d="${DROP_PATH}" fill="${fill}" stroke="${edge}" stroke-width="1.5"/>
+    <circle cx="35" cy="35" r="26" fill="#fff"/>
+    <g transform="translate(23 23)">${glyph}</g>
+  </svg>`;
 }
 
 function entry(row, re) {
@@ -376,7 +439,6 @@ function projectList(features) {
       geom,
       pin,
       sheet,
-      sector: sectorOf(sectorText),
       matched: !!sheet,
       hasBoundary: !!geom,
       sheetOnly: !!feature.properties?._sheetOnly,
@@ -386,6 +448,7 @@ function projectList(features) {
     });
     const last = out[out.length - 1];
     last.dvtmSub = rowDvtmSub(sheet, title, last.dtGroup);
+    last.sector = sectorOf(sectorText, last.dtGroup, last.dvtmSub);
   });
   sheetOnly.forEach(p => {
     if (p.sheet && matchedRows.has(p.sheet)) return;
@@ -576,7 +639,8 @@ function statHtml(label, value, icon, wide) {
 function overviewHtml(st, props) {
   const row = props.sheet;
   const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
-  const sector = sectorOf(sectorText);
+  const groupId = st.dtGroup || rowGroupId(row, titleOf(props));
+  const sector = sectorOf(sectorText, groupId, st.dvtmSub || rowDvtmSub(row, titleOf(props), groupId));
   const goal = entry(row, /mục tiêu/i);
   const place = entry(row, /địa điểm/i);
   const priority = entry(row, /ưu tiên/i);
@@ -599,9 +663,9 @@ function overviewHtml(st, props) {
     : '';
   const groupName = investGroupLabel(st.dtGroup || rowGroupId(row, titleOf(props)));
   return `<div class="invest-head">
-      <span class="invest-badge" style="color:${sector.color}">${ico(sector.icon)}</span>
+      <span class="invest-badge">${sectorDropSvg(sector)}</span>
       <div class="invest-head-main">
-        <div class="invest-kicker"><b>${escapeHtml(sector.label)}</b><span class="invest-pieces">${escapeHtml(groupName)}</span>${pieces}${chip}</div>
+        <div class="invest-kicker"><b style="color:${sector.color}">${escapeHtml(sector.label)}</b><span class="invest-pieces">${escapeHtml(groupName)}</span>${pieces}${chip}</div>
         <div class="lp-title">${escapeHtml(titleOf(props))}</div>
       </div>
     </div>
@@ -780,7 +844,6 @@ function rebuildSheetOnly(features, rows) {
       geom: null,
       pin,
       sheet: row,
-      sector: sectorOf(entry(row, /lĩnh vực/i)),
       matched: true,
       hasBoundary: false,
       sheetOnly: true,
@@ -790,6 +853,7 @@ function rebuildSheetOnly(features, rows) {
     });
     const last = sheetOnly[sheetOnly.length - 1];
     last.dvtmSub = rowDvtmSub(row, title, last.dtGroup);
+    last.sector = sectorOf(entry(row, /lĩnh vực/i), last.dtGroup, last.dvtmSub);
   });
 }
 
@@ -875,12 +939,12 @@ function openFromMark(feature, layer, host, e) {
   openCard(feature, layer, host);
 }
 
-function sectorMarker(sector, unmatched) {
+function sectorMarker(sector) {
   return L.divIcon({
     className: 'invest-pin',
-    html: `<div class="invest-mark" style="color:${sector.color};--c:${sector.color}">${ico(sector.icon)}</div>`,
-    iconSize: [26, 26],
-    iconAnchor: unmatched ? [13, 36] : [13, 13]
+    html: sectorDropSvg(sector),
+    iconSize: [26, 36],
+    iconAnchor: [13, 36]
   });
 }
 
@@ -936,9 +1000,9 @@ function drawOn(m, features) {
         pane: MARK_PANE,
         keyboard: false,
         zIndexOffset: 140,
-        icon: sectorMarker(p.sector, true)
+        icon: sectorMarker(p.sector)
       });
-      mark.bindTooltip(`${p.sector.label} · ${p.title} · chưa có ranh`, { className: 'invest-tip', direction: 'top', offset: [0, -28] });
+      mark.bindTooltip(`${p.sector.label} · ${p.title} · chưa có ranh`, { className: 'invest-tip', direction: 'top', offset: [0, -36] });
       mark.on('click', (e) => openFromMark(p.feature, layer || mark, m, e));
       mark.addTo(group);
       return;
@@ -959,9 +1023,9 @@ function drawOn(m, features) {
       pane: MARK_PANE,
       keyboard: false,
       zIndexOffset: p.matched ? 120 : 160,
-      icon: sectorMarker(p.sector, !p.matched)
+      icon: sectorMarker(p.sector)
     });
-    mark.bindTooltip(`${p.sector.label} · ${p.title}`, { className: 'invest-tip', direction: 'top', offset: [0, p.matched ? -8 : -28] });
+    mark.bindTooltip(`${p.sector.label} · ${p.title}`, { className: 'invest-tip', direction: 'top', offset: [0, -36] });
     mark.on('click', (e) => openFromMark(p.feature, layer, m, e));
     mark.addTo(group);
   });
@@ -1185,10 +1249,11 @@ function planPage(id, geometry, recorded) {
   if (id === 'qhct') return parcelQhctHtml(geometry, recorded, 'invest');
   return analyzeParcelPlan(geometry, { level: 'QHPK', includeHidden: true }).then(res => ({
     html: parcelPlanHtml(res, recorded, {
-      title: `QHPK 1/2.000 ${w.on}`,
+      title: 'Thông tin quy hoạch:',
       noneLabel: 'Đất khác',
       empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
       place: 'invest',
+      compact: true,
       note: qhpkNote()
     }),
     shapes: res.shapes
@@ -1223,7 +1288,10 @@ async function showTab(id, { syncMap = true } = {}) {
   if (!st || !isPlanLevel(id)) return;
   const seq = st.seq;
   st.tab = id;
-  if (syncMap) applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom);
+  // Giống thửa/vùng đo: hiện lô cắt ranh, không mở brief chỉ tên đồ án.
+  if (syncMap) {
+    applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom, { skipProjects: true });
+  }
   const el = $('investCard');
   const page = el?.querySelector('.cad-page');
   if (!page) return;

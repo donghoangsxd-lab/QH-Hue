@@ -1151,7 +1151,7 @@ async function parcelVisionHtml(geometry, recorded, place) {
       title: 'Thông tin quy hoạch:', unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
       empty: `${w.it} nằm ngoài các vùng của sơ đồ tổ chức không gian 1/25.000.`, partsHead: 'Vùng chức năng và định hướng',
       place,
-      compact: place !== 'measure' && place !== 'invest',
+      compact: place !== 'measure',
       note: `${QHC2045.short} · Sơ đồ tổ chức không gian 1/25.000 · ${QHC2045.status}. Đối chiếu cả khi lớp đang tắt.`
     }),
     shapes: res.shapes
@@ -1209,7 +1209,7 @@ async function parcelLandHtml(geometry, recorded, place) {
       empty,
       extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
       place,
-      compact: place !== 'measure' && place !== 'invest',
+      compact: place !== 'measure',
       note: `Mọi đồ án QHC 1/10.000 đã nhập và lô vùng lõi ${QHC2045.short}. Đồ án phạm vi nhỏ hơn được ưu tiên; phần còn lại lấy lô vùng lõi. Gồm mọi giai đoạn, kể cả khi lớp đang tắt.`
     }),
     shapes: res.shapes

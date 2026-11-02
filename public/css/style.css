@@ -4603,11 +4603,13 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
 .invest-head { display: flex; gap: 8px; align-items: flex-start; min-width: 0; padding-right: 46px; }
 .invest-badge {
-  flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-  border-radius: 10px; color: var(--accent-cyan); background: rgba(15, 23, 42, 0.72);
-  border: 1px solid currentColor;
+  flex: none; width: 28px; height: 38px; display: flex; align-items: flex-start; justify-content: center;
+  padding: 0; background: transparent; border: 0;
 }
-.invest-badge .ico { width: 18px; height: 18px; margin: 0; }
+.invest-badge .invest-drop {
+  width: 28px; height: 38px; display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
 .invest-head-main { min-width: 0; flex: 1; }
 .invest-kicker {
   display: flex; align-items: center; gap: 6px; min-width: 0;
@@ -4674,12 +4676,11 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container .leaflet-invest-pane path.leaflet-interactive:focus,
 .leaflet-container .leaflet-investHighlight-pane path:focus,
 .leaflet-marker-icon.invest-pin:focus { outline: none; }
-.invest-mark {
-  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; color: #fff; background: rgba(15, 23, 42, 0.9);
-  border: 1.5px solid var(--c, #fff); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); cursor: pointer;
+.invest-pin .invest-drop {
+  display: block; width: 26px; height: 36px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  cursor: pointer;
 }
-.invest-mark .ico { width: 14px; height: 14px; margin: 0; }
 .invest-dot {
   width: 12px; height: 12px; border-radius: 50%; background: #ef4444; border: 2px solid #fff;
   box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); cursor: pointer; animation: invest-dot 1.8s ease-out infinite;

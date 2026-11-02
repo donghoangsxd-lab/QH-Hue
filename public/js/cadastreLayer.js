@@ -758,7 +758,7 @@ function planPage(id, geometry, recorded, place) {
         empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
         place,
         note,
-        compact: place !== 'measure' && place !== 'invest'
+        compact: place !== 'measure'
       }),
       shapes: res.shapes
     };
