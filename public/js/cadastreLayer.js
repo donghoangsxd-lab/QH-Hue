@@ -54,6 +54,12 @@ const HL_PANE = 'cadastreHighlightPane';
 const HL_PANE_Z = 630;
 const HIGHLIGHT_HALO = { color: '#111827', weight: 7, opacity: 0.55, fill: false };
 const HIGHLIGHT = { color: '#fde047', weight: 3.5, opacity: 1, fill: false };
+// Thành phần đất khi bấm dòng bảng QH: cùng hiệu ứng ranh TP (quầng vàng + nét trắng).
+const LAND_GLOW = { color: '#facc15', weight: 11, opacity: 0.45, fill: false, lineJoin: 'round' };
+const landEdgeStyle = (color) => ({
+  color: '#ffffff', weight: 2.4, opacity: 1, dashArray: null,
+  fillColor: color || '#94a3b8', fillOpacity: 0.38, fillRule: 'nonzero', lineJoin: 'round'
+});
 
 // Nhóm loại đất (mã theo Thông tư 28/2014/TT-BTNMT, Phụ lục 01) cho dòng phụ popup; thửa nhiều mục đích lấy mã đầu
 const GROUPS = [
@@ -763,15 +769,14 @@ function paintLand(geoms, color) {
   const m = cardState?.map;
   if (!m || !geoms?.length) return;
   if (!m.getPane(HL_PANE)) return;
-  landFill = L.geoJSON({
+  const fc = {
     type: 'FeatureCollection',
     features: geoms.map(geometry => ({ type: 'Feature', properties: {}, geometry }))
-  }, {
-    pane: HL_PANE,
-    interactive: false,
-    style: { color: '#111827', weight: 2, opacity: 1, fillColor: color || '#94a3b8', fillOpacity: 0.62 }
-  }).addTo(m);
-  const bounds = landFill.getBounds?.();
+  };
+  const glow = L.geoJSON(fc, { pane: HL_PANE, interactive: false, style: LAND_GLOW });
+  const edge = L.geoJSON(fc, { pane: HL_PANE, interactive: false, style: landEdgeStyle(color) });
+  landFill = L.layerGroup([glow, edge]).addTo(m);
+  const bounds = glow.getBounds?.();
   if (bounds?.isValid?.()) frameParcel(m, bounds);
 }
 

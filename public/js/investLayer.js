@@ -57,6 +57,12 @@ const HOVER = { ...BASE, weight: 2.8, fillOpacity: 0.24 };
 // Viền chọn rõ như thửa đất: quầng tối + nét vàng đặc (không trùng nét đứt magenta của lớp nền).
 const HALO = { color: '#111827', weight: 8, opacity: 0.75, fill: false, lineJoin: 'round' };
 const LINE = { color: '#fde047', weight: 3.5, opacity: 1, fill: false, dashArray: null, lineJoin: 'round' };
+// Thành phần đất khi bấm dòng bảng QH: cùng hiệu ứng ranh TP (quầng vàng + nét trắng).
+const LAND_GLOW = { color: '#facc15', weight: 11, opacity: 0.45, fill: false, lineJoin: 'round' };
+const landEdgeStyle = (color) => ({
+  color: '#ffffff', weight: 2.4, opacity: 1, dashArray: null,
+  fillColor: color || '#94a3b8', fillOpacity: 0.38, fillRule: 'nonzero', lineJoin: 'round'
+});
 const SELECTED = {
   color: '#fde047', weight: 3, opacity: 1, dashArray: null,
   fillColor: '#fde047', fillOpacity: 0.22, fillRule: 'nonzero', lineJoin: 'round'
@@ -977,20 +983,9 @@ function paintLand(geoms, color) {
     type: 'FeatureCollection',
     features: geoms.map(geometry => ({ type: 'Feature', properties: {}, geometry }))
   };
-  const stroke = color || '#fde047';
-  // Quầng tối + viền sáng: dễ thấy ranh lô đang chọn trong ranh dự án.
   landFill = L.layerGroup([
-    L.geoJSON(fc, {
-      pane: HL_PANE, interactive: false, keyboard: false,
-      style: { color: '#111827', weight: 9, opacity: 0.8, fill: false, lineJoin: 'round' }
-    }),
-    L.geoJSON(fc, {
-      pane: HL_PANE, interactive: false, keyboard: false,
-      style: {
-        color: stroke, weight: 3.5, opacity: 1, dashArray: null,
-        fillColor: stroke, fillOpacity: 0.32, fillRule: 'nonzero', lineJoin: 'round'
-      }
-    })
+    L.geoJSON(fc, { pane: HL_PANE, interactive: false, keyboard: false, style: LAND_GLOW }),
+    L.geoJSON(fc, { pane: HL_PANE, interactive: false, keyboard: false, style: landEdgeStyle(color) })
   ]).addTo(host);
 }
 
