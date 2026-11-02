@@ -21,12 +21,13 @@ export const QHC2045 = {
   }
 };
 
-/** Thông tin đồ án QHC 1/10.000 khu vực đô thị trung tâm (khác chỉ tiêu QĐ 108 của lớp 1/25.000). */
+/** Quy mô QHC 1/10.000 khu vực đô thị trung tâm (khác chỉ tiêu QĐ 108 của lớp 1/25.000). */
 export const QHC10_CENTER_BRIEF = {
   title: 'Quy hoạch chung 1/10.000 khu vực đô thị trung tâm',
-  phamVi: 'Được phát triển mở rộng trên nền tảng thành phố Huế (khớp nối đồng bộ khu đô thị mới An Vân Dương) và thị xã Hương Thuỷ, thị xã Hương Trà hiện hữu;',
-  quyMo: 'Diện tích khoảng 108.650 ha; dân số đến năm 2030 khoảng 850 nghìn người, đến năm 2045 khoảng 1.010 nghìn người;',
-  tinhChat: 'Là trung tâm di sản văn hóa thế giới với quần thể di tích cố đô Huế; trung tâm tổ chức Festival, dịch vụ, du lịch, thương mại, tài chính, y tế, giáo dục, khoa học - công nghệ cấp quốc gia và mang tầm quốc tế; trung tâm hành chính - chính trị toàn đô thị gắn với phát triển công nghiệp, tiểu thủ công nghiệp, vận tải, logistics; là khu vực đô thị hiện hữu mở rộng, trong đó đô thị Hương Trà, Hương Thủy được phát triển thành các quận phục vụ bảo tồn, phát huy giá trị đặc sắc cố đô và di sản văn hóa vật thể, phi vật thể đã được Tổ chức Giáo dục, Khoa học và Văn hóa của Liên hợp quốc (UNESCO) công nhận;'
+  dienTich: 'Diện tích khoảng 108.650 ha.',
+  danSoLabel: 'Dân số:',
+  danSo2030: 'Đến năm 2030 khoảng 850 nghìn người;',
+  danSo2045: 'Đến năm 2045 khoảng 1.010 nghìn người.'
 };
 
 /** Lớp tĩnh QHC đô thị (1/25.000 + 1/10.000 trung tâm): không phải đồ án nhập trong catalog. */

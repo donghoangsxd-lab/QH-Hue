@@ -770,7 +770,7 @@ function qhpkAt(lng, lat) {
 
 /**
  * Brief khi bấm lô/vùng lớp tĩnh QHC đô thị:
- * 1/25.000 → chỉ tiêu QĐ 108; 1/10.000 trung tâm → Phạm vi / Quy mô / Tính chất (không đổi cấp bản đồ).
+ * 1/25.000 → chỉ tiêu QĐ 108; 1/10.000 trung tâm → quy mô (không đổi cấp bản đồ).
  */
 function syncQhcCityBrief(opts) {
   if (opts?.hideProject) return;
@@ -1381,7 +1381,7 @@ function initQhcRows() {
     }
     ensurePlanView();
     fitCenter();
-    // Brief Phạm vi / Quy mô / Tính chất 1/10.000 + bảng cơ cấu đất trung tâm ở panel dưới.
+    // Brief quy mô 1/10.000 + bảng cơ cấu đất trung tâm ở panel dưới.
     syncQhcCityBrief();
     document.dispatchEvent(new Event(QHC_CENTER_INFO_EVENT));
   });

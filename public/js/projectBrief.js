@@ -222,21 +222,20 @@ function popRows(pop) {
     </div>`;
 }
 
-/** Brief QHC 1/10.000 trung tâm: Phạm vi / Quy mô / Tính chất (khác bảng chỉ tiêu QĐ 108 của 1/25.000). */
+/** Brief QHC 1/10.000 trung tâm: chỉ quy mô (diện tích + dân số 2030/2045). */
 function qhc10CenterBriefHtml() {
   const b = QHC10_CENTER_BRIEF;
   return `<div class="qhc25-scale-card qhc10-brief-card">
     <h4 class="qhc25-scale-title">${escapeHtml(b.title)}</h4>
-    <h5 class="qhc25-scale-h">Phạm vi</h5>
-    <p class="qhc25-scale-note">${escapeHtml(b.phamVi)}</p>
     <h5 class="qhc25-scale-h">Quy mô</h5>
-    <p class="qhc25-scale-note">${escapeHtml(b.quyMo)}</p>
-    <h5 class="qhc25-scale-h">Tính chất</h5>
-    <p class="qhc25-scale-note">${escapeHtml(b.tinhChat)}</p>
+    <p class="qhc25-scale-note">${escapeHtml(b.dienTich)}</p>
+    <p class="qhc25-scale-note">${escapeHtml(b.danSoLabel)}</p>
+    <p class="qhc25-scale-note">- ${escapeHtml(b.danSo2030)}</p>
+    <p class="qhc25-scale-note">- ${escapeHtml(b.danSo2045)}</p>
   </div>`;
 }
 
-/** Brief đồ án QHC đô thị: 1/25.000 = chỉ tiêu QĐ 108; 1/10.000 trung tâm = Phạm vi / Quy mô / Tính chất. */
+/** Brief đồ án QHC đô thị: 1/25.000 = chỉ tiêu QĐ 108; 1/10.000 trung tâm = quy mô. */
 function renderQhcCity(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
@@ -359,7 +358,7 @@ async function show(name) {
   if (!project) { hide(); return; }
   const token = ++seq;
   openName = project;
-  // QHC đô thị tĩnh: brief theo cấp đang xem (1/25.000 = QĐ 108; 1/10.000 = Phạm vi / Quy mô / Tính chất).
+  // QHC đô thị tĩnh: brief theo cấp đang xem (1/25.000 = QĐ 108; 1/10.000 = quy mô).
   if (isQhcStaticName(project)) {
     openName = QHC2045.short;
     const scale = getLevel() === 'qhc10' ? '10' : '25';
