@@ -21,6 +21,14 @@ export const QHC2045 = {
   }
 };
 
+/** Lớp tĩnh QHC đô thị (1/25.000 + 1/10.000 trung tâm): không phải đồ án nhập trong catalog. */
+export function isQhcStaticName(name) {
+  const n = String(name || '').trim();
+  if (!n) return false;
+  if (n === QHC2045.short || n === QHC2045.name) return true;
+  return /qhc đô thị TT\s*Huế 2045/i.test(n) || /qhc đô thị Thừa Thiên Huế/i.test(n);
+}
+
 // Đô thị trung tâm: bấm vào đây ở màn hình toàn thành phố thì mở QHC 1/10.000 thay vì chọn phường
 const CENTER_IDS = ['trung-tam', 'hoa-chau', 'my-thuong'];
 export const CENTER_AREAS = CORE_AREAS.filter(a => CENTER_IDS.includes(a.id));

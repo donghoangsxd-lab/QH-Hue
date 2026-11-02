@@ -197,6 +197,27 @@ function nonePieces(rest) {
     return [];
   }
 }
+
+/** Gắn pickKey từng phần + shapes.byLot để bấm dòng lô tô đúng một ranh (không gộp theo loại đất). */
+function attachLotPicks(res) {
+  if (!res) return res;
+  const byLot = {};
+  (res.parts || []).forEach((p, i) => {
+    const id = `lot:${i}`;
+    p.pickKey = id;
+    if (p.geom) pushGeom(byLot, id, p.geom);
+  });
+  res.shapes = res.shapes || { byLabel: {}, none: [] };
+  res.shapes.byLot = byLot;
+  return res;
+}
+
+/** Lấy hình học tô bản đồ theo khóa dòng (lô riêng) hoặc loại đất / phần trống. */
+export function landGeomsOf(shapes, key) {
+  if (!shapes || !key) return [];
+  if (key === '__none') return shapes.none || [];
+  return shapes.byLot?.[key] || shapes.byLabel?.[key] || [];
+}
 const toFeature = (polys) => {
   const ps = polys.map(p => p.map(closeRing)).filter(p => p[0] && p[0].length >= 4);
   return ps.length === 1 ? turf.polygon(ps[0]) : turf.multiPolygon(ps);
@@ -252,7 +273,7 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
     console.warn('Cắt hình thửa với lô QH lỗi, chuyển sang lấy mẫu lưới:', err);
     if (opts.level || extras.length) throw err;
     const res = await analyzePlanLand(closeRing(polys[0][0]));
-    return { ...res, exact: false, parts: [], shapes: { byLabel: {}, none: [] } };
+    return { ...res, exact: false, parts: [], shapes: { byLabel: {}, byLot: {}, none: [] } };
   }
 
   const files = new Set();
@@ -289,7 +310,7 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
   });
   const covered = parts.reduce((s, p) => s + p.area, 0);
   const none = Math.max(0, area - covered);
-  return {
+  return attachLotPicks({
     area,
     rows: [...rows.values()].map(r => ({ ...r, pct: (r.area / area) * 100 })).sort((a, b) => b.area - a.area),
     none: { area: none, pct: (none / area) * 100 },
@@ -298,7 +319,7 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
     exact: true,
     parts: detail.sort((a, b) => b.area - a.area),
     shapes: { byLabel, none: nonePieces(rest) }
-  };
+  });
 }
 
 /**
@@ -325,7 +346,7 @@ export function analyzeParcelZones(geometry, features, classify) {
     const a = inter ? turf.area(inter) : 0;
     if (a < SLIVER_M2) continue;
     const info = classify(features[i]);
-    parts.push({ ...info, area: a, pct: (a / area) * 100 });
+    parts.push({ ...info, area: a, pct: (a / area) * 100, geom: inter });
     pushGeom(byLabel, info.label, inter);
     rest = turf.difference(rest, shape);
   }
@@ -336,13 +357,13 @@ export function analyzeParcelZones(geometry, features, classify) {
     row.lots++;
   });
   const none = Math.max(0, area - parts.reduce((s, p) => s + p.area, 0));
-  return {
+  return attachLotPicks({
     area,
     rows: [...rows.values()].map(r => ({ ...r, pct: (r.area / area) * 100 })).sort((a, b) => b.area - a.area),
     none: { area: none, pct: (none / area) * 100 },
     parts: parts.sort((a, b) => b.area - a.area),
     shapes: { byLabel, none: nonePieces(rest) }
-  };
+  });
 }
 
 const fmtArea = (m2) => (m2 >= 10000 ? `${fmtNum(m2 / 10000)} ha` : `${fmtNum(Math.round(m2))} m²`);
@@ -531,8 +552,10 @@ function lotBlock(p, scheme) {
   const own = p.sub || '';
   const tag = scheme && !own.includes(scheme) ? scheme : '';
   const sub = [own, p.label && p.label !== p.name ? p.label : '', tag].filter(Boolean).join(' · ');
-  return `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
-      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
+  const pick = p.pickKey || p.label;
+  const title = escapeHtml(p.name || p.label);
+  return `<div class="pls-lot" data-land="${escapeHtml(pick)}" data-color="${escapeHtml(p.color || '')}" title="${title} · bấm để tô sáng ranh lô trên bản đồ">
+      <div class="pls-lot-head"><b class="pls-lot-name">${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
       ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
       ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
       ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
@@ -565,8 +588,9 @@ function planLotsTable(parts, totalArea) {
   const body = list.map((p) => {
     const plan = p.lot && p.lot.plan;
     const pct = p.pct;
-    return `<tr class="pls-tr" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))}">
-      <td class="pls-type">${landMarksHtml(p.color, p.key)}<span>${escapeHtml(p.label)}</span></td>
+    const pick = p.pickKey || p.label;
+    return `<tr class="pls-tr" data-land="${escapeHtml(pick)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))} · bấm để tô sáng ranh lô">
+      <td class="pls-type">${landMarksHtml(p.color, p.key)}<span class="pls-lot-name">${escapeHtml(p.label)}</span></td>
       <td class="pls-num">${fmtM2(p.area)}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'floors'))}</td>

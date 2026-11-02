@@ -31,6 +31,7 @@ import {
 } from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
 import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, setPreferPlace, QHC_CORE_EVENT } from './qhc2045Layer.js';
+import { isQhcStaticName } from './qhc2045.js';
 import { getLevel, setLevel, withLevelLock, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 import { browseState } from './facetStore.js';
@@ -278,6 +279,8 @@ function onWardSelected(name) {
 const RETURN_LEVELS = new Set(['qhc10', 'urban']);
 const KIND_LEVEL = { QHC: 'qhc10', QHCT: 'qhct' };
 function onProjectOpened(e) {
+  // Brief lớp tĩnh QHC đô thị (1/25.000 hoặc 1/10.000): cùng đồ án, không đổi cấp bản đồ.
+  if (isQhcStaticName(e?.detail)) { syncEscHint(); return; }
   const level = getLevel();
   const kind = planLevelOf(e?.detail);
   if (level === 'qhpk' && kind === 'QHPK') { /* giữ lớp */ }

@@ -9,7 +9,7 @@ import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './project
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
 import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
-import { QHC2045, QHC_CENTER_INFO_EVENT } from './qhc2045.js';
+import { QHC2045, QHC_CENTER_INFO_EVENT, isQhcStaticName } from './qhc2045.js';
 import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
@@ -328,13 +328,6 @@ async function showStack(peers) {
   await Promise.all(cards.map(card => fillCover(card, token)));
   if (token !== seq) return;
   renderStack(cards);
-}
-
-function isQhcStaticName(name) {
-  const n = String(name || '').trim();
-  if (!n) return false;
-  if (n === QHC2045.short || n === QHC2045.name) return true;
-  return /qhc đô thị TT\s*Huế 2045/i.test(n) || /qhc đô thị Thừa Thiên Huế/i.test(n);
 }
 
 async function show(name) {

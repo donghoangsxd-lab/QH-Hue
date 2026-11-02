@@ -21,7 +21,7 @@ import {
 import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { adjustmentPacks } from './adjustLayer.js';
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
-import { QHC2045, QHC_CENTER_INFO_EVENT, landOf } from './qhc2045.js';
+import { QHC2045, QHC_CENTER_INFO_EVENT, isQhcStaticName, landOf } from './qhc2045.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { watchTiles } from './loadProgress.js';
 import { geeTileLayer } from './geeTiles.js';
@@ -1831,6 +1831,8 @@ async function openQhcCenterInfo() {
 // Thông tin đồ án đã lưu: mở dạng gọn trong panel dưới (giữ kiểu xem bản đồ đang dùng, không tự chia đôi)
 export async function openProjectInfo(project) {
   if (!project) return;
+  // QHC đô thị tĩnh: lô ở sdd.json, mở qua QHC_CENTER_INFO_EVENT (nút bảng), không qua catalog.
+  if (isQhcStaticName(project)) return;
   if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
   const seq = ++infoSeq;
   if (!cachedLots(project).length) showToast(`Đang tải lô đất «${project}»…`);

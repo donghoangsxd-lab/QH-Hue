@@ -1528,9 +1528,7 @@ body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
   bottom: auto !important;
   width: 100% !important;
   max-width: none !important;
-  max-height: none !important;
   height: auto;
-  flex: 1 1 auto;
   align-self: stretch;
   min-width: 0;
   min-height: 0;
@@ -1543,8 +1541,19 @@ body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
   z-index: auto;
   overflow: hidden;
 }
-body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
+/* Thửa: kéo full slot (nhiều trang). Thẻ lô QHPK/QHCT/QHC: cao theo nội dung, không để trống dưới. */
+body.plan-info-open #planInfoSlot > .cad-card {
+  max-height: none !important;
   flex: 1 1 auto;
+}
+body.plan-info-open #planInfoSlot > .leaflet-popup.dock-card {
+  max-height: 100%;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
+  flex: 0 1 auto;
   min-height: 0;
   width: 100% !important;
   display: flex;
@@ -1554,11 +1563,19 @@ body.plan-info-open #planInfoSlot .leaflet-popup-content-wrapper {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
-body.plan-info-open #planInfoSlot .cad-page,
-body.plan-info-open #planInfoSlot .leaflet-popup-content {
+body.plan-info-open #planInfoSlot .cad-page {
   max-height: none !important;
   width: auto !important;
   flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+body.plan-info-open #planInfoSlot .leaflet-popup-content {
+  max-height: none !important;
+  height: auto !important;
+  width: auto !important;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -4855,6 +4872,18 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .cad-page .pls-lots { max-height: none; gap: 2px; }
 .cad-page .pls-lot { padding: 2px 4px; cursor: pointer; }
 .cad-page .pls-lot.is-on { border-color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.16); }
+.cad-page .pls-lot-name,
+.invest-card .pls-lot-name {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--cyan-rgb), 0.45);
+  text-underline-offset: 2px;
+}
+.cad-page .pls-lot:hover .pls-lot-name,
+.invest-card .pls-lot:hover .pls-lot-name,
+.pls-table tr.pls-tr:hover .pls-lot-name {
+  text-decoration-color: var(--accent-cyan);
+}
 .cad-busy { padding: 6px 2px; color: var(--text-muted); font-size: var(--fs-sm); }
 .pls-pie-host {
   display: grid;

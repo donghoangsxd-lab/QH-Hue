@@ -17,7 +17,7 @@ import { MAP_MAX_ZOOM } from './basemap.js';
 import { planMap, getViewMode, isSplitOn, setViewMode } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
-import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
+import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies, landGeomsOf } from './planLandStats.js';
 import { parcelQhcHtml, qhcFeatureAt, showQhcFeature } from './qhc2045Layer.js';
 import { parcelQhctHtml, qhctFeatureAt, showQhctLot } from './qhctLayer.js';
 import { annotateCompliance } from './planCompliance.js';
@@ -793,7 +793,7 @@ function toggleLand(key, color) {
   if (st.landKey === key) { clearLandFill(); return; }
   clearLandFill();
   const pack = st.cache.get(st.tab)?.shapes;
-  const geoms = key === '__none' ? pack?.none : pack?.byLabel?.[key];
+  const geoms = landGeomsOf(pack, key);
   if (!geoms?.length) return;
   paintLand(geoms, color);
   st.landKey = key;

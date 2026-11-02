@@ -17,7 +17,7 @@ import {
 } from './investClassify.js';
 import { readDrawingFile } from './drawingReaders.js';
 import { countApartments } from './apartmentLayer.js';
-import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
+import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies, landGeomsOf } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
@@ -973,14 +973,25 @@ function paintLand(geoms, color) {
   const host = card?.map;
   if (!host || !geoms?.length) return;
   ensurePane(host, HL_PANE, HL_PANE_Z);
-  landFill = L.geoJSON({
+  const fc = {
     type: 'FeatureCollection',
     features: geoms.map(geometry => ({ type: 'Feature', properties: {}, geometry }))
-  }, {
-    pane: HL_PANE,
-    interactive: false,
-    style: { color: '#111827', weight: 2, opacity: 1, fillColor: color || '#94a3b8', fillOpacity: 0.62 }
-  }).addTo(host);
+  };
+  const stroke = color || '#fde047';
+  // Quầng tối + viền sáng: dễ thấy ranh lô đang chọn trong ranh dự án.
+  landFill = L.layerGroup([
+    L.geoJSON(fc, {
+      pane: HL_PANE, interactive: false, keyboard: false,
+      style: { color: '#111827', weight: 9, opacity: 0.8, fill: false, lineJoin: 'round' }
+    }),
+    L.geoJSON(fc, {
+      pane: HL_PANE, interactive: false, keyboard: false,
+      style: {
+        color: stroke, weight: 3.5, opacity: 1, dashArray: null,
+        fillColor: stroke, fillOpacity: 0.32, fillRule: 'nonzero', lineJoin: 'round'
+      }
+    })
+  ]).addTo(host);
 }
 
 function markLand(key) {
@@ -1007,7 +1018,7 @@ function toggleLand(key, color) {
   landFill?.remove();
   landFill = null;
   const pack = card.cache.get(card.tab)?.shapes;
-  const geoms = key === '__none' ? pack?.none : pack?.byLabel?.[key];
+  const geoms = landGeomsOf(pack, key);
   if (!geoms?.length) return;
   paintLand(geoms, color);
   card.landKey = key;
@@ -1189,6 +1200,29 @@ function planPage(id, geometry, recorded) {
   }));
 }
 
+function planPageHasLots(pageData) {
+  const s = pageData?.shapes;
+  if (!s) return false;
+  if (s.byLot && Object.keys(s.byLot).length) return true;
+  return Object.keys(s.byLabel || {}).length > 0;
+}
+
+/** Cấp có lô cắt ranh dự án, ưu tiên chi tiết nhất: QHCT → QHPK → QHC 1/10.000 → QHC 1/25.000. */
+async function pickFinestInvestTab(st) {
+  const order = ['qhct', 'qhpk', 'qhc10', 'qhc25'];
+  for (const id of order) {
+    let pageData = st.cache.get(id);
+    if (!pageData) {
+      try { pageData = await planPage(id, st.geom, st.recorded); }
+      catch { continue; }
+      if (card !== st) return st.tab || 'qhpk';
+      st.cache.set(id, pageData);
+    }
+    if (planPageHasLots(pageData)) return id;
+  }
+  return 'qhct';
+}
+
 async function showTab(id, { syncMap = true } = {}) {
   const st = card;
   if (!st || !isPlanLevel(id)) return;
@@ -1229,7 +1263,7 @@ async function showTab(id, { syncMap = true } = {}) {
   }
 }
 
-function togglePlan() {
+async function togglePlan() {
   const st = card;
   const el = $('investCard');
   const box = el?.querySelector('.invest-plan');
@@ -1239,7 +1273,17 @@ function togglePlan() {
   box.hidden = !open;
   btn.innerHTML = `${ico('area')}${open ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}`;
   syncSelectionStyle();
-  if (open) showTab(st.tab);
+  if (!open) {
+    landFill?.remove();
+    landFill = null;
+    st.landKey = null;
+    return;
+  }
+  const page = el.querySelector('.cad-page');
+  if (page) page.innerHTML = '<div class="cad-busy">Đang tìm cấp quy hoạch chi tiết nhất tại dự án…</div>';
+  const best = await pickFinestInvestTab(st);
+  if (card !== st) return;
+  await showTab(best);
 }
 
 function showInfo(id) {
