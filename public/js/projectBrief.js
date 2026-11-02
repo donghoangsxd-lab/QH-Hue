@@ -9,8 +9,9 @@ import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './project
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
 import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
-import { QHC2045, QHC_CENTER_INFO_EVENT, isQhcStaticName } from './qhc2045.js';
+import { QHC2045, QHC10_CENTER_BRIEF, QHC_CENTER_INFO_EVENT, isQhcStaticName } from './qhc2045.js';
 import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
+import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const WAIT = '<span class="project-brief-wait">…</span>';
@@ -221,19 +222,40 @@ function popRows(pop) {
     </div>`;
 }
 
-/** Brief đồ án QHC đô thị (1/25.000 và 1/10.000 trung tâm): chỉ tiêu QĐ 108/QĐ-TTg — cùng một đồ án, hai lớp bản đồ. */
+/** Brief QHC 1/10.000 trung tâm: Phạm vi / Quy mô / Tính chất (khác bảng chỉ tiêu QĐ 108 của 1/25.000). */
+function qhc10CenterBriefHtml() {
+  const b = QHC10_CENTER_BRIEF;
+  return `<div class="qhc25-scale-card qhc10-brief-card">
+    <h4 class="qhc25-scale-title">${escapeHtml(b.title)}</h4>
+    <h5 class="qhc25-scale-h">Phạm vi</h5>
+    <p class="qhc25-scale-note">${escapeHtml(b.phamVi)}</p>
+    <h5 class="qhc25-scale-h">Quy mô</h5>
+    <p class="qhc25-scale-note">${escapeHtml(b.quyMo)}</p>
+    <h5 class="qhc25-scale-h">Tính chất</h5>
+    <p class="qhc25-scale-note">${escapeHtml(b.tinhChat)}</p>
+  </div>`;
+}
+
+/** Brief đồ án QHC đô thị: 1/25.000 = chỉ tiêu QĐ 108; 1/10.000 trung tâm = Phạm vi / Quy mô / Tính chất. */
 function renderQhcCity(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
   const level = PLAN_LEVELS.find(item => item.key === 'QHC');
+  const scale = card.qhcScale || (getLevel() === 'qhc10' ? '10' : '25');
+  const is10 = scale === '10';
   el.dataset.level = 'QHC';
+  el.dataset.qhcScale = scale;
   el.hidden = false;
+  const sub = is10
+    ? `${escapeHtml(QHC2045.status)} · Quy hoạch chung 1/10.000 khu vực đô thị trung tâm`
+    : `${escapeHtml(QHC2045.status)} · Sơ đồ tổ chức không gian 1/25.000`;
+  const body = is10 ? qhc10CenterBriefHtml() : qhcScaleBriefHtml();
   el.innerHTML = `<div class="project-brief-head">
       <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : 'QHC')}</span>${escapeHtml(QHC2045.short)}</h2>
       ${briefTools(card, { pdf: false, info: true })}
     </div>
-    <p class="project-brief-sub" title="${escapeHtml(QHC2045.name)}">${escapeHtml(QHC2045.status)} · Lớp 1/25.000 và 1/10.000 trung tâm</p>
-    <div class="project-brief-scale">${qhcScaleBriefHtml()}</div>`;
+    <p class="project-brief-sub" title="${escapeHtml(QHC2045.name)}">${sub}</p>
+    <div class="project-brief-scale">${body}</div>`;
   syncBriefStack();
 }
 
@@ -337,13 +359,16 @@ async function show(name) {
   if (!project) { hide(); return; }
   const token = ++seq;
   openName = project;
-  // QHC đô thị 1/25.000 + 1/10.000 trung tâm: cùng đồ án → brief chỉ tiêu QĐ 108 (không đổi cấp bản đồ).
+  // QHC đô thị tĩnh: brief theo cấp đang xem (1/25.000 = QĐ 108; 1/10.000 = Phạm vi / Quy mô / Tính chất).
   if (isQhcStaticName(project)) {
     openName = QHC2045.short;
-    render({ name: QHC2045.short, level: 'QHC', qhcCity: true, entry: null });
-    try { await loadQhc25Scale(); } catch (e) { /* lỗi đã hiện trong khối chỉ tiêu */ }
-    if (token !== seq) return;
-    render({ name: QHC2045.short, level: 'QHC', qhcCity: true, entry: null });
+    const scale = getLevel() === 'qhc10' ? '10' : '25';
+    render({ name: QHC2045.short, level: 'QHC', qhcCity: true, qhcScale: scale, entry: null });
+    if (scale === '25') {
+      try { await loadQhc25Scale(); } catch (e) { /* lỗi đã hiện trong khối chỉ tiêu */ }
+      if (token !== seq) return;
+      render({ name: QHC2045.short, level: 'QHC', qhcCity: true, qhcScale: scale, entry: null });
+    }
     return;
   }
   const entry = entryOf(project);
@@ -362,7 +387,13 @@ async function show(name) {
   render(base);
 }
 
+function paintQhc10BriefHost() {
+  const host = document.getElementById('qhc10Brief');
+  if (host) host.innerHTML = qhc10CenterBriefHtml();
+}
+
 export function initProjectBrief() {
+  paintQhc10BriefHost();
   const host = document.getElementById('mapArea');
   if (!host || document.getElementById('projectBrief')) return;
   const el = document.createElement('aside');
@@ -393,6 +424,12 @@ export function initProjectBrief() {
     if (decision) openInspectDecision(decision.getAttribute('data-brief-decision'));
   });
   document.addEventListener(PROJECT_INFO_EVENT, (e) => show(e.detail));
+  document.addEventListener(LEVEL_EVENT, () => {
+    if (openName !== QHC2045.short) return;
+    const scale = getLevel() === 'qhc10' ? '10' : getLevel() === 'qhc25' ? '25' : '';
+    if (!scale) return;
+    show(QHC2045.short);
+  });
   document.addEventListener(PROJECT_UNFOCUS_EVENT, hide);
   document.addEventListener(ADJUST_CHANGE_EVENT, () => {
     const peers = inspectPeers();

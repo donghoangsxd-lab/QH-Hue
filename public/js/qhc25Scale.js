@@ -125,7 +125,7 @@ function openLayers() {
   }
 }
 
-/** HTML chỉ tiêu QĐ 108 (đã load). Dùng chung brief QHC 1/25.000 và 1/10.000 — cùng một đồ án. */
+/** HTML chỉ tiêu QĐ 108 (đã load). Chỉ dùng brief / danh sách lớp QHC 1/25.000. */
 export function qhcScaleBriefHtml() {
   return qhc25ScaleHtml();
 }
