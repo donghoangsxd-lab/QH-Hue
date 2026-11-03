@@ -5,10 +5,11 @@
 // Đổ bóng địa hình: ô hệ số tĩnh trên bucket (terrain/hillshade/, scripts/build-hillshade.js), nhân thẳng vào màu
 // trong canvas để in / chụp bản đồ (html2canvas) vẫn giữ bóng.
 import { map } from './mapEngine.js';
-import { planMap, shownMaps } from './planMap.js';
+import { planMap } from './planMap.js';
 import { geeApi } from './api.js';
-import { fmtNum, startTaskProgress } from './utils.js';
+import { fmtNum } from './utils.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
+import { trackWork, watchTiles } from './loadProgress.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 // Khớp HUE_BOUNDS trong config/constants.js, nới 10 km (cùng DEM_BUFFER_M phía máy chủ)
@@ -237,10 +238,6 @@ const TerrainGrid = L.GridLayer.extend({
 
 let visible = false;
 let leftLayer = null, rightLayer = null;
-// Tiến độ: chờ GEE trả nguồn ô (theo thời gian, tới SOURCE_PCT) rồi tải ô cao độ trong khung nhìn (theo số ô)
-const SOURCE_PCT = 20;
-const SOURCE_TAU_MS = 1500;
-let task = null;
 
 function opacity() {
   const el = $('terrainOpacity');
@@ -248,14 +245,16 @@ function opacity() {
 }
 
 function makeLayer() {
-  return new TerrainGrid({
+  return watchTiles(new TerrainGrid({
     maxZoom: MAP_MAX_ZOOM,
     maxNativeZoom: NATIVE_MAX_ZOOM,
     bounds: HUE_DEM_BOUNDS,
     opacity: opacity(),
     zIndex: 0,
-    attribution
-  });
+    attribution,
+    updateWhenZooming: false,
+    keepBuffer: 1
+  }), 'Địa hình');
 }
 
 /** Nhãn nguồn cao độ đang dùng (FABDEM, hoặc SRTM khi ô FABDEM không tải được) */
@@ -286,37 +285,6 @@ function onMouseMove(e) {
   setReadout(v === null ? '' : `Tại con trỏ: ${fmtNum(v)} m`);
 }
 
-// Leaflet phát 'load' khi mọi ô đã gọi done(), còn 'tileload' chỉ sau hiệu ứng hiện dần (~200 ms).
-// Đếm tileload/tileerror (mỗi ô một lần) nên thanh không nhảy 100% khi mới xong khoảng 2/3.
-function trackTerrainTiles(layers, onProgress) {
-  const counts = layers.map(() => [0, 0]);
-  const report = () => onProgress(counts.reduce((s, c) => s + c[0], 0), counts.reduce((s, c) => s + c[1], 0));
-  return Promise.all(layers.map((layer, i) => new Promise(resolve => {
-    const seen = new Set();
-    let closed = false;
-    const finish = () => {
-      if (closed) return;
-      closed = true;
-      clearTimeout(timer);
-      layer.off('tileloadstart', onStart).off('tileload tileerror', onDone);
-      resolve();
-    };
-    const onStart = () => { counts[i][1]++; report(); };
-    const onDone = (ev) => {
-      const c = ev.coords;
-      const key = c ? `${c.z}/${c.x}/${c.y}` : '';
-      if (key && seen.has(key)) return;
-      if (key) seen.add(key);
-      counts[i][0]++;
-      report();
-      if (counts[i][1] > 0 && counts[i][0] >= counts[i][1]) finish();
-    };
-    const timer = setTimeout(finish, 60000);
-    layer.on('tileloadstart', onStart).on('tileload tileerror', onDone);
-    queueMicrotask(() => { if (!counts[i][1]) finish(); });
-  })));
-}
-
 export function setTerrainVisible(on) {
   visible = !!on;
   const legend = $('terrainLegend');
@@ -324,24 +292,13 @@ export function setTerrainVisible(on) {
   const box = $('terrainBox');
   if (box) box.style.display = visible ? '' : 'none';
   if (!map) return;
-  task?.cancel();
-  task = null;
   if (visible) {
-    const own = task = startTaskProgress('Đang tải địa hình (cao độ nền)');
-    own.creep(SOURCE_PCT, SOURCE_TAU_MS);
-    // Chờ biết nguồn ô (FABDEM hay SRTM dự phòng) để ghi nguồn đúng
-    tileUrl().then(() => {
-      if (!visible || task !== own) return;
+    trackWork('Địa hình', tileUrl()).then(() => {
+      if (!visible) return;
       if (!leftLayer) leftLayer = makeLayer();
       if (planMap && !rightLayer) rightLayer = makeLayer();
-      const pairs = [[map, leftLayer], [planMap, rightLayer]].filter(([m, l]) => m && l);
-      const shown = shownMaps();
-      own.set(SOURCE_PCT, 'Đang tải ô cao độ địa hình');
-      trackTerrainTiles(pairs.filter(([m]) => shown.includes(m)).map(([, l]) => l), (n, total) => {
-        const frac = total ? n / total : 0;
-        own.set(SOURCE_PCT + (100 - SOURCE_PCT) * frac, total ? `Đang tải ô cao độ địa hình (${n}/${total})` : 'Đang tải ô cao độ địa hình');
-      }).then(() => { if (task === own) own.done('Đã tải địa hình'); });
-      pairs.forEach(([m, l]) => { if (!m.hasLayer(l)) l.addTo(m); });
+      [[map, leftLayer], [planMap, rightLayer]].filter(([m, l]) => m && l)
+        .forEach(([m, l]) => { if (!m.hasLayer(l)) l.addTo(m); });
     });
     map.on('mousemove', onMouseMove);
     planMap?.on('mousemove', onMouseMove);

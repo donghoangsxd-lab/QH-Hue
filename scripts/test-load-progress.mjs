@@ -74,4 +74,37 @@ assert.doesNotMatch(css, /task-progress-stack/);
 assert.match(read('public/js/mapEngine.js'), /geeTileLayer\(url, geeTileOpts/);
 assert.match(read('public/js/geeTiles.js'), /fully masked/);
 assert.doesNotMatch(read('public/js/mapEngine.js'), /Đã tải bản đồ độ phủ/);
+
+const rowPairs = [...progress.matchAll(/'([^']+)':\s*'([^']+)'/g)]
+  .filter(([, , sel]) => sel.startsWith('#chk_') || sel === '#basemapSelect');
+assert.ok(rowPairs.length >= 20, `ROW quá ít: ${rowPairs.length}`);
+for (const [, name, sel] of rowPairs) {
+  const id = sel.slice(1);
+  assert.match(html, new RegExp(`id="${id}"`), `ROW '${name}' → ${sel} thiếu trong index.html`);
+}
+assert.match(progress, /'Đường sắt, đường thủy': '#chk_roads'/);
+assert.match(progress, /'Địa hình': '#chk_terrain'/);
+assert.match(progress, /'Cây xanh': '#chk_tree'/);
+assert.match(progress, /'Mô phỏng ngập': '#chk_flood'/);
+assert.match(progress, /'Thoát nước': '#chk_drainage'/);
+assert.match(progress, /'Lưu vực': '#chk_basin'/);
+assert.match(progress, /'Rủi ro': '#chk_risk'/);
+assert.match(progress, /'Công trình vi phạm': '#chk_violate'/);
+
+assert.match(read('public/js/floodSim.js'), /watchTiles\(/);
+assert.match(read('public/js/floodSim.js'), /trackWork\('Mô phỏng ngập'/);
+assert.match(read('public/js/terrainLayer.js'), /watchTiles\(/);
+assert.match(read('public/js/terrainLayer.js'), /trackWork\('Địa hình'/);
+assert.doesNotMatch(read('public/js/terrainLayer.js'), /trackTerrainTiles/);
+assert.match(read('public/js/drainageLayer.js'), /trackWork\('Thoát nước'/);
+assert.match(read('public/js/drainageLayer.js'), /if \(!arrowIndex \|\| !waterIndex \|\| !visible\) return;/);
+assert.match(read('public/js/basinLayer.js'), /trackWork\('Lưu vực'/);
+assert.match(read('public/js/basinLayer.js'), /if \(!visible\) \{[\s\S]*?syncViews\(\);/);
+assert.match(read('public/js/riskLayer.js'), /trackWork\('Rủi ro'/);
+assert.match(read('public/js/riskLayer.js'), /RISK_CONCURRENCY = 4/);
+assert.match(read('public/js/violateLayer.js'), /trackWork\('Công trình vi phạm'/);
+assert.match(read('public/js/cadastreLayer.js'), /trackWork\('Thửa đất địa chính'/);
+assert.match(read('public/js/treeLayer.js'), /startLoadMeter\('Cây xanh'\)/);
+assert.match(read('public/js/treeLayer.js'), /AbortError/);
+
 console.log('test-load-progress ok');

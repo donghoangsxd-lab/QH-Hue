@@ -4,6 +4,7 @@ import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { setRiverCounts, setWardRiverHtml } from './uiComponents.js';
+import { trackWork } from './loadProgress.js';
 
 const PANE = 'violatePane';
 const HIT_PANE = 'violateHitPane';
@@ -316,7 +317,7 @@ function setOn(next) {
   clearMaps();
   if (!on || !map) return;
   if (box) box.innerHTML = '<p class="flood-muted">Đang tải số liệu…</p>';
-  Promise.all([loadPack(), loadLines()]).then(([data, geo]) => {
+  trackWork('Công trình vi phạm', Promise.all([loadPack(), loadLines()])).then(([data, geo]) => {
     if (!on) return;
     try { publishCounts(data); } catch (err) { console.warn('Hành lang sông:', err); }
     try { paintBox(); } catch (err) { console.warn('Hành lang sông:', err); }

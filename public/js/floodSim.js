@@ -9,6 +9,7 @@ import { escapeHtml, isApproved, fmtNum } from './utils.js';
 import { loadElevTile, NATIVE_MAX_ZOOM, HUE_DEM_BOUNDS } from './terrainLayer.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { POP_METHOD_EVENT, floodPopulation, popMethod } from './popMethod.js';
+import { trackWork, watchTiles } from './loadProgress.js';
 
 const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải DEM 30 m)
 const MAX_LIST = 150;
@@ -73,7 +74,10 @@ const FloodGrid = L.GridLayer.extend({
 });
 
 function makeLayer() {
-  const layer = new FloodGrid({ maxZoom: MAP_MAX_ZOOM, maxNativeZoom: NATIVE_MAX_ZOOM, bounds: HUE_DEM_BOUNDS, zIndex: 2, opacity: 0.85 });
+  const layer = watchTiles(new FloodGrid({
+    maxZoom: MAP_MAX_ZOOM, maxNativeZoom: NATIVE_MAX_ZOOM, bounds: HUE_DEM_BOUNDS, zIndex: 2, opacity: 0.85,
+    updateWhenZooming: false, keepBuffer: 1
+  }), 'Mô phỏng ngập');
   layer.on('tileunload', (e) => liveTiles.delete(e.tile));
   return layer;
 }
@@ -170,13 +174,13 @@ let binsData = null;
 
 function ensureBins() {
   if (!binsPromise) {
-    binsPromise = fetch(geeApi('action=getFloodBins&dem=fabdem'))
+    binsPromise = trackWork('Mô phỏng ngập', fetch(geeApi('action=getFloodBins&dem=fabdem'))
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(d => {
         if (!d || !Array.isArray(d.wards)) throw new Error('phản hồi không có bảng phường');
         binsData = d;
         return d;
-      })
+      }))
       .catch(err => { console.warn('Không tải được bảng dân số theo cao độ:', err.message); binsPromise = null; return null; });
   }
   return binsPromise;
@@ -262,10 +266,10 @@ function loadFloodBuildings() {
   if (floodBld) return Promise.resolve(floodBld);
   if (!floodBldP) {
     const url = new URL('data/gba/bldg-flood.json', document.baseURI).href;
-    floodBldP = fetch(url).then((res) => {
+    floodBldP = trackWork('Mô phỏng ngập', fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
-    }).then((data) => { floodBld = data; return data; })
+    }).then((data) => { floodBld = data; return data; }))
       .catch((err) => { floodBldP = null; throw err; });
   }
   return floodBldP;

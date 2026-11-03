@@ -7,10 +7,12 @@ import { state, infraLabels, BUFFER_COLORS, layerType, getPlanScenarioList, isNe
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, isApproved } from './utils.js';
 import { sarSeasons, lstSeasons } from './satLayers.js';
+import { trackWork } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
 const RING = { flood: '#38bdf8', heat: '#fb923c', both: '#e879f9' };
+const RISK_CONCURRENCY = 4;
 
 let riskPromise = null;
 let left = null, right = null;
@@ -31,13 +33,30 @@ const median = (arr) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
+/** Chạy tối đa `limit` promise tạo từ jobs cùng lúc (allSettled semantics). */
+function mapLimit(jobs, limit, run) {
+  const out = new Array(jobs.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, jobs.length) || 1 }, async () => {
+    while (i < jobs.length) {
+      const idx = i++;
+      try {
+        out[idx] = { status: 'fulfilled', value: await run(jobs[idx], idx) };
+      } catch (reason) {
+        out[idx] = { status: 'rejected', reason };
+      }
+    }
+  });
+  return Promise.all(workers).then(() => out);
+}
+
 /** { floodYears: [năm đã tính], flood: Map(id → số mùa ngập), lstYear, lst: Map(id → °C), lstMedian, failed } — tải 1 lần */
 export function loadInfraRisk() {
   if (riskPromise) return riskPromise;
   const sar = sarSeasons(), lst = lstSeasons();
   const years = sar.years.filter(y => y <= sar.def).sort((a, b) => a - b);
-  riskPromise = Promise.all([
-    Promise.allSettled(years.map(y => getJson(`action=getInfraRisk&kind=flood&year=${y}`))),
+  riskPromise = trackWork('Rủi ro', Promise.all([
+    mapLimit(years, RISK_CONCURRENCY, (y) => getJson(`action=getInfraRisk&kind=flood&year=${y}`)),
     getJson(`action=getInfraRisk&kind=lst&year=${lst.def}`).catch(() => null)
   ]).then(([floodRes, lstRes]) => {
     const flood = new Map();
@@ -53,7 +72,7 @@ export function loadInfraRisk() {
       floodYears, flood, failed: years.length - floodYears.length,
       lstYear: lstRes ? lstRes.year : null, lst: lstMap, lstMedian: median([...lstMap.values()])
     };
-  });
+  }));
   riskPromise.catch(() => { riskPromise = null; });
   return riskPromise;
 }

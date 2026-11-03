@@ -12,6 +12,7 @@ import { loadOsmOpen, osmWaterInput } from './osmOpen.js';
 import {
   buildWaterIndex, waterwaysFromFeatures, normalizePolyline, outfallIndexes, mercXY, unmerc
 } from './drainageNorm.js';
+import { trackWork } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -100,7 +101,7 @@ let lines = null;
 function loadDrainage() {
   if (lines) return Promise.resolve(lines);
   if (!dataPromise) {
-    dataPromise = fetch(geeApi('action=getDrainage'))
+    dataPromise = trackWork('Thoát nước', fetch(geeApi('action=getDrainage'))
       .then(async r => {
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
@@ -108,7 +109,7 @@ function loadDrainage() {
         }
         return r.json();
       })
-        .then(topo => { lines = decodeTopo(topo); if (waterIndex) applyOutfalls(); return lines; })
+      .then(topo => { lines = decodeTopo(topo); if (waterIndex) applyOutfalls(); return lines; }))
       .catch(err => { dataPromise = null; throw err; });
   }
   return dataPromise;
@@ -171,10 +172,11 @@ function storeArrow(key, tile) {
 
 /** Tải hết các ô để số liệu bám / đảo / rà là toàn bộ lớp, không chỉ khung nhìn */
 function prefetchArrows() {
-  if (!arrowIndex || !waterIndex) return;
+  if (!arrowIndex || !waterIndex || !visible) return;
   const keys = Object.keys(arrowIndex.tiles);
   let active = 0;
   const next = () => {
+    if (!visible) return;
     while (active < 4 && keys.length) {
       const key = keys.shift();
       if (!arrowIndex.tiles[key] || arrowRaw.has(key) || arrowInflight.has(key)) continue;

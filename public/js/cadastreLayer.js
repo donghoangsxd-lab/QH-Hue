@@ -12,7 +12,7 @@
 import { map, WARD_BOUNDS_EVENT, openLotPopup } from './mapEngine.js';
 import { state } from './state.js';
 import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
-import { watchTiles } from './loadProgress.js';
+import { trackWork, watchTiles } from './loadProgress.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { planMap, getViewMode, isSplitOn, setViewMode } from './planMap.js';
 import { geeApi } from './api.js';
@@ -173,13 +173,13 @@ function setStatus(html) {
 
 function ensureReady() {
   if (!ready) {
-    ready = Promise.all([
+    ready = trackWork('Thửa đất địa chính', Promise.all([
       fetch(geeApi('action=getCadastreInfo')).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
       import(LIBS.pmtiles), import(LIBS.vectorTile), import(LIBS.pbf)
     ]).then(([info, pm, vt, pbf]) => {
       if (!info || !info.pmtiles) throw new Error('máy chủ chưa cấu hình dữ liệu thửa đất');
       return { info, archive: new pm.PMTiles(info.pmtiles), VectorTile: vt.VectorTile, Pbf: pbf.default };
-    });
+    }));
     ready.catch(() => { ready = null; });
   }
   return ready;
@@ -1190,13 +1190,13 @@ function onPopupOpen(e) {
 
 function loadXaList() {
   if (!xaList) {
-    xaList = ensureReady()
+    xaList = trackWork('Thửa đất địa chính', ensureReady()
       .then(({ info }) => fetch(`${info.indexBase}xa.json`))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((list) => {
         list.forEach((x) => xaByCode.set(String(x.maxa), x));
         return list;
-      });
+      }));
     xaList.catch(() => { xaList = null; });
   }
   return xaList;

@@ -4,8 +4,9 @@ import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
-import { escapeHtml, fmtNum, isApproved, distanceMeters, startTaskProgress } from './utils.js';
+import { escapeHtml, fmtNum, isApproved, distanceMeters } from './utils.js';
 import { seasonYears } from './satLayers.js';
+import { startLoadMeter } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 const PANE = 'treePriorityPane';
@@ -337,12 +338,20 @@ function load(part, alive) {
     ? getJson(q)
     : (async () => {
       for (let i = 0; i < 60; i++) {
+        if (alive && !alive()) {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          throw err;
+        }
         const d = await getJson(q);
         if (!d.pending) return d;
         if (!alive || alive()) {
           const box = $('treeZones');
           const n = `${fmtNum(d.done)}/${fmtNum(d.total)}`;
           if (box) box.innerHTML = `<div class="flood-muted">Đang khoanh vùng (${n} phường, xã).</div>`;
+          if (typeof d.done === 'number' && typeof d.total === 'number' && d.total > 0 && task) {
+            task.set(Math.min(99, Math.round((100 * d.done) / d.total)));
+          }
         }
         await new Promise(r => setTimeout(r, 800));
       }
@@ -385,8 +394,7 @@ async function show() {
   const box = $('treeZones');
   if (box) box.innerHTML = '<div class="flood-muted">Đang khoanh vùng trên Google Earth Engine.</div>';
   task?.cancel();
-  task = startTaskProgress('Đang khoanh vùng ưu tiên trồng cây');
-  task.creep(90, 8000);
+  task = startLoadMeter('Cây xanh');
   try {
     const d = await load('zones', () => my === seq && visible);
     if (my !== seq || !visible) { task.cancel(); return; }
@@ -397,15 +405,15 @@ async function show() {
     if (method) method.textContent = methodHtml(d);
     if (box) box.innerHTML = listHtml(zones);
     polys = drawZones(zones);
-    task.done(zones.length ? 'Đã có vùng ưu tiên trồng cây' : 'Không có vùng đạt ngưỡng');
+    task.done();
     if (!wardsReady()) {
       waitWards().then(() => { if (my === seq && visible) refreshNames(); });
     }
     const details = $('treeWardDetails');
     if (details && details.open) loadWards();
   } catch (err) {
-    if (my !== seq) { task?.cancel(); return; }
-    task?.fail('Không khoanh được vùng ưu tiên');
+    if (err?.name === 'AbortError' || my !== seq || !visible) { task?.cancel(); return; }
+    task?.fail();
     if (box) box.innerHTML = `<div class="flood-muted">Chưa tính được: ${escapeHtml(err.message)}</div>`;
   }
 }

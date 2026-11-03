@@ -11,6 +11,7 @@ import { geeApi } from './api.js';
 import { escapeHtml } from './utils.js';
 import { loadOsmOpen, osmWaterInput } from './osmOpen.js';
 import { FLAG_M, buildWaterIndex, nearestOnRing, waterwaysFromFeatures } from './drainageNorm.js';
+import { trackWork } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -149,7 +150,7 @@ let dataPromise = null;
 function loadBasins() {
   if (data) return Promise.resolve(data);
   if (!dataPromise) {
-    dataPromise = fetch(geeApi('action=getBasins'))
+    dataPromise = trackWork('Lưu vực', fetch(geeApi('action=getBasins'))
       .then(async r => {
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
@@ -157,7 +158,7 @@ function loadBasins() {
         }
         return r.json();
       })
-      .then(topo => { data = decodeTopo(topo); return data; })
+      .then(topo => { data = decodeTopo(topo); return data; }))
       .catch(err => { dataPromise = null; throw err; });
   }
   return dataPromise;
@@ -338,6 +339,7 @@ export function setBasinVisible(on) {
   if (!visible) {
     if (waterTimer) { clearInterval(waterTimer); waterTimer = null; }
     setStatus('');
+    syncViews();
     return;
   }
   const ready = data ? Promise.resolve() : (setStatus('Đang tải ranh lưu vực…'), loadBasins());

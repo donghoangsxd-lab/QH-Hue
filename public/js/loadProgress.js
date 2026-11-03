@@ -15,7 +15,14 @@ const ROW = {
   'Độ phủ hạ tầng': '#chk_heat',
   'Ranh giới phường xã': '#chk_bound',
   'Mạng lưới đường': '#chk_roads',
-  'Đường sắt, đường thủy': '#chk_osmWater',
+  'Đường sắt, đường thủy': '#chk_roads',
+  'Địa hình': '#chk_terrain',
+  'Cây xanh': '#chk_tree',
+  'Mô phỏng ngập': '#chk_flood',
+  'Thoát nước': '#chk_drainage',
+  'Lưu vực': '#chk_basin',
+  'Rủi ro': '#chk_risk',
+  'Công trình vi phạm': '#chk_violate',
   'ngập thực tế (Sentinel-1)': '#chk_sarflood',
   'nhiệt độ bề mặt (Landsat)': '#chk_lst',
   'NDVI (Sentinel-2)': '#chk_ndvi',
@@ -351,6 +358,11 @@ function taskName(label) {
   if (/dân cư/i.test(text)) return 'Phân bổ dân cư';
   if (/địa hình|lát cắt|cao độ/i.test(text)) return 'Địa hình';
   if (/trồng cây/i.test(text)) return 'Cây xanh';
+  if (/mô phỏng ngập/i.test(text)) return 'Mô phỏng ngập';
+  if (/thoát nước|khe tụ thủy/i.test(text)) return 'Thoát nước';
+  if (/lưu vực|phân thủy/i.test(text)) return 'Lưu vực';
+  if (/rủi ro/i.test(text)) return 'Rủi ro';
+  if (/vi phạm/i.test(text)) return 'Công trình vi phạm';
   return text.slice(0, 80) || 'Tác vụ';
 }
 
