@@ -8,6 +8,10 @@ import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastr
 import { LOTS_PROGRESS_EVENT, lotsRevision } from './projectFiles.js';
 import { openStreetView } from './streetView.js';
 import { escapeHtml, ico, showToast } from './utils.js';
+import {
+  isAdminAxis, resolveAdminHits, adminContextMenuHtml,
+  selectAdminWard, selectAdminUrban, closeAdminInfoCard, closeAdminChooser
+} from './adminMapPick.js';
 
 const NOTE_KEY = 'qhhue_map_notes';
 const LONG_MS = 1500;
@@ -294,13 +298,22 @@ function armPlanFly(menu, latlng, targetMap) {
   pull();
 }
 
-function openMenu(ev, latlng, targetMap) {
+async function openMenu(ev, latlng, targetMap) {
   closeMenu();
   closeNoteEditor(false);
+  closeAdminChooser();
   const el = document.createElement('div');
   el.className = 'map-ctx-menu';
   el.setAttribute('role', 'menu');
+  let adminHits = null;
+  let adminBlock = '';
+  if (isAdminAxis()) {
+    adminHits = await resolveAdminHits(latlng, targetMap);
+    adminBlock = adminContextMenuHtml(adminHits);
+  }
+  el._adminHits = adminHits;
   el.innerHTML = [
+    adminBlock,
     item('parcel', 'parcel', 'Xem thông tin thửa đất'),
     planItem(),
     item('access', 'inspect', 'Xem khả năng tiếp cận hạ tầng'),
@@ -323,10 +336,16 @@ function openMenu(ev, latlng, targetMap) {
   el.style.visibility = '';
   armPlanFly(el, latlng, targetMap);
   el.addEventListener('click', (e) => {
-    const act = e.target.closest('button')?.dataset.act;
+    const btn = e.target.closest('button');
+    if (!btn || btn.disabled) return;
+    const act = btn.dataset.act;
     if (!act) return;
     closeMenu();
-    if (act === 'parcel') {
+    if (act === 'admin-ward') {
+      selectAdminWard(el._adminHits?.ward?.name, { tipAt: latlng, infoEv: ev });
+    } else if (act === 'admin-urban') {
+      if (el._adminHits?.urban) selectAdminUrban(el._adminHits.urban, { infoEv: ev });
+    } else if (act === 'parcel') {
       openParcelAt(latlng, targetMap, { revealPlan: true }).then(ok => {
         if (ok === false) showToast('Không có thửa đất tại vị trí này.', 'info');
       });
@@ -363,7 +382,7 @@ function onContext(e, m) {
   if (e.originalEvent?._sketchHandled || e.originalEvent?._measureHandled) return;
   if (consumeMeasureContext()) return;
   if (state.adminDrawMode || state.lotShapeEdit) return;
-  openMenu(e.originalEvent, e.latlng, m);
+  void openMenu(e.originalEvent, e.latlng, m);
 }
 
 function bindLongPress(m) {
@@ -466,5 +485,6 @@ export function initMapContext(list) {
     if (menuEl) { closeMenu(); e.stopPropagation(); }
     else if (noteEditor) closeNoteEditor(false);
     else if (placeEl) closePlace();
+    else closeAdminInfoCard();
   });
 }

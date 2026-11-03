@@ -56,6 +56,7 @@ import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initQhc25Scale } from './qhc25Scale.js';
 import { initChuyenNganh, consumeDvhcMapClick } from './chuyenNganh.js';
+import { consumeAdminHybridClick } from './adminMapPick.js';
 import { initChamDiem } from './chamDiemUi.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
@@ -737,10 +738,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!detailLocked && cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
-    // ĐVHC / Đô thị: nền chỉ chọn xã hoặc ranh đô thị (khi chưa mở thửa / công trình — đã ưu tiên ở trên).
+    // Trục A ĐVHC / Đô thị: chọn hỗn hợp phường/xã hoặc đô thị (không khóa theo tab).
     const adminBrowse = document.body.classList.contains('dvhc-browse')
       || document.body.classList.contains('dothi-browse');
     if (!adminBrowse && !detailLocked && qhcClick(e, targetMap)) return;
+    if (await consumeAdminHybridClick(e.latlng, targetMap, e.originalEvent)) return;
     if (consumeDvhcMapClick(e.latlng)) return;
     if (await consumeDothiMapClick(e.latlng, targetMap)) return;
     // Trục Quy hoạch: không chọn phường; nền chỉ thu gọn đồ án (wardFromMapClick). Lô / đồ án qua qhcClick và lớp lô.

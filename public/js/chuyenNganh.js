@@ -595,7 +595,7 @@ function hideDvhcTip() {
   if (dvhcTip && map?.hasLayer(dvhcTip)) map.closeTooltip(dvhcTip);
 }
 
-function selectDvhcName(name, { tipAt, zoom = true } = {}) {
+export function selectDvhcName(name, { tipAt, zoom = true } = {}) {
   if (!name) return false;
   if (name === DVHC_CITY.name) {
     setAreaFilter({ ...AREA_TP }, 'user');
@@ -609,6 +609,16 @@ function selectDvhcName(name, { tipAt, zoom = true } = {}) {
     document.querySelector('#axisWardList .axis-area.active')?.scrollIntoView({ block: 'nearest' });
   });
   return true;
+}
+
+/** Đổi tab ĐVHC / Đô thị / Chấm điểm trên trục A (đồng bộ class browse). */
+export function ensureAdminTab(id) {
+  if (!id) return;
+  if (adminTabId() === id) {
+    syncAdminBrowseClass();
+    return;
+  }
+  document.querySelector(`[data-admin-tab="${id}"]`)?.click();
 }
 
 /** Bấm nền khi đang tab ĐVHC: chọn đơn vị tại điểm, phóng tới, hiện dân số / diện tích. */

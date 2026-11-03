@@ -6,7 +6,7 @@
 // (qhc2045Layer.js) và lô QHCT 1/500 (qhctLayer.js) gộp theo đồ án.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
-import { planMap, isCompareOn, isSplitOn } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, onCompareChange, onViewChange } from './planMap.js';
 import { escapeHtml, ico } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT, GP_SCOPE_EVENT, URBAN_FOCUS_EVENT } from './generalPlan.js';
 import { getLevel, setLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -40,8 +40,9 @@ const tipOpts = { sticky: true, direction: 'top', offset: [0, -8], className: 'u
 // Đang chọn đô thị: ẩn nền tô phân loại đô thị (urbanAreaLayer.js) để màu vùng đồ án không bị pha
 const FOCUS_CLASS = 'urban-focused';
 
-const target = () => planMap || map;
+// Trục A ép HT: người dùng thấy map, không phải planMap — tô phạm vi QHC/QHPK/QHCT đúng bản đồ đang hiện.
 const shownMap = () => (planMap && isCompareOn() && !isSplitOn() ? planMap : map);
+const target = () => shownMap();
 const polysOf = (g) => (g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []);
 const toLatLngs = (ring) => ring.map(([lng, lat]) => [lat, lng]);
 const multi = (geoms) => ({ type: 'MultiPolygon', coordinates: geoms.flatMap(polysOf) });
@@ -186,7 +187,8 @@ function rowHtml(k, stat) {
 function clearLayers() {
   group?.remove();
   group = null;
-  target()?.getContainer().classList.remove(FOCUS_CLASS);
+  map?.getContainer().classList.remove(FOCUS_CLASS);
+  planMap?.getContainer().classList.remove(FOCUS_CLASS);
 }
 
 function draw(items) {
@@ -299,4 +301,8 @@ export function initUrbanFocus() {
     }
     if (getLevel() === 'urban') focusUrban({ key: `gp:${d.id}`, name: d.name, geometry: d.geometry, city: d.city }, { fit: false });
   });
+  // Đổi HT/QH hoặc chia đôi: vẽ lại lên đúng bản đồ đang hiện (trục A mặc định HT).
+  const redrawShown = () => { if (current && getLevel() === 'urban') render(); };
+  onCompareChange(redrawShown);
+  onViewChange(redrawShown);
 }

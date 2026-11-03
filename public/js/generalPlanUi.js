@@ -348,7 +348,7 @@ function areaBtn(raw, n, period) {
   const qd = !!(raw && raw.qd756);
   const item = qd ? raw : resolved(raw);
   const stats = qd
-    ? { pop: period === 'ht' ? item.pop : null, km2: item.km2 }
+    ? { pop: item.pop, km2: item.km2 }
     : statsFor(item, period);
   const pop = statCell(stats.pop, POP_FMT);
   const km = statCell(stats.km2, KM_FMT);
@@ -366,6 +366,7 @@ function areaBtn(raw, n, period) {
   const qdAttr = qd
     ? ` data-gp-qd="1"${item.cityPlan ? ' data-gp-city="1"' : ''}${geom ? ` data-gp-file="${escapeHtml(geom.file)}" data-gp-geom="${escapeHtml(geom.id)}"` : ''}`
     : '';
+  // Đến 2030: cột Dân số = dân số đô thị (item.pop); tip đã ghi tổng khi khác.
   const tipBase = item.tip || `${full}: dân số ${pop}, diện tích ${km} km²`;
   const tip = full && !tipBase.includes(full) ? `${full}. ${tipBase}` : tipBase;
   return `<button type="button" class="axis-area gp-row${mark}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(full)}"${qdAttr} aria-pressed="${on}" title="${escapeHtml(tip)}"><span class="axis-num">${num}</span><span class="${nameCls}">${nameInner}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;

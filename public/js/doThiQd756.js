@@ -73,6 +73,7 @@ function row(fields) {
   const item = {
     qd756: true,
     pop: null,
+    popTotal: null,
     km2: null,
     geom: null,
     strive: false,
@@ -95,6 +96,14 @@ function tipOf(item) {
   if (item.members.length) lines.push(`Gồm: ${item.members.join(', ')}`);
   if (item.host) lines.push(`Nằm trong ${item.host}`);
   if (item.core) lines.push(`Lõi: ${item.core}`);
+  if (item.pop != null) {
+    const urban = Number(item.pop).toLocaleString('vi-VN');
+    if (item.popTotal != null && item.popTotal !== item.pop) {
+      lines.push(`Dân số đô thị: ${urban} người · Tổng dân số: ${Number(item.popTotal).toLocaleString('vi-VN')} người`);
+    } else {
+      lines.push(`Dân số đô thị: ${urban} người`);
+    }
+  }
   if (item.strive) lines.push('Phấn đấu');
   if (item.note) lines.push(item.note);
   if (item.missing) lines.push('Chưa có ranh');
@@ -110,9 +119,11 @@ const HUONG_TRA = ['Hương Trà', 'Kim Trà', 'Bình Điền'];
 const PHONG_DIEN = ['Phong Điền', 'Phong Thái', 'Phong Dinh', 'Phong Phú', 'Phong Quảng'];
 const CHAN_MAY = ['Chân Mây - Lăng Cô', 'Vinh Lộc', 'Phú Lộc'];
 
+// Dân số đô thị (pop) và tổng dân số phạm vi (popTotal) — bảng «Dân số đô thị» bổ sung vào danh sách Đến 2030.
+// Cột danh sách hiện pop (dân số đô thị); tip ghi cả hai khi khác nhau. Không suy từ tỷ lệ diện tích.
 const city2030 = row({
   id: 'hue', name: 'Thành phố Huế', cls: 'I', city: true, cityPlan: true, hue: true,
-  km2: DVHC_CITY.km2,
+  km2: DVHC_CITY.km2, pop: 1121625, popTotal: 1507223,
   note: 'Đô thị loại I theo QĐ 756. Diện tích là toàn thành phố (dvhcStats).'
 });
 
@@ -128,72 +139,87 @@ export const DOTHI_2030 = [
     row({
       id: 'trung-tam', name: 'Khu vực đô thị trung tâm', cls: 'II', strive: true,
       members: CENTER_9, geom: { file: GP, id: 'trung-tam' }, km2: 247.77,
+      pop: 607254, popTotal: 607254,
       note: 'Phấn đấu loại II. Ranh 9 phường (generalPlan #trung-tam), chưa gồm Hóa Châu và Mỹ Thượng.'
     }),
     row({
       id: 'huong-thuy', name: 'Khu vực đô thị Hương Thủy', cls: 'II', strive: true,
       members: HUONG_THUY, geom: { file: GP, id: 'huong-thuy' }, km2: 428.97,
+      pop: 114060, popTotal: 114060,
       note: 'Phấn đấu loại II. Ba phường đủ phạm vi khu vực.'
     })
   ]),
   group('III', [
     row({
       id: 'huong-tra', name: 'Khu vực đô thị Hương Trà', cls: 'III',
-      members: HUONG_TRA, geom: { file: GP, id: 'huong-tra' }, km2: 393.79
+      members: HUONG_TRA, geom: { file: GP, id: 'huong-tra' }, km2: 393.79,
+      pop: 67709, popTotal: 83364
     }),
     row({
       id: 'phong-dien', name: 'Khu vực đô thị Phong Điền', cls: 'III',
       members: PHONG_DIEN, geom: { file: VIS, id: 'phong-dien' }, km2: 972.79,
+      pop: 139907, popTotal: 139907,
       note: 'Năm phường đủ khu vực. Không dùng ranh thị xã cũ (generalPlan / urban614 #phong-dien).'
     }),
     row({
       id: 'hoa-chau', name: 'Đô thị Hóa Châu', cls: 'III',
       members: ['Hóa Châu'], geom: { file: GP, id: 'hoa-chau' }, km2: 34.67,
+      pop: 41777, popTotal: 41777,
       note: 'Cả phường Hóa Châu. Không lấy lõi Thanh Hà.'
     }),
     row({
       id: 'my-thuong', name: 'Đô thị Mỹ Thượng', cls: 'III',
-      members: ['Mỹ Thượng'], geom: { file: GP, id: 'my-thuong' }, km2: 29.2
+      members: ['Mỹ Thượng'], geom: { file: GP, id: 'my-thuong' }, km2: 29.2,
+      pop: 47020, popTotal: 47020
     }),
     row({
       id: 'chan-may', name: 'Đô thị Chân Mây – Lăng Cô', cls: 'III',
       members: ['Chân Mây - Lăng Cô'],
       geom: { file: CHAN_MAY_FILE, id: 'chan-may-lang-co' }, km2: 264.37,
+      pop: 13869, popTotal: 53187,
       note: 'Ranh GIS đồ án QHC Chân Mây - Lăng Cô. Không dùng thị trấn Lăng Cô (urban614 #lang-co) và không dùng ranh ba xã urbanVision #chan-may.'
     }),
     row({
       id: 'quang-dien', name: 'Đô thị Quảng Điền', cls: 'III', strive: true,
       host: 'xã Quảng Điền', geom: { file: U6, id: 'sia' }, km2: 11.67,
+      pop: 13572, popTotal: 41620,
       note: 'Phấn đấu loại III. Ranh Đô thị Sịa (thị trấn Sịa cũ), không lấy cả xã Quảng Điền.'
     }),
     row({
       id: 'a-luoi-2', name: 'Đô thị A Lưới 2', cls: 'III', strive: true,
       host: 'xã A Lưới 2', geom: { file: U6, id: 'a-luoi' }, km2: 14.17,
+      pop: 8396, popTotal: 20825,
       note: 'Phấn đấu loại III. Ranh thị trấn A Lưới cũ, không lấy cả xã A Lưới 2.'
     }),
     row({
       id: 'vinh-thanh', name: 'Đô thị Vinh Thanh', cls: 'III',
-      host: 'xã Phú Vinh', geom: { file: U6, id: 'vinh-thanh' }, km2: 10.44
+      host: 'xã Phú Vinh', geom: { file: U6, id: 'vinh-thanh' }, km2: 10.44,
+      pop: 12671, popTotal: 12671
     }),
     row({
       id: 'phu-da', name: 'Đô thị Phú Đa', cls: 'III',
-      host: 'xã Phú Vang', geom: { file: U6, id: 'phu-da' }, km2: 29.84
+      host: 'xã Phú Vang', geom: { file: U6, id: 'phu-da' }, km2: 29.84,
+      pop: 14676, popTotal: 14676
     }),
     row({
       id: 'loc-son', name: 'Đô thị Lộc Sơn', cls: 'III',
-      host: 'xã Hưng Lộc', geom: { file: U6, id: 'loc-son' }, km2: 18.82
+      host: 'xã Hưng Lộc', geom: { file: U6, id: 'loc-son' }, km2: 18.82,
+      pop: 8593, popTotal: 8593
     }),
     row({
       id: 'khe-tre', name: 'Đô thị Khe Tre', cls: 'III',
-      host: 'xã Khe Tre', geom: { file: U6, id: 'khe-tre' }, km2: 4.34
+      host: 'xã Khe Tre', geom: { file: U6, id: 'khe-tre' }, km2: 4.34,
+      pop: 4719, popTotal: 4719
     }),
     row({
       id: 'phu-loc', name: 'Đô thị Phú Lộc', cls: 'III',
-      host: 'xã Phú Lộc', geom: { file: U6, id: 'phu-loc' }, km2: 29.98
+      host: 'xã Phú Lộc', geom: { file: U6, id: 'phu-loc' }, km2: 29.98,
+      pop: 13717, popTotal: 13717
     }),
     row({
       id: 'vinh-hien', name: 'Đô thị Vinh Hiền', cls: 'III',
-      host: 'xã Vinh Lộc', geom: { file: U6, id: 'vinh-hien' }, km2: 19.59
+      host: 'xã Vinh Lộc', geom: { file: U6, id: 'vinh-hien' }, km2: 19.59,
+      pop: 13685, popTotal: 13685
     })
   ])
 ];
