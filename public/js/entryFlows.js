@@ -2,9 +2,14 @@
 // Quản trị ghi thẳng lớp công bố. Cán bộ CanBo gửi hàng chờ. Chưa đăng nhập thì không gửi.
 import { map } from './mapEngine.js';
 import { state } from './state.js';
-import { geeApi } from './api.js';
 import { escapeHtml, announceTool } from './utils.js';
 import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
+import {
+  isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit
+} from './entryKernel.js';
+import { FLOW_IDS as REGISTRY_FLOW_IDS } from './entryRegistry.js';
+import { allEntrySteps, visibleEntrySteps, PUBLISH_KIND } from './entrySteps.js';
+import { typeOptionsHtml } from './pointEntrySchema.js';
 import { EVAL_URBANS, fieldsForScope, gapRows } from './urbanEntrySchema.js';
 import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
 import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
@@ -37,6 +42,7 @@ let stepId = 'qd';
 let hoMode = 'new';
 let landMode = 'new';
 let netSector = 'giao-thong';
+let htktPane = 'net';
 let ptTab = 'dvhc';
 let ktMode = 'quyche';
 let daGeom = null;
@@ -45,34 +51,9 @@ let crsId = 'HUE_3';
 let crsLon0 = '';
 const held = {};
 
-const STEPS = [
-  { id: 'qd', label: 'Quyết định', hint: 'Quyết định phê duyệt đồ án.', file: 'pdf', max: 2 * MB, accept: '.pdf' },
-  { id: 'ql', label: 'Quy chế', hint: 'Quy chế theo đồ án. Khác quyết định phê duyệt.', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'quy-dinh' },
-  { id: 'tm', label: 'Thuyết minh', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'thuyet-minh' },
-  { id: 'ranh', label: 'Bản vẽ ranh giới quy hoạch', file: 'draw', draw: 'boundary', sector: '', phase: 'quy-hoach', role: 'ranh-hoso' },
-  { id: 'dat-ht', label: 'Hiện trạng sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'hien-trang', role: 'ht-dat-hoso' },
-  { id: 'dat-qh', label: 'Quy hoạch sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'quy-hoach', role: 'qh-dat-hoso' }
-];
-const NET_ROLE = {
-  'giao-thong:hien-trang': 'ht-giao-thong',
-  'giao-thong:quy-hoach': 'qh-giao-thong',
-  'cap-nuoc:hien-trang': 'ht-cap-nuoc',
-  'cap-nuoc:quy-hoach': 'qh-cap-nuoc',
-  'cap-dien:hien-trang': 'ht-cap-dien',
-  'cap-dien:quy-hoach': 'qh-cap-dien',
-  'san-nen-thoat-mua:hien-trang': 'ht-san-nen',
-  'san-nen-thoat-mua:quy-hoach': 'qh-san-nen',
-  'thoat-nuoc-thai:hien-trang': 'ht-thoat-thai',
-  'thoat-nuoc-thai:quy-hoach': 'qh-thoat-thai',
-  'chat-thai-ran-nghia-trang:hien-trang': 'ht-chat-thai',
-  'chat-thai-ran-nghia-trang:quy-hoach': 'qh-chat-thai',
-  'thong-tin-lien-lac:hien-trang': 'ht-vien-thong',
-  'thong-tin-lien-lac:quy-hoach': 'qh-vien-thong'
-};
+const STEPS = allEntrySteps();
 function visibleSteps() {
-  if (hoMode === 'net') return STEPS.filter(s => s.draw === 'network' && s.sector === netSector);
-  if (hoMode === 'adjust') return [];
-  return STEPS.filter(s => s.draw !== 'network');
+  return visibleEntrySteps({ hoMode, netSector, stepList: STEPS });
 }
 
 function paintGroup(selector, attr, value) {
@@ -83,32 +64,9 @@ function paintGroup(selector, attr, value) {
   });
 }
 
-SECTORS.forEach(s => {
-  ['hien-trang', 'quy-hoach'].forEach(phase => {
-    const id = `${s.id}-${phase === 'hien-trang' ? 'ht' : 'qh'}`;
-    STEPS.push({
-      id,
-      label: `${phase === 'hien-trang' ? 'Hiện trạng' : 'Quy hoạch'} — ${s.label}`,
-      file: 'draw',
-      draw: 'network',
-      sector: s.id,
-      phase,
-      role: NET_ROLE[`${s.id}:${phase}`]
-    });
-  });
-});
-
-const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
-const PUBLISH_KIND = { ranh: 'ranh-gioi', 'dat-ht': 'hien-trang', 'dat-qh': 'su-dung-dat' };
-
-function allowedKeys() {
-  if (isAdmin()) return null;
-  return Array.isArray(state.entryUnits) ? state.entryUnits : [];
-}
-
-function signedIn() {
-  return isAdmin() || (Array.isArray(state.entryUnits) && !!state.authToken);
-}
+const isAdmin = isAdminEntry;
+const signedIn = isEntrySignedIn;
+const allowedKeys = allowedEntryKeys;
 
 function clearPreview() {
   if (preview && map) map.removeLayer(preview);
@@ -323,24 +281,18 @@ function collectFields(root) {
   return fields;
 }
 
-async function postJson(action, body) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const res = await fetch(geeApi(`action=${action}`), { method: 'POST', headers, body: JSON.stringify(body) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.success === false || data.error) throw new Error(data.message || data.error || `Lỗi ${res.status}`);
-  return data;
-}
+const postJson = postEntry;
 
 async function saveHanhChinh() {
   const status = $('hcStatus');
   const unit = $('hcUnit')?.value || '';
-  if (!officerCanEdit(unit)) {
-    if (status) status.textContent = 'Đăng nhập cán bộ hoặc quản trị, đúng đơn vị được giao.';
+  const gate = assertOfficerUnit(unit);
+  if (!gate.ok) {
+    if (status) status.textContent = gate.message;
     return;
   }
   const fields = collectFields($('flowPhatTrienBody'));
-  const officer = (state.authUser && (state.authUser.name || state.authUser.email)) || '';
+  const officer = entryOfficerName();
   writeUnit(unit, fields, { officer });
   const [type, code] = unit.split(':');
   const name = areasOf(type === 'tp' ? 'tp' : type).find(a => unitKeyOf(a.type, a.code) === unit)?.name || unit;
@@ -587,7 +539,61 @@ function schemeSearchHtml() {
     </label>`;
 }
 
+function renderHtktPoint() {
+  const root = $('htktPointBox');
+  if (!root) return;
+  root.hidden = false;
+  if ($('htktBox')) $('htktBox').hidden = true;
+  root.innerHTML = `<p class="entry-note">Đề xuất điểm hạ tầng kỹ thuật lẻ (nhà máy, trạm…). Khác form hạ tầng xã hội. Trạng thái chờ duyệt như điểm HTXH; quản trị duyệt trên popup hoặc hàng chờ.</p>
+    <div class="form-grid">
+      <label for="htktType">Loại</label>
+      <select id="htktType">${typeOptionsHtml('htkt', '16-CN')}</select>
+      <label for="htktPhase">Giai đoạn</label>
+      <select id="htktPhase">
+        <option value="HT" selected>Hiện trạng</option>
+        <option value="QH">Quy hoạch mới</option>
+      </select>
+      <label for="htktNhomHaTang">Phân cấp</label>
+      <select id="htktNhomHaTang" disabled>
+        <option value="Cấp đô thị" selected>Cấp đô thị</option>
+      </select>
+      <label for="htktName">Tên</label>
+      <input type="text" id="htktName" placeholder="Tên công trình / trạm…" maxlength="150">
+      <label for="htktLat">Tọa độ</label>
+      <div class="rp-coord-row">
+        <input type="text" id="htktLat" placeholder="Vĩ độ">
+        <input type="text" id="htktLng" placeholder="Kinh độ">
+        <button type="button" id="btnHtktPick" title="Ghim trên bản đồ" aria-label="Ghim tọa độ"><svg class="ico"><use href="#i-pin"/></svg></button>
+      </div>
+      <label for="htktWard">Phường/Xã</label>
+      <input type="text" id="htktWard" placeholder="Tự nhận diện theo tọa độ">
+      <label for="htktSize">Diện tích</label>
+      <input type="number" id="htktSize" placeholder="m² (không bắt buộc)" min="0" step="1">
+      <label for="htktRadius">Bán kính</label>
+      <output id="htktRadius" class="rp-radius">—</output>
+    </div>
+    <button type="button" class="btn-submit" id="btnSubmitHtktPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>
+    <div id="htktStatus" class="rp-status" role="status" aria-live="polite"></div>`;
+  updateRadiusPreview('htkt');
+  ['htktType', 'htktNhomHaTang', 'htktWard', 'htktName', 'htktSize'].forEach(id => {
+    $(id)?.addEventListener('input', () => updateRadiusPreview('htkt'));
+    $(id)?.addEventListener('change', () => updateRadiusPreview('htkt'));
+  });
+  $('btnSubmitHtktPoint')?.addEventListener('click', () => submitInfraPoint('htkt'));
+  $('btnHtktPick')?.addEventListener('click', () => {
+    state.isPickMode = true;
+    state.pickTarget = 'htkt';
+    announceTool('Chọn vị trí trên bản đồ cho điểm HTKT.');
+  });
+}
+
 function renderHoSo() {
+  if (hoMode === 'net' && htktPane === 'diem') {
+    renderHtktPoint();
+    return;
+  }
+  if ($('htktPointBox')) $('htktPointBox').hidden = true;
+  if ($('htktBox') && hoMode === 'net') $('htktBox').hidden = false;
   const rootId = hoMode === 'net' ? 'htktBox' : 'hoSoBox';
   const root = $(rootId);
   const idle = $(rootId === 'htktBox' ? 'hoSoBox' : 'htktBox');
@@ -1215,7 +1221,10 @@ function renderDuAn() {
     ['UTM48_6', 'VN-2000 UTM 48, múi 6°'],
     ['WGS84', 'WGS84 (kinh, vĩ)']
   ].map(([id, label]) => `<option value="${id}"${id === crs ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
-  root.innerHTML = `<p class="entry-note">Bổ sung dự án: tên, nhóm, quyết định pháp lý và ranh giới. Quản trị ghi thẳng lớp dự án. Cán bộ cần quản trị ghi hộ.</p>
+  const note = isAdmin()
+    ? 'Quản trị ghi thẳng lớp dự án (tên và/hoặc ranh).'
+    : 'Đăng nhập Google để đề xuất: cần tên dự án hoặc file ranh (hoặc cả hai). Quản trị duyệt trong hàng chờ.';
+  root.innerHTML = `<p class="entry-note">${note}</p>
     <div class="form-grid">
       <label for="daName">Tên dự án</label>
       <input id="daName" maxlength="200" value="${escapeHtml(name)}" placeholder="Tên dự án">
@@ -1231,7 +1240,7 @@ function renderDuAn() {
       <span class="cad-drop-sub">DXF, KML hoặc KMZ. Vùng Polygon.</span>
       <input type="file" id="daFile" accept=".dxf,.kml,.kmz" hidden>
     </label>
-    <button type="button" class="btn-submit" id="daSave">Lưu dự án</button>
+    <button type="button" class="btn-submit" id="daSave">${isAdmin() ? 'Lưu dự án' : 'Gửi đề xuất'}</button>
     <div id="daStatus" class="rp-status" role="status"></div>`;
   $('daFile')?.addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1273,29 +1282,45 @@ async function saveDuAn() {
   const name = $('daName')?.value.trim() || '';
   const groupId = $('daGroup')?.value || '';
   const decision = $('daDecision')?.value.trim() || '';
-  if (!isAdmin()) {
-    if (status) status.textContent = 'Cần đăng nhập quản trị để ghi dự án lên bản đồ.';
+  if (!name && !daGeom) {
+    if (status) status.textContent = 'Cần tên dự án hoặc file ranh giới.';
     return;
   }
   if (!name) {
-    if (status) status.textContent = 'Nhập tên dự án.';
+    if (status) status.textContent = 'Có ranh thì cần nhập tên dự án để làm khóa.';
     return;
   }
   const fields = { 'Tên dự án': name, 'Nhóm dự án': investGroupLabel(groupId) };
   if (decision) fields['Quyết định pháp lý'] = decision;
   try {
-    if (status) status.textContent = 'Đang ghi dự án…';
-    const body = { key: name, match: name, groupId, fields };
+    if (isAdmin()) {
+      if (status) status.textContent = 'Đang ghi dự án…';
+      const body = { key: name, match: name, groupId, fields };
+      if (daGeom) body.geometry = daGeom;
+      await postJson('saveInvestProject', body);
+      if (status) status.textContent = daGeom ? 'Đã ghi dự án và ranh.' : 'Đã ghi dự án. Chưa có ranh.';
+      return;
+    }
+    if (!state.authToken) {
+      if (status) status.textContent = 'Đăng nhập Google để gửi đề xuất dự án.';
+      return;
+    }
+    if (status) status.textContent = 'Đang gửi đề xuất…';
+    const body = { key: name, name, groupId, decision, fields };
     if (daGeom) body.geometry = daGeom;
-    await postJson('saveInvestProject', body);
-    if (status) status.textContent = daGeom ? 'Đã ghi dự án và ranh.' : 'Đã ghi dự án. Chưa có ranh.';
+    const data = await postJson('submitInvestProposal', body);
+    if (status) {
+      status.textContent = data.id
+        ? `Đã gửi hàng chờ duyệt (mã ${String(data.id).slice(0, 8)}…). Chưa hiện trên bản đồ.`
+        : 'Đã gửi hàng chờ duyệt. Chưa hiện trên bản đồ.';
+    }
   } catch (err) {
     if (status) status.textContent = err.message;
   }
 }
 
 const FLOW_ALIAS = { flowHanhChinh: 'flowPhatTrien', flowHoSo: 'flowQuyHoach' };
-const FLOW_IDS = ['flowPhatTrien', 'flowQuyHoach', 'flowHtkt', 'flowHtxh', 'flowKienTruc', 'flowDuAn'];
+const FLOW_IDS = REGISTRY_FLOW_IDS;
 
 export function openEntryFlow(id, opts = {}) {
   const flow = FLOW_ALIAS[id] || id;
@@ -1322,8 +1347,12 @@ export function openEntryFlow(id, opts = {}) {
   paintGroup('#ptTabs [data-pt]', 'data-pt', ptTab);
   paintGroup('#qhEntryTabs [data-qmode]', 'data-qmode', hoMode === 'net' ? 'add' : hoMode);
   paintGroup('#ktTabs [data-kmode]', 'data-kmode', ktMode);
+  paintGroup('#htktPaneTabs [data-htkt-pane]', 'data-htkt-pane', htktPane);
   if (flow === 'flowQuyHoach' || flow === 'flowHtkt') renderHoSo();
-  else clearPreview();
+  else {
+    clearPreview();
+    if ($('htktPointBox')) $('htktPointBox').hidden = true;
+  }
   if (flow === 'flowPhatTrien') renderHanhChinh();
   if (flow === 'flowKienTruc') renderKienTruc();
   if (flow === 'flowDuAn') renderDuAn();
@@ -1374,5 +1403,18 @@ export function initEntryFlows(hooks = {}) {
       state.pickTarget = 'infra';
     }
     renderKienTruc();
+  });
+  $('htktPaneTabs')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-htkt-pane]');
+    if (!btn) return;
+    htktPane = btn.dataset.htktPane === 'diem' ? 'diem' : 'net';
+    paintGroup('#htktPaneTabs [data-htkt-pane]', 'data-htkt-pane', htktPane);
+    if (htktPane === 'diem') {
+      state.pickTarget = 'htkt';
+    } else {
+      state.isPickMode = false;
+      state.pickTarget = 'infra';
+    }
+    renderHoSo();
   });
 }

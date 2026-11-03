@@ -38,12 +38,18 @@ const BACKUP_HEADERS = ["Ten_QH", "Tab", "ID_DoiTuong", "ThoiGian", "GiaTriCu", 
 // Các cột importCadBatch có thể ghi đè trên dòng có sẵn (Geojson lưu riêng cột GeojsonCu)
 const BACKUP_COL_KEYS = ["lat", "lng", "ward", "nhom", "quyMoHT", "quyMoQH", "tenQH", "trangThai", "thoiGian", "ghiChu",
   "tangCao", "matDoXD", "heSoSDD", "kyHieu"];
-const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS", "14-NOXH"];
+const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS", "14-NOXH",
+  "15-GT", "16-CN", "17-CD", "18-SM", "19-XL", "20-CTR", "21-TT"];
 
-// Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
-const NETWORK_TABS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Nhà ở xã hội" };
+// Mạng lưới + điểm HTKT lẻ: tab tự tạo khi ghi điểm đầu tiên
+const NETWORK_TABS = {
+  "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Nhà ở xã hội",
+  "15-GT": "15-GT HTKT Giao thông", "16-CN": "16-CN HTKT Cấp nước", "17-CD": "17-CD HTKT Cấp điện",
+  "18-SM": "18-SM HTKT San nền thoát mưa", "19-XL": "19-XL HTKT Thoát nước thải",
+  "20-CTR": "20-CTR HTKT Chất thải rắn", "21-TT": "21-TT HTKT Viễn thông"
+};
 // Loại không cần diện tích: điểm quy hoạch mới được ghi QuyMo_QH = 0
-const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
+const NO_AREA_TYPES = ["13-BUS", "10-PCCC", "15-GT", "16-CN", "17-CD", "18-SM", "19-XL", "20-CTR", "21-TT"];
 // Chỉ tiêu quy hoạch lô (tầng cao, mật độ xây dựng %, hệ số sử dụng đất) — tab cũ chưa có thì tự thêm cuối dòng tiêu đề khi nhập đồ án
 const PLAN_HEADERS = ["TangCao", "MatDoXD", "HeSoSDD"];
 const LOT_CODE_HEADER = "KyHieu";
@@ -1430,7 +1436,7 @@ var KIEN_TRUC_SHEET = "KienTruc";
 var CANBO_SHEET = "CanBo";
 var CHO_DUYET_SHEET = "ChoDuyet";
 var CHO_DUYET_HEADERS = ["Id", "Email", "HoTen", "DonVi", "Loai", "DoAn", "TrangThai", "ThoiGian", "LyDo", "Gcs", "TomTat"];
-var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true, "van-ban": true, "quy-che": true };
+var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true, "van-ban": true, "quy-che": true, "du-an": true };
 var CHI_TIEU_HEADERS = ["UnitKey", "UnitType", "UnitCode", "UnitName", "Field", "Value", "Officer", "ThoiGianCapNhat"];
 var KIEN_TRUC_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude", "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note", "Loai", "KhuVuc", "LinkAnh", "Link3D"];
 
@@ -1712,8 +1718,14 @@ function choDuyetRow_(values) {
 }
 
 function addChoDuyet(body) {
-  assertCanWrite_(body.email, body.unit, false);
-  if (!CHO_DUYET_KINDS[String(body.kind || "")]) throw new Error("Loại hồ sơ không hợp lệ");
+  var kind = String(body.kind || "");
+  if (!CHO_DUYET_KINDS[kind]) throw new Error("Loại hồ sơ không hợp lệ");
+  // Đề xuất dự án: mọi email Google đã xác thực phía Cloud Run; không khóa tab CanBo.
+  if (kind === "du-an") {
+    if (!body.email) throw new Error("Chưa đăng nhập Google");
+  } else {
+    assertCanWrite_(body.email, body.unit, false);
+  }
   var id = choDuyetId_(body.gcs);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);

@@ -6,6 +6,7 @@ import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, ico, showToast, fmtNum, setStatusContent } from './utils.js';
 import { wardNameAt } from './mapEngine.js';
 import { queryOverpassHedged } from './serviceArea.js';
+import { OSM_TYPE_CODES, HTXH_POINT_TYPES } from './pointEntrySchema.js';
 
 // Khung = constants.HUE_BOUNDS (lọc theo khung nhanh hơn nhiều so với lọc theo ranh hành chính trên Overpass)
 const OSM_QUERY = `[out:json][timeout:90][bbox:15.9,106.9,16.9,108.3];
@@ -21,12 +22,10 @@ const OSM_QUERY = `[out:json][timeout:90][bbox:15.9,106.9,16.9,108.3];
 out geom;`;
 const FETCH_TIMEOUT_MS = 100000;
 const HEDGE_MS = 25000;
-const TYPE_LABELS = {
-  "13-BUS": "Trạm dừng xe buýt",
-  "10-PCCC": "Trụ sở cảnh sát PCCC",
-  "11-NT": "Nhà tang lễ, nghĩa trang",
-  "8-VH": "Nhà văn hóa, thể thao"
-};
+
+const TYPE_LABELS = Object.fromEntries(
+  HTXH_POINT_TYPES.filter(t => OSM_TYPE_CODES.includes(t.code)).map(t => [t.code, t.label.replace(/^\d+\.\s*/, '')])
+);
 const LEISURE_VI = {
   sports_centre: 'Nhà thi đấu, trung tâm thể thao',
   pitch: 'Sân thể thao',

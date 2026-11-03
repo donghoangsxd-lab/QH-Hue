@@ -3,12 +3,7 @@
 // PDF cán bộ (quy chế, văn bản kèm) nằm ở cho-duyet/<id>.pdf cho tới khi duyệt.
 const crypto = require('crypto');
 const { landsFromFeatures, boundaryFromFeatures } = require('./landDedupe');
-
-const NET_ROLES = new Set([
-  'ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc',
-  'ht-cap-dien', 'qh-cap-dien', 'ht-san-nen', 'qh-san-nen', 'ht-thoat-thai', 'qh-thoat-thai',
-  'ht-chat-thai', 'qh-chat-thai', 'ht-vien-thong', 'qh-vien-thong'
-]);
+const { NET_ROLE_SET: NET_ROLES } = require('./netRoles');
 
 const DRAW_KINDS = new Set(['su-dung-dat', 'hien-trang', 'ranh-gioi', 'ban-ve']);
 const PDF_KINDS = new Set(['van-ban', 'quy-che']);
@@ -105,7 +100,15 @@ function stagePdf(key, unitKey, name, line, pdf) {
   return { kind: key, unit: unitKey, tenQH: name, summary: line || fileName, pdf: { name: fileName, bytes, object, role } };
 }
 
-function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, lotReview, clip, pdf }) {
+function investGeom(geometry) {
+  if (!geometry || typeof geometry !== 'object') return null;
+  if (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon') return null;
+  const text = JSON.stringify(geometry);
+  if (text.length > 800000) throw fail(413, 'Ranh dự án quá lớn');
+  return geometry;
+}
+
+function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, lotReview, clip, pdf, geometry, groupId }) {
   const key = String(kind || '');
   const name = String(tenQH || '').trim().slice(0, 120);
   const unitKey = String(unit || '').trim();
@@ -118,6 +121,23 @@ function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, 
   if (key === 'kien-truc') {
     if (!point || typeof point !== 'object') throw fail(400, 'Thiếu công trình');
     return { kind: key, unit: unitKey, tenQH: '', summary: line || String(point.name || ''), point };
+  }
+  if (key === 'du-an') {
+    const packet = fields && typeof fields === 'object' && !Array.isArray(fields) ? fields : {};
+    const geom = investGeom(geometry);
+    const title = (name || line || '').trim().slice(0, 200);
+    if (!title && !geom) throw fail(400, 'Cần tên dự án hoặc ranh giới');
+    const ten = title || 'Đề xuất chưa đặt tên';
+    const stored = {
+      kind: key,
+      unit: unitKey || 'tp:TP',
+      tenQH: ten,
+      summary: line || ten,
+      fields: packet,
+      groupId: String(groupId || '').slice(0, 40)
+    };
+    if (geom) stored.geometry = geom;
+    return stored;
   }
   if (!DRAW_KINDS.has(key)) throw fail(400, 'Loại hồ sơ không hợp lệ');
   if (!name) throw fail(400, 'Thiếu tên đồ án');
@@ -136,7 +156,7 @@ function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, 
   return stored;
 }
 
-async function applyPublication(obj, { projects, callAppsScript, publishKienTruc, readPendingPdf }) {
+async function applyPublication(obj, { projects, callAppsScript, publishKienTruc, publishInvest, readPendingPdf }) {
   const kind = obj && obj.kind;
   if (kind === 'quy-che' || kind === 'van-ban') {
     const object = obj.pdf && obj.pdf.object;
@@ -175,6 +195,11 @@ async function applyPublication(obj, { projects, callAppsScript, publishKienTruc
     await publishKienTruc(obj.point || {}, obj.email);
     return { published: true, note: '' };
   }
+  if (kind === 'du-an') {
+    if (typeof publishInvest !== 'function') throw fail(500, 'Thiếu bước ghi dự án');
+    await publishInvest(obj);
+    return { published: true, note: 'Đã ghi dự án đầu tư.' };
+  }
   if (kind === 'ban-ve') {
     await projects.saveNet({ tenQH: obj.tenQH, role: obj.role, features: obj.features });
     return { published: true, note: '' };
@@ -198,4 +223,4 @@ async function applyPublication(obj, { projects, callAppsScript, publishKienTruc
   throw fail(400, 'Loại hồ sơ không hợp lệ');
 }
 
-module.exports = { stageSpec, applyPublication, applyLotKeep, NET_ROLES, DRAW_KINDS, PDF_KINDS };
+module.exports = { stageSpec, applyPublication, applyLotKeep, NET_ROLES, DRAW_KINDS, PDF_KINDS, NET_ROLE_SET: NET_ROLES };

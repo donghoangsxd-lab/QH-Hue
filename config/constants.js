@@ -85,6 +85,17 @@ function parkTierOf(size, urbanNhom) {
 
 // D. MẠNG LƯỚI HẠ TẦNG KHÁC — không có chỉ tiêu m²/người theo phường, không tính vào quy mô / độ phủ / heatmap của 8 nhóm
 const NETWORK_CODES = ["13-BUS", "10-PCCC", "11-NT", "14-NOXH"];
+/** Điểm HTKT lẻ (đề xuất trục C) — tab Sheet tự tạo như mạng lưới; không bán kính QCVN xã hội. */
+const HTKT_POINT_CODES = ["15-GT", "16-CN", "17-CD", "18-SM", "19-XL", "20-CTR", "21-TT"];
+const htktPointConfig = {
+  "15-GT": { label: "HTKT Giao thông", radius: 0, noArea: true },
+  "16-CN": { label: "HTKT Cấp nước", radius: 0, noArea: true },
+  "17-CD": { label: "HTKT Cấp điện", radius: 0, noArea: true },
+  "18-SM": { label: "HTKT San nền / thoát mưa", radius: 0, noArea: true },
+  "19-XL": { label: "HTKT Thoát nước thải", radius: 0, noArea: true },
+  "20-CTR": { label: "HTKT Chất thải rắn", radius: 0, noArea: true },
+  "21-TT": { label: "HTKT Viễn thông", radius: 0, noArea: true }
+};
 const networkConfig = {
   // Mục 2.8.3.3: đi bộ đến bến ≤ 500 m; khu trung tâm: bến xe buýt cách nhau ≤ 600 m.
   // gapIgnore: bỏ qua trạm cách < 100 m khi tìm trạm kế cận (cặp trạm 2 bên đường)
@@ -270,10 +281,13 @@ const constants = {
   // Danh sách mã nhóm hạ tầng tiêu chuẩn phục vụ đánh giá quy chuẩn
   CODES_TO_CHECK: ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"],
   NETWORK_CODES,
+  HTKT_POINT_CODES,
+  htktPointConfig,
   networkConfig,
   NT_KINDS,
   ntKind,
   isNetworkCode: (code) => NETWORK_CODES.includes(code),
+  isHtktPointCode: (code) => HTKT_POINT_CODES.includes(code),
 
   // Gán hạ tầng hiện trạng cho một thửa địa chính (tab HaTangHienTrang).
   // cap: urban / unit cố định, choose = admin chọn, auto = công viên theo diện tích (PARK_TIERS).
@@ -345,6 +359,8 @@ const constants = {
     "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH",
     "THCS": "5-THCS", "YT": "7-YT", "VH": "8-VH", "TM": "9-TM",
     "PCCC": "10-PCCC", "NT": "11-NT", "CSD": "12-CSD", "BUS": "13-BUS", "NOXH": "14-NOXH",
+    "GT": "15-GT", "CN": "16-CN", "CD": "17-CD", "SM": "18-SM", "XL": "19-XL", "CTR": "20-CTR", "TT": "21-TT",
+    "15": "15-GT", "16": "16-CN", "17": "17-CD", "18": "18-SM", "19": "19-XL", "20": "20-CTR", "21": "21-TT",
     // THPT (tab 6-THPT) tính chung mã 4-TH; isThptItem tách chỉ tiêu và độ phủ riêng
     "THPT": "4-TH",
     "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH", "5": "5-THCS",
@@ -411,6 +427,7 @@ const constants = {
   standardRadius: function(item, profile = 'DT') {
     if (this.isThptItem(item)) return urbanInfraConfig.THPT.radius;
     const code = this.resolveTypeCode(item);
+    if (HTKT_POINT_CODES.includes(code)) return 0;
     if (code === '1-CV') return this.parkTier(item).radius;
     if (NETWORK_CODES.includes(code)) return this.networkRadius(item, code, profile);
     if (this.isUrbanLevel(item) && CODE_LEVEL_KEYS[code] && urbanInfraConfig[CODE_LEVEL_KEYS[code][0]]) {

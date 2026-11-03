@@ -23,6 +23,7 @@ const pdfLimits = require('./pdfLimits');
 const gcsWrite = require('./gcsWrite');
 const { pendingDecisionObject } = require('./pdfPaths');
 const { adjustSubmitMode } = require('./adjustDraft');
+const { NET_ROLES: BAN_VE_NET_ROLES } = require('./netRoles');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
 
 const INDEX_NAME = 'projects/index.json';
@@ -1888,14 +1889,9 @@ async function linkInfraLots({ tenQH, pairs }) {
 
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
-// Bản vẽ riêng từng đồ án. Khớp NET_LAYERS. Ba role *-hoso là file cũ, không lên lớp.
-// Form nhập của quản trị ghi su-dung-dat, hien-trang hoặc ranh-gioi (publishSchemeDraw).
-// ht-thoat-nuoc giữ nguyên. Nước thải dùng ht-thoat-thai / qh-thoat-thai.
-const NET_ROLES = [
-  'ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien',
-  'ht-san-nen', 'qh-san-nen', 'ht-thoat-thai', 'qh-thoat-thai', 'ht-chat-thai', 'qh-chat-thai', 'ht-vien-thong', 'qh-vien-thong',
-  'ht-dat-hoso', 'qh-dat-hoso', 'ranh-hoso'
-];
+// Bản vẽ riêng từng đồ án. Khớp services/netRoles.js + NET_LAYERS.
+// Ba role *-hoso là file cũ, không lên lớp. Form nhập ghi su-dung-dat / hien-trang / ranh-gioi.
+const NET_ROLES = [...BAN_VE_NET_ROLES, 'ht-dat-hoso', 'qh-dat-hoso', 'ranh-hoso'];
 const NET_GEOM = new Set(['Point', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
 const NET_MAX_FEATURES = 4000;
 const NET_MAX_CHARS = 1500000;

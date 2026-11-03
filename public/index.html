@@ -1319,7 +1319,7 @@
         </div>
 
         <div id="addCho" style="display:none;">
-          <div class="cad-hint">Hồ sơ cán bộ (tab CanBo, Trạng thái TRUE) nằm ở đây cho đến khi duyệt. Duyệt chuyển vào bảng hoặc lớp bản đồ của đồ án. Từ chối ghi lý do. Người xem bản đồ không thấy hàng chờ. Bấm tải danh sách mới đọc Sheet. Xem trên bản đồ: lô đỏ là lô ngoài ranh hoặc bị cắt. Tick lô đỏ để giữ hình gốc; lựa chọn ghi vào cột Lý do của dòng ChoDuyet.</div>
+          <div class="cad-hint">Facade hàng chờ: hồ sơ cán bộ / đề xuất dự án (ChoDuyet) và điểm HTXH·HTKT đang <b>TrangThai = FALSE</b> đã nạp trên máy. Duyệt hồ sơ chuyển vào bảng hoặc lớp đồ án; duyệt điểm gọi approvePoint. CAD pending và điều chỉnh cục bộ vẫn ở panel riêng. Người xem bản đồ không thấy hàng chờ.</div>
           <button type="button" class="btn-submit" id="btnChoLoad">Tải danh sách chờ duyệt</button>
           <div id="choStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="choKeep"></div>
@@ -1381,8 +1381,12 @@
           </details>
         </div>
         <div id="flowHtkt" hidden>
-          <p class="entry-note">Bản vẽ mạng bảy ngành hạ tầng kỹ thuật, gắn vào một đồ án. Chọn ngành rồi tải hiện trạng hoặc quy hoạch.</p>
+          <div class="add-mode-switch entry-sub" id="htktPaneTabs" role="tablist" aria-label="Hạ tầng kỹ thuật">
+            <button type="button" class="entry-sub-btn active" data-htkt-pane="net" role="tab" aria-selected="true">Bản vẽ mạng</button>
+            <button type="button" class="entry-sub-btn" data-htkt-pane="diem" role="tab" aria-selected="false">Điểm lẻ</button>
+          </div>
           <div id="htktBox"></div>
+          <div id="htktPointBox" hidden></div>
         </div>
         <div id="flowHtxh" hidden>
           <p class="entry-note">Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án.</p>

@@ -259,6 +259,44 @@ function investStoreText(items, groups) {
   return JSON.stringify({ v: 1, saved: Date.now(), items, groups });
 }
 
+async function writeInvestEdit({ key, match, fields, groupId, geometry }) {
+  const store = parseInvestStore((await getInvestEdits())?.text);
+  const current = store.items.filter(it => it.key !== key);
+  const row = { key, match: match || '', fields };
+  if (groupId) row.groupId = groupId;
+  if (geometry) row.geometry = geometry;
+  current.push(row);
+  if (current.length > INVEST_EDIT_MAX) {
+    const err = new Error('Quá nhiều dự án đã sửa');
+    err.status = 413;
+    throw err;
+  }
+  const text = investStoreText(current, store.groups);
+  if (text.length > 1200000) {
+    const err = new Error('Bản hiệu chỉnh quá lớn');
+    err.status = 413;
+    throw err;
+  }
+  await gcsWrite.putJson(INVEST_EDITS_NAME, text);
+  forgetTextFile(constants.INVEST_EDITS_URL);
+  return { groupId: groupId || '', hasGeometry: !!geometry };
+}
+
+async function publishInvestFromStage(obj) {
+  const key = cleanInvestText(obj && obj.tenQH, 200) || 'Đề xuất chưa đặt tên';
+  const packet = { ...(obj && obj.fields && typeof obj.fields === 'object' ? obj.fields : {}) };
+  if (!investProjectName(packet)) packet['Tên dự án'] = key;
+  const fields = parseInvestFields(packet) || { 'Tên dự án': key };
+  const groupId = cleanInvestGroupId(obj && obj.groupId);
+  const geometry = obj && obj.geometry ? cleanInvestGeometry(obj.geometry) : undefined;
+  if (obj && obj.geometry && !geometry) {
+    const err = new Error('Ranh chỉ nhận Polygon hoặc MultiPolygon');
+    err.status = 400;
+    throw err;
+  }
+  await writeInvestEdit({ key, match: key, fields, groupId, geometry });
+}
+
 function applyInvestEdits(base, items) {
   const data = base ? JSON.parse(JSON.stringify(base)) : { headers: [], rows: [] };
   if (!Array.isArray(data.rows)) data.rows = [];
@@ -359,7 +397,8 @@ function checkPendingPdfRate(req) {
 }
 const URBAN_UNIT_RE = /^(tp:TP|dothi:[a-z0-9]+(?:-[a-z0-9]+)*|xa:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const URBAN_FIELDS = new Set([
-  'danSo', 'danSoTamTru', 'dienTich', 'matDoDuong', 'ldPhiNong', 'nuocSach', 'matDoCong', 'xlnt', 'ctr',
+  'danSo', 'danSoTamTru', 'dienTich', 'thangCapNhat', 'loaiPhuong', 'xaDatChuan', 'loaiDoThi', 'hienTrangDoThi',
+  'matDoDuong', 'ldPhiNong', 'nuocSach', 'matDoCong', 'xlnt', 'ctr',
   'nghiaTrang', 'giuongBenh', 'khongGianXanh', 'vaiTro', 'trungTam', 'dauMoiGt', 'quyCheKt',
   'i01', 'i02', 'i03', 'i04', 'i05', 'i06', 'i11', 'i13', 'i14', 'i15'
 ]);
@@ -461,7 +500,9 @@ async function publishKienTrucPoint(point, email) {
   const pt = parseCoordInBounds(point.lat, point.lng);
   const noArea = isNetwork && !!constants.networkConfig[type].noArea;
   const khuVuc = String(point.khuVuc || '');
-  if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) throw httpError(400, 'Loại công trình không hợp lệ');
+  if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES, ...constants.HTKT_POINT_CODES].includes(type)) {
+    throw httpError(400, 'Loại công trình không hợp lệ');
+  }
   if (!name) throw httpError(400, 'Thiếu tên công trình');
   if (!pt) throw httpError(400, 'Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế');
   if (!Number.isFinite(size) || size < 0 || size > 1e8) throw httpError(400, 'Diện tích không hợp lệ');
@@ -3269,17 +3310,45 @@ module.exports = async (req, res) => {
       if (body.geometry !== undefined && body.geometry !== null && !geometry) {
         return res.status(400).json({ error: true, message: 'Ranh chỉ nhận Polygon hoặc MultiPolygon' });
       }
-      const current = store.items.filter(it => it.key !== key);
-      const row = { key, match, fields };
-      if (groupId) row.groupId = groupId;
-      if (geometry) row.geometry = geometry;
-      current.push(row);
-      if (current.length > INVEST_EDIT_MAX) return res.status(413).json({ error: true, message: 'Quá nhiều dự án đã sửa' });
-      const text = investStoreText(current, store.groups);
-      if (text.length > 1200000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
-      await gcsWrite.putJson(INVEST_EDITS_NAME, text);
-      forgetTextFile(constants.INVEST_EDITS_URL);
-      return res.status(200).json({ success: true, groupId: groupId || null, hasGeometry: !!geometry });
+      try {
+        const written = await writeInvestEdit({ key, match, fields, groupId, geometry });
+        return res.status(200).json({ success: true, groupId: written.groupId || null, hasGeometry: !!written.hasGeometry });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được dự án' });
+      }
+    }
+
+    // User đăng nhập Google đề xuất dự án (tên hoặc ranh) → hàng chờ kind du-an.
+    if (action === 'submitInvestProposal') {
+      requirePostFromApp(req);
+      checkAddPointRate(req);
+      const actor = await entryActor(req);
+      if (actor.admin) return res.status(400).json({ error: true, message: 'Quản trị ghi thẳng bằng Lưu dự án, không gửi hàng chờ' });
+      const body = readJsonBody(req);
+      const name = cleanInvestText(body.key || body.name || body.tenQH, 200);
+      const groupId = cleanInvestGroupId(body.groupId);
+      const decision = cleanInvestText(body.decision, 300);
+      const fields = parseInvestFields(body.fields) || {};
+      if (name) fields['Tên dự án'] = name;
+      if (decision && !fields['Quyết định pháp lý']) fields['Quyết định pháp lý'] = decision;
+      const geometry = body.geometry != null ? cleanInvestGeometry(body.geometry) : null;
+      if (body.geometry != null && !geometry) {
+        return res.status(400).json({ error: true, message: 'Ranh chỉ nhận Polygon hoặc MultiPolygon' });
+      }
+      try {
+        const staged = await stageChoDuyet(actor, {
+          kind: 'du-an',
+          unit: 'tp:TP',
+          tenQH: name,
+          summary: name || (geometry ? 'Đề xuất ranh dự án' : ''),
+          fields,
+          groupId,
+          geometry: geometry || undefined
+        });
+        return res.status(200).json({ success: true, staged: true, id: staged.id });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gửi được đề xuất dự án' });
+      }
     }
 
     // Gộp nhiều ranh KML thành một dự án. keys là khóa ranh; clear=true thì chỉ gỡ các khóa đó khỏi nhóm.
@@ -4569,13 +4638,17 @@ module.exports = async (req, res) => {
       const type = String(body.type || '');
       const name = sanitizeSheetText(body.name, 150);
       const isNetwork = constants.isNetworkCode(type);
-      const nhomHaTang = isNetwork || body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+      const isHtkt = constants.isHtktPointCode(type);
+      const nhomHaTang = isNetwork || isHtkt || body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
       const size = Number(body.size || 0);
       const pt = parseCoordInBounds(body.lat, body.lng);
-      const noArea = isNetwork && !!constants.networkConfig[type].noArea;
+      const noArea = (isNetwork && !!constants.networkConfig[type].noArea)
+        || (isHtkt && !!(constants.htktPointConfig[type] || {}).noArea);
 
-      if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
+      if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES, ...constants.HTKT_POINT_CODES].includes(type)) {
+        return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
+      }
       if (!name) return res.status(400).json({ error: true, message: "Thiếu tên công trình" });
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế" });
       if (!Number.isFinite(size) || size < 0 || size > 1e8) return res.status(400).json({ error: true, message: "Diện tích không hợp lệ" });
@@ -4584,7 +4657,7 @@ module.exports = async (req, res) => {
       const evaluatedWardsForAdd = await loadEvaluatedWards(wardVectorParsed);
       const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForAdd);
       if (!geoWard) return res.status(400).json({ error: true, message: "Vị trí nằm ngoài ranh giới 40 phường/xã" });
-      const radius = qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
+      const radius = isHtkt ? 0 : qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
 
       const result = await callAppsScript({
         action: 'addPoint',
@@ -4653,7 +4726,9 @@ module.exports = async (req, res) => {
         const type = String(body.type || '');
         const name = sanitizeSheetText(body.name, 150);
         const pt = parseCoordInBounds(body.lat, body.lng);
-        if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
+        if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES, ...constants.HTKT_POINT_CODES].includes(type)) {
+          return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
+        }
         if (!name || !pt) return res.status(400).json({ error: true, message: 'Thiếu tên hoặc tọa độ hợp lệ' });
         const staged = await stageChoDuyet(actor, {
           kind: 'kien-truc',
@@ -4782,6 +4857,9 @@ module.exports = async (req, res) => {
           return res.status(200).send(buffer);
         }
         const features = Array.isArray(obj.features) ? obj.features : [];
+        if (obj.kind === 'du-an' && obj.geometry) {
+          features.push({ name: obj.tenQH || '', geometry: obj.geometry, props: { ...(obj.fields || {}) } });
+        }
         const pdf = obj.pdf && obj.pdf.name ? { name: String(obj.pdf.name).slice(0, 120), bytes: Number(obj.pdf.bytes) || 0 } : null;
         return res.status(200).json({
           success: true,
@@ -4791,6 +4869,7 @@ module.exports = async (req, res) => {
           tenQH: row.tenQH || '',
           unit: row.unit || '',
           features,
+          fields: obj.kind === 'du-an' && obj.fields ? obj.fields : undefined,
           pdf,
           lotReview: Array.isArray(obj.lotReview) ? obj.lotReview : [],
           clip: obj.clip || null
@@ -4811,6 +4890,7 @@ module.exports = async (req, res) => {
         projects,
         callAppsScript: (params, payload) => scriptEntry(params.action, payload),
         publishKienTruc: (point, email) => publishKienTrucPoint(point, email),
+        publishInvest: publishInvestFromStage,
         readPendingPdf: (name) => choDuyet.readPdf(name)
       });
       const keepNote = keepIds.length ? `Giữ hình gốc: ${keepIds.join(', ')}` : '';

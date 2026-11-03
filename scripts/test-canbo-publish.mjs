@@ -54,6 +54,18 @@ assert.throws(() => stageSpec({
   tenQH: 'QHC Khe Tre',
   features: [{ name: 'điểm', geometry: { type: 'Point', coordinates: [107.5, 16.4] }, props: {} }]
 }), /vùng/);
+const invest = stageSpec({
+  kind: 'du-an',
+  unit: 'tp:TP',
+  tenQH: 'Khu đô thị mới',
+  fields: { 'Tên dự án': 'Khu đô thị mới' },
+  geometry: poly
+});
+assert.equal(invest.kind, 'du-an');
+assert.equal(invest.tenQH, 'Khu đô thị mới');
+assert.equal(invest.geometry.type, 'Polygon');
+assert.throws(() => stageSpec({ kind: 'du-an', unit: 'tp:TP', fields: {} }), /tên dự án hoặc ranh/);
+assert.ok(script.includes('"du-an": true'));
 const storeSrc = fs.readFileSync(new URL('../services/choDuyetStore.js', import.meta.url), 'utf8');
 assert.match(storeSrc, /cho-duyet\/\$\{id\}\.json/);
 assert.match(storeSrc, /private, no-store/);

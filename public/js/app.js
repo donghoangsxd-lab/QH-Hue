@@ -192,7 +192,8 @@ const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1
 const RURAL_UNIT_RADIUS = 2000;
 const isThptName = (name) => /THPT|TRUNG HOC PHO THONG/.test(String(name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D'));
 // Mạng lưới: trạm xe buýt 500 m đi bộ (Mục 2.8.3.3), PCCC 3 km phường / 5 km xã (Mục 2.5.13.1), nghĩa trang theo Bảng 23
-const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
+const NO_AREA_TYPES = ["13-BUS", "10-PCCC", "15-GT", "16-CN", "17-CD", "18-SM", "19-XL", "20-CTR", "21-TT"];
+const HTKT_TYPES = new Set(["15-GT", "16-CN", "17-CD", "18-SM", "19-XL", "20-CTR", "21-TT"]);
 const NT_SAFETY = { funeral: 0, crematorium: 500, cemetery_cat: 100, cemetery_once: 500, cemetery_hung: 1000 };
 function networkRadius(type, ward, name) {
   if (type === '13-BUS') return 500;
@@ -201,6 +202,7 @@ function networkRadius(type, ward, name) {
   return NT_SAFETY[ntKindOf({ name })];
 }
 function qcvnRadius(type, nhomHaTang, ward, name, size) {
+  if (HTKT_TYPES.has(type)) return 0;
   if (isNetworkType(type)) return networkRadius(type, ward, name);
   if (type === '1-CV') return parkTierOf(size, nhomHaTang).radius;
   if (type === '6-THPT') return URBAN_RADIUS;
@@ -211,7 +213,8 @@ function qcvnRadius(type, nhomHaTang, ward, name, size) {
 
 const POINT_IDS = {
   new: { type: 'newType', nhom: 'newNhomHaTang', name: 'newName', lat: 'newLat', lng: 'newLng', ward: 'newWard', size: 'newSize', phase: 'newPhase', radius: 'newRadius' },
-  kt: { type: 'ktType', nhom: 'ktNhomHaTang', name: 'ktName', lat: 'ktLat', lng: 'ktLng', ward: 'ktWard', size: 'ktSize', phase: 'ktPhase', radius: 'ktRadius' }
+  kt: { type: 'ktType', nhom: 'ktNhomHaTang', name: 'ktName', lat: 'ktLat', lng: 'ktLng', ward: 'ktWard', size: 'ktSize', phase: 'ktPhase', radius: 'ktRadius' },
+  htkt: { type: 'htktType', nhom: 'htktNhomHaTang', name: 'htktName', lat: 'htktLat', lng: 'htktLng', ward: 'htktWard', size: 'htktSize', phase: 'htktPhase', radius: 'htktRadius' }
 };
 
 function pointIds(prefix) {
@@ -219,11 +222,11 @@ function pointIds(prefix) {
 }
 
 function pointStatus(prefix, text, color) {
-  if (prefix !== 'kt') {
+  if (prefix === 'new') {
     setStatus(text, color);
     return;
   }
-  const el = document.getElementById('ktStatus');
+  const el = document.getElementById(prefix === 'kt' ? 'ktStatus' : `${prefix}Status`);
   if (!el) return;
   el.style.color = color || '';
   el.textContent = text;
@@ -250,6 +253,10 @@ export function updateRadiusPreview(prefix = 'new') {
   }
   if (type === '14-NOXH') {
     out.innerHTML = '<small>Chung cư: không có bán kính phục vụ, chỉ thể hiện vị trí và diện tích</small>';
+    return;
+  }
+  if (HTKT_TYPES.has(type)) {
+    out.innerHTML = '<small>Điểm HTKT kỹ thuật: không áp bán kính QCVN hạ tầng xã hội</small>';
     return;
   }
   if (isNetworkType(type)) {
@@ -308,7 +315,7 @@ export async function submitInfraPoint(prefix, extra = {}) {
   pointSubmitting = true;
   pointStatus(prefix, arch ? 'Đang gửi công trình.' : 'Đang gửi đề xuất.', 'var(--accent-orange)');
   try {
-    const body = { type, nhomHaTang, name, lat, lng, size, phase };
+    const body = { type, nhomHaTang: HTKT_TYPES.has(type) ? 'Cấp đô thị' : nhomHaTang, name, lat, lng, size, phase };
     if (arch && extra.fields) Object.assign(body, extra.fields);
     if (!arch) markDataWritten();
     const headers = { 'Content-Type': 'application/json' };
@@ -662,7 +669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lat = latlng.lat.toFixed(6);
     const lng = latlng.lng.toFixed(6);
     const seq = ++pickSeq;
-    const prefix = state.pickTarget === 'kientruc' ? 'kt' : 'new';
+    const prefix = state.pickTarget === 'kientruc' ? 'kt' : state.pickTarget === 'htkt' ? 'htkt' : 'new';
     const ids = pointIds(prefix);
     const inputLat = document.getElementById(ids.lat);
     const inputLng = document.getElementById(ids.lng);

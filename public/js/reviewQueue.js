@@ -1,8 +1,10 @@
-// Quản trị: hàng chờ cán bộ. Tải danh sách và xem bản đồ chỉ khi bấm nút.
-import { map } from './mapEngine.js';
+// Quản trị: facade hàng chờ — ChoDuyet (B/C-net/E/F) + điểm FALSE (C-điểm/D) trên máy.
+import { map, approvePointStatus } from './mapEngine.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml } from './utils.js';
+import { DRAW_SUPPORTS } from './entrySteps.js';
+import { HTKT_POINT_CODES } from './pointEntrySchema.js';
 
 const $ = (id) => document.getElementById(id);
 const KIND_LABEL = {
@@ -13,9 +15,11 @@ const KIND_LABEL = {
   'ranh-gioi': 'Ranh giới',
   'ban-ve': 'Bản vẽ hạ tầng',
   'van-ban': 'Văn bản PDF',
-  'quy-che': 'Quy chế kiến trúc'
+  'quy-che': 'Quy chế kiến trúc',
+  'du-an': 'Dự án đầu tư'
 };
 const PDF_KIND = new Set(['van-ban', 'quy-che']);
+const HTKT_SET = new Set(HTKT_POINT_CODES);
 
 let preview = null;
 let previewRenderer = null;
@@ -97,6 +101,21 @@ function showFeatures(features, review) {
   } catch (e) { /* ranh rỗng */ }
 }
 
+function isPendingStatus(status) {
+  return status === false || status === 'FALSE' || status === 0 || status === '0';
+}
+
+function pendingPoints() {
+  const seen = new Set();
+  const rows = [];
+  [...(state.rawDataList || []), ...(state.planDataList || [])].forEach(p => {
+    if (!p || !p.id || seen.has(p.id) || !isPendingStatus(p.status)) return;
+    seen.add(p.id);
+    rows.push(p);
+  });
+  return rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+}
+
 function rowHtml(row) {
   const id = escapeHtml(row.id || '');
   const kind = KIND_LABEL[row.kind] || row.kind || '';
@@ -110,6 +129,19 @@ function rowHtml(row) {
     <button type="button" class="btn-submit" data-act="approve" data-id="${id}">Duyệt</button>
     <input data-reason="${id}" maxlength="300" placeholder="Lý do từ chối">
     <button type="button" class="btn-submit btn-secondary" data-act="reject" data-id="${id}">Từ chối</button>
+  </article>`;
+}
+
+function pointRowHtml(p) {
+  const id = escapeHtml(p.id || '');
+  const domain = HTKT_SET.has(p.type) ? 'HTKT' : 'HTXH';
+  return `<article class="cad-item">
+    <b>Điểm ${domain}</b>
+    <span>${escapeHtml(p.type || '')} · ${escapeHtml(p.ward || '')}</span>
+    <span>${escapeHtml(p.name || '')}</span>
+    <span>TrangThai = FALSE</span>
+    <button type="button" class="btn-submit btn-secondary" data-act="focus-point" data-id="${id}">Xem trên bản đồ</button>
+    <button type="button" class="btn-submit" data-act="approve-point" data-id="${id}">Duyệt điểm</button>
   </article>`;
 }
 
@@ -128,6 +160,13 @@ function paintKeep(id, review, clip) {
     <div class="lot-keep">${review.map(item => `<label><input type="checkbox" data-keep="${escapeHtml(item.id)}"> ${escapeHtml(item.name || item.id)} — ${item.status === 'bo' ? 'bỏ, ngoài ranh' : 'cắt theo ranh'}</label>`).join('')}</div>`;
 }
 
+function formatNote(hosoN, pointN) {
+  const formats = Object.entries(DRAW_SUPPORTS)
+    .map(([ext, modes]) => `${ext}: ${modes.join('+')}`)
+    .join('; ');
+  return `${hosoN} hồ sơ ChoDuyet · ${pointN} điểm chờ (FALSE). CAD/adjust vẫn ở panel riêng. Định dạng bản vẽ — ${formats}.`;
+}
+
 async function loadList() {
   const status = $('choStatus');
   const list = $('choList');
@@ -138,8 +177,18 @@ async function loadList() {
   try {
     const data = await post('listChoDuyet', {});
     const rows = data.rows || [];
-    list.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<p class="entry-note">Không có hồ sơ chờ duyệt.</p>';
-    if (status) status.textContent = `${rows.length} hồ sơ chờ duyệt.`;
+    const points = pendingPoints();
+    const parts = [];
+    if (rows.length) {
+      parts.push('<p class="entry-note"><b>Hồ sơ cán bộ / đề xuất F</b></p>');
+      parts.push(rows.map(rowHtml).join(''));
+    }
+    if (points.length) {
+      parts.push('<p class="entry-note"><b>Điểm hạ tầng chờ duyệt (C / D)</b></p>');
+      parts.push(points.map(pointRowHtml).join(''));
+    }
+    list.innerHTML = parts.length ? parts.join('') : '<p class="entry-note">Không có hồ sơ hoặc điểm chờ duyệt.</p>';
+    if (status) status.textContent = formatNote(rows.length, points.length);
   } catch (err) {
     if (status) status.textContent = err.message;
   }
@@ -151,6 +200,22 @@ async function onListClick(event) {
   const id = button.dataset.id || '';
   const status = $('choStatus');
   try {
+    if (button.dataset.act === 'focus-point') {
+      const p = pendingPoints().find(row => row.id === id);
+      if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lng) || !map) {
+        if (status) status.textContent = 'Không tìm thấy tọa độ điểm.';
+        return;
+      }
+      showFeatures([{ name: p.name, geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, props: {} }], []);
+      if (status) status.textContent = `Đang xem điểm ${p.name || id}. Duyệt trên hàng này hoặc popup bản đồ.`;
+      return;
+    }
+    if (button.dataset.act === 'approve-point') {
+      if (status) status.textContent = 'Đang duyệt điểm.';
+      await approvePointStatus(id);
+      await loadList();
+      return;
+    }
     if (button.dataset.act === 'preview') {
       const data = await post('previewChoDuyet', { id });
       if (data.pdf || PDF_KIND.has(button.dataset.kind || '')) {
