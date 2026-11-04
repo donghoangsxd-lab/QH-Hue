@@ -30,6 +30,9 @@ if (!js.includes('INSPECT_INNER_OPACITY = 0.42') || !js.includes('soft = false')
 if (!js.includes('bindAccessPinLayout') || !js.includes('layoutAccessPins')) {
   throw new Error('thiếu né va chạm nhãn');
 }
+if (!/function boxesOverlap\s*\([^)]*\)\s*\{/.test(js)) {
+  throw new Error('boxesOverlap thiếu thân hàm { } — mapEngine không nạp được');
+}
 if (!js.includes('inspect-lot-chip') || !js.includes('ACCESS_PIN_W')) {
   throw new Error('thiếu chip DivIcon');
 }
