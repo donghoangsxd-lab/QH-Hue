@@ -174,9 +174,8 @@ function shapeMeasure(tool, lls) {
   return `Dài ${fmtLen(pathLen(lls))}`;
 }
 
-function shapeTip(tool, text, m) {
-  const label = TOOLS[tool]?.label || 'Hình';
-  return `${label} · ${text} · ${stateName(m)} · chuột phải để chỉnh · Delete để xóa`;
+function shapeTip(tool, text) {
+  return text || TOOLS[tool]?.label || 'Hình';
 }
 
 function shapeLayers(tool, lls, c, preview, hostMap) {
@@ -447,7 +446,7 @@ function paintShape(fg) {
   fg.clearLayers();
   layers.forEach(l => fg.addLayer(l));
   armHit(fg);
-  const tip = shapeTip(s.tool, text, fg.sketchHost || map);
+  const tip = shapeTip(s.tool, text);
   const editing = live?.fg === fg && live.session.isEditing();
   if (fg._skTipEdit !== editing || !fg.getTooltip()) {
     fg.unbindTooltip();
@@ -560,7 +559,7 @@ function finish() {
   const m = drawMap || map;
   const { layers, text } = shapeLayers(t, pts, color, false, m);
   const fg = L.featureGroup(layers);
-  fg.bindTooltip(shapeTip(t, text, m), { sticky: true, className: 'sketch-tip' });
+  fg.bindTooltip(shapeTip(t, text), { sticky: true, className: 'sketch-tip' });
   fg.sketch = { tool: t, pts: pts.map(p => L.latLng(p)), color };
   if (t === 'arrow') fg.sketch.head = arrowHead(pts[0], pts[1]);
   addShape(fg, m);
@@ -611,7 +610,7 @@ function textShape(latlng, text, c, sizePx, m) {
     keyboard: false
   });
   const fg = L.featureGroup([marker]);
-  fg.bindTooltip('Chữ · chuột phải để sửa · Delete để xóa', { sticky: true, className: 'sketch-tip' });
+  fg.bindTooltip('Chữ', { sticky: true, className: 'sketch-tip' });
   // Chiều cao chữ ngoài thực địa theo mức phóng lúc ghi (để DXF ra đúng cỡ như đang thấy)
   fg.sketch = { tool: 'text', pts: [L.latLng(latlng)], color: c, text, sizePx, heightM: sizePx * metersPerPixel(latlng.lat, m) };
   return fg;
@@ -899,7 +898,7 @@ async function importKmlFile(file) {
     const { layers, text } = shapeLayers(s.tool, lls, c, false, host);
     const fg = L.featureGroup(layers);
     fg.sketch = { tool: s.tool, pts: lls, color: c };
-    fg.bindTooltip(shapeTip(s.tool, text, host), { sticky: true, className: 'sketch-tip' });
+    fg.bindTooltip(shapeTip(s.tool, text), { sticky: true, className: 'sketch-tip' });
     addShape(fg, host);
   }
   const bounds = L.latLngBounds(pack.shapes.flatMap(s => s.pts.map(p => [p.lat, p.lng])));
