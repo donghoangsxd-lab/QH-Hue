@@ -4,10 +4,82 @@ import { layerToType } from './cadImport.js';
 
 const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop)$/i;
 const CLOSE_TOL_DEG = 1e-7; // ~1 cm
+const HEX = /^[0-9a-f]+$/i;
 
 const children = (el, name) => [...el.children].filter(c => c.localName === name);
 const childText = (el, name) => { const c = children(el, name)[0]; return c ? c.textContent.trim() : ''; };
 const descendants = (el, name) => [...el.getElementsByTagNameNS('*', name)];
+
+/** KML color aabbggrr (hoặc #rrggbb) → CSS #rrggbb; null nếu không đọc được. */
+export function cssFromKmlColor(raw) {
+  const s = String(raw || '').trim().replace(/^#/, '');
+  if (!HEX.test(s)) return null;
+  if (s.length === 8) return `#${s.slice(6, 8)}${s.slice(4, 6)}${s.slice(2, 4)}`.toLowerCase();
+  if (s.length === 6) return `#${s.toLowerCase()}`;
+  return null;
+}
+
+function styleColor(styleEl, tag) {
+  for (const st of children(styleEl, tag)) {
+    const c = cssFromKmlColor(childText(st, 'color'));
+    if (c) return c;
+  }
+  return null;
+}
+
+/** Từ Style: ưu tiên nét (LineStyle) vì phác thảo dùng một màu cho viền và tô. */
+function colorFromStyleEl(styleEl) {
+  if (!styleEl) return null;
+  return styleColor(styleEl, 'LineStyle')
+    || styleColor(styleEl, 'PolyStyle')
+    || styleColor(styleEl, 'LabelStyle')
+    || styleColor(styleEl, 'IconStyle');
+}
+
+function styleIdFromUrl(url) {
+  const s = String(url || '').trim();
+  const i = s.lastIndexOf('#');
+  return i >= 0 ? s.slice(i + 1) : s;
+}
+
+function indexStyles(doc) {
+  const styles = new Map();
+  const maps = new Map();
+  for (const el of descendants(doc, 'Style')) {
+    const id = el.getAttribute('id');
+    if (id) styles.set(id, el);
+  }
+  for (const el of descendants(doc, 'StyleMap')) {
+    const id = el.getAttribute('id');
+    if (id) maps.set(id, el);
+  }
+  return { styles, maps };
+}
+
+function resolveStyleById(id, styles, maps, seen = new Set()) {
+  if (!id || seen.has(id)) return null;
+  seen.add(id);
+  if (styles.has(id)) return styles.get(id);
+  const sm = maps.get(id);
+  if (!sm) return null;
+  for (const pair of children(sm, 'Pair')) {
+    if (childText(pair, 'key').toLowerCase() !== 'normal') continue;
+    const nested = children(pair, 'Style')[0];
+    if (nested) return nested;
+    return resolveStyleById(styleIdFromUrl(childText(pair, 'styleUrl')), styles, maps, seen);
+  }
+  return null;
+}
+
+/** Style gắn Placemark: Style lồng trước, rồi styleUrl / StyleMap (key=normal). */
+function placemarkColor(pm, styles, maps) {
+  const inline = children(pm, 'Style')[0];
+  const fromInline = colorFromStyleEl(inline);
+  if (fromInline) return fromInline;
+  const url = childText(pm, 'styleUrl');
+  if (!url) return null;
+  return colorFromStyleEl(resolveStyleById(styleIdFromUrl(url), styles, maps));
+}
 
 // ExtendedData (SimpleData/Data) hoặc bảng thuộc tính HTML trong description (ArcGIS)
 function layerField(pm) {
@@ -83,14 +155,16 @@ function dedupeLine(pts) {
 }
 
 /**
- * Đọc KML (văn bản) → { entities: [{kind: 'POLYGON'|'POLYLINE'|'LINE'|'POINT', layer, name, attrs, rings, pt?}], stats }.
- * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point (Placemark không có vùng); đường hở đếm vào stats.skipped.
+ * Đọc KML (văn bản) → { entities: [{kind, layer, name, attrs, rings, pt?, color?}], stats }.
+ * color: CSS #rrggbb từ Style / styleUrl / StyleMap khi có; không có thì bỏ trống.
+ * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point; đường hở đếm vào stats.skipped.
  * opts.openLines: giữ LineString chưa khép thành kind 'LINE' (phác thảo). Nhập CAD không bật tùy chọn này.
  */
 export function parseKml(text, opts = {}) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('File KML lỗi cấu trúc XML.');
   const openLines = !!opts.openLines;
+  const { styles, maps } = indexStyles(doc);
   const stats = { placemark: 0, polygon: 0, polyline: 0, line: 0, point: 0, skipped: {} };
   const skip = (label, n = 1) => { stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
@@ -99,6 +173,7 @@ export function parseKml(text, opts = {}) {
     const name = childText(pm, 'name');
     const layer = resolveLayer(pm, name);
     const attrs = placemarkAttrs(pm, name, folderNames(pm));
+    const color = placemarkColor(pm, styles, maps) || undefined;
     const polyRings = [];
     for (const poly of descendants(pm, 'Polygon')) {
       for (const lr of descendants(poly, 'LinearRing')) {
@@ -118,16 +193,16 @@ export function parseKml(text, opts = {}) {
         if (line) loose.push(line); else skip('line hở');
       } else skip('line hở');
     }
-    if (polyRings.length) { entities.push({ kind: 'POLYGON', layer, name, attrs, rings: polyRings }); stats.polygon++; }
-    if (lineRings.length) { entities.push({ kind: 'POLYLINE', layer, name, attrs, rings: lineRings }); stats.polyline++; }
-    if (loose.length) { entities.push({ kind: 'LINE', layer, name, attrs, rings: loose }); stats.line++; }
+    if (polyRings.length) { entities.push({ kind: 'POLYGON', layer, name, attrs, rings: polyRings, color }); stats.polygon++; }
+    if (lineRings.length) { entities.push({ kind: 'POLYLINE', layer, name, attrs, rings: lineRings, color }); stats.polyline++; }
+    if (loose.length) { entities.push({ kind: 'LINE', layer, name, attrs, rings: loose, color }); stats.line++; }
     const points = descendants(pm, 'Point');
     // Point đi kèm vùng trong cùng Placemark (MultiGeometry) là điểm nhãn của vùng → không nhập riêng
     if (polyRings.length || lineRings.length || loose.length) continue;
     let added = 0;
     for (const p of points) {
       const pt = parseCoords(childText(p, 'coordinates'))[0];
-      if (pt) { entities.push({ kind: 'POINT', layer, name, attrs, rings: [], pt }); stats.point++; added++; }
+      if (pt) { entities.push({ kind: 'POINT', layer, name, attrs, rings: [], pt, color }); stats.point++; added++; }
     }
     if (!added && !lines.length) skip(points.length ? 'point lỗi tọa độ' : 'placemark không có hình');
   }

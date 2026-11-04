@@ -77,7 +77,8 @@ export async function kmlTextFromFile(file) {
 
 /**
  * Phác thảo: Polygon / MultiGeometry, đường khép, đường hở, điểm.
- * Trả { shapes: [{tool, pts:[LatLng-like {lat,lng}], text?}], skipped, stats }.
+ * Trả { shapes: [{tool, pts:[LatLng-like {lat,lng}], text?, color?}], dropped, stats }.
+ * color lấy từ Style KML khi có; không có thì để trống (UI dùng màu palette đang chọn).
  */
 export function sketchShapesFromKml(text) {
   let parsed;
@@ -86,10 +87,13 @@ export function sketchShapesFromKml(text) {
   const shapes = [];
   let dropped = 0;
   const ringsSeen = [];
-  const push = (tool, lnglats, textLabel) => {
+  const push = (tool, lnglats, textLabel, color) => {
     if (shapes.length >= SKETCH_MAX_SHAPES) { dropped++; return; }
     const pts = lnglats.map(([lng, lat]) => ({ lat, lng }));
-    shapes.push(textLabel ? { tool, pts, text: textLabel } : { tool, pts });
+    const shape = { tool, pts };
+    if (textLabel) shape.text = textLabel;
+    if (color) shape.color = color;
+    shapes.push(shape);
   };
   for (const e of parsed.entities) {
     if (e.kind === 'POLYGON' || e.kind === 'POLYLINE') {
@@ -97,25 +101,25 @@ export function sketchShapesFromKml(text) {
         const clean = cleanRing(ring);
         if (!clean) { dropped++; continue; }
         ringsSeen.push(clean);
-        push('polygon', clean);
+        push('polygon', clean, null, e.color);
       }
     } else if (e.kind === 'LINE') {
       for (const line of e.rings || []) {
         const clean = cleanLine(line);
         if (!clean) { dropped++; continue; }
         ringsSeen.push(clean);
-        push(clean.length === 2 ? 'line' : 'polyline', clean);
+        push(clean.length === 2 ? 'line' : 'polyline', clean, null, e.color);
       }
     } else if (e.kind === 'POINT') {
       const q = wgsPair(e.pt);
       if (!q) { dropped++; continue; }
       ringsSeen.push([q]);
       const label = String(e.name || '').trim();
-      if (label) push('text', [q], label.slice(0, 200));
+      if (label) push('text', [q], label.slice(0, 200), e.color);
       else {
         const lat = q[1];
         const dLng = 25 / (111320 * Math.cos(lat * Math.PI / 180));
-        push('circle', [q, [q[0] + dLng, lat]]);
+        push('circle', [q, [q[0] + dLng, lat]], null, e.color);
       }
     }
   }

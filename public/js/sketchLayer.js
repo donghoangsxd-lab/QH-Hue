@@ -890,14 +890,15 @@ async function importKmlFile(file) {
   }
   const host = shownMaps()[0] || map;
   for (const s of pack.shapes) {
+    const c = s.color || color;
     if (s.tool === 'text') {
-      addShape(textShape(s.pts[0], s.text, color, textSize(), host), host);
+      addShape(textShape(s.pts[0], s.text, c, textSize(), host), host);
       continue;
     }
     const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
-    const { layers, text } = shapeLayers(s.tool, lls, color, false, host);
+    const { layers, text } = shapeLayers(s.tool, lls, c, false, host);
     const fg = L.featureGroup(layers);
-    fg.sketch = { tool: s.tool, pts: lls, color };
+    fg.sketch = { tool: s.tool, pts: lls, color: c };
     fg.bindTooltip(shapeTip(s.tool, text, host), { sticky: true, className: 'sketch-tip' });
     addShape(fg, host);
   }
