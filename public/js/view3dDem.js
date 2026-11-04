@@ -3,7 +3,7 @@
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 const DEM_Z = 13;
-export const DEM_N = 17;
+export const DEM_N = 11;
 
 function tileUrl(z, x, y) {
   return AWS_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
