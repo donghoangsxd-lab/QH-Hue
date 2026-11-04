@@ -1108,8 +1108,8 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const found = [];
   let stopsInside = 0;
   if (raw.osmError) gaps.push(`${raw.osmError}. Không tính cây xanh, mặt nước, đường và khoảng cách công trình.`);
-  else {
-    for (const el of raw.osm.elements || []) {
+  else if (raw.osm && Array.isArray(raw.osm.elements)) {
+    for (const el of raw.osm.elements) {
       const tags = el.tags || {};
       if (el.type === 'way' && Array.isArray(el.geometry) && el.geometry.length > 1) {
         const local = el.geometry.map((p) => toLocal(p.lon, p.lat, origin));
@@ -1608,7 +1608,7 @@ function bootMap(place, model, ground) {
         getFillColor: [255, 255, 255, 255]
       })
     ];
-    if (groundPack && groundPack.sat && !showStack) {
+    if (groundPack && groundPack.sat && !showStack && typeof deck.BitmapLayer === 'function') {
       try {
         layers.push(new deck.BitmapLayer({
           id: 'google-sat',
@@ -2198,18 +2198,18 @@ async function start() {
     if (!built) return;
     built.raw.osm = osm;
     built.raw.osmError = '';
-    showBuilt();
+    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (OSM):', err); }
   }).catch((err) => {
     if (!built) return;
     built.raw.osmError = err.message;
-    showBuilt();
+    try { showBuilt(); } catch (e) { console.warn('Mô hình 3D (OSM lỗi):', e); }
   });
   // Thửa đất chỉ phục vụ chỉ số phụ — tải nền, không chặn khung 3D.
   readLayer('cadastre', 'thuadat', tiles).then((cad) => {
     if (!built) return;
     built.raw.cadastre = cad;
     built.raw.cadError = '';
-    showBuilt();
+    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (thửa):', err); }
   }).catch((err) => {
     if (!built) return;
     built.raw.cadError = err.message;

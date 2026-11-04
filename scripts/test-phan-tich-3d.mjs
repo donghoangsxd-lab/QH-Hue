@@ -141,6 +141,9 @@ if (js.includes('new deck.LightingEffect') || js.includes('new deck.DirectionalL
 if (!js.includes('composeGoogleGround') || !js.includes('google-sat') || !js.includes('google-labels') || !js.includes('filterMassing')) {
   throw new Error('thiếu nền Google hoặc lọc nhà cao theo bán kính');
 }
+if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
+  throw new Error('buildModel chưa chịu osm=null khi tải dần');
+}
 if (!js.includes('effects: []') || !js.includes('useDevicePixels: 1')) {
   throw new Error('chưa tắt effects / chưa kẹp devicePixelRatio');
 }
