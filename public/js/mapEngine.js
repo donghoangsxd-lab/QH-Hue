@@ -4100,6 +4100,34 @@ function planTagHtml(it, isPlan) {
   return info ? ` <span class="plan-tag" style="--tag:${info.color};">${info.label}</span>` : '';
 }
 
+const ACCESS_NAME_CAP = 8;
+
+function accessNameList(items) {
+  const names = items.map(it => escapeHtml(infraTitle(it.name || 'Công trình')));
+  if (names.length <= ACCESS_NAME_CAP) return names.join(', ');
+  return `${names.slice(0, ACCESS_NAME_CAP).join(', ')} và ${names.length - ACCESS_NAME_CAP} công trình khác`;
+}
+
+// Gom tên Hiện trạng / Quy hoạch — một nhãn nhóm, không gắn tem từng công trình
+function coveredAccessHtml(items, isPlan) {
+  if (!items.length) return '';
+  if (!isPlan) return `<div class="c-cyan">${accessNameList(items)}</div>`;
+  const ht = [];
+  const qh = [];
+  items.forEach(it => {
+    if (PLAN_CHANGE_INFO[it.planChange]) qh.push(it);
+    else ht.push(it);
+  });
+  const rows = [];
+  if (ht.length) {
+    rows.push(`<div class="access-bucket"><span class="access-bucket-k">Hiện trạng</span>${accessNameList(ht)}</div>`);
+  }
+  if (qh.length) {
+    rows.push(`<div class="access-bucket"><span class="access-bucket-k access-bucket-qh">Quy hoạch</span>${accessNameList(qh)}</div>`);
+  }
+  return rows.join('') || `<div class="c-cyan">${accessNameList(items)}</div>`;
+}
+
 // Tuyến theo mạng giao thông từ vị trí tra cứu tới công trình gần nhất mỗi nhóm: nét màu theo nhóm, vòng sáng + ranh khu đất
 // ở công trình (bản đồ quy hoạch ưu tiên lô QH), chấm sáng chạy từ vị trí về phía công trình; nhóm không nối được đường
 // thì ghi khoảng cách chim bay. hiKeys: công trình đang làm nổi (thêm các công trình gần nhất)
@@ -4360,11 +4388,14 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map, opt
   if (coveredCount > 0) {
     codes.forEach(code => {
       if (!coveredGroups[code]) return;
-      const items = [...coveredGroups[code].values()].sort((a, b) => (PLAN_CHANGE_INFO[b.planChange] ? 1 : 0) - (PLAN_CHANGE_INFO[a.planChange] ? 1 : 0));
-      const shown = items.slice(0, 5).map(it => `${escapeHtml(infraTitle(it.name || 'Công trình'))}${planTagHtml(it, isPlan)}`).join(', ')
-        + (items.length > 5 ? ` và ${items.length - 5} công trình khác` : '');
+      const items = [...coveredGroups[code].values()].sort((a, b) => {
+        const ka = PLAN_CHANGE_INFO[a.planChange] ? 1 : 0;
+        const kb = PLAN_CHANGE_INFO[b.planChange] ? 1 : 0;
+        if (ka !== kb) return ka - kb;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+      });
       const gained = htGroups && !htGroups[code] ? ` <span class="plan-tag" style="--tag:${PLAN_CHANGE_INFO.new.color};">Mới tiếp cận nhờ quy hoạch</span>` : '';
-      html += `<div class="sug-card"><b>${escapeHtml(infraLabels[code] || code)}</b>${gained}<div class="c-cyan">${shown}</div></div>`;
+      html += `<div class="sug-card"><b>${escapeHtml(infraLabels[code] || code)}</b>${gained}${coveredAccessHtml(items, isPlan)}</div>`;
     });
   } else {
     html += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
