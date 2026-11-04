@@ -37,7 +37,7 @@ function popCell(nam) {
     : '—';
   const hoaTxt = hoa ? `khoảng ${fmtNum(hoa.giaTri)}%` : '—';
   const dlTxt = dl ? rangeText(dl.min, dl.max, 'triệu lượt') : '—';
-  const label = nam === 2065 ? 'Tầm nhìn 2065' : `Năm ${nam}`;
+  const label = nam === 2065 ? 'Tầm nhìn<br>đến 2065' : `Năm ${nam}`;
   return `<tr><th scope="row">${label}</th><td>${escapeHtml(danTxt)}</td><td>${escapeHtml(hoaTxt)}</td><td>${escapeHtml(dlTxt)}</td></tr>`;
 }
 

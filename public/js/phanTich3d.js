@@ -11,6 +11,7 @@ import { floorsAt, floorsOnRing, metresForFloors, parseFloorPack } from './bldgF
 import { partFloorLabel } from './bldgParts.js';
 import { parseAdditionPack, toExplicitVolumes } from './bldgAdditions.js';
 import { bindDeckNotchZoom } from './wheelZoom.js';
+import { sampleDemGrid } from './view3dDem.js';
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -65,6 +66,7 @@ const FOV_Y = 36;
 const WHITE_BLOCK = [248, 250, 252, 232];
 let floorTint = false;
 const FACILITY = {
+  park: { label: 'Công viên', color: [22, 163, 74, 248], glow: [74, 222, 128], walk: 500, rank: 0 },
   school: { label: 'Trường học', color: [217, 119, 6, 248], glow: [245, 158, 11], walk: 500, rank: 1 },
   health: { label: 'Y tế', color: [220, 38, 38, 248], glow: [248, 113, 113], walk: 700, rank: 2 },
   market: { label: 'Chợ', color: [202, 138, 4, 248], glow: [250, 204, 21], walk: 500, rank: 3 },
@@ -72,6 +74,58 @@ const FACILITY = {
   parking: { label: 'Bãi đỗ', color: [29, 78, 216, 248], glow: [96, 165, 250], walk: 350, rank: 5 },
   bus: { label: 'Xe buýt', color: [3, 105, 161, 248], glow: [56, 189, 248], walk: 400, rank: 6 }
 };
+const FAC_COUNT_IDS = ['park', 'school', 'health', 'market', 'culture', 'parking', 'bus'];
+const TOWER_BEACON_M = 48;
+const LOT_HATCH_STEP = 9;
+
+function hexRgba(hex, a = 255) {
+  const s = String(hex || '').replace('#', '');
+  if (s.length !== 6) return [56, 189, 248, a];
+  return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16), a];
+}
+
+function lightenRgb(rgb, t = 0.35) {
+  return [
+    Math.min(255, Math.round(rgb[0] + (255 - rgb[0]) * t)),
+    Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * t)),
+    Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * t))
+  ];
+}
+
+/** Nét hatch 45° trong polygon địa phương — chỉ đoạn nằm trong ring. */
+function hatchInRing(ring, step = LOT_HATCH_STEP) {
+  let minx = Infinity;
+  let miny = Infinity;
+  let maxx = -Infinity;
+  let maxy = -Infinity;
+  for (const p of ring) {
+    if (p[0] < minx) minx = p[0];
+    if (p[1] < miny) miny = p[1];
+    if (p[0] > maxx) maxx = p[0];
+    if (p[1] > maxy) maxy = p[1];
+  }
+  if (!Number.isFinite(minx) || maxx - minx < 2 || maxy - miny < 2) return [];
+  const paths = [];
+  const pad = (maxy - miny) + step;
+  for (let c = minx + miny - pad; c <= maxx + maxy + pad; c += step) {
+    let run = [];
+    const flush = () => {
+      if (run.length >= 2) paths.push(run);
+      run = [];
+    };
+    for (let x = minx; x <= maxx + 0.01; x += 2.5) {
+      const y = c - x;
+      if (y < miny - 0.5 || y > maxy + 0.5) {
+        flush();
+        continue;
+      }
+      if (pointInRing([x, y], ring)) run.push([x, y]);
+      else flush();
+    }
+    flush();
+  }
+  return paths;
+}
 const AMENITY_RE = 'school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking';
 const SEARCH_M = 2000;
 const HEIGHT_LIM = 160;
@@ -779,7 +833,7 @@ function facilityKind(tags) {
 
 async function loadOsm(place) {
   try {
-    const res = await fetch(`/api/osmClip?lat=${place.lat}&lng=${place.lng}&r=${place.r}`, { signal: AbortSignal.timeout(12000) });
+    const res = await fetch(`/api/osmClip?lat=${place.lat}&lng=${place.lng}&r=${place.r}`, { signal: AbortSignal.timeout(28000) });
     if (res.ok) {
       const data = await res.json();
       if (osmDated(data)) return data;
@@ -1104,7 +1158,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const halos = [];
   const openBloom = [];
   const roadM = { truc: 0, khuvuc: 0, tertiary: 0, noibo: 0, xedap: 0, dibo: 0, rail: 0, water: 0 };
-  const nearest = { school: null, health: null, market: null, bus: null, culture: null, parking: null };
+  const nearest = { park: null, school: null, health: null, market: null, bus: null, culture: null, parking: null };
   const found = [];
   let stopsInside = 0;
   if (raw.osmError) gaps.push(`${raw.osmError}. Không tính cây xanh, mặt nước, đường và khoảng cách công trình.`);
@@ -1199,6 +1253,57 @@ function buildModel(raw, origin, r, heights, floorPack) {
     if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong vòng tròn.');
   }
 
+  // Điểm hạ tầng từ webapp (Google Sheet) — bổ sung khi OSM lỗi / thiếu.
+  for (const it of raw.localInfra || []) {
+    if (!it || !FACILITY[it.id]) continue;
+    const lng = Number(it.lng);
+    const lat = Number(it.lat);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+    const dist = Number.isFinite(it.dist) ? it.dist : hav(origin.lng, origin.lat, lng, lat);
+    const p = toLocal(lng, lat, origin);
+    const row = { id: it.id, dist, name: it.name || '', lng, lat, x: p[0], y: p[1], rings: null, local: true };
+    if (!nearest[it.id] || row.dist < nearest[it.id].dist) nearest[it.id] = row;
+    if (row.dist <= r) found.push(row);
+    if (it.id === 'bus' && row.x * row.x + row.y * row.y <= r * r) stopsInside += 1;
+    if (it.id === 'park' && row.dist <= r) {
+      const s = 28;
+      const sq = [
+        [row.x - s, row.y - s], [row.x + s, row.y - s],
+        [row.x + s, row.y + s], [row.x - s, row.y + s], [row.x - s, row.y - s]
+      ];
+      greenRings.push(sq);
+      greens.push({ rings: wind([sq]), h: 2.2, fill: [46, 178, 96, 250] });
+      pushHalo(halos, sq, clip, [34, 197, 94]);
+    }
+  }
+
+  // Ranh lô hạ tầng (màu hatch TT16) từ webapp.
+  const infraLots = [];
+  for (const lot of raw.localLots || []) {
+    if (!lot?.rings?.length) continue;
+    const rgb = hexRgba(lot.color || '#38bdf8', 255);
+    const soft = lightenRgb(rgb, 0.4);
+    for (const lngLatRing of lot.rings) {
+      if (!Array.isArray(lngLatRing) || lngLatRing.length < 4) continue;
+      const local = lngLatRing.map((p) => toLocal(Number(p[0]), Number(p[1]), origin));
+      const cut = clipRing(local, clip);
+      if (!cut || ringArea(cut) < 12) continue;
+      const wound = wind([cut]);
+      const path = cut.concat([cut[0]]);
+      infraLots.push({
+        rings: wound,
+        h: 0.55,
+        z0: 0,
+        fill: [rgb[0], rgb[1], rgb[2], 72],
+        glow: [soft[0], soft[1], soft[2], 110],
+        edge: [soft[0], soft[1], soft[2], 235],
+        path,
+        hatch: hatchInRing(cut).map((seg) => ({ path: seg, color: [rgb[0], rgb[1], rgb[2], 160] })),
+        name: lot.name || ''
+      });
+    }
+  }
+
   const seen = new Set();
   const facilities = [];
   found.sort((a, b) => a.dist - b.dist);
@@ -1208,8 +1313,8 @@ function buildModel(raw, origin, r, heights, floorPack) {
     seen.add(key);
     facilities.push(row);
   }
-  const counts = { school: 0, health: 0, market: 0, culture: 0, parking: 0, bus: 0 };
-  facilities.forEach((f) => { counts[f.id] += 1; });
+  const counts = { park: 0, school: 0, health: 0, market: 0, culture: 0, parking: 0, bus: 0 };
+  facilities.forEach((f) => { counts[f.id] = (counts[f.id] || 0) + 1; });
   const access = [];
   facilities.forEach((f) => {
     const meta = FACILITY[f.id];
@@ -1277,6 +1382,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
   return {
     volumes, blocks, greens, waters, squares, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
+    infraLots,
     roadM, driveM, squareArea: area, area, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
     groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
     green: coverRatio(greenRings, r),
@@ -1388,11 +1494,13 @@ function paintMassing(rows, radius) {
 }
 
 function nearestText(row, r, osmError) {
+  if (row) {
+    const name = row.name ? `${row.name} · ` : '';
+    const where = row.dist <= r ? 'trong vòng' : 'ngoài vòng';
+    return `${name}${fmt0(row.dist)} m, ${where}`;
+  }
   if (osmError) return 'Không có số liệu.';
-  if (!row) return 'Không có trong bán kính 2 km.';
-  const name = row.name ? `${row.name} · ` : '';
-  const where = row.dist <= r ? 'trong vòng' : 'ngoài vòng';
-  return `${name}${fmt0(row.dist)} m, ${where}`;
+  return 'Không có trong bán kính 2 km.';
 }
 
 function paintKeys(showFloors) {
@@ -1402,6 +1510,7 @@ function paintKeys(showFloors) {
     ? [['#ffedd5', '1-2 tầng'], ['#fdba74', '3-5 tầng'], ['#ea580c', '6-10 tầng'], ['#9a3412', '11-50 tầng']]
     : [['#d6ccbc', 'Tường'], ['#807262', 'Mái']];
   rows.push(
+    ['#16a34a', 'Công viên'],
     ['#d97706', 'Trường'],
     ['#dc2626', 'Y tế'],
     ['#ca8a04', 'Chợ'],
@@ -1431,25 +1540,30 @@ function paintPanel(model, place) {
   paintLegend(floorTint);
   const areaHa = model.area / 10000;
   const counts = model.counts || {};
-  const countLine = ['school', 'health', 'market', 'culture', 'parking', 'bus']
+  const hasLocal = FAC_COUNT_IDS.some((id) => (counts[id] || 0) > 0);
+  const countLine = FAC_COUNT_IDS
     .map((id) => `${FACILITY[id].label} ${fmt0(counts[id] || 0)}`).join(' · ');
+  const osmOnly = model.osmError && !hasLocal;
   const items = [
     li('Diện tích vòng tròn', `${fmt1(areaHa)} ha`, `Bán kính ${fmt0(place.r)} m.`),
     li('Mật độ xây dựng', model.buildings ? `${fmt1(model.footprint / model.area * 100)}%` : 'Không có dấu chân.',
       model.buildings ? `${fmt0(model.buildings)} công trình.` : ''),
     li('Tầng trung bình', model.meanF == null ? 'Không có số mét.' : fmt1(model.meanF), 'Theo diện tích dấu chân. Tầng = làm tròn (mét / 4).'),
     li('Diện tích sàn', model.meanF == null ? 'Không có số mét.' : `${fmt0(model.gfa)} m²`, 'Dấu chân trong vòng nhân số tầng.'),
-    li('Hạ tầng trong vòng', model.osmError ? 'Không có số liệu.' : countLine, 'Đếm tâm công trình nằm trong bán kính.'),
-    li('Cây xanh, công viên', model.osmError ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`, 'Phần diện tích vòng.'),
+    li('Hạ tầng trong vòng', osmOnly ? 'Không có số liệu.' : countLine,
+      hasLocal ? 'Theo điểm đã duyệt trên bản đồ (bổ sung OSM nếu có).' : 'Đếm tâm công trình nằm trong bán kính.'),
+    li('Cây xanh, công viên', model.osmError && !(counts.park > 0) ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`, 'Phần diện tích vòng.'),
     li('Mặt nước', model.osmError ? 'Không có số liệu.' : `${fmt1(model.water * 100)}%`, 'Phần diện tích vòng.'),
-    li('Trường học', nearestText(model.nearest.school, place.r, model.osmError), ''),
-    li('Y tế', nearestText(model.nearest.health, place.r, model.osmError), ''),
-    li('Chợ', nearestText(model.nearest.market, place.r, model.osmError), ''),
-    li('Xe buýt', nearestText(model.nearest.bus, place.r, model.osmError), '')
+    li('Trường học', nearestText(model.nearest.school, place.r, model.osmError && !hasLocal), ''),
+    li('Y tế', nearestText(model.nearest.health, place.r, model.osmError && !hasLocal), ''),
+    li('Chợ', nearestText(model.nearest.market, place.r, model.osmError && !hasLocal), ''),
+    li('Xe buýt', nearestText(model.nearest.bus, place.r, model.osmError && !hasLocal), '')
   ];
   $('stats').replaceChildren(...items);
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
-  $('src').textContent = `Nền vệ tinh và tem tên © Google. Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Đường, công viên và công trình © người đóng góp OpenStreetMap, ODbL.${when}`;
+  const demNote = model.dem ? ' Cao độ nền Terrarium (FABDEM/SRTM).' : '';
+  const lotNote = (model.infraLots || []).length ? ` Ranh lô hạ tầng ${fmt0(model.infraLots.length)} (màu hatch TT16).` : '';
+  $('src').textContent = `Nền vệ tinh và tem tên © Google.${demNote}${lotNote} Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Hạ tầng nội bộ Sở XD; đường/công viên OSM ODbL.${when}`;
   paintMassing(model.massing || [], place.r);
 }
 
@@ -1463,6 +1577,8 @@ function bootMap(place, model, ground) {
   let deckgl = null;
   let edgeMemo = null;
   let groundPack = ground || null;
+  let pulse = 0;
+  let beaconTimer = 0;
   const moodName = DEFAULT_LIGHT;
   const preset = LIGHT_PRESETS[moodName];
   const root = document.documentElement;
@@ -1634,6 +1750,24 @@ function bootMap(place, model, ground) {
     } else {
       layers.push(polys('plate-links', [{ rings: [disc], h: 0.4, fill: [0, 0, 0, 0] }], zLinks));
     }
+    if (model.demQuads?.length && !showStack) {
+      try {
+        layers.push(new deck.PolygonLayer(withMask({
+          id: 'dem-mesh',
+          data: model.demQuads,
+          coordinateSystem: CART,
+          modelMatrix: lift(zLinks + PLATE),
+          _full3d: true,
+          positionFormat: 'XYZ',
+          extruded: false,
+          filled: true,
+          stroked: false,
+          pickable: false,
+          getPolygon: (d) => d.rings,
+          getFillColor: (d) => d.fill
+        })));
+      } catch (err) { /* bỏ lưới cao độ nếu máy không hỗ trợ */ }
+    }
     layers.push(new deck.PathLayer({
       id: 'rim',
       data: [{ path: disc.concat([disc[0]]) }],
@@ -1654,6 +1788,67 @@ function bootMap(place, model, ground) {
     layers.push(polys('greens', model.greens, zVoids + PLATE));
     layers.push(polys('waters', model.waters, zVoids + PLATE));
     layers.push(polys('squares', model.squares, zVoids + PLATE));
+    const lotList = model.infraLots || [];
+    if (lotList.length) {
+      const lotZ = (showStack ? zUses : zLinks) + PLATE;
+      const byBase = new Map();
+      lotList.forEach((lot) => {
+        const key = lot.z0 || 0;
+        if (!byBase.has(key)) byBase.set(key, []);
+        byBase.get(key).push(lot);
+      });
+      let li = 0;
+      byBase.forEach((data, z0) => {
+        layers.push(polys(li ? `infra-lot-fill-${li}` : 'infra-lot-fill', data, lotZ + z0, (d) => d.fill));
+        li += 1;
+      });
+      const hatchPaths = lotList.flatMap((lot) => (lot.hatch || []).map((h) => ({
+        path: h.path.map((p) => [p[0], p[1], (lot.z0 || 0) + 0.7]),
+        color: h.color
+      })));
+      if (hatchPaths.length) {
+        layers.push(new deck.PathLayer(withMask({
+          id: 'infra-lot-hatch',
+          data: hatchPaths,
+          coordinateSystem: CART,
+          modelMatrix: lift(lotZ),
+          getPath: (d) => d.path,
+          getColor: (d) => d.color,
+          getWidth: 1.4,
+          widthUnits: 'meters',
+          widthMinPixels: 1,
+          pickable: false
+        })));
+      }
+      layers.push(new deck.PathLayer(withMask({
+        id: 'infra-lot-glow',
+        data: lotList,
+        coordinateSystem: CART,
+        modelMatrix: lift(lotZ + 0.85),
+        getPath: (d) => d.path.map((p) => [p[0], p[1], d.z0 || 0]),
+        getColor: (d) => d.glow,
+        getWidth: 7,
+        widthUnits: 'pixels',
+        widthMinPixels: 4,
+        jointRounded: true,
+        capRounded: true,
+        pickable: false
+      })));
+      layers.push(new deck.PathLayer(withMask({
+        id: 'infra-lot-edge',
+        data: lotList,
+        coordinateSystem: CART,
+        modelMatrix: lift(lotZ + 1.1),
+        getPath: (d) => d.path.map((p) => [p[0], p[1], (d.z0 || 0) + 0.15]),
+        getColor: (d) => d.edge,
+        getWidth: 2.4,
+        widthUnits: 'pixels',
+        widthMinPixels: 1.5,
+        jointRounded: true,
+        capRounded: true,
+        pickable: false
+      })));
+    }
     const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
     if (openBloom) layers.push(openBloom);
     if (k > 0.12) {
@@ -1735,6 +1930,37 @@ function bootMap(place, model, ground) {
           characterSet: 'Đế Tháp0123456789'
         }));
       } catch (err) { /* số tầng vẫn ở bảng bên trái */ }
+    }
+    const beacons = model.beacons || [];
+    if (beacons.length) {
+      const wave = 0.5 + 0.5 * Math.sin(pulse / 180 * Math.PI);
+      const glow = Math.round(80 + wave * 160);
+      layers.push(new deck.ScatterplotLayer({
+        id: 'tower-beacon-glow',
+        data: beacons,
+        coordinateSystem: CART,
+        modelMatrix: lift(zVolumes),
+        getPosition: (d) => d.position,
+        getRadius: 10 + wave * 14,
+        radiusUnits: 'meters',
+        getFillColor: [255, 220, 80, Math.round(40 + wave * 90)],
+        stroked: false,
+        pickable: false
+      }));
+      layers.push(new deck.ScatterplotLayer({
+        id: 'tower-beacon',
+        data: beacons,
+        coordinateSystem: CART,
+        modelMatrix: lift(zVolumes),
+        getPosition: (d) => d.position,
+        getRadius: 3.5 + wave * 2.5,
+        radiusUnits: 'meters',
+        getFillColor: [255, 250, 200, glow],
+        stroked: true,
+        getLineColor: [255, 180, 40, 255],
+        lineWidthMinPixels: 1,
+        pickable: false
+      }));
     }
     layers.push(new deck.PathLayer(withMask({
       id: 'roads',
@@ -1926,6 +2152,16 @@ function bootMap(place, model, ground) {
     camera = fitState(view.k);
     deckgl.setProps({ viewState: camera });
   });
+  let beaconStamp = 0;
+  const tickBeacon = (now) => {
+    beaconTimer = requestAnimationFrame(tickBeacon);
+    if (!(model.beacons || []).length) return;
+    if (now - beaconStamp < 70) return;
+    beaconStamp = now;
+    pulse = (pulse + 14) % 360;
+    draw();
+  };
+  if ((model.beacons || []).length) beaconTimer = requestAnimationFrame(tickBeacon);
   $('btnTach').disabled = false;
   $('btnGop').disabled = false;
   document.body.dataset.ready = '1';
@@ -1933,6 +2169,7 @@ function bootMap(place, model, ground) {
     replace(next, nextGround) {
       model = next;
       if (nextGround) groundPack = nextGround;
+      if ((model.beacons || []).length && !beaconTimer) beaconTimer = requestAnimationFrame(tickBeacon);
       draw();
     }
   };
@@ -2092,10 +2329,43 @@ async function loadFloorPack() {
   floorPack = remote;
 }
 
+function applyDemOffsets(model, dem) {
+  if (!dem || !model?.volumes) return;
+  model.dem = dem;
+  model.demQuads = dem.quads || [];
+  model.volumes.forEach((v) => {
+    const c = centroid(v.rings[0]);
+    const dz = dem.offsetAt(c[0], c[1]);
+    if (!Number.isFinite(dz)) return;
+    v.z0 = (v.z0 || 0) + dz;
+  });
+  (model.infraLots || []).forEach((lot) => {
+    const c = centroid(lot.rings[0]);
+    const dz = dem.offsetAt(c[0], c[1]);
+    if (!Number.isFinite(dz)) return;
+    lot.z0 = (lot.z0 || 0) + dz;
+  });
+  model.beacons = model.volumes
+    .filter((v) => v.h >= TOWER_BEACON_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
+    .map((v) => {
+      const c = centroid(v.rings[0]);
+      return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 5] };
+    });
+}
+
 function showBuilt() {
   if (!built) return;
   const model = buildModel(built.raw, built.origin, built.place.r, built.heights, floorPack);
   model.osmError = built.raw.osmError;
+  if (built.dem) applyDemOffsets(model, built.dem);
+  else {
+    model.beacons = model.volumes
+      .filter((v) => v.h >= TOWER_BEACON_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
+      .map((v) => {
+        const c = centroid(v.rings[0]);
+        return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 5] };
+      });
+  }
   paintPanel(model, built.place, built.ward);
   $('status').textContent = model.meanF == null
     ? 'Chưa có chiều cao mét trong ô.'
@@ -2135,6 +2405,15 @@ if (typeof window !== 'undefined') {
       showBuilt();
       return;
     }
+    if (e.data.type === 'qh-3d-infra') {
+      if (!built) return;
+      const points = Array.isArray(e.data.points) ? e.data.points : [];
+      const lots = Array.isArray(e.data.lots) ? e.data.lots : [];
+      built.raw.localInfra = points;
+      built.raw.localLots = lots;
+      try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (hạ tầng nội bộ):', err); }
+      return;
+    }
     if (e.data.type !== 'qh-floor-edit') return;
     loadFloorPack().then(showBuilt).catch(() => {});
   });
@@ -2155,7 +2434,7 @@ async function start() {
     return;
   }
   const raw = {
-    gba: [], cadastre: [], osm: null, sites: [], massing: [],
+    gba: [], cadastre: [], osm: null, sites: [], massing: [], localInfra: [], localLots: [],
     gbaError: '', cadError: '', osmError: '', heightMeta: null
   };
   // Đường nóng: dấu chân + chiều cao + nền Google. OSM/thửa đất chạy sau để khỏi treo khung 3D.
@@ -2187,13 +2466,19 @@ async function start() {
     $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   }
   try {
-    built = { raw, origin, place: { ...place, mLng, mLat }, heights, ward, ground };
+    built = { raw, origin, place: { ...place, mLng, mLat }, heights, ward, ground, dem: null };
     await loadFloorPack().catch(() => {});
     showBuilt();
   } catch (err) {
     console.warn('Mô hình 3D:', err);
     $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
   }
+  const placeBuilt = { ...place, mLng, mLat };
+  sampleDemGrid(placeBuilt, origin).then((dem) => {
+    if (!built || !dem) return;
+    built.dem = dem;
+    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (DEM):', err); }
+  }).catch(() => {});
   loadOsm(place).then((osm) => {
     if (!built) return;
     built.raw.osm = osm;

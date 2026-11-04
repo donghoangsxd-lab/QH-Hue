@@ -2639,21 +2639,63 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-track { background: rgba(4, 17, 43, 0.85); margin: 22px 0 10px; border-radius: 3px; }
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb { background: #1f4a7a; border-radius: 3px; border: 1px solid rgba(var(--cyan-rgb), 0.25); }
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb:hover { background: #2a6aa8; }
-/* Ký hiệu công trình phía trên tên lô đang tiếp cận; gỡ cùng lớp kết quả kiểm tra */
+/* Chip tên lô tiếp cận: nền tối bán trong suốt, chữ ngang; gỡ cùng lớp kiểm tra */
 .leaflet-marker-icon.inspect-lot-pin {
-  display: flex; align-items: flex-start; justify-content: center;
-  overflow: visible; pointer-events: none; background: none; border: 0;
+  display: block;
+  overflow: visible !important;
+  pointer-events: auto;
+  background: none;
+  border: 0;
 }
-.inspect-lot-pin img {
-  width: 22px; height: 27px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+.inspect-lot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 168px;
+  padding: 2px 7px 2px 3px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  cursor: default;
 }
-.inspect-lot-pin b {
-  position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
-  max-width: 132px; padding: 0;
-  background: none; border: 0;
-  color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1.2; text-align: center;
+.inspect-lot-chip img {
+  width: 18px;
+  height: 22px;
+  flex: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.inspect-lot-name {
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+#map.inspect-pins-tight .inspect-lot-name,
+#mapPlan.inspect-pins-tight .inspect-lot-name {
   white-space: normal;
-  text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 -1px 2px #000, 1px 0 2px #000, -1px 0 2px #000;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: unset;
+}
+.inspect-lot-chip:hover {
+  position: relative;
+  z-index: 20;
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(125, 211, 252, 0.55);
+}
+.inspect-lot-chip:hover .inspect-lot-name {
+  white-space: nowrap !important;
+  display: inline;
+  -webkit-line-clamp: unset;
+  max-width: none;
+  overflow: visible;
 }
 .access-bucket { margin-top: 3px; font-size: var(--fs-sm); color: var(--accent-cyan); line-height: 1.35; }
 .access-bucket-k {
@@ -3600,15 +3642,16 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
   white-space: normal;
   hyphens: auto;
 }
-/* Cột Giai đoạn: vừa nhãn dài nhất («Tầm nhìn 2065»), không chiếm chỗ các cột số */
+/* Cột Giai đoạn: hẹp; «Tầm nhìn / đến 2065» xuống dòng sẵn trong HTML */
 .qhc25-scale-table thead th:first-child,
 .qhc25-scale-table tbody th {
-  width: 5.4rem;
+  width: 4.2rem;
   padding-right: 2px;
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
   word-break: normal;
   overflow-wrap: normal;
+  line-height: 1.25;
   color: var(--axis-color-strong);
 }
 .qhc25-scale-table thead th:first-child { color: var(--axis-color-muted); }
@@ -6855,7 +6898,7 @@ body.project-review.la-page #projectReviewHost {
   .layer-main-count,
   .project-phase,
   .rs-seq,
-  .inspect-lot-pin b { font-size: 10px; }
+  .inspect-lot-name { font-size: 10px; }
   .cad-tab small { white-space: normal; line-height: 1.15; text-align: center; }
   .cad-card .pp-row,
   .dock-card .pp-row { grid-template-columns: minmax(64px, 36%) minmax(0, 1fr); }

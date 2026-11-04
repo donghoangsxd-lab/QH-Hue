@@ -14,6 +14,7 @@ import { createVertexHandles, vertexMenuButton } from './vertexHandles.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
+import { clipPathAtParcel, accessLabelAnchor } from './accessRouteGeom.js';
 import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
@@ -3255,8 +3256,14 @@ function addNegativeRing(group, m, lat, lng, radius, innerOpacity = SEL_INNER_OP
   return circle;
 }
 
-// Viền khu đất đang chọn vẽ trên pane âm bản để vẫn nổi khi bật vùng phục vụ; không tự bật chế độ âm bản
-function addParcelOutline(fg, geometry, renderer, color = SEL_ACCENT) {
+// Viền khu đất đang chọn vẽ trên pane âm bản để vẫn nổi khi bật vùng phục vụ; không tự bật chế độ âm bản.
+// soft: tiếp cận HT — glow nhẹ hơn để lộ nền vệ tinh.
+function addParcelOutline(fg, geometry, renderer, color = SEL_ACCENT, soft = false) {
+  if (soft) {
+    fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color, weight: 5, opacity: 0.22, fill: false } }));
+    fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color: '#ffffff', weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 } }));
+    return;
+  }
   fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color, weight: 7, opacity: 0.35, fill: false } }));
   fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color: '#ffffff', weight: 2.2, opacity: 1, fillColor: color, fillOpacity: 0.12 } }));
 }
@@ -3302,10 +3309,14 @@ function clearSingleIsochrone() {
   singleIsoSeq++;
   if (stopFlow) stopFlow();
   stopFlow = null;
+  clearAccessPinLayout();
   accessNotes.clear();
   layers.singleIso.clearLayers();
   planLayers.singleIso.clearLayers();
-  [map, planMap].forEach(m => m?.getContainer().classList.remove('sel-active'));
+  [map, planMap].forEach(m => {
+    if (!m) return;
+    m.getContainer().classList.remove('sel-active', 'inspect-pins-tight');
+  });
   leftRenderer.highlight(null);
   planRenderer.highlight(null);
 }
@@ -4128,9 +4139,100 @@ function coveredAccessHtml(items, isPlan) {
   return rows.join('') || `<div class="c-cyan">${accessNameList(items)}</div>`;
 }
 
-// Tuyến theo mạng giao thông từ vị trí tra cứu tới công trình gần nhất mỗi nhóm: nét màu theo nhóm, vòng sáng + ranh khu đất
-// ở công trình (bản đồ quy hoạch ưu tiên lô QH), chấm sáng chạy từ vị trí về phía công trình; nhóm không nối được đường
-// thì ghi khoảng cách chim bay. hiKeys: công trình đang làm nổi (thêm các công trình gần nhất)
+const ACCESS_PIN_W = 168;
+const ACCESS_PIN_H = 40;
+const ACCESS_PIN_STEP = 28;
+const ACCESS_PIN_ANGLES = [0, 45, -45, 90, -90, 135, -135, 180];
+let accessPinLayout = null;
+
+function clearAccessPinLayout() {
+  if (!accessPinLayout) return;
+  const { map: m, onView } = accessPinLayout;
+  if (m && onView) {
+    m.off('zoomend', onView);
+    m.off('moveend', onView);
+  }
+  accessPinLayout = null;
+}
+
+function syncAccessPinZoom(m) {
+  if (!m) return;
+  m.getContainer().classList.toggle('inspect-pins-tight', m.getZoom() < 16);
+}
+
+function boxesOverlap(a, b)
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+function layoutAccessPins(m, markers, anchors) {
+  if (!m || !markers.length) return;
+  const placed = [];
+  markers.forEach((marker, i) => {
+    const base = anchors[i];
+    if (!base || !marker) return;
+    const origin = L.latLng(base[0], base[1]);
+    let chosen = origin;
+    let chosenBox = null;
+    for (const ang of ACCESS_PIN_ANGLES) {
+      const rad = (ang * Math.PI) / 180;
+      const pt = m.latLngToContainerPoint(origin);
+      const dx = ang === 0 ? 0 : Math.cos(rad) * ACCESS_PIN_STEP;
+      const dy = ang === 0 ? 0 : Math.sin(rad) * ACCESS_PIN_STEP;
+      const cand = L.point(pt.x + dx, pt.y + dy);
+      const box = {
+        x: cand.x - ACCESS_PIN_W / 2,
+        y: cand.y - ACCESS_PIN_H,
+        w: ACCESS_PIN_W,
+        h: ACCESS_PIN_H
+      };
+      if (placed.some((p) => boxesOverlap(box, p))) continue;
+      chosen = m.containerPointToLatLng(cand);
+      chosenBox = box;
+      break;
+    }
+    if (!chosenBox) {
+      const pt = m.latLngToContainerPoint(origin);
+      chosenBox = { x: pt.x - ACCESS_PIN_W / 2, y: pt.y - ACCESS_PIN_H, w: ACCESS_PIN_W, h: ACCESS_PIN_H };
+    }
+    placed.push(chosenBox);
+    marker.setLatLng(chosen);
+  });
+}
+
+function bindAccessPinLayout(m, markers, anchors) {
+  clearAccessPinLayout();
+  if (!m || !markers.length) return;
+  const apply = () => {
+    if (accessPinLayout && accessPinLayout.seq !== singleIsoSeq) return;
+    syncAccessPinZoom(m);
+    layoutAccessPins(m, markers, anchors);
+  };
+  accessPinLayout = { map: m, markers, anchors, seq: singleIsoSeq, onView: apply };
+  m.on('zoomend', apply);
+  m.on('moveend', apply);
+  apply();
+}
+
+function drawAccessRouteLines(group, renderer, routed) {
+  const layers = [];
+  routed.slice().reverse().forEach((r) => {
+    const color = BUFFER_COLORS[r.code] || SEL_ACCENT;
+    const line = { renderer, lineCap: 'round', lineJoin: 'round', interactive: false };
+    layers.push(L.polyline(r.path, { ...line, color: '#020617', weight: 3.2, opacity: 0.28 }));
+    layers.push(L.polyline(r.path, {
+      ...line,
+      color,
+      weight: 2.2,
+      opacity: 0.82,
+      dashArray: '7,8'
+    }));
+  });
+  layers.forEach((layer) => group.addLayer(layer));
+  return layers;
+}
+
+// Tuyến theo mạng giao thông từ vị trí tra cứu tới công trình gần nhất mỗi nhóm: nét đứt cắt tại ranh lô,
+// chấm sáng chạy dọc tuyến; nhóm không nối được đường thì ghi khoảng cách chim bay.
 async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
   const isPlan = m === planMap;
   const group = isPlan ? planLayers.singleIso : layers.singleIso;
@@ -4151,16 +4253,11 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
   }).sort((a, b) => (a.path ? 0 : 1e9) + (a.distM ?? a.airM) - ((b.path ? 0 : 1e9) + (b.distM ?? b.airM)));
 
   const renderer = selRendererFor(m);
-  const routed = rows.filter(r => r.path);
-  routed.slice().reverse().forEach(r => {          // tuyến ngắn nhất vẽ trên cùng
-    const color = BUFFER_COLORS[r.code] || SEL_ACCENT;
-    const line = { renderer, lineCap: 'round', lineJoin: 'round', interactive: false };
-    group.addLayer(L.polyline(r.path, { ...line, color: '#020617', weight: 7, opacity: 0.5 }));
-    group.addLayer(L.polyline(r.path, { ...line, color, weight: 3.2, opacity: 0.95 }));
-  });
+  let routed = rows.filter(r => r.path).map((r) => ({ ...r, path: r.path.slice() }));
+  let routeLayers = drawAccessRouteLines(group, renderer, routed);
   const rings = rows.map(r => {
     const color = BUFFER_COLORS[r.code] || SEL_ACCENT;
-    const ring = L.circleMarker([Number(r.item.lat), Number(r.item.lng)], { renderer, radius: 9, color, weight: 2.5, fillColor: color, fillOpacity: 0.25, interactive: false });
+    const ring = L.circleMarker([Number(r.item.lat), Number(r.item.lng)], { renderer, radius: 7, color, weight: 2, fillColor: color, fillOpacity: 0.2, interactive: false });
     group.addLayer(ring);
     hiKeys.add(pointKey(r.item));
     accessNotes.set(r.item.id, r.path ? fmtDist(r.distM) : `≈ ${fmtDist(r.airM)} chim bay`);
@@ -4193,25 +4290,45 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
     const r = rows[i];
     if (!r) return;
     const bounds = L.latLngBounds([[lat, lng], [Number(r.item.lat), Number(r.item.lng)]]);
-    if (r.path) bounds.extend(L.latLngBounds(r.path));
+    const shown = routed.find((x) => x.code === r.code);
+    if (shown?.path) bounds.extend(L.latLngBounds(shown.path));
+    else if (r.path) bounds.extend(L.latLngBounds(r.path));
     if (lots[i]) bounds.extend(L.geoJSON(lots[i].geometry).getBounds());
     m.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
   });
 
-  // Ranh khu đất công trình gần nhất: bản đồ quy hoạch lấy lô QH, chưa có thì lô hiện trạng; tải file đồ án nếu lô chưa vẽ.
-  // Có ranh thì bỏ vòng tròn đích (ranh đã đánh dấu công trình)
+  // Ranh khu đất: có ranh thì cắt tuyến tại mép, bỏ vòng tròn đích.
   const found = await Promise.all(rows.map(r => infraLotOf(r.item.id, r.item.tenQH, isPlan ? ['QH', 'HT'] : ['HT']).catch(() => null)));
   if (seq !== singleIsoSeq) return;
+  let clipped = false;
   found.forEach((lot, i) => {
     if (!lot || !lot.geometry) return;
     lots[i] = lot;
     group.removeLayer(rings[i]);
-    addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[rows[i].code] || SEL_ACCENT);
+    addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[rows[i].code] || SEL_ACCENT, true);
+    if (rows[i].path) {
+      const next = clipPathAtParcel(rows[i].path, lot.geometry);
+      const slot = routed.find((x) => x.code === rows[i].code);
+      if (slot && next && next.length) {
+        const prev = slot.path;
+        const moved = prev.length !== next.length
+          || prev[prev.length - 1][0] !== next[next.length - 1][0]
+          || prev[prev.length - 1][1] !== next[next.length - 1][1];
+        slot.path = next;
+        if (moved) clipped = true;
+      }
+    }
     const sub = popup.isOpen() && popup.getElement()?.querySelector(`[data-route="${i}"] .js-lot`);
     if (!sub) return;
     const phase = lot.phase === 'QH' ? 'theo quy hoạch' : isPlan ? 'hiện trạng (chưa có ranh quy hoạch)' : 'hiện trạng';
     sub.textContent = `Ranh khu đất ${phase}${lot.file ? ` · ${lot.file}` : ''}`;
   });
+  if (clipped) {
+    routeLayers.forEach((layer) => group.removeLayer(layer));
+    if (stopFlow) stopFlow();
+    routeLayers = drawAccessRouteLines(group, renderer, routed);
+    stopFlow = routed.length ? startFlowAnimation(m, group, routed.map((r) => r.path)) : null;
+  }
 }
 
 // Mạng lưới tại vị trí tra cứu (đường chim bay): trạm xe buýt ≤ 500 m (Mục 2.8.3.3), trụ sở PCCC ≤ 3 km phường / 5 km xã
@@ -4241,9 +4358,9 @@ function networkInspectHtml(source, lat, lng, wardName, num, skip = null) {
 }
 
 // Vòng âm bản quanh vị trí tra cứu: bán kính đi bộ cấp đơn vị ở (mầm non, tiểu học, THCS: 1 km) hoặc bán kính chung giả lập.
-// Đậm vừa phải hơn khi chọn công trình vì bên trong không vẽ mạng đường, cần nhìn xuyên xuống nền vệ tinh.
+// Opacity thấp hơn để lộ nền vệ tinh khi đang xem nhãn / tuyến tiếp cận.
 const INSPECT_RING_M = 1000;
-const INSPECT_INNER_OPACITY = 0.66;
+const INSPECT_INNER_OPACITY = 0.42;
 const PLAN_NEAR_MAX = 6;
 
 // Công trình đã duyệt phủ tới vị trí, theo nhóm: { type: Map(tên → công trình) }. Buffer mỗi công trình là vòng tròn
@@ -4281,7 +4398,7 @@ function planChangesHtml(source, lat, lng, ringRadius, num) {
   return html;
 }
 
-// Mỗi nhóm đang phủ tới vị trí: công trình gần nhất. Ký hiệu nằm trên tên, neo tại tâm lô (chưa có ranh thì tại điểm công trình).
+// Mỗi nhóm đang phủ tới vị trí: công trình gần nhất. Chip tên neo mép ngoài lô (chưa có ranh thì tại điểm công trình).
 // Cả ký hiệu lẫn tên nằm trong singleIso nên tắt kiểm tra (clearSingleIsochrone) gỡ hết.
 function nearestCovered(groups, lat, lng, codes = INFRA_CODES) {
   const out = [];
@@ -4302,20 +4419,21 @@ function nearestCovered(groups, lat, lng, codes = INFRA_CODES) {
 function accessLotMarker(it) {
   const files = ICON_FILES[layerType(it)] || ICON_FILES['1-CV'];
   const iconUrl = `./icons/${isApproved(it.status) ? files.approved : files.pending}`;
+  const title = escapeHtml(infraTitle(it.name || 'Công trình'));
   return L.marker([Number(it.lat), Number(it.lng)], {
-    interactive: false,
+    interactive: true,
     keyboard: false,
     zIndexOffset: 900,
     icon: L.divIcon({
       className: 'inspect-lot-pin',
-      html: `<img src="${iconUrl}" alt="" /><b>${escapeHtml(infraTitle(it.name || 'Công trình'))}</b>`,
-      iconSize: [22, 27],
-      iconAnchor: [11, 27]
+      html: `<div class="inspect-lot-chip"><img src="${iconUrl}" alt="" /><span class="inspect-lot-name">${title}</span></div>`,
+      iconSize: [ACCESS_PIN_W, ACCESS_PIN_H],
+      iconAnchor: [ACCESS_PIN_W / 2, ACCESS_PIN_H]
     })
   });
 }
 
-async function showAccessedLots(targetMap, items, seq, isPlan) {
+async function showAccessedLots(targetMap, items, seq, isPlan, clickLat, clickLng) {
   if (!items.length) return;
   const group = isPlan ? planLayers.singleIso : layers.singleIso;
   const renderer = selRendererFor(targetMap);
@@ -4324,16 +4442,15 @@ async function showAccessedLots(targetMap, items, seq, isPlan) {
     group.addLayer(marker);
     return marker;
   });
+  const anchors = items.map((it) => [Number(it.lat), Number(it.lng)]);
   const found = await Promise.all(items.map(it => infraLotOf(it.id, it.tenQH, isPlan ? ['QH', 'HT'] : ['HT']).catch(() => null)));
   if (seq !== singleIsoSeq) return;
   found.forEach((lot, i) => {
     if (!lot?.geometry) return;
-    addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[layerType(items[i])] || SEL_ACCENT);
-    try {
-      const [x, y] = turf.centroid(lot.geometry).geometry.coordinates;
-      markers[i].setLatLng([y, x]);
-    } catch (e) { /* giữ ký hiệu tại tọa độ công trình */ }
+    addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[layerType(items[i])] || SEL_ACCENT, true);
+    anchors[i] = accessLabelAnchor(clickLat, clickLng, items[i], lot.geometry);
   });
+  bindAccessPinLayout(targetMap, markers, anchors);
 }
 
 // Tính trực tiếp trên toàn TP (không phụ thuộc phường đang lọc). Bản đồ quy hoạch dò theo kịch bản QH (gồm công trình
@@ -4368,7 +4485,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map, opt
     .filter(it => hasValidCoord(it) && distanceMeters(clickLat, clickLng, Number(it.lat), Number(it.lng)) <= ringRadius)
     .map(pointKey));
   (isPlan ? planRenderer : leftRenderer).highlight(hiKeys);
-  showAccessedLots(targetMap, nearestCovered(coveredGroups, clickLat, clickLng, codes), routeSeq, isPlan);
+  showAccessedLots(targetMap, nearestCovered(coveredGroups, clickLat, clickLng, codes), routeSeq, isPlan, clickLat, clickLng);
 
   let html = `<div class="pp">
     <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
