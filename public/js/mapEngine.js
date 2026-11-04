@@ -4160,7 +4160,7 @@ function syncAccessPinZoom(m) {
   m.getContainer().classList.toggle('inspect-pins-tight', m.getZoom() < 16);
 }
 
-function boxesOverlap(a, b)
+function boxesOverlap(a, b) {
   return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
 }
 
