@@ -75,8 +75,44 @@ const FACILITY = {
   bus: { label: 'Xe buýt', color: [3, 105, 161, 248], glow: [56, 189, 248], walk: 400, rank: 6 }
 };
 const FAC_COUNT_IDS = ['park', 'school', 'health', 'market', 'culture', 'parking', 'bus'];
-const TOWER_BEACON_M = 48;
-const LOT_HATCH_STEP = 9;
+const TOWER_PIN_M = 48;
+/** Ghim đỏ kiểu Google — tip neo đáy icon, đặt trên đỉnh tháp. */
+let TOWER_PIN_URL = '';
+function towerPinUrl() {
+  if (TOWER_PIN_URL || typeof document === 'undefined') return TOWER_PIN_URL;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext('2d');
+  if (!g) return '';
+  g.clearRect(0, 0, 64, 64);
+  g.beginPath();
+  g.moveTo(32, 60);
+  g.bezierCurveTo(32, 60, 10, 38, 10, 24);
+  g.arc(32, 24, 22, Math.PI * 0.92, Math.PI * 0.08, true);
+  g.bezierCurveTo(54, 38, 32, 60, 32, 60);
+  g.closePath();
+  g.fillStyle = '#ea4335';
+  g.fill();
+  g.strokeStyle = '#b31412';
+  g.lineWidth = 2;
+  g.stroke();
+  g.beginPath();
+  g.arc(32, 24, 9, 0, Math.PI * 2);
+  g.fillStyle = '#ffffff';
+  g.fill();
+  TOWER_PIN_URL = c.toDataURL('image/png');
+  return TOWER_PIN_URL;
+}
+
+function towerPinsOf(volumes) {
+  return (volumes || [])
+    .filter((v) => v.h >= TOWER_PIN_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
+    .map((v) => {
+      const c = centroid(v.rings[0]);
+      return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 2] };
+    });
+}
 
 function hexRgba(hex, a = 255) {
   const s = String(hex || '').replace('#', '');
@@ -90,41 +126,6 @@ function lightenRgb(rgb, t = 0.35) {
     Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * t)),
     Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * t))
   ];
-}
-
-/** Nét hatch 45° trong polygon địa phương — chỉ đoạn nằm trong ring. */
-function hatchInRing(ring, step = LOT_HATCH_STEP) {
-  let minx = Infinity;
-  let miny = Infinity;
-  let maxx = -Infinity;
-  let maxy = -Infinity;
-  for (const p of ring) {
-    if (p[0] < minx) minx = p[0];
-    if (p[1] < miny) miny = p[1];
-    if (p[0] > maxx) maxx = p[0];
-    if (p[1] > maxy) maxy = p[1];
-  }
-  if (!Number.isFinite(minx) || maxx - minx < 2 || maxy - miny < 2) return [];
-  const paths = [];
-  const pad = (maxy - miny) + step;
-  for (let c = minx + miny - pad; c <= maxx + maxy + pad; c += step) {
-    let run = [];
-    const flush = () => {
-      if (run.length >= 2) paths.push(run);
-      run = [];
-    };
-    for (let x = minx; x <= maxx + 0.01; x += 2.5) {
-      const y = c - x;
-      if (y < miny - 0.5 || y > maxy + 0.5) {
-        flush();
-        continue;
-      }
-      if (pointInRing([x, y], ring)) run.push([x, y]);
-      else flush();
-    }
-    flush();
-  }
-  return paths;
 }
 const AMENITY_RE = 'school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking';
 const SEARCH_M = 2000;
@@ -1290,15 +1291,15 @@ function buildModel(raw, origin, r, heights, floorPack) {
       if (!cut || ringArea(cut) < 12) continue;
       const wound = wind([cut]);
       const path = cut.concat([cut[0]]);
+      // Chỉ tô + viền sáng (không PathLayer hatch) — hatch dày dễ làm WebGL chết khi rebuild.
       infraLots.push({
         rings: wound,
         h: 0.55,
         z0: 0,
-        fill: [rgb[0], rgb[1], rgb[2], 72],
-        glow: [soft[0], soft[1], soft[2], 110],
-        edge: [soft[0], soft[1], soft[2], 235],
+        fill: [rgb[0], rgb[1], rgb[2], 90],
+        glow: [soft[0], soft[1], soft[2], 130],
+        edge: [soft[0], soft[1], soft[2], 240],
         path,
-        hatch: hatchInRing(cut).map((seg) => ({ path: seg, color: [rgb[0], rgb[1], rgb[2], 160] })),
         name: lot.name || ''
       });
     }
@@ -1577,8 +1578,7 @@ function bootMap(place, model, ground) {
   let deckgl = null;
   let edgeMemo = null;
   let groundPack = ground || null;
-  let pulse = 0;
-  let beaconTimer = 0;
+  const pinUrl = towerPinUrl();
   const moodName = DEFAULT_LIGHT;
   const preset = LIGHT_PRESETS[moodName];
   const root = document.documentElement;
@@ -1802,24 +1802,6 @@ function bootMap(place, model, ground) {
         layers.push(polys(li ? `infra-lot-fill-${li}` : 'infra-lot-fill', data, lotZ + z0, (d) => d.fill));
         li += 1;
       });
-      const hatchPaths = lotList.flatMap((lot) => (lot.hatch || []).map((h) => ({
-        path: h.path.map((p) => [p[0], p[1], (lot.z0 || 0) + 0.7]),
-        color: h.color
-      })));
-      if (hatchPaths.length) {
-        layers.push(new deck.PathLayer(withMask({
-          id: 'infra-lot-hatch',
-          data: hatchPaths,
-          coordinateSystem: CART,
-          modelMatrix: lift(lotZ),
-          getPath: (d) => d.path,
-          getColor: (d) => d.color,
-          getWidth: 1.4,
-          widthUnits: 'meters',
-          widthMinPixels: 1,
-          pickable: false
-        })));
-      }
       layers.push(new deck.PathLayer(withMask({
         id: 'infra-lot-glow',
         data: lotList,
@@ -1931,37 +1913,6 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* số tầng vẫn ở bảng bên trái */ }
     }
-    const beacons = model.beacons || [];
-    if (beacons.length) {
-      const wave = 0.5 + 0.5 * Math.sin(pulse / 180 * Math.PI);
-      const glow = Math.round(80 + wave * 160);
-      layers.push(new deck.ScatterplotLayer({
-        id: 'tower-beacon-glow',
-        data: beacons,
-        coordinateSystem: CART,
-        modelMatrix: lift(zVolumes),
-        getPosition: (d) => d.position,
-        getRadius: 10 + wave * 14,
-        radiusUnits: 'meters',
-        getFillColor: [255, 220, 80, Math.round(40 + wave * 90)],
-        stroked: false,
-        pickable: false
-      }));
-      layers.push(new deck.ScatterplotLayer({
-        id: 'tower-beacon',
-        data: beacons,
-        coordinateSystem: CART,
-        modelMatrix: lift(zVolumes),
-        getPosition: (d) => d.position,
-        getRadius: 3.5 + wave * 2.5,
-        radiusUnits: 'meters',
-        getFillColor: [255, 250, 200, glow],
-        stroked: true,
-        getLineColor: [255, 180, 40, 255],
-        lineWidthMinPixels: 1,
-        pickable: false
-      }));
-    }
     layers.push(new deck.PathLayer(withMask({
       id: 'roads',
       data: model.roads,
@@ -2071,7 +2022,30 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* số nằm trên thẻ bên trái */ }
     }
-    deckgl.setProps({ layers });
+    const pins = model.towerPins || [];
+    if (pins.length && pinUrl && typeof deck.IconLayer === 'function') {
+      try {
+        layers.push(new deck.IconLayer({
+          id: 'tower-pin',
+          data: pins,
+          coordinateSystem: CART,
+          modelMatrix: lift(planeZ('volumes')),
+          getPosition: (d) => d.position,
+          getIcon: () => ({ url: pinUrl, width: 64, height: 64, anchorY: 64 }),
+          getSize: 28,
+          sizeUnits: 'pixels',
+          sizeMinPixels: 18,
+          sizeMaxPixels: 36,
+          billboard: true,
+          pickable: false
+        }));
+      } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
+    }
+    try {
+      deckgl.setProps({ layers });
+    } catch (err) {
+      console.warn('Vẽ 3D:', err);
+    }
   }
 
   camera = fitState(view.k);
@@ -2152,16 +2126,6 @@ function bootMap(place, model, ground) {
     camera = fitState(view.k);
     deckgl.setProps({ viewState: camera });
   });
-  let beaconStamp = 0;
-  const tickBeacon = (now) => {
-    beaconTimer = requestAnimationFrame(tickBeacon);
-    if (!(model.beacons || []).length) return;
-    if (now - beaconStamp < 70) return;
-    beaconStamp = now;
-    pulse = (pulse + 14) % 360;
-    draw();
-  };
-  if ((model.beacons || []).length) beaconTimer = requestAnimationFrame(tickBeacon);
   $('btnTach').disabled = false;
   $('btnGop').disabled = false;
   document.body.dataset.ready = '1';
@@ -2169,7 +2133,7 @@ function bootMap(place, model, ground) {
     replace(next, nextGround) {
       model = next;
       if (nextGround) groundPack = nextGround;
-      if ((model.beacons || []).length && !beaconTimer) beaconTimer = requestAnimationFrame(tickBeacon);
+      edgeMemo = null;
       draw();
     }
   };
@@ -2345,12 +2309,7 @@ function applyDemOffsets(model, dem) {
     if (!Number.isFinite(dz)) return;
     lot.z0 = (lot.z0 || 0) + dz;
   });
-  model.beacons = model.volumes
-    .filter((v) => v.h >= TOWER_BEACON_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
-    .map((v) => {
-      const c = centroid(v.rings[0]);
-      return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 5] };
-    });
+  model.towerPins = towerPinsOf(model.volumes);
 }
 
 function showBuilt() {
@@ -2358,14 +2317,7 @@ function showBuilt() {
   const model = buildModel(built.raw, built.origin, built.place.r, built.heights, floorPack);
   model.osmError = built.raw.osmError;
   if (built.dem) applyDemOffsets(model, built.dem);
-  else {
-    model.beacons = model.volumes
-      .filter((v) => v.h >= TOWER_BEACON_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
-      .map((v) => {
-        const c = centroid(v.rings[0]);
-        return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 5] };
-      });
-  }
+  else model.towerPins = towerPinsOf(model.volumes);
   paintPanel(model, built.place, built.ward);
   $('status').textContent = model.meanF == null
     ? 'Chưa có chiều cao mét trong ô.'
