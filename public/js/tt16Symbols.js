@@ -1,5 +1,6 @@
 // Ký hiệu ranh lô theo TT 16/2025/TT-BXD, Phụ lục I: Mục 04 – QHPK 1/2.000, 1/5.000 (trang 19–22), bộ dùng cho mọi đồ án
-// hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), khóa "C-"; Mục 05 – QHCT 1/500 (PL1), khóa "T-", dùng lại ô Mục 04.
+// hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), khóa "C-"; Mục 05 – QHCT 1/500 (PL1), khóa "T-", mặc định ô Mục 04.
+// Hỗn hợp / di tích / an ninh / cây xanh hạn chế (cùng ACI Mục 02): QHPK và QHCT dùng ô C_*.
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
 import { SAND_COLOR, VISION_LEGEND_GROUPS } from './qhc2045.js';
@@ -25,19 +26,20 @@ export const TT16_STYLES = {
 // Loại đất Mục 04 còn lại (và đầu mục tương ứng của quy hoạch chung). codes: tên phân lớp, bỏ tiền tố giai đoạn
 Object.assign(TT16_STYLES, {
   "O-NO": { label: 'Nhóm nhà ở', layer: 'DAT_O_Nhomnhao', aci: 42, color: '#cc9900', pattern: 'Nhomnhao' },
-  "O-HH": { label: 'Hỗn hợp nhóm nhà ở và dịch vụ', layer: 'DAT_O_Honhop_Nhomo', aci: 22, color: '#cc3200', pattern: 'Honhop' },
+  // Hỗn hợp / di tích / an ninh / cây xanh hạn chế: cùng ACI với Mục 02 → dùng ô C_* (QHC 1/10.000)
+  "O-HH": { label: 'Hỗn hợp nhóm nhà ở và dịch vụ', layer: 'DAT_O_Honhop_Nhomo', aci: 22, color: '#cc3200', pattern: 'C_HH' },
   "O-LX": { label: 'Làng xóm, dân cư nông thôn', layer: 'DAT_O_Langxom', aci: 57, color: '#7f7f40', pattern: 'Langxom' },
-  "CX-HC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'Cayxanhhanche' },
+  "CX-HC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'C_CXHC' },
   "CX-CD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
   "SX-CN": { label: 'Sản xuất công nghiệp, kho bãi', layer: 'DAT_SX_Congnghiep', aci: 192, color: '#6600cc', pattern: 'Congnghiep' },
   "SX-VL": { label: 'Khai thác khoáng sản, VLXD', layer: 'DAT_SX_Vatlieu', aci: 175, color: '#4d4d99', pattern: 'Vatlieu' },
-  // ACI 1 như Mục 02 (C-DVCC). Nền hoa văn và tô đặc đủ đậm: #e03131 alpha 0.25 trên vệ tinh và nền UI tối trông như đen
-  "CC-DV": { label: 'Công cộng - dịch vụ', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'DVCC', solidOpacity: 0.62, fillOpacity: 0.55 },
+  // ACI 1 như Mục 02 (C-DVCC). Lưới đỏ đặc dễ đục nền: hạ nền / tô đặc / nét hatch (hatchOpacity).
+  "CC-DV": { label: 'Công cộng - dịch vụ', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'DVCC', solidOpacity: 0.35, fillOpacity: 0.28, hatchOpacity: 0.5 },
   "DT-NC": { label: 'Đào tạo, nghiên cứu', layer: 'DAT_DaotaoNC', aci: 144, color: '#007399', pattern: 'DaotaoNC' },
   "CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
   "DL": { label: 'Khu dịch vụ du lịch', layer: 'DAT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
-  "DT-TG": { label: 'Di tích, tôn giáo', layer: 'DAT_Ditich_tongiao', aci: 16, color: '#7f0000', pattern: 'Ditich' },
-  "AN": { label: 'An ninh', layer: 'DAT_Anninh', aci: 64, color: '#739900', pattern: 'Anninh' },
+  "DT-TG": { label: 'Di tích, tôn giáo', layer: 'DAT_Ditich_tongiao', aci: 16, color: '#7f0000', pattern: 'C_DTTG' },
+  "AN": { label: 'An ninh', layer: 'DAT_Anninh', aci: 64, color: '#739900', pattern: 'C_AN' },
   "QP": { label: 'Quốc phòng', layer: 'DAT_Quocphong', aci: 79, color: '#394c26', pattern: 'Quocphong' },
   "GT": { label: 'Đường giao thông', layer: 'DAT_HTKT_DuongGT', aci: 251, color: '#5b5b5b', pattern: 'DuongGT' },
   "NTR": { label: 'Nghĩa trang', layer: 'DAT_HTKT_Nghiatrang', aci: 251, color: '#5b5b5b', pattern: 'Nghiatrang' },
@@ -60,7 +62,7 @@ Object.assign(TT16_STYLES, {
 Object.assign(TT16_STYLES, {
   "C-DVO": { label: 'Đơn vị ở', layer: 'DAT_DD_Donvio', aci: 30, color: '#ff7f00', pattern: 'C_DVO' },
   "C-HH": { label: 'Hỗn hợp (đơn vị ở và dịch vụ công cộng đô thị)', layer: 'DAT_DD_Honhop', aci: 22, color: '#cc3200', pattern: 'C_HH' },
-  "C-DVCC": { label: 'Dịch vụ - công cộng đô thị', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'C_DVCC', solidOpacity: 0.62, fillOpacity: 0.55 },
+  "C-DVCC": { label: 'Dịch vụ - công cộng đô thị', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'C_DVCC', solidOpacity: 0.35, fillOpacity: 0.28, hatchOpacity: 0.5 },
   "C-CQDT": { label: 'Cơ quan, trụ sở đô thị', layer: 'DAT_DD_Coquandothi', aci: 34, color: '#994c00', pattern: 'C_CQDT' },
   "C-CXDT": { label: 'Cây xanh sử dụng công cộng đô thị', layer: 'DAT_DD_CayxanhCCdothi', aci: 72, color: '#66cc00', pattern: 'C_CXDT' },
   "C-GTDT": { label: 'Giao thông đô thị', layer: 'DAT_DD_Giaothongdothi', aci: 8, color: '#808080', pattern: 'C_GTDT' },
@@ -89,7 +91,7 @@ Object.assign(TT16_STYLES, {
   "C-SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_NNK_Songsuoi', aci: 152, color: '#0066cc', pattern: 'C_SS' },
   "C-MNB": { label: 'Mặt nước ven biển', layer: 'DAT_NNK_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'C_MNB' }
 });
-// QHCT 1/500 (Mục 05 PL1): cùng ô hoa văn Mục 04, màu ACI của Mục 05. Riêng nhà ở biệt thự là kẻ dọc đứt (ô Nhaobietthu).
+// QHCT 1/500 (Mục 05 PL1): mặc định ô Mục 04; di tích / an ninh / cây xanh hạn chế dùng ô Mục 02 (cùng ACI).
 // Hậu tố cấp _QG / _CV / _CT / _CH / _DVO cùng hoa văn; landPatternKey bỏ hậu tố đó trước khi đối chiếu PATTERN_CODES.
 Object.assign(TT16_STYLES, {
   "T-LK": { label: 'Nhà ở liền kề', layer: 'DAT_NO_Nhaolienke', aci: 32, color: '#cc6600', pattern: 'Nhomnhao' },
@@ -109,10 +111,10 @@ Object.assign(TT16_STYLES, {
   "T-CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_CT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
   "T-DV": { label: 'Dịch vụ', layer: 'DAT_CT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
   "T-DL": { label: 'Du lịch', layer: 'DAT_CT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
-  "T-DTTG": { label: 'Di tích, tôn giáo', layer: 'DAT_CT_Ditichtongiao', aci: 16, color: '#7f0000', pattern: 'Ditich' },
-  "T-CXHC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_CT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'Cayxanhhanche' },
+  "T-DTTG": { label: 'Di tích, tôn giáo', layer: 'DAT_CT_Ditichtongiao', aci: 16, color: '#7f0000', pattern: 'C_DTTG' },
+  "T-CXHC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_CT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'C_CXHC' },
   "T-CXCD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_CT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
-  "T-AN": { label: 'An ninh', layer: 'DAT_CT_Anninh', aci: 64, color: '#739900', pattern: 'Anninh' },
+  "T-AN": { label: 'An ninh', layer: 'DAT_CT_Anninh', aci: 64, color: '#739900', pattern: 'C_AN' },
   "T-QP": { label: 'Quốc phòng', layer: 'DAT_CT_Quocphong', aci: 79, color: '#394c26', pattern: 'Quocphong' },
   "T-GT": { label: 'Đường giao thông', layer: 'DAT_CTHTKT_DuongGT', aci: 251, color: '#5b5b5b', pattern: 'DuongGT' },
   // ACI 252 đúng Mục 05. Bộ QHPK (2-BDX) mượn ACI 175 vì 252 sát nghĩa trang ACI 251
@@ -542,8 +544,8 @@ function honeycomb(r) {
 // Hoa văn trích từ Phụ lục thưa hơn hẳn các loại đất khác khi đặt cạnh nhau: thu nhỏ khoảng cách (giữ độ dày nét, cỡ chấm)
 const DENSE_SCALE = 0.7;
 // QHPK 1/2.000: hatch các loại này dày, che nền vệ tinh. Nhân tỷ lệ ô lên 2 (độ dày nét giữ nguyên, khoảng cách nét gấp đôi).
-// Chỉ khóa Mục 04; QHCT dùng lại cùng ô TILES (T-LK, T-CC, T-AN, T-TM…) nên không nằm trong tập này.
-const LOOSE_HATCH_KEYS = new Set(['O-NO', 'O-HH', 'CC-DV', 'AN', 'QP', 'DT-TG', 'HTK']);
+// Chỉ khóa Mục 04 còn dùng ô Mục 04; O-HH / AN / DT-TG / CX-HC đã trỏ ô Mục 02 (không nhân).
+const LOOSE_HATCH_KEYS = new Set(['O-NO', 'CC-DV', 'QP', 'HTK']);
 
 // Ô lặp: w × h (pt); segs [x0,y0,x1,y1,…]; dots [x,y,…]; round: đầu nét tròn (hoa văn chấm); dotR: bán kính chấm (pt);
 // scale: tỷ lệ hatch so với Phụ lục (mặc định 1)
@@ -808,7 +810,8 @@ function tileFor(key) {
     c.fillStyle = hexToRgba(s.color, s.fillOpacity || PATTERN_BG_ALPHA);
     c.fillRect(0, 0, cv.width, cv.height);
     c.scale((w * r) / t.w, (h * r) / t.h);
-    c.strokeStyle = c.fillStyle = s.color;
+    const hatchA = s.hatchOpacity != null ? s.hatchOpacity : 1;
+    c.strokeStyle = c.fillStyle = hatchA < 1 ? hexToRgba(s.color, hatchA) : s.color;
     c.lineWidth = LINE_PT / k;
     c.lineCap = t.round ? 'round' : 'butt';
     drawTile(c, t, k);

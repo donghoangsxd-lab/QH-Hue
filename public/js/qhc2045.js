@@ -23,11 +23,9 @@ export const QHC2045 = {
 
 /** Quy mô QHC 1/10.000 khu vực đô thị trung tâm (khác chỉ tiêu QĐ 108 của lớp 1/25.000). */
 export const QHC10_CENTER_BRIEF = {
-  title: 'Quy hoạch chung 1/10.000 khu vực đô thị trung tâm',
-  dienTich: 'Diện tích khoảng 108.650 ha.',
-  danSoLabel: 'Dân số:',
-  danSo2030: 'Đến năm 2030 khoảng 850 nghìn người;',
-  danSo2045: 'Đến năm 2045 khoảng 1.010 nghìn người.'
+  dienTichHa: '108.650',
+  danSo2030: '850 nghìn người',
+  danSo2045: '1.010 nghìn người'
 };
 
 /** Lớp tĩnh QHC đô thị (1/25.000 + 1/10.000 trung tâm): không phải đồ án nhập trong catalog. */

@@ -68,7 +68,7 @@ export function qhc25ScaleHtml() {
     <p class="qhc25-scale-cite">${escapeHtml(cite)}</p>
     <h5 class="qhc25-scale-h">a) Quy mô dân số, tỷ lệ đô thị hóa</h5>
     <div class="qhc25-scale-scroll">
-      <table class="qhc25-scale-table">
+      <table class="qhc25-scale-table qhc25-scale-pop">
         <thead><tr><th scope="col">Giai đoạn</th><th scope="col">Dân số toàn đô thị</th><th scope="col">Đô thị hóa</th><th scope="col">Khách du lịch</th></tr></thead>
         <tbody>${popCell(2030)}${popCell(2045)}${popCell(2065)}</tbody>
       </table>
@@ -77,7 +77,7 @@ export function qhc25ScaleHtml() {
     <h5 class="qhc25-scale-h">b) Quy mô đất đai</h5>
     <p class="qhc25-scale-note">${escapeHtml(LAND_NOTE)}</p>
     <div class="qhc25-scale-scroll">
-      <table class="qhc25-scale-table">
+      <table class="qhc25-scale-table qhc25-scale-land">
         <thead><tr><th scope="col">Giai đoạn</th><th scope="col">Đất xây dựng</th><th scope="col">Đất dân dụng</th><th scope="col">Chỉ tiêu ĐD</th><th scope="col">Ngoài dân dụng</th><th scope="col">Điểm DC nông thôn</th></tr></thead>
         <tbody>${landCell(2030)}${landCell(2045)}</tbody>
       </table>
