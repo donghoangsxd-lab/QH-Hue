@@ -2,7 +2,8 @@ import fs from 'fs';
 import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
-  hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF
+  hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
+  filterMassing, namesMatch
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -47,15 +48,30 @@ if (edges.length !== 5 || edges[0][0][2] !== 10 || edges[1][0][2] !== 2 || edges
   throw new Error(`cạnh khối ${edges.length}`);
 }
 if (OPEN_CAMERA.rotationX !== 42 || OPEN_CAMERA.rotationOrbit !== -50) throw new Error('camera mở');
-if (DEFAULT_LIGHT !== 'hoanghon' || !LIGHT_PRESETS.sang || !LIGHT_PRESETS.dem) throw new Error('ánh sáng mặc định');
-for (const name of ['sang', 'hoanghon', 'dem']) {
-  const preset = LIGHT_PRESETS[name];
-  if (!preset.ambient.intensity || preset.sun.direction.length !== 3) throw new Error(`preset ${name}`);
+if (DEFAULT_LIGHT !== 'nhanh' || !LIGHT_PRESETS.nhanh) throw new Error('chế độ render nhanh');
+{
+  const preset = LIGHT_PRESETS.nhanh;
+  if (!preset.css.canvas || !preset.ground.rim) throw new Error('preset nhanh');
   const clear = hexToClear(preset.css.canvas);
   if (Math.abs(clear[0] - 0.91) < 0.01 && Math.abs(clear[1] - 0.933) < 0.01) throw new Error('nền lạnh cũ');
+  if ((clear[0] + clear[1] + clear[2]) / 3 > 0.45) throw new Error('nền 3D còn quá sáng');
 }
-const dusk = hexToClear(LIGHT_PRESETS.hoanghon.css.canvas);
-if ((dusk[0] + dusk[1] + dusk[2]) / 3 > 0.35) throw new Error('hoàng hôn còn sáng');
+if (!namesMatch('Meliá Vinpearl Huế (Vincom cùng khối)', 'Meliá Vinpearl Huế')) throw new Error('khớp tên Vinpearl');
+if (!namesMatch('The Manor Crown A', 'The Manor Crown - Tower A')) throw new Error('khớp tên Manor');
+{
+  const sites = [
+    { name: 'Meliá Vinpearl Huế', lng: 107.5942, lat: 16.4631 },
+    { name: 'The Manor Crown - Tower A', lng: 107.6069, lat: 16.4633 }
+  ];
+  const rows = [
+    { name: 'Meliá Vinpearl Huế (Vincom cùng khối)', drawn: true },
+    { name: 'The Manor Crown A', drawn: true },
+    { name: 'La Vela Hotel', drawn: false }
+  ];
+  const near = filterMassing(rows, sites, 16.4637, 107.5952, 800);
+  if (near.length !== 1 || near[0].name.indexOf('Vinpearl') < 0) throw new Error(`lọc massing ${near.map((r) => r.name)}`);
+  if (filterMassing(rows, sites, 16.4637, 107.5952, 150).length !== 1) throw new Error('Vinpearl trong 150 m');
+}
 const tiles = tilesFor(16.4637, 107.5952, 500);
 if (tiles.length < 4 || tiles.length > 12) throw new Error(`số tile ${tiles.length}`);
 const seg = clipSegment([-1000, 0], [1000, 0], 500);
@@ -117,12 +133,24 @@ if (!js.includes('orthographic: false') || !js.includes('WHITE_BLOCK') || !js.in
   throw new Error('thiếu phối cảnh, khối trắng hoặc vầng không gian mở');
 }
 if (js.includes('0.91, 0.933, 0.953') || js.includes('#e8eef3') || !js.includes('_full3d: true') || !js.includes('volume-edge')) {
-  throw new Error('thiếu nền hoàng hôn, mái hoặc cạnh khối');
+  throw new Error('thiếu nền nhanh, mái hoặc cạnh khối');
+}
+if (js.includes('new deck.LightingEffect') || js.includes('new deck.DirectionalLight') || js.includes('material: SOFT') || js.includes('ROOF_MAT')) {
+  throw new Error('vẫn còn giả lập ánh sáng / material nặng');
+}
+if (!js.includes('composeGoogleGround') || !js.includes('google-sat') || !js.includes('google-labels') || !js.includes('filterMassing')) {
+  throw new Error('thiếu nền Google hoặc lọc nhà cao theo bán kính');
+}
+if (!js.includes('effects: []') || !js.includes('useDevicePixels: 1')) {
+  throw new Error('chưa tắt effects / chưa kẹp devicePixelRatio');
 }
 if (!html.includes('id="btnGop" aria-pressed="true"') || html.includes('aria-pressed="true">Tách lớp')) {
   throw new Error('nút gộp chưa là mặc định');
 }
-for (const s of ['Hoàng hôn', 'data-light="dem"', 'Màu theo tầng', '>Gộp một khối<', 'id="gapRow" class="gap" hidden']) {
+if (html.includes('data-light=') || html.includes('Hoàng hôn') || html.includes('btnSang')) {
+  throw new Error('còn nút giả lập ánh sáng');
+}
+for (const s of ['Màu theo tầng', '>Gộp một khối<', 'id="gapRow" class="gap" hidden']) {
   if (!html.includes(s)) throw new Error(`html thiếu ${s}`);
 }
 const css3 = fs.readFileSync(new URL('../public/css/phan-tich-3d.css', import.meta.url), 'utf8');

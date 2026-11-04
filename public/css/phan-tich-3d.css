@@ -7,11 +7,11 @@
   --text-main: #cbd5e1;
   --text-muted: #94a3b8;
   --accent-cyan: #38bdf8;
-  --canvas: #2e2432;
-  --canvas-top: #5a3c50;
-  --canvas-deep: #120e16;
-  --vignette: rgba(8, 4, 10, 0.48);
-  --sky-wash: rgba(255, 186, 140, 0.16);
+  --canvas: #1a2332;
+  --canvas-top: #2a3a4e;
+  --canvas-deep: #0c121c;
+  --vignette: rgba(4, 8, 14, 0.22);
+  --sky-wash: rgba(255, 255, 255, 0.04);
 }
 html, body {
   margin: 0;
