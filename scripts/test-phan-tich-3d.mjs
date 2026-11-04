@@ -129,6 +129,16 @@ const css = fs.readFileSync(new URL('../public/css/style.css', import.meta.url),
 if (!panel.includes('openView3d') || !css.includes('.view3d-panel') || !css.includes('(orientation: landscape) and (max-height: 520px)')) {
   throw new Error('thiếu khung 3D nổi');
 }
+if (!panel.includes('qh-3d-infra') || !panel.includes('packLocalInfra') || !panel.includes('packLocalLots')) {
+  throw new Error('chưa gửi hạ tầng / ranh lô vào iframe 3D');
+}
+if (!js.includes('qh-3d-infra') || !js.includes('localInfra') || !js.includes('localLots') || !js.includes('sampleDemGrid') || !js.includes('tower-beacon') || !js.includes('infra-lot-hatch')) {
+  throw new Error('thiếu nhận hạ tầng nội bộ / ranh lô / DEM / đèn tháp');
+}
+const dem = fs.readFileSync(new URL('../public/js/view3dDem.js', import.meta.url), 'utf8');
+if (!dem.includes('sampleDemGrid') || !dem.includes('terrarium') || !dem.includes('offsetAt')) {
+  throw new Error('view3dDem thiếu lưới cao độ');
+}
 if (!js.includes('orthographic: false') || !js.includes('WHITE_BLOCK') || !js.includes('openBloom')) {
   throw new Error('thiếu phối cảnh, khối trắng hoặc vầng không gian mở');
 }

@@ -47,11 +47,11 @@ Heatmap GEE dùng buffer tròn. Bám đường là Dijkstra `computeServiceArea`
 
 ## MOD-09 Đo, phác thảo, in, 3D
 
-`mapEngine.js`: `toggleMeasure`, `clearMeasure`, `handleMeasureClick`, `consumeMeasureMapClick`, `setMeasureListener`. `sketchLayer.js` `initSketchLayer`, `handleSketchClick`, `consumeSketchMapClick`. `sketchEdit.js` `createSketchEditSession`. `vertexHandles.js` `createVertexHandles`. `sketchExport.js` `exportKml`, `exportDxf`. `printLayout.js` `exportMapA3`, `captureMapScreenshot`. `printVector.js` `drawMapPaths`. `terrainProfile.js` `syncTerrainProfile`. `cadastreLayer.js` `openMeasurePlan`. `phanTich3d.js`, `view3dPanel.js` `openView3d`. 3D đọc `buildings.pmtiles` qua Range; pipeline và cache mép: MOD-20 và MOD-22.
+`mapEngine.js`: `toggleMeasure`, `clearMeasure`, `handleMeasureClick`, `consumeMeasureMapClick`, `setMeasureListener`. `sketchLayer.js` `initSketchLayer`, `handleSketchClick`, `consumeSketchMapClick`. `sketchEdit.js` `createSketchEditSession`. `vertexHandles.js` `createVertexHandles`. `sketchExport.js` `exportKml`, `exportDxf`. `printLayout.js` `exportMapA3`, `captureMapScreenshot`. `printVector.js` `drawMapPaths`. `terrainProfile.js` `syncTerrainProfile`. `cadastreLayer.js` `openMeasurePlan`. `phanTich3d.js`, `view3dPanel.js` `openView3d` (`qh-3d-infra` điểm + ranh lô TT16), `view3dDem.js` `sampleDemGrid` (Terrarium). 3D đọc `buildings.pmtiles` qua Range; pipeline và cache mép: MOD-20 và MOD-22.
 
 ## MOD-10 Tra cứu, định vị, popup
 
-`mapEngine.js`: `infraClickAt`, `onPointClick`, `zoomToPoint`, `handleInspectPointClick`, `clearInspectResult`, `approvePointStatus`, `openSharedLot`. `lotPopup.js`: `lotHeading`, `projectFullName`, `limitsHtml`, `dossierButtons`. `csdProof.js` `showCsdProof`. `app.js` `chooseWard`. `decisionViewer.js` `openDecision`, `openInlinePdf`. `viewLink.js` `viewUrlWithLot` (tham số `lo`).
+`mapEngine.js`: `infraClickAt`, `onPointClick`, `zoomToPoint`, `handleInspectPointClick`, `clearInspectResult`, `approvePointStatus`, `openSharedLot`, nhãn/tuyến tiếp cận (`accessLotMarker`, `showAccessRoutes`, `showAccessedLots`). `accessRouteGeom.js`: `clipPathAtParcel`, `accessLabelAnchor`. `lotPopup.js`: `lotHeading`, `projectFullName`, `limitsHtml`, `dossierButtons`. `csdProof.js` `showCsdProof`. `app.js` `chooseWard`. `decisionViewer.js` `openDecision`, `openInlinePdf`. `viewLink.js` `viewUrlWithLot` (tham số `lo`). `scripts/test-access-labels.mjs`.
 
 ## MOD-11 Đề xuất điểm
 
