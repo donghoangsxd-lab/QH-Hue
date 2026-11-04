@@ -57,6 +57,9 @@ if (!html.includes('id="massing"') || !html.includes('id="massingNote"')) throw 
 if (!view.includes('paintMassing(model.massing') || !view.includes('small.textContent = row.note')) {
   throw new Error('bảng chưa ghi lý do chưa vẽ');
 }
+if (!view.includes('filterMassing(') || !view.includes('Không có nhà cao đã công bố trong bán kính')) {
+  throw new Error('bảng nhà cao chưa lọc theo bán kính');
+}
 if (!css.includes('table.massing .off') || !css.includes('.mass-note')) throw new Error('thiếu kiểu bảng');
 if (js.includes('La Vela') || fs.readFileSync(new URL('../public/js/bldgParts.js', import.meta.url), 'utf8').includes('La Vela')) {
   throw new Error('mã tự thêm tọa độ nhà chưa định vị');
