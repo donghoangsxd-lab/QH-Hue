@@ -2648,12 +2648,19 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   width: 22px; height: 27px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 .inspect-lot-pin b {
-  position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
-  max-width: 148px; padding: 1px 5px; border-radius: 4px;
-  background: rgba(2, 6, 23, 0.86); border: 1px solid rgba(125, 211, 252, 0.5);
-  color: #fff; font-size: 11px; font-weight: 700; line-height: 1.25; text-align: center;
+  position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+  max-width: 132px; padding: 0;
+  background: none; border: 0;
+  color: #fff; font-size: 9.5px; font-weight: 700; line-height: 1.2; text-align: center;
   white-space: normal;
+  text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 -1px 2px #000, 1px 0 2px #000, -1px 0 2px #000;
 }
+.access-bucket { margin-top: 3px; font-size: var(--fs-sm); color: var(--accent-cyan); line-height: 1.35; }
+.access-bucket-k {
+  display: inline; margin-right: 4px; font-weight: 700; color: var(--text-muted);
+}
+.access-bucket-k::after { content: ':'; }
+.access-bucket-qh { color: #22c55e; }
 .route-card { position: relative; padding-left: 20px !important; }
 .route-card[data-route] { cursor: pointer; }
 .route-card[data-route]:hover { border-color: var(--accent-cyan); }
@@ -6848,7 +6855,7 @@ body.project-review.la-page #projectReviewHost {
   .layer-main-count,
   .project-phase,
   .rs-seq,
-  .inspect-lot-pin b { font-size: 11.5px; }
+  .inspect-lot-pin b { font-size: 10px; }
   .cad-tab small { white-space: normal; line-height: 1.15; text-align: center; }
   .cad-card .pp-row,
   .dock-card .pp-row { grid-template-columns: minmax(64px, 36%) minmax(0, 1fr); }
