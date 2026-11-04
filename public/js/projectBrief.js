@@ -222,16 +222,16 @@ function popRows(pop) {
     </div>`;
 }
 
-/** Brief QHC 1/10.000 trung tâm: chỉ quy mô (diện tích + dân số 2030/2045). */
+/** Brief QHC 1/10.000 trung tâm: hai mục Diện tích và Dân số (không lặp tiêu đề đồ án / «Quy mô»). */
 function qhc10CenterBriefHtml() {
   const b = QHC10_CENTER_BRIEF;
   return `<div class="qhc25-scale-card qhc10-brief-card">
-    <h4 class="qhc25-scale-title">${escapeHtml(b.title)}</h4>
-    <h5 class="qhc25-scale-h">Quy mô</h5>
-    <p class="qhc25-scale-note">${escapeHtml(b.dienTich)}</p>
-    <p class="qhc25-scale-note">${escapeHtml(b.danSoLabel)}</p>
-    <p class="qhc25-scale-note">- ${escapeHtml(b.danSo2030)}</p>
-    <p class="qhc25-scale-note">- ${escapeHtml(b.danSo2045)}</p>
+    <div class="project-brief-hero qhc10-brief-hero"><span>Diện tích</span><strong>≈ ${escapeHtml(b.dienTichHa)}<small>ha</small></strong></div>
+    <h5 class="qhc25-scale-h">Dân số</h5>
+    <div class="project-brief-pops qhc10-brief-pops">
+      <div class="project-brief-pop"><span>Đến năm 2030</span><b>≈ ${escapeHtml(b.danSo2030)}</b></div>
+      <div class="project-brief-pop"><span>Đến năm 2045</span><b>≈ ${escapeHtml(b.danSo2045)}</b></div>
+    </div>
   </div>`;
 }
 
