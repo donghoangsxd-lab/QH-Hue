@@ -328,20 +328,30 @@ function openShapeMenu(fg, e) {
   L.popup({ className: 'sketch-popup', closeButton: false }).setLatLng(e.latlng).setContent(box).openOn(m);
 }
 
+/** Đang đo: không chặn click/chuột phải để chấm đỉnh hoặc mở menu đo trên nét phác thảo. */
+const measureBlocksSketch = () => !!(state.activeMeasureType);
+
 /** Hình đã vẽ: rê hoặc click sáng viền; chuột phải mở menu phác thảo (không mở menu bản đồ). */
 function bindShapeMenu(fg) {
-  fg.on('mouseover', () => setHover(fg));
+  fg.on('mouseover', () => {
+    if (measureBlocksSketch()) return;
+    setHover(fg);
+  });
   fg.on('mouseout', (e) => {
     if (pointerInside(fg, e) || hoverFg !== fg) return;
     setHover(null);
   });
   fg.on('click', (e) => {
+    if (measureBlocksSketch()) return;
     if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
     stopShapeEvent(e);
+    // Tránh ô focus đen quanh path SVG sau khi click chọn
+    e.originalEvent?.target?.blur?.();
     (fg.sketchHost || map).closePopup();
     selectShape(fg);
   });
   fg.on('contextmenu', (e) => {
+    if (measureBlocksSketch()) return;
     if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
     stopShapeEvent(e);
     openShapeMenu(fg, e);
@@ -399,6 +409,7 @@ function shapeAt(m, latlng) {
 
 function onShapePointerDown(ev, m) {
   if (ev.pointerType === 'mouse') return;
+  if (measureBlocksSketch()) return;
   if (ev.target?.closest?.('.sketch-handle, .leaflet-popup, .map-ctx-menu, .sketch-menu')) return;
   const ll = m.mouseEventToLatLng(ev);
   const fg = shapeAt(m, ll);

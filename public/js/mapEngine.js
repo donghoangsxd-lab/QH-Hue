@@ -799,6 +799,8 @@ function syncMeasurePick() {
   const on = state.activeMeasureType === 'distance' || state.activeMeasureType === 'area';
   pick.classList.toggle('active', on);
   pick.setAttribute('aria-pressed', String(on));
+  // Điện thoại ẩn nút đo riêng: hiện X trên nút gộp khi đang đo (dài hoặc diện tích).
+  pick.innerHTML = ico(on ? 'close' : 'ruler');
 }
 
 function resetMeasureButtons() {
@@ -813,7 +815,9 @@ function resetMeasureButtons() {
 
 function syncMeasureZoom() {
   const on = state.activeMeasureType === 'distance' || state.activeMeasureType === 'area';
+  const measuring = on || state.activeMeasureType === 'profile';
   [map, planMap].filter(Boolean).forEach(m => {
+    m.getContainer()?.classList.toggle('measure-mode', measuring);
     if (!m.doubleClickZoom) return;
     if (on) m.doubleClickZoom.disable();
     else if (!state.sketchTool) m.doubleClickZoom.enable();

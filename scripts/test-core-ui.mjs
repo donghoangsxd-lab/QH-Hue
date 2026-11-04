@@ -758,6 +758,15 @@ assert.doesNotMatch(onContext, /activeMeasureType/);
 assert.doesNotMatch(ctxNow, /Xóa kết quả đo|Xóa phép đo/);
 assert.match(read('public/index.html'), /id="btnMeasureDist"[^>]*Điều chỉnh/);
 assert.match(read('public/index.html'), /id="btnMeasureArea"[^>]*Điều chỉnh/);
+assert.match(read('public/index.html'), /id="btnMeasurePick"/);
+assert.match(read('public/index.html'), /id="measureChooser"[\s\S]*Đo diện tích/);
+const phoneMenus = read('public/js/app.js');
+assert.match(phoneMenus, /initPhoneToolMenus/);
+assert.match(phoneMenus, /r\.left - menu\.offsetWidth/);
+assert.doesNotMatch(phoneMenus.slice(phoneMenus.indexOf('initPhoneToolMenus'), phoneMenus.indexOf('btnMeasureProfile')), /r\.right \+ 6/);
+assert.match(measureJs, /measure-mode/);
+assert.match(read('public/js/sketchLayer.js'), /measureBlocksSketch/);
+assert.match(read('public/css/style.css'), /measure-mode path\.sketch-hit/);
 
 const linePts = [
   { lat: 16.46, lng: 107.58 },

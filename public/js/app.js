@@ -857,10 +857,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             el.setAttribute('aria-checked', String(el.dataset.tbValue === state.activeMeasureType));
           });
         }
+        // Cột nút mép phải: mở menu sang trái (giống compareChooser), kẹp trong khung nhìn.
         menu.hidden = false;
         const r = btn.getBoundingClientRect();
-        const top = Math.max(4, Math.min(r.top, window.innerHeight - menu.offsetHeight - 4));
-        menu.style.left = `${Math.round(r.right + 6)}px`;
+        const pad = 4;
+        const left = Math.max(pad, Math.min(r.left - menu.offsetWidth - 6, window.innerWidth - menu.offsetWidth - pad));
+        const top = Math.max(pad, Math.min(r.top, window.innerHeight - menu.offsetHeight - pad));
+        menu.style.left = `${Math.round(left)}px`;
         menu.style.top = `${Math.round(top)}px`;
         btn.setAttribute('aria-expanded', 'true');
       });

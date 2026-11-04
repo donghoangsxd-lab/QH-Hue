@@ -1250,6 +1250,13 @@ body.compare-on .map-title-split { display: inline-flex; }
 .leaflet-container.sketch-editing,
 .leaflet-container.sketch-editing.sketch-mode,
 .leaflet-container.measure-editing { cursor: default !important; }
+/* Đang đo: nét phác thảo không chặn click để chấm đỉnh đo trên hình đã vẽ */
+.leaflet-container.measure-mode path.sketch-shape,
+.leaflet-container.measure-mode path.sketch-hit,
+.leaflet-container.measure-mode .sketch-text,
+.leaflet-container.measure-mode .sketch-text-body {
+  pointer-events: none !important;
+}
 /* Hàng phụ: tùy chọn chữ, chọn định dạng lưu */
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
@@ -1267,6 +1274,13 @@ body.compare-on .map-title-split { display: inline-flex; }
 .leaflet-pane > svg path.measure-hit-area { pointer-events: all; cursor: pointer; }
 .leaflet-interactive.sketch-edge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 3px #fff); cursor: pointer; }
 .leaflet-interactive.sketch-picked { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px rgb(var(--cyan-rgb))); }
+/* Bỏ ô focus đen của trình duyệt khi click chọn nét phác thảo / chữ / núm đỉnh */
+.leaflet-container .leaflet-drawToolPane-pane path.leaflet-interactive:focus,
+.leaflet-container .leaflet-drawToolPane-pane path:focus,
+.leaflet-marker-icon.sketch-text:focus,
+.leaflet-marker-icon.sketch-handle:focus {
+  outline: none;
+}
 .sketch-text-body.sketch-edge { outline: 2px solid #fff; outline-offset: 3px; border-radius: 2px; }
 .sketch-text-body.sketch-picked { outline: 2px solid var(--accent-cyan); outline-offset: 3px; border-radius: 2px; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85); }
 .sketch-text-editor {
