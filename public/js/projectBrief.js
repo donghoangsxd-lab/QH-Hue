@@ -239,9 +239,9 @@ function qhc10CenterBriefHtml() {
 function renderQhcCity(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
-  const level = PLAN_LEVELS.find(item => item.key === 'QHC');
   const scale = card.qhcScale || (getLevel() === 'qhc10' ? '10' : '25');
   const is10 = scale === '10';
+  const stamp = is10 ? 'QHC 1/10.000' : 'QHC 1/25.000';
   el.dataset.level = 'QHC';
   el.dataset.qhcScale = scale;
   el.hidden = false;
@@ -250,7 +250,7 @@ function renderQhcCity(card) {
     : `${escapeHtml(QHC2045.status)} · Sơ đồ tổ chức không gian 1/25.000`;
   const body = is10 ? qhc10CenterBriefHtml() : qhcScaleBriefHtml();
   el.innerHTML = `<div class="project-brief-head">
-      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : 'QHC')}</span>${escapeHtml(QHC2045.short)}</h2>
+      <h2 class="project-brief-name"><span class="project-brief-level">${stamp}</span>${escapeHtml(QHC2045.short)}</h2>
       ${briefTools(card, { pdf: false, info: true })}
     </div>
     <p class="project-brief-sub" title="${escapeHtml(QHC2045.name)}">${sub}</p>

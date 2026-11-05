@@ -20,68 +20,107 @@ function mocOf(row, nam) {
   return (row && row.moc || []).find(m => Number(m.nam) === nam) || null;
 }
 
-function rangeText(min, max, unit) {
-  if (min == null || max == null) return '—';
-  const a = fmtNum(min);
-  const b = fmtNum(max);
-  return unit ? `${a} – ${b} ${unit}` : `${a} – ${b}`;
+function prefixHtml(prefix) {
+  const text = String(prefix || '').trim();
+  if (!text) return '';
+  const m = text.match(/^(.*\S)\s+(khoảng)$/i);
+  const bits = m ? [m[1], m[2]] : [text];
+  return `<span class="qhc25-k">${bits.map(bit => `<span>${escapeHtml(bit)}</span>`).join('')}</span>`;
 }
 
-function popCell(nam) {
-  const dan = mocOf(byId('dan-so'), nam);
-  const hoa = mocOf(byId('ty-le-do-thi-hoa'), nam);
-  const dl = mocOf(byId('khach-du-lich'), nam);
-  if (!dan && !hoa && !dl) return '';
-  const danTxt = dan
-    ? `${dan.cachGhi === 'có thể dung nạp tối đa khoảng' ? 'tối đa khoảng ' : 'khoảng '}${fmtNum(dan.giaTri)} người`
-    : '—';
-  const hoaTxt = hoa ? `khoảng ${fmtNum(hoa.giaTri)}%` : '—';
-  const dlTxt = dl ? rangeText(dl.min, dl.max, 'triệu lượt') : '—';
-  const label = nam === 2065 ? 'Tầm nhìn<br>đến 2065' : `Năm ${nam}`;
-  return `<tr><th scope="row">${label}</th><td>${escapeHtml(danTxt)}</td><td>${escapeHtml(hoaTxt)}</td><td>${escapeHtml(dlTxt)}</td></tr>`;
+function qtyHtml(prefix, value, unit) {
+  const pre = prefixHtml(prefix);
+  const shown = value == null || value === '' ? '—' : String(value);
+  const u = unit ? `<small>${escapeHtml(unit)}</small>` : '';
+  return `<span class="qhc25-qty">${pre}<span class="qhc25-n"><b>${escapeHtml(shown)}</b>${u}</span></span>`;
 }
 
-function landCell(nam) {
-  const m = mocOf(byId('dat-xay-dung'), nam);
-  if (!m) return '';
-  const m2 = m.datDanDungM2Nguoi
-    ? rangeText(m.datDanDungM2Nguoi.min, m.datDanDungM2Nguoi.max, 'm²/người')
-    : '—';
-  return `<tr>
-    <th scope="row">Năm ${nam}</th>
-    <td>khoảng ${fmtNum(m.giaTri)} ha</td>
-    <td>khoảng ${fmtNum(m.danDungHa)} ha</td>
-    <td>${escapeHtml(m2)}</td>
-    <td>khoảng ${fmtNum(m.ngoaiDanDungHa)} ha</td>
-    <td>khoảng ${fmtNum(m.diemDanCuNongThonHa)} ha</td>
-  </tr>`;
+const dash = () => qtyHtml('', '—');
+
+function approxPrefix(row) {
+  return /tối đa/i.test(String((row && row.cachGhi) || '')) ? 'tối đa khoảng' : 'khoảng';
+}
+
+const POP_YEARS = [2030, 2045, 2065];
+const LAND_YEARS = [2030, 2045];
+
+function yearHeads(years) {
+  return years.map(nam => (
+    nam === 2065
+      ? '<th scope="col" title="Tầm nhìn đến năm 2065">2065</th>'
+      : `<th scope="col">${nam}</th>`
+  )).join('');
+}
+
+function rowHtml(label, title, cells) {
+  const tip = title && title !== label ? ` title="${escapeHtml(title)}"` : '';
+  return `<tr><th scope="row"${tip}>${escapeHtml(label)}</th>${cells.map(html => `<td>${html}</td>`).join('')}</tr>`;
+}
+
+function popTable() {
+  const dan = POP_YEARS.map(nam => {
+    const row = mocOf(byId('dan-so'), nam);
+    if (!row || row.giaTri == null) return dash();
+    return qtyHtml(approxPrefix(row), fmtNum(row.giaTri), 'người');
+  });
+  const hoa = POP_YEARS.map(nam => {
+    const row = mocOf(byId('ty-le-do-thi-hoa'), nam);
+    if (!row || row.giaTri == null) return dash();
+    return qtyHtml(approxPrefix(row), `${fmtNum(row.giaTri)}%`);
+  });
+  const dl = POP_YEARS.map(nam => {
+    const row = mocOf(byId('khach-du-lich'), nam);
+    if (!row || row.min == null || row.max == null) return dash();
+    return qtyHtml('', `${fmtNum(row.min)} – ${fmtNum(row.max)}`, 'triệu lượt');
+  });
+  return `<table class="qhc25-scale-table qhc25-scale-pop">
+    <thead><tr><th scope="col">Chỉ tiêu</th>${yearHeads(POP_YEARS)}</tr></thead>
+    <tbody>
+      ${rowHtml('Dân số', 'Dân số toàn đô thị', dan)}
+      ${rowHtml('Đô thị hóa', '', hoa)}
+      ${rowHtml('Khách du lịch', '', dl)}
+    </tbody>
+  </table>`;
+}
+
+function landTable() {
+  const at = (nam) => mocOf(byId('dat-xay-dung'), nam);
+  const haCells = (key) => LAND_YEARS.map(nam => {
+    const m = at(nam);
+    const n = m ? m[key] : null;
+    if (n == null) return dash();
+    return qtyHtml('khoảng', fmtNum(n), 'ha');
+  });
+  const chiTieu = LAND_YEARS.map(nam => {
+    const r = at(nam) && at(nam).datDanDungM2Nguoi;
+    if (!r || r.min == null || r.max == null) return dash();
+    return qtyHtml('', `${fmtNum(r.min)} – ${fmtNum(r.max)}`, 'm²/người');
+  });
+  return `<table class="qhc25-scale-table qhc25-scale-land">
+    <thead><tr><th scope="col">Chỉ tiêu</th>${yearHeads(LAND_YEARS)}</tr></thead>
+    <tbody>
+      ${rowHtml('Đất xây dựng', '', haCells('giaTri'))}
+      ${rowHtml('Đất dân dụng', '', haCells('danDungHa'))}
+      ${rowHtml('Chỉ tiêu ĐD', 'Chỉ tiêu đất dân dụng', chiTieu)}
+      ${rowHtml('Ngoài dân dụng', 'Đất ngoài dân dụng', haCells('ngoaiDanDungHa'))}
+      ${rowHtml('Điểm DC nông thôn', 'Điểm dân cư nông thôn', haCells('diemDanCuNongThonHa'))}
+    </tbody>
+  </table>`;
 }
 
 export function qhc25ScaleHtml() {
   if (!doc) return '<p class="qhc25-scale-empty">Đang tải chỉ tiêu quy mô…</p>';
   const qd = doc.quyetDinh || {};
   const cite = qd.so && qd.ngay
-    ? `Theo ${qd.so} ngày ${String(qd.ngay).slice(8, 10)}/${String(qd.ngay).slice(5, 7)}/${String(qd.ngay).slice(0, 4)}`
-    : 'Theo Quyết định 108/QĐ-TTg';
-  return `<div class="qhc25-scale-card">
-    <h4 class="qhc25-scale-title">Chỉ tiêu quy mô đồ án</h4>
-    <p class="qhc25-scale-cite">${escapeHtml(cite)}</p>
+    ? `${qd.so} ngày ${String(qd.ngay).slice(8, 10)}/${String(qd.ngay).slice(5, 7)}/${String(qd.ngay).slice(0, 4)}`
+    : '108/QĐ-TTg';
+  return `<div class="qhc25-scale-card" title="${escapeHtml(cite)}">
     <h5 class="qhc25-scale-h">a) Quy mô dân số, tỷ lệ đô thị hóa</h5>
-    <div class="qhc25-scale-scroll">
-      <table class="qhc25-scale-table qhc25-scale-pop">
-        <thead><tr><th scope="col">Giai đoạn</th><th scope="col">Dân số toàn đô thị</th><th scope="col">Đô thị hóa</th><th scope="col">Khách du lịch</th></tr></thead>
-        <tbody>${popCell(2030)}${popCell(2045)}${popCell(2065)}</tbody>
-      </table>
-    </div>
+    ${popTable()}
     <p class="qhc25-scale-note">${escapeHtml(POP_NOTE)}</p>
     <h5 class="qhc25-scale-h">b) Quy mô đất đai</h5>
     <p class="qhc25-scale-note">${escapeHtml(LAND_NOTE)}</p>
-    <div class="qhc25-scale-scroll">
-      <table class="qhc25-scale-table qhc25-scale-land">
-        <thead><tr><th scope="col">Giai đoạn</th><th scope="col">Đất xây dựng</th><th scope="col">Đất dân dụng</th><th scope="col">Chỉ tiêu ĐD</th><th scope="col">Ngoài dân dụng</th><th scope="col">Điểm DC nông thôn</th></tr></thead>
-        <tbody>${landCell(2030)}${landCell(2045)}</tbody>
-      </table>
-    </div>
+    ${landTable()}
   </div>`;
 }
 
