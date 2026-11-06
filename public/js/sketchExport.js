@@ -78,9 +78,12 @@ function dxfEntities(items) {
   const out = [];
   const tag = (code, value) => out.push(String(code), String(value));
   const xy = (ll) => wgs84ToVn2000(ll.lat, ll.lng);
-  const head = (type, it) => { tag(0, type); tag(8, LAYERS[it.tool]); tag(62, ACI[it.color] || 7); };
+  const head = (type, it, dashedLine) => {
+    tag(0, type); tag(8, LAYERS[it.tool]); tag(62, ACI[it.color] || 7);
+    if (dashedLine && it.dash) tag(6, 'DASHED');
+  };
   const polyline = (it, pts, closed) => {
-    head('POLYLINE', it); tag(66, 1); tag(10, '0.0'); tag(20, '0.0'); tag(30, '0.0'); tag(70, closed ? 1 : 0);
+    head('POLYLINE', it, true); tag(66, 1); tag(10, '0.0'); tag(20, '0.0'); tag(30, '0.0'); tag(70, closed ? 1 : 0);
     pts.forEach(([x, y]) => { tag(0, 'VERTEX'); tag(8, LAYERS[it.tool]); tag(10, num(x)); tag(20, num(y)); tag(30, '0.0'); });
     tag(0, 'SEQEND'); tag(8, LAYERS[it.tool]);
   };
@@ -90,20 +93,20 @@ function dxfEntities(items) {
       const h = Math.max(0.1, it.heightM * 0.72);   // chiều cao chữ hoa ≈ 0,72 cỡ chữ trên màn hình
       it.text.split('\n').forEach((line, i) => {
         if (!line.trim()) return;
-        head('TEXT', it);
+        head('TEXT', it, false);
         tag(10, num(x)); tag(20, num(y - it.heightM * (0.95 + i * 1.25))); tag(30, '0.0');
         tag(40, num(h)); tag(1, dxfText(line)); tag(7, 'VN_ARIAL');
       });
     } else if (it.tool === 'circle') {
       const [x, y] = xy(it.pts[0]);
-      head('CIRCLE', it); tag(10, num(x)); tag(20, num(y)); tag(30, '0.0'); tag(40, num(radiusM(it)));
+      head('CIRCLE', it, true); tag(10, num(x)); tag(20, num(y)); tag(30, '0.0'); tag(40, num(radiusM(it)));
     } else if (it.tool === 'polygon') {
       polyline(it, it.pts.map(xy), true);
     } else {
       polyline(it, it.pts.map(xy), false);
       if (it.tool === 'arrow' && it.head) {
         const [a, b, c] = it.head.map(xy);
-        head('SOLID', it);
+        head('SOLID', it, false);
         tag(10, num(a[0])); tag(20, num(a[1])); tag(30, '0.0');
         tag(11, num(b[0])); tag(21, num(b[1])); tag(31, '0.0');
         tag(12, num(c[0])); tag(22, num(c[1])); tag(32, '0.0');
@@ -123,8 +126,9 @@ export function exportDxf(items) {
   tag(9, '$DWGCODEPAGE'); tag(3, 'ANSI_1258');
   tag(0, 'ENDSEC');
   tag(0, 'SECTION'); tag(2, 'TABLES');
-  tag(0, 'TABLE'); tag(2, 'LTYPE'); tag(70, 1);
+  tag(0, 'TABLE'); tag(2, 'LTYPE'); tag(70, 2);
   tag(0, 'LTYPE'); tag(2, 'CONTINUOUS'); tag(70, 0); tag(3, 'Solid line'); tag(72, 65); tag(73, 0); tag(40, '0.0');
+  tag(0, 'LTYPE'); tag(2, 'DASHED'); tag(70, 0); tag(3, 'Dashed'); tag(72, 65); tag(73, 2); tag(40, '23.0'); tag(49, '15.0'); tag(49, '-8.0');
   tag(0, 'ENDTAB');
   tag(0, 'TABLE'); tag(2, 'LAYER'); tag(70, layerNames.length);
   layerNames.forEach(n => { tag(0, 'LAYER'); tag(2, n); tag(70, 0); tag(62, 7); tag(6, 'CONTINUOUS'); });

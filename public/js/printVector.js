@@ -148,21 +148,39 @@ function pathGroups(m) {
   byRenderer.forEach((set, r) => {
     const el = r._container;
     if (!el) return;
-    const alpha = visibleAlpha(el, host);
-    if (alpha <= 0.01) return;
+    const pane = el.closest('.leaflet-pane');
+    // Nét phác thảo / đo dùng SVG riêng. html2canvas bỏ SVG này khỏi ảnh nền và không vẽ lại được nét;
+    // sau lúc chụp, opacity của svg có thể về 0 nên không được loại nhóm này chỉ vì alpha khung.
+    const overlay = !!pane?.className.includes('drawTool');
+    let alpha = visibleAlpha(el, host);
+    if (alpha <= 0.01) {
+      if (!overlay || !host.isConnected || getComputedStyle(host).display === 'none') return;
+      alpha = 1;
+    }
     let list = null;
     if (r._drawFirst) {
       list = [];
       for (let o = r._drawFirst; o; o = o.next) list.push(o.layer);
     } else if (r._rootGroup) {
       const byPath = new Map([...set].map(l => [l._path, l]));
-      list = [...r._rootGroup.children].map(p => byPath.get(p));
+      list = [...r._rootGroup.children].map(p => byPath.get(p)).filter(l => l && set.has(l));
+      if (list.length < set.size) {
+        const have = new Set(list);
+        set.forEach(l => { if (!have.has(l)) list.push(l); });
+      }
     }
     list = (list || [...set]).filter(l => l && set.has(l));
-    const pane = el.closest('.leaflet-pane');
-    groups.push({ el, alpha, list, z: pane ? (parseInt(getComputedStyle(pane).zIndex, 10) || 0) : 0 });
+    groups.push({
+      el, alpha, list, overlay,
+      z: pane ? (parseInt(getComputedStyle(pane).zIndex, 10) || 0) : 0
+    });
   });
   return groups.sort((a, b) => a.z - b.z || (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+}
+
+/** Danh sách vector lúc này, trước khi html2canvas đụng cây DOM */
+export function captureVectorGroups(m) {
+  return m ? pathGroups(m) : [];
 }
 
 /** Phần tử DOM chứa vector đã vẽ lại trong PDF (bỏ khỏi ảnh chụp nền) */
@@ -259,7 +277,7 @@ function drawPath(pdf, l, alpha, ctx) {
  * Vẽ mọi L.Path đang hiện của bản đồ m vào khung giấy.
  * rect: vùng in theo px khung bản đồ m; frame: vị trí trên giấy (mm). Nét theo px bản đồ × (mm / px) để đồng bộ với icon.
  */
-export function drawMapPaths(pdf, m, rect, frame) {
+export function drawMapPaths(pdf, m, rect, frame, groups) {
   const k = frame.w / rect.w;
   const zoom = m.getZoom();
   const origin = m.getPixelOrigin();
@@ -280,7 +298,7 @@ export function drawMapPaths(pdf, m, rect, frame) {
   };
   pdf.setLineDashPattern([], 0);
   let n = 0;
-  pathGroups(m).forEach(g => g.list.forEach(l => { if (drawPath(pdf, l, g.alpha, ctx)) n++; }));
+  (groups || pathGroups(m)).forEach(g => g.list.forEach(l => { if (drawPath(pdf, l, g.alpha, ctx)) n++; }));
   pdf.setLineDashPattern([], 0);
   setAlpha(pdf, 1, 1);
   return n;

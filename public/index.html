@@ -96,6 +96,7 @@
     <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
     <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
     <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m8 7 4-4 4 4M8 17l4 4 4-4M7 8 3 12l4 4M17 8l4 4-4 4"/></symbol>
     <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></symbol>
     <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10 14"/><path d="m21 3-7 18-4-7-7-4z"/></symbol>
@@ -367,6 +368,9 @@
           <button type="button" class="sketch-color" data-color="#a3e635" title="Xanh lá" aria-label="Màu xanh lá"></button>
           <button type="button" class="sketch-color" data-color="#ffffff" title="Trắng" aria-label="Màu trắng"></button>
           <span class="sketch-sep"></span>
+          <button type="button" class="sketch-btn sketch-dash" data-dash="0" title="Nét liền" aria-pressed="true">Nét liền</button>
+          <button type="button" class="sketch-btn sketch-dash" data-dash="1" title="Nét đứt" aria-pressed="false">Nét đứt</button>
+          <span class="sketch-sep"></span>
           <button type="button" class="sketch-btn sketch-export" id="btnSketchImport" title="Nhập hình từ file KML hoặc KMZ (WGS84) vào phác thảo phiên này">Nhập KML/KMZ</button>
           <button type="button" class="sketch-btn" id="btnSketchUndo" title="Hoàn tác (Backspace)" aria-label="Hoàn tác"><svg class="ico"><use href="#i-undo"/></svg></button>
           <button type="button" class="sketch-btn" id="btnSketchSave" title="Lưu phác thảo ra file KML / DXF" aria-label="Lưu phác thảo" aria-expanded="false" aria-controls="sketchSaveRow"><svg class="ico"><use href="#i-save"/></svg></button>
@@ -400,18 +404,18 @@
       <div class="print-frame" id="printFrame">
         <span class="print-frame-tag" id="printFrameTag">Vùng in</span>
         <i class="print-cross"></i>
-        <i class="print-corner tl"></i>
-        <i class="print-corner tr"></i>
-        <i class="print-corner bl"></i>
-        <i class="print-corner br"></i>
+        <i class="print-corner tl" data-corner="tl" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner tr" data-corner="tr" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner bl" data-corner="bl" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner br" data-corner="br" title="Kéo để đổi cỡ khung"></i>
       </div>
       <div class="print-frame" id="printFrameRight" hidden>
         <span class="print-frame-tag">Quy hoạch</span>
         <i class="print-cross"></i>
-        <i class="print-corner tl"></i>
-        <i class="print-corner tr"></i>
-        <i class="print-corner bl"></i>
-        <i class="print-corner br"></i>
+        <i class="print-corner tl" data-corner="tl" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner tr" data-corner="tr" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner bl" data-corner="bl" title="Kéo để đổi cỡ khung"></i>
+        <i class="print-corner br" data-corner="br" title="Kéo để đổi cỡ khung"></i>
       </div>
       <div class="print-dock" role="dialog" aria-labelledby="printDockTitle">
         <div class="print-dock-head">
@@ -425,11 +429,16 @@
           <button type="button" data-paper="a1" aria-pressed="false">A1</button>
           <button type="button" data-paper="a0" aria-pressed="false">A0</button>
         </div>
-        <div class="print-layout-live" id="printLayoutLive">Bố cục: Một khung + cột phải</div>
+        <div class="print-sizes print-frames" role="radiogroup" aria-label="Dạng khung bản vẽ">
+          <button type="button" data-frame="plain" aria-pressed="false">Khung trống</button>
+          <button type="button" data-frame="side" aria-pressed="true">Ghi chú phải</button>
+          <button type="button" data-frame="bottom" aria-pressed="false">Ghi chú dưới</button>
+        </div>
+        <div class="print-layout-live" id="printLayoutLive">Bố cục: Ghi chú bên phải</div>
         <label class="print-title-lbl">Tiêu đề
           <input id="printTitle" type="text" maxlength="140" autocomplete="off" spellcheck="false">
         </label>
-        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn. Đang chia đôi màn hình thì PDF tự xuất hai ô Hiện trạng | Quy hoạch.</p>
+        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Kéo một góc khung để đổi cỡ: tỷ lệ giữ theo dạng khung đang chọn, khung không lớn hơn màn hình. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn. Đang chia đôi màn hình thì PDF tự xuất hai ô Hiện trạng | Quy hoạch.</p>
         <div class="print-dock-actions">
           <button type="button" class="print-btn" id="printCancel">Hủy</button>
           <button type="button" class="print-btn print-btn-go" id="printGo">Xuất PDF</button>
