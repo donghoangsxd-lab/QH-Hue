@@ -1262,7 +1262,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
 .sketch-sub select { height: 24px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); }
-.sketch-btn.sketch-telex, .sketch-btn.sketch-export { width: auto; height: 24px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
+.sketch-btn.sketch-telex, .sketch-btn.sketch-export, .sketch-btn.sketch-dash { width: auto; height: 24px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
+#map.sketch-moving, #mapPlan.sketch-moving { cursor: move !important; }
 /* Chữ phác thảo: cỡ cố định trên màn hình, viền tối để đọc được trên ảnh vệ tinh */
 .sketch-text { background: none; border: none; }
 .sketch-text-body, .sketch-text-editor {
@@ -3941,11 +3942,16 @@ table.ward-table th {
 }
 .print-cross::before { left: 50%; top: 0; width: 1px; height: 100%; }
 .print-cross::after { top: 50%; left: 0; height: 1px; width: 100%; }
-.print-corner { position: absolute; width: 22px; height: 22px; border: 3px solid var(--accent-cyan); }
-.print-corner.tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
-.print-corner.tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
-.print-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
-.print-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+.print-corner {
+  position: absolute; width: 22px; height: 22px; border: 3px solid var(--accent-cyan);
+  pointer-events: auto; touch-action: none;
+}
+.print-corner.tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; cursor: nwse-resize; }
+.print-corner.tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; cursor: nesw-resize; }
+.print-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; cursor: nesw-resize; }
+.print-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; cursor: nwse-resize; }
+.print-frames { flex-wrap: wrap; }
+.print-frames button { flex: 1 1 30%; font-size: var(--fs-sm); padding: 0 4px; }
 .print-dock {
   position: absolute; z-index: 2;
   left: var(--info-left); right: calc(var(--tb-btn) + 24px); bottom: 12px;
@@ -4007,6 +4013,20 @@ table.ward-table th {
 .pa3-split-lbl { position: absolute; padding: 0.3em 0.8em; border-radius: 0.3em; background: rgba(15,23,42,0.82); color: #fff; font-size: 1.2em; font-weight: 700; letter-spacing: 0.06em; }
 .pa3-side { position: absolute; display: flex; flex-direction: column; gap: 1.4em; box-sizing: border-box; }
 /* Dual: tiêu đề trên + ghi chú ngang dưới (cùng nội dung cột phải) */
+.pa3-plain-title {
+  position: absolute; z-index: 2; text-align: center; pointer-events: none;
+}
+.pa3-plain-title b {
+  display: inline-block; max-width: 86%; padding: 0.28em 0.8em;
+  color: #fff; font-size: 1.7em; font-weight: 700; line-height: 1.25; text-transform: uppercase;
+  background: rgba(15, 23, 42, 0.78); border-radius: 0.2em;
+}
+.pa3-bottom-id {
+  flex: 0 0 28%; max-width: 34%; display: flex; flex-direction: column; justify-content: center;
+  gap: 0.2em; min-width: 0; text-align: center;
+}
+.pa3-bottom-id .pa3-title { font-size: 1.45em; }
+.pa3-bottom-id .pa3-scale-block { justify-content: center; }
 .pa3-dual-title {
   position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.15em; box-sizing: border-box; text-align: center;

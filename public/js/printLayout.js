@@ -15,7 +15,7 @@ import { getLevel, levelChk, LEVELS } from './mapLevel.js';
 import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss } from './tt16Symbols.js';
 import {
   PX_MM, loadPrintFonts, createPdf, cleanText, setFont, setAlpha, withClip, parseColor,
-  vectorContainers, drawMapPaths, drawDom
+  vectorContainers, captureVectorGroups, drawMapPaths, drawDom
 } from './printVector.js';
 import { escapeHtml, distanceMeters, loadHtml2Canvas, loadJsPdf, showToast, inlineSpriteIcons } from './utils.js';
 
@@ -78,28 +78,63 @@ const dotted = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'
 let busy = false;
 let previewOn = false;
 let paperId = 'a3';
+let frameKind = 'side';
+let frameUser = null;
 let dockBound = false;
 let frameObserver = null;
 let classObserver = null;
 
-function sheetOf(id) {
+const FRAME_LABEL = { plain: 'Khung trống', side: 'Ghi chú bên phải', bottom: 'Ghi chú bên dưới' };
+
+function sheetOf(id, kind = frameKind) {
   const paper = PAPERS.find(p => p.id === id) || PAPERS[0];
   const pageW = Math.floor(paper.wMm / 25.4 * DPI);
   const pageH = Math.floor(paper.hMm / 25.4 * DPI);
   const s = pageW / A3.pageW;
   const M = A3.m * s;
-  const SIDE_W = A3.side * s;
   const GUT_X = A3.gutX * s;
   const GUT_Y = A3.gutY * s;
+  if (kind === 'plain') {
+    const gut = 36 * s;
+    const maxW = pageW - 2 * M - 2 * gut;
+    const maxH = pageH - 2 * M - 2 * gut;
+    const aspect = pageW / pageH;
+    let w = maxW;
+    let h = w / aspect;
+    if (h > maxH) { h = maxH; w = h * aspect; }
+    return {
+      paper, pageW, pageH, s, M, SIDE_W: 0, GUT_X: gut, GUT_Y: gut, dual: false, kind,
+      notesBand: null,
+      frame: { x: M + gut + (maxW - w) / 2, y: M + gut + (maxH - h) / 2, w, h }
+    };
+  }
+  if (kind === 'bottom') {
+    const notesH = Math.round((pageH - 2 * M) * 0.26);
+    const gap = 18 * s;
+    const notesY = pageH - M - notesH;
+    const y = M + GUT_Y;
+    return {
+      paper, pageW, pageH, s, M, SIDE_W: 0, GUT_X, GUT_Y, dual: false, kind,
+      notesBand: { x: M, y: notesY, w: pageW - 2 * M, h: notesH },
+      frame: { x: M + GUT_X, y, w: pageW - 2 * M - 2 * GUT_X, h: notesY - gap - y }
+    };
+  }
+  const SIDE_W = A3.side * s;
   const maxW = pageW - SIDE_W - 2 * M - 2 * GUT_X;
   const maxH = pageH - 2 * M - 2 * GUT_Y;
   let w = maxW;
   let h = w / FRAME_ASPECT;
   if (h > maxH) { h = maxH; w = h * FRAME_ASPECT; }
   return {
-    paper, pageW, pageH, s, M, SIDE_W, GUT_X, GUT_Y, dual: false,
+    paper, pageW, pageH, s, M, SIDE_W, GUT_X, GUT_Y, dual: false, kind, notesBand: null,
     frame: { x: M + GUT_X + (maxW - w) / 2, y: M + GUT_Y + (maxH - h) / 2, w, h }
   };
+}
+
+function previewAspect() {
+  if (dualLayout()) return FRAME_ASPECT_DUAL;
+  const frame = sheetOf('a3', frameKind).frame;
+  return frame.w / frame.h;
 }
 
 function sheetOfDual(id) {
@@ -541,12 +576,16 @@ function drawPageChrome(pdf, sheet, { sideSep = true } = {}) {
     const sepX = W - M - sheet.SIDE_W * PX_MM;
     pdf.line(sepX, M + inset, sepX, H - M - inset);
   }
+  if (sheet.notesBand) {
+    const y = sheet.notesBand.y * PX_MM;
+    pdf.line(M + inset, y, W - M - inset, y);
+  }
 }
 
 /** Lưới, vạch, số tọa độ, khung bản đồ và khung tờ (bố cục cột phải) */
 function drawGridPdf(pdf, grid, sheet) {
   drawFrameGrid(pdf, grid, sheet.frame, sheet, { ticks: true });
-  drawPageChrome(pdf, sheet, { sideSep: true });
+  drawPageChrome(pdf, sheet, { sideSep: sheet.SIDE_W > 0 });
 }
 
 function drawMapCornerLabel(pdf, framePx, text, sheet) {
@@ -775,6 +814,49 @@ function dualPageHtml({ title, place, gridStep, scale, sheet }) {
   </div>`;
 }
 
+function plainPageHtml({ title, sheet }) {
+  const F = sheet.frame;
+  return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(12 * sheet.s).toFixed(2)}px">
+    <div class="pa3-plain-title" style="left:${F.x}px; top:${F.y + 14 * sheet.s}px; width:${F.w}px">
+      <b>${escapeHtml(title)}</b>
+    </div>
+  </div>`;
+}
+
+function bottomPageHtml({ title, place, gridStep, scale, sheet }) {
+  const N = sheet.notesBand;
+  const pad = 10 * sheet.s;
+  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 180 * sheet.s).pop() || NICE_STEPS[0];
+  const date = printStamp();
+  return `<div class="pa3-page pa3-vector pa3-dual" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * sheet.s).toFixed(2)}px">
+    <div class="pa3-dual-notes" style="left:${N.x + pad}px; top:${N.y + pad * 0.4}px; width:${N.w - 2 * pad}px; height:${N.h - pad * 0.8}px">
+      <div class="pa3-bottom-id">
+        <div class="pa3-org pa3-dual-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b></div>
+        <div class="pa3-title">${escapeHtml(title)}</div>
+        <div class="pa3-place">${escapeHtml(place)}</div>
+        <div class="pa3-scale-block pa3-dual-scale">
+          <div class="pa3-north">${NORTH_SVG}</div>
+          <div class="pa3-scale">
+            <div class="pa3-ratio">Tỷ lệ 1:${dotted(scale.ratio)}</div>
+            ${scaleBarHtml(lenM, lenM / scale.mPerFramePx)}
+          </div>
+        </div>
+      </div>
+      <div class="pa3-legend">
+        <div class="pa3-sec">CHÚ GIẢI</div>
+        <div class="pa3-lg">${legendRows(sheet.s) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
+      </div>
+      ${printMetaHtml(sheet, gridStep, date)}
+    </div>
+  </div>`;
+}
+
+function pageHtml(kind, pack) {
+  if (kind === 'plain') return plainPageHtml(pack);
+  if (kind === 'bottom') return bottomPageHtml(pack);
+  return sideHtml(pack);
+}
+
 function placeRaster(pdf, canvas, type, F) {
   const data = type === 'JPEG' ? canvas.toDataURL('image/jpeg', 0.9) : canvas.toDataURL('image/png');
   pdf.addImage(data, type, F.x, F.y, F.w, F.h, undefined, 'FAST');
@@ -804,7 +886,7 @@ function syncLayoutFromView() {
   if (right) right.hidden = !dual;
   if (tag) tag.textContent = dual ? 'Hiện trạng' : 'Vùng in';
   const live = $('printLayoutLive');
-  if (live) live.textContent = dual ? 'Bố cục: Hai ô so sánh' : 'Bố cục: Một khung + cột phải';
+  if (live) live.textContent = dual ? 'Bố cục: Hai ô so sánh' : `Bố cục: ${FRAME_LABEL[frameKind] || FRAME_LABEL.side}`;
 }
 
 function placeFrame() {
@@ -850,20 +932,34 @@ function placeFrame() {
     const leftW = Math.max(80, splitX - padL - gap);
     const rightX = splitX + gap;
     const rightW = Math.max(80, area.clientWidth - padR - rightX);
-    const aspect = FRAME_ASPECT_DUAL;
-    let w = Math.min(leftW, rightW);
+    const aspect = previewAspect();
+    const maxW = Math.min(leftW, rightW);
+    let w = frameUser ? frameUser.w : maxW;
     let h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
-    const top = padT + Math.max(0, (availH - h) / 2);
+    if (w > maxW) { w = maxW; h = w / aspect; }
+    const top = frameUser
+      ? Math.min(Math.max(padT, frameUser.y), padT + Math.max(0, availH - h))
+      : padT + Math.max(0, (availH - h) / 2);
     setBox(frame, padL + (leftW - w) / 2, top, w, h);
     setBox(right, rightX + (rightW - w) / 2, top, w, h);
   } else {
     const availW = Math.max(120, area.clientWidth - padL - padR);
-    const aspect = FRAME_ASPECT;
-    let w = availW;
+    const aspect = previewAspect();
+    let w = frameUser ? frameUser.w : availW;
     let h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
-    setBox(frame, padL + (availW - w) / 2, padT + Math.max(0, (availH - h) / 2), w, h);
+    if (w > availW) { w = availW; h = w / aspect; }
+    const minW = Math.min(160, availW);
+    if (w < minW) { w = minW; h = w / aspect; }
+    const x = frameUser
+      ? Math.min(Math.max(padL, frameUser.x), padL + Math.max(0, availW - w))
+      : padL + (availW - w) / 2;
+    const y = frameUser
+      ? Math.min(Math.max(padT, frameUser.y), padT + Math.max(0, availH - h))
+      : padT + Math.max(0, (availH - h) / 2);
+    if (frameUser) frameUser = { x, y, w, h };
+    setBox(frame, x, y, w, h);
   }
   updateLiveScale();
 }
@@ -882,10 +978,68 @@ function updateLiveScale() {
 function setPaper(id) {
   if (!PAPERS.some(p => p.id === id)) return;
   paperId = id;
-  document.querySelectorAll('.print-sizes button').forEach(btn => {
+  document.querySelectorAll('.print-sizes button[data-paper]').forEach(btn => {
     btn.setAttribute('aria-pressed', String(btn.dataset.paper === id));
   });
   updateLiveScale();
+}
+
+function setFrameKind(id) {
+  if (!FRAME_LABEL[id]) return;
+  frameKind = id;
+  frameUser = null;
+  document.querySelectorAll('.print-frames button').forEach(btn => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.frame === id));
+  });
+  if (previewOn) placeFrame();
+}
+
+function bindFrameResize() {
+  document.querySelectorAll('#printPreview .print-corner').forEach(corner => {
+    if (corner.dataset.bound) return;
+    corner.dataset.bound = '1';
+    corner.addEventListener('pointerdown', (ev) => {
+      if (!previewOn || busy || ev.button !== 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const area = $('mapArea');
+      const frame = corner.closest('.print-frame');
+      const left = $('printFrame');
+      if (!area || !frame || !left) return;
+      const areaRect = area.getBoundingClientRect();
+      const start = frame.getBoundingClientRect();
+      const id = corner.dataset.corner || 'br';
+      const anchorX = id.includes('l') ? start.right - areaRect.left : start.left - areaRect.left;
+      const anchorY = id.includes('t') ? start.bottom - areaRect.top : start.top - areaRect.top;
+      const aspect = previewAspect();
+      const move = (e) => {
+        const px = e.clientX - areaRect.left;
+        const py = e.clientY - areaRect.top;
+        let w = Math.max(1, Math.abs(px - anchorX));
+        const hPtr = Math.max(1, Math.abs(py - anchorY));
+        if (hPtr * aspect > w) w = hPtr * aspect;
+        let h = w / aspect;
+        const maxW = area.clientWidth - 80;
+        const maxH = area.clientHeight - 80;
+        if (w > maxW) { w = maxW; h = w / aspect; }
+        if (h > maxH) { h = maxH; w = h * aspect; }
+        if (w < 140) return;
+        const leftBox = left.getBoundingClientRect();
+        const x = frame === left
+          ? (id.includes('l') ? anchorX - w : anchorX)
+          : leftBox.left - areaRect.left;
+        const y = id.includes('t') ? anchorY - h : anchorY;
+        frameUser = { x, y, w, h };
+        placeFrame();
+      };
+      const up = () => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    });
+  });
 }
 
 function onPreviewKey(e) {
@@ -907,6 +1061,11 @@ function bindDock() {
     const btn = e.target.closest('button[data-paper]');
     if (btn) setPaper(btn.dataset.paper);
   });
+  document.querySelector('.print-frames')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-frame]');
+    if (btn) setFrameKind(btn.dataset.frame);
+  });
+  bindFrameResize();
   $('printCancel')?.addEventListener('click', closePreview);
   $('printGo')?.addEventListener('click', runExport);
   $('printTitle')?.addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
@@ -925,7 +1084,9 @@ function openPreview() {
   const input = $('printTitle');
   if (input && input.dataset.touched !== '1') input.value = defaultTitle();
   bindDock();
+  frameUser = null;
   setPaper(paperId);
+  setFrameKind(frameKind);
   map.on('move zoom resize', onMapView);
   document.addEventListener('keydown', onPreviewKey, true);
   frameObserver = new ResizeObserver(() => placeFrame());
@@ -956,17 +1117,25 @@ function closePreview() {
   classObserver = null;
 }
 
+/** Nét SVG phác thảo / đo vẽ sau ảnh icon: chữ phác thảo là marker, nằm trong ảnh đó */
+function paintVectors(pdf, m, full, F, groups) {
+  if (!groups.length) return;
+  withClip(pdf, F, () => drawMapPaths(pdf, m, full, F, groups));
+}
+
 /** Vẽ một ô bản đồ (nền + vector + icon) vào framePx */
 async function paintMapCell(pdf, m, full, framePx, targetW) {
   const F = toMm(framePx);
   const size = m.getSize();
+  const groups = captureVectorGroups(m);
   const base = await captureOneMap(m, rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
   placeRaster(pdf, base, 'JPEG', F);
-  withClip(pdf, F, () => drawMapPaths(pdf, m, full, F));
+  paintVectors(pdf, m, full, F, groups.filter(g => !g.overlay));
   if (hasTopIcons([m])) {
     const top = await captureOneMap(m, rasterScale(size, targetW, TOP_MAX_PIXELS), 'top');
     placeRaster(pdf, top, 'PNG', F);
   }
+  paintVectors(pdf, m, full, F, groups.filter(g => g.overlay));
 }
 
 /**
@@ -1032,13 +1201,15 @@ async function drawMapFrame(pdf, rect, sheet) {
   try {
     const size = staged.size;
     const full = { x: 0, y: 0, w: size.x, h: size.y };
+    const groups = captureVectorGroups(staged.map);
     const base = await captureMapCanvas(rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
     placeRaster(pdf, base.canvas, 'JPEG', F);
-    withClip(pdf, F, () => drawMapPaths(pdf, staged.map, full, F));
+    paintVectors(pdf, staged.map, full, F, groups.filter(g => !g.overlay));
     if (hasTopIcons([staged.map])) {
       const top = await captureMapCanvas(rasterScale(size, targetW, TOP_MAX_PIXELS), 'top');
       placeRaster(pdf, top.canvas, 'PNG', F);
     }
+    paintVectors(pdf, staged.map, full, F, groups.filter(g => g.overlay));
     return { grid: computeGrid(full), splitRel: null };
   } finally {
     staged.restore();
@@ -1076,13 +1247,12 @@ async function runExport() {
 
     holder = document.createElement('div');
     holder.className = 'pa3-holder';
-    holder.innerHTML = dual
-      ? dualPageHtml({ title, place, gridStep: grid.step, scale: seen, sheet })
-      : sideHtml({ title, place, gridStep: grid.step, splitX: null, frameW: rect.w, scale: seen, sheet });
+    const pack = { title, place, gridStep: grid.step, splitX: null, frameW: rect.w, scale: seen, sheet };
+    holder.innerHTML = dual ? dualPageHtml(pack) : pageHtml(frameKind, pack);
     document.body.appendChild(holder);
     const page = holder.firstElementChild;
     await document.fonts.ready;
-    fitLegend(page, dual);
+    fitLegend(page, dual || frameKind === 'bottom');
     await drawDom(pdf, page, page);
 
     const stamp = new Date().toISOString().slice(0, 10);

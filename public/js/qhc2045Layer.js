@@ -892,9 +892,9 @@ function drawVision() {
     style: visionWaterStyle
   });
   const greenLayer = L.geoJSON({ type: 'FeatureCollection', features: greens }, {
-    pane: PANE[0], renderer: r, interactive: false,
+    pane: PANE[0], renderer: r, bubblingMouseEvents: false,
     style: visionGreenStyle
-  });
+  }).on('click', (e) => { if (!passToolClick(m, e)) openVisionPopup(e.layer.feature, e.latlng); });
   const lineLayer = L.geoJSON({ type: 'FeatureCollection', features: lines }, {
     pane: PANE[0], renderer: r,
     style: (f) => ({ ...visionLineStyle(cats.lines[f.properties.k]), opacity: 0.95 }),
@@ -906,6 +906,7 @@ function drawVision() {
   });
   layers.vision = L.featureGroup([fillLayer, waterLayer, greenLayer, lineLayer]);
   layers.vision.fills = fills;
+  layers.vision.greens = greens;
   layers.vision.fillsLayer = fillLayer;
   layers.vision.waterLayer = waterLayer;
   layers.vision.greenLayer = greenLayer;
@@ -915,8 +916,9 @@ function drawVision() {
 
 function qhcVisionCardHtml(f, latlng) {
   const cats = data.vision.cats;
-  const zone = cats.zones[f.properties.k] || 'Khác';
-  const desc = cats.funcs[f.properties.f] || '';
+  const isGreen = f.properties.L === 'x';
+  const zone = isGreen ? 'Không gian cây xanh' : (cats.zones[f.properties.k] || 'Khác');
+  const desc = isGreen ? '' : (cats.funcs[f.properties.f] || '');
   const name = f.properties.n ? String(f.properties.n).trim() : '';
   let areaM2 = null;
   if (typeof turf !== 'undefined' && f.geometry) {
@@ -925,7 +927,7 @@ function qhcVisionCardHtml(f, latlng) {
   const ha = zoneAreaHa(f.properties, areaM2);
   const areaText = ha > 0 ? `${fmtNum(ha)} ha` : '—';
   const ward = wardNameAt(latlng.lat, latlng.lng);
-  const zoneSwatch = `<i class="qhc-sw" style="background:${visionColor(zone)}"></i>`;
+  const zoneSwatch = `<i class="qhc-sw" style="background:${isGreen ? GREEN_COLOR : visionColor(zone)}"></i>`;
   return `<div class="pp land-popup land-popup-card qhc-pop">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
@@ -939,7 +941,7 @@ function qhcVisionCardHtml(f, latlng) {
     <div class="lp-pane is-on" data-lp-pane="chi-tieu">
       ${metricCellsHtml([
         { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaText },
-        { tone: 'cover', icon: 'layers', label: 'Vùng chức năng', value: zone },
+        { tone: 'cover', icon: 'layers', label: isGreen ? 'Loại không gian' : 'Vùng chức năng', value: zone },
         { tone: 'floors', icon: 'map', label: 'Phường, xã', value: ward || '—' },
         { tone: 'far', icon: 'file', label: 'Tên vùng', value: name || '—' }
       ])}
@@ -1016,7 +1018,10 @@ function openVisionPopup(f, latlng) {
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcVisionCardHtml(f, latlng));
   attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
-  addPopupCollapseToggle(popup, 'viền vùng', 'Bấm lại vào vùng chức năng để hiện bảng thông tin');
+  const again = f.properties.L === 'x'
+    ? 'Bấm lại vào không gian cây xanh để hiện bảng thông tin'
+    : 'Bấm lại vào vùng chức năng để hiện bảng thông tin';
+  addPopupCollapseToggle(popup, 'viền vùng', again);
   bindLandCardTabs(popup.getElement());
   bindQhcDossier(popup);
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
@@ -1126,6 +1131,8 @@ export function qhcClick(e, m) {
     if (f) { openLotPopup(f, e.latlng); return true; }
   }
   if (layers.vision && m.hasLayer(layers.vision)) {
+    const green = featureAt(layers.vision.greens || [], lng, lat);
+    if (green) { openVisionPopup(green, e.latlng); return true; }
     const f = featureAt(layers.vision.fills, lng, lat);
     if (f) { openVisionPopup(f, e.latlng); return true; }
   }
