@@ -135,8 +135,11 @@ if (!panel.includes('qh-3d-infra') || !panel.includes('packLocalInfra') || !pane
 if (!js.includes('qh-3d-infra') || !js.includes('localInfra') || !js.includes('localLots') || !js.includes('sampleDemGrid') || !js.includes('tower-pin') || !js.includes('towerPinUrl') || !js.includes('infra-lot-edge')) {
   throw new Error('thiếu nhận hạ tầng nội bộ / ranh lô / DEM / ghim tháp');
 }
-if (js.includes('hatchInRing') || js.includes('infra-lot-hatch') || js.includes('tower-beacon') || js.includes('tickBeacon')) {
-  throw new Error('hatch/đèn nhấp nháy nặng vẫn còn — dễ trắng màn hình 3D');
+if (js.includes('hatchInRing') || js.includes('infra-lot-hatch') || js.includes('tower-beacon') || js.includes('tickBeacon') || js.includes("id: 'dem-mesh'")) {
+  throw new Error('hatch/đèn/lưới DEM vẫn còn — dễ trắng màn hình 3D');
+}
+if (!js.includes('webglcontextlost') || !js.includes('queueShow') || !js.includes('boundSat')) {
+  throw new Error('thiếu chặn mất GPU / gộp vẽ lại / giữ ảnh nền');
 }
 const dem = fs.readFileSync(new URL('../public/js/view3dDem.js', import.meta.url), 'utf8');
 if (!dem.includes('sampleDemGrid') || !dem.includes('terrarium') || !dem.includes('offsetAt')) {

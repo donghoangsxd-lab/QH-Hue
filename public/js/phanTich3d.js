@@ -446,7 +446,7 @@ export async function composeGoogleGround(lat, lng, r, origin) {
   const spanX = maxX - minX;
   const spanY = maxY - minY;
   if (!(spanX > 1 && spanY > 1)) return null;
-  const px = Math.min(2048, Math.max(512, Math.round(Math.sqrt(cells.length) * 256)));
+  const px = Math.min(1024, Math.max(384, Math.round(Math.sqrt(cells.length) * 192)));
   const scale = px / Math.max(spanX, spanY);
   const w = Math.max(2, Math.round(spanX * scale));
   const h = Math.max(2, Math.round(spanY * scale));
@@ -1578,6 +1578,10 @@ function bootMap(place, model, ground) {
   let deckgl = null;
   let edgeMemo = null;
   let groundPack = ground || null;
+  let gpuOk = true;
+  let satLayer = null;
+  let labelLayer = null;
+  let boundSat = null;
   const pinUrl = towerPinUrl();
   const moodName = DEFAULT_LIGHT;
   const preset = LIGHT_PRESETS[moodName];
@@ -1706,6 +1710,7 @@ function bootMap(place, model, ground) {
   }
 
   function draw() {
+    if (!gpuOk || !deckgl) return;
     const k = view.k;
     const zLinks = planeZ('links');
     const zUses = planeZ('uses');
@@ -1726,47 +1731,32 @@ function bootMap(place, model, ground) {
     ];
     if (groundPack && groundPack.sat && !showStack && typeof deck.BitmapLayer === 'function') {
       try {
-        layers.push(new deck.BitmapLayer({
-          id: 'google-sat',
-          coordinateSystem: CART,
-          bounds: groundPack.bounds,
-          image: groundPack.sat,
-          pickable: false
-        }));
-        if (groundPack.labels) {
-          layers.push(new deck.BitmapLayer({
+        if (boundSat !== groundPack.sat || !satLayer) {
+          boundSat = groundPack.sat;
+          satLayer = new deck.BitmapLayer({
+            id: 'google-sat',
+            coordinateSystem: CART,
+            bounds: groundPack.bounds,
+            image: groundPack.sat,
+            pickable: false
+          });
+          labelLayer = groundPack.labels ? new deck.BitmapLayer({
             id: 'google-labels',
             coordinateSystem: CART,
             modelMatrix: lift(0.15),
             bounds: groundPack.bounds,
             image: groundPack.labels,
             pickable: false
-          }));
+          }) : null;
         }
-      } catch (err) { groundPack = null; }
+        layers.push(satLayer);
+        if (labelLayer) layers.push(labelLayer);
+      } catch (err) { groundPack = null; satLayer = null; }
     }
     if (!groundPack || showStack) {
       layers.push(polys('plate-links', [{ rings: [disc], h: PLATE, fill: groundTone.links }], zLinks));
     } else {
       layers.push(polys('plate-links', [{ rings: [disc], h: 0.4, fill: [0, 0, 0, 0] }], zLinks));
-    }
-    if (model.demQuads?.length && !showStack) {
-      try {
-        layers.push(new deck.PolygonLayer(withMask({
-          id: 'dem-mesh',
-          data: model.demQuads,
-          coordinateSystem: CART,
-          modelMatrix: lift(zLinks + PLATE),
-          _full3d: true,
-          positionFormat: 'XYZ',
-          extruded: false,
-          filled: true,
-          stroked: false,
-          pickable: false,
-          getPolygon: (d) => d.rings,
-          getFillColor: (d) => d.fill
-        })));
-      } catch (err) { /* bỏ lưới cao độ nếu máy không hỗ trợ */ }
     }
     layers.push(new deck.PathLayer({
       id: 'rim',
@@ -2055,12 +2045,19 @@ function bootMap(place, model, ground) {
     controller: { scrollZoom: false, touchZoom: true, dragPan: true, dragRotate: true, touchRotate: true, doubleClickZoom: false, keyboard: false },
     viewState: camera,
     onViewStateChange: ({ viewState }) => {
+      if (!gpuOk) return;
       camera = viewState;
       deckgl.setProps({ viewState: camera });
     },
     effects: [],
     parameters: { clearColor: hexToClear(preset.css.canvas) },
     useDevicePixels: 1
+  });
+  parent.querySelector('canvas')?.addEventListener('webglcontextlost', (e) => {
+    gpuOk = false;
+    e.preventDefault();
+    const st = $('status');
+    if (st) st.textContent = 'Hết bộ nhớ đồ họa. Đóng khung 3D rồi mở lại.';
   });
 
   let job = 0;
@@ -2293,31 +2290,11 @@ async function loadFloorPack() {
   floorPack = remote;
 }
 
-function applyDemOffsets(model, dem) {
-  if (!dem || !model?.volumes) return;
-  model.dem = dem;
-  model.demQuads = dem.quads || [];
-  model.volumes.forEach((v) => {
-    const c = centroid(v.rings[0]);
-    const dz = dem.offsetAt(c[0], c[1]);
-    if (!Number.isFinite(dz)) return;
-    v.z0 = (v.z0 || 0) + dz;
-  });
-  (model.infraLots || []).forEach((lot) => {
-    const c = centroid(lot.rings[0]);
-    const dz = dem.offsetAt(c[0], c[1]);
-    if (!Number.isFinite(dz)) return;
-    lot.z0 = (lot.z0 || 0) + dz;
-  });
-  model.towerPins = towerPinsOf(model.volumes);
-}
-
 function showBuilt() {
   if (!built) return;
   const model = buildModel(built.raw, built.origin, built.place.r, built.heights, floorPack);
   model.osmError = built.raw.osmError;
-  if (built.dem) applyDemOffsets(model, built.dem);
-  else model.towerPins = towerPinsOf(model.volumes);
+  model.towerPins = towerPinsOf(model.volumes);
   paintPanel(model, built.place, built.ward);
   $('status').textContent = model.meanF == null
     ? 'Chưa có chiều cao mét trong ô.'
@@ -2349,12 +2326,22 @@ function showBuilt() {
   else view.replace(model, built.ground);
 }
 
+let showQueued = false;
+function queueShow() {
+  if (showQueued) return;
+  showQueued = true;
+  setTimeout(() => {
+    showQueued = false;
+    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D:', err); }
+  }, 500);
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
     if (e.origin !== location.origin || !e.data) return;
     if (e.data.type === 'qh-bldg-add') {
       mountAdditions(parseAdditionPack(e.data.pack));
-      showBuilt();
+      queueShow();
       return;
     }
     if (e.data.type === 'qh-3d-infra') {
@@ -2363,11 +2350,11 @@ if (typeof window !== 'undefined') {
       const lots = Array.isArray(e.data.lots) ? e.data.lots : [];
       built.raw.localInfra = points;
       built.raw.localLots = lots;
-      try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (hạ tầng nội bộ):', err); }
+      queueShow();
       return;
     }
     if (e.data.type !== 'qh-floor-edit') return;
-    loadFloorPack().then(showBuilt).catch(() => {});
+    loadFloorPack().then(queueShow).catch(() => {});
   });
 }
 
@@ -2425,28 +2412,25 @@ async function start() {
     console.warn('Mô hình 3D:', err);
     $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
   }
-  const placeBuilt = { ...place, mLng, mLat };
-  sampleDemGrid(placeBuilt, origin).then((dem) => {
-    if (!built || !dem) return;
-    built.dem = dem;
-    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (DEM):', err); }
-  }).catch(() => {});
+  // Không dựng lưới DEM lên GPU (mesh XYZ làm mất context, trắng màn rồi reset).
+  // sampleDemGrid giữ trong module để lấy cao độ khi cần, không gọi trong khung này.
+  void sampleDemGrid;
   loadOsm(place).then((osm) => {
     if (!built) return;
     built.raw.osm = osm;
     built.raw.osmError = '';
-    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (OSM):', err); }
+    queueShow();
   }).catch((err) => {
     if (!built) return;
     built.raw.osmError = err.message;
-    try { showBuilt(); } catch (e) { console.warn('Mô hình 3D (OSM lỗi):', e); }
+    queueShow();
   });
   // Thửa đất chỉ phục vụ chỉ số phụ — tải nền, không chặn khung 3D.
   readLayer('cadastre', 'thuadat', tiles).then((cad) => {
     if (!built) return;
     built.raw.cadastre = cad;
     built.raw.cadError = '';
-    try { showBuilt(); } catch (err) { console.warn('Mô hình 3D (thửa):', err); }
+    queueShow();
   }).catch((err) => {
     if (!built) return;
     built.raw.cadError = err.message;
