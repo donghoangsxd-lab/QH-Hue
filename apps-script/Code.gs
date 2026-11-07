@@ -725,19 +725,25 @@ function scheduleWebappWarm() {
 
 // Đồng bộ Sheet → GCS ngoài doPost: đổi loại / sửa / xóa công trình trả JSON ngay (Worker/Cloud Run chỉ chờ ~25–55 s).
 // Gộp nhiều lần sửa liên tiếp vào 1 lượt; cờ CAD (Script Property) OR nếu bất kỳ lần nào cần cad_parcels.json.
+// Không được gọi syncSheetsToGCS trong catch: tạo trigger từ web app đôi khi lỗi → sync đồng bộ lại gây 502.
 const SYNC_HANDLER = "runScheduledSheetsSync";
 const SYNC_DELAY_MS = 5 * 1000;
 const SYNC_CAD_PROP = "PENDING_SYNC_CAD";
+const SYNC_PENDING_PROP = "PENDING_SHEETS_SYNC";
 
 function scheduleSheetsSync(includeCad) {
+  var props = PropertiesService.getScriptProperties();
   try {
-    var props = PropertiesService.getScriptProperties();
     if (includeCad) props.setProperty(SYNC_CAD_PROP, "1");
+    props.setProperty(SYNC_PENDING_PROP, "1");
+  } catch (e) {
+    Logger.log("⚠ Không ghi cờ PENDING_SHEETS_SYNC: " + e.toString());
+  }
+  try {
     var pending = ScriptApp.getProjectTriggers().some(function(t) { return t.getHandlerFunction() === SYNC_HANDLER; });
     if (!pending) ScriptApp.newTrigger(SYNC_HANDLER).timeBased().after(SYNC_DELAY_MS).create();
   } catch (err) {
-    Logger.log("⚠ Không hẹn được đồng bộ bucket, chạy ngay: " + err.toString());
-    syncSheetsToGCS(includeCad);
+    Logger.log("⚠ Không hẹn được đồng bộ bucket (bỏ qua, không sync trong doPost): " + err.toString());
   }
 }
 
@@ -748,7 +754,22 @@ function runScheduledSheetsSync() {
   var props = PropertiesService.getScriptProperties();
   var includeCad = props.getProperty(SYNC_CAD_PROP) === "1";
   props.deleteProperty(SYNC_CAD_PROP);
+  props.deleteProperty(SYNC_PENDING_PROP);
   syncSheetsToGCS(includeCad);
+}
+
+/** doPost: đồng bộ ngay khi Cloud Run/admin gọi riêng (không gắn vào retype). */
+function flushSheetsSync(body) {
+  var includeCad = !!(body && (body.includeCad === true || body.includeCad === "1"));
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(SYNC_CAD_PROP) === "1") includeCad = true;
+  props.deleteProperty(SYNC_CAD_PROP);
+  props.deleteProperty(SYNC_PENDING_PROP);
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === SYNC_HANDLER) ScriptApp.deleteTrigger(t);
+  });
+  syncSheetsToGCS(includeCad);
+  return { "success": true, "synced": true, "includeCad": includeCad };
 }
 
 function warmWebappCache() {
@@ -1872,7 +1893,9 @@ function doPost(e) {
     if (action === "saveHaTangHienTrang") return jsonOutput(saveHaTangHienTrang(body));
     if (action === "deleteHaTangHienTrang") return jsonOutput(deleteHaTangHienTrang(body));
     if (action === "getHaTangHienTrang") return jsonOutput(listHaTangHienTrang());
-    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "parcel-infra-1" });
+    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "retype-defer-sync-3" });
+    if (action === "flushSheetsSync") return jsonOutput(flushSheetsSync(body));
+    if (action === "runScheduledSheetsSync") return jsonOutput(flushSheetsSync(body));
     if (action === "addPendingPoints") {
       if (!Array.isArray(body.items) || !body.items.length) {
         return jsonOutput({ "error": "Không nhận được danh sách điểm. Deploy bản Code.gs này: Manage deployments → Edit → Version: New version." });
@@ -3036,6 +3059,8 @@ function retypeInfraRow(body) {
     newId = nextIdForSheet(target.getDataRange().getValues(), tgtCol.id, type.split('-')[1]);
 
     var width = src[0].length;
+    // Ghi fields kèm (nhóm, tên…) ngay khi chuyển tab — tránh writeInfraEdit quét lại toàn bộ sheet (dễ quá hạn doPost)
+    var f = body.fields || {};
     var out = rows.map(function(r) {
       var formulas = source.getRange(r + 1, 1, 1, width).getFormulas()[0];
       var row = tgtHeaders.map(function() { return ''; });
@@ -3049,6 +3074,16 @@ function retypeInfraRow(body) {
       }
       row[tgtCol.id] = newId + suffixOf(src[r][srcCol.id]);
       if (tgtCol.thoiGian >= 0) row[tgtCol.thoiGian] = currentTime;
+      if (f.name !== undefined && tgtCol.name >= 0) row[tgtCol.name] = f.name;
+      if (f.nhom !== undefined && tgtCol.nhom >= 0) row[tgtCol.nhom] = f.nhom === "Cấp đô thị" ? "Cấp đô thị" : "Cấp đơn vị ở";
+      if (f.quyMoHT !== undefined && tgtCol.quyMoHT >= 0) row[tgtCol.quyMoHT] = f.quyMoHT === '' ? '' : f.quyMoHT;
+      if (f.quyMoQH !== undefined && tgtCol.quyMoQH >= 0) row[tgtCol.quyMoQH] = f.quyMoQH === '' ? '' : f.quyMoQH;
+      if (f.note !== undefined && tgtCol.ghiChu >= 0) row[tgtCol.ghiChu] = f.note;
+      if (f.plan && typeof f.plan === 'object') {
+        if (f.plan.floors !== undefined && tgtCol.tangCao >= 0) row[tgtCol.tangCao] = f.plan.floors;
+        if (f.plan.coverage !== undefined && tgtCol.matDoXD >= 0) row[tgtCol.matDoXD] = f.plan.coverage;
+        if (f.plan.far !== undefined && tgtCol.heSoSDD >= 0) row[tgtCol.heSoSDD] = f.plan.far;
+      }
       return row;
     });
     var start = target.getLastRow() + 1;
@@ -3085,13 +3120,11 @@ function retypeInfraRow(body) {
     lock.releaseLock();
   }
 
-  var f = body.fields || {};
-  var missing = Object.keys(f).length ? writeInfraEdit(newId, f).missing : [];
-  // Không syncSheetsToGCS đồng bộ: đóng gói infrastructure_hue.json dễ vượt 55 s → Worker/CF trả 502 rỗng
+  // Không syncSheetsToGCS / writeInfraEdit đồng bộ trong doPost
   scheduleSheetsSync(cadChanged > 0);
   return {
     "success": true, "id": id, "newId": newId, "tab": target.getName(), "rows": moved,
-    "dropped": dropped, "missing": missing
+    "dropped": dropped, "missing": [], "script": "retype-defer-sync-3"
   };
 }
 

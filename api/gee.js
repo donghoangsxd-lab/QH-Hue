@@ -3814,6 +3814,10 @@ module.exports = async (req, res) => {
         if (!result.newId) {
           return res.status(502).json({ error: true, message: 'Apps Script chưa có retypeInfraRow: Deploy Code.gs → Manage deployments → Edit → New version' });
         }
+        // Bản GAS cũ vẫn sync trong doPost → 502; bản mới trả script=retype-defer-sync-3
+        if (result.script !== 'retype-defer-sync-3') {
+          console.warn(`retypeInfraRow thiếu scriptVersion mới (got ${result.script || 'none'}) — cần Deploy New version Code.gs`);
+        }
         const tenQH = sanitizeSheetText(body.tenQH, 120);
         const layer = sanitizeSheetText(raw.layer, 60);
         let lots = 0;
@@ -3828,9 +3832,13 @@ module.exports = async (req, res) => {
           }
         }
         invalidateAllCaches();
+        // Đồng bộ GCS tách request: không chặn phản hồi client (Worker/CF cắt ~30–55 s)
+        callAppsScript({ action: 'flushSheetsSync' }, { action: 'flushSheetsSync', includeCad: false }).catch((err) => {
+          console.warn('flushSheetsSync sau retype:', err && err.message ? err.message : err);
+        });
         return res.status(200).json({
           success: true, kind: 'INFRA', id, newId: result.newId, tab: result.tab || '', lots, saved,
-          dropped: Array.isArray(result.dropped) ? result.dropped : []
+          dropped: Array.isArray(result.dropped) ? result.dropped : [], script: result.script || ''
         });
       }
       const result = await callAppsScript({ action: 'editInfraRow' }, { action: 'editInfraRow', id, fields });
