@@ -103,19 +103,39 @@ function stampCache(headers, state) {
   return headers;
 }
 
+async function sleepMs(ms) {
+  if (typeof scheduler !== 'undefined' && typeof scheduler.wait === 'function') {
+    await scheduler.wait(ms);
+    return;
+  }
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function jsonGatewayError(status, message) {
+  return new Response(JSON.stringify({ error: true, message }), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+  });
+}
+
+// Cloud Run min-instances=0: lần gọi đầu sau khi ngủ hay trả 502/503 HTML. Đọc body HTML → JSON để UI hiện được.
+async function asJsonIfGatewayError(res) {
+  if (res.status < 502 || res.status > 504) return res;
+  const type = String(res.headers.get('content-type') || '');
+  if (type.includes('application/json')) return res;
+  let snippet = '';
+  try { snippet = (await res.text()).replace(/\s+/g, ' ').trim().slice(0, 160); } catch (e) { snippet = ''; }
+  const why = snippet || 'Cloud Run chưa kịp trả lời (cold start hoặc quá tải)';
+  return jsonGatewayError(res.status, `Cổng API ${res.status}: ${why}. Thử lại sau vài giây.`);
+}
+
 export async function proxyApi(request, env, ctx, now = Date.now()) {
   if (request.method !== 'OPTIONS' && !allow(apiHits, clientIp(request), now, apiMax(request.url), WINDOW_MS)) {
     return limited('Quá nhiều yêu cầu, vui lòng chậm lại');
   }
   const upstream = String((env && env.API_UPSTREAM) || '').trim().replace(/\/$/, '');
   if (!upstream) {
-    return new Response(JSON.stringify({
-      error: true,
-      message: 'Chưa đặt API_UPSTREAM (URL Cloud Run, không có dấu / cuối)'
-    }), {
-      status: 503,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
-    });
+    return jsonGatewayError(503, 'Chưa đặt API_UPSTREAM (URL Cloud Run, không có dấu / cuối)');
   }
   const incoming = new URL(request.url);
   const target = new URL(incoming.pathname + incoming.search, upstream);
@@ -125,30 +145,34 @@ export async function proxyApi(request, env, ctx, now = Date.now()) {
   if (ip) headers.set('x-forwarded-for', ip);
   const method = request.method;
   const hasBody = method !== 'GET' && method !== 'HEAD';
-  const req = new Request(target.toString(), {
+  // Giữ body để retry 1 lần khi Cloud Run cold start trả 502/503/504
+  const bodyBuf = hasBody ? await request.arrayBuffer() : null;
+  const makeUpstream = () => new Request(target.toString(), {
     method,
     headers,
-    body: hasBody ? request.body : undefined,
+    body: bodyBuf,
     redirect: 'manual'
   });
   const cacheable = method === 'GET' && !request.headers.get('range') && !request.headers.get('authorization');
   const cache = cacheable && typeof caches !== 'undefined' ? caches.default : null;
   if (cache) {
-    const hit = await cache.match(req);
+    const hit = await cache.match(makeUpstream());
     if (hit) return hit;
   }
   let res;
   try {
-    res = await fetch(req);
+    res = await fetch(makeUpstream());
+    if (res.status >= 502 && res.status <= 504) {
+      await sleepMs(2000);
+      res = await fetch(makeUpstream());
+    }
   } catch (err) {
-    return new Response(JSON.stringify({ error: true, message: 'Không gọi được API' }), {
-      status: 502,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
-    });
+    return jsonGatewayError(502, 'Không gọi được API');
   }
+  res = await asJsonIfGatewayError(res);
   const cc = res.headers.get('cache-control') || '';
   const shared = /s-maxage=\d+/.test(cc) && !/no-store|private/i.test(cc);
-  if (cache && res.ok && shared && ctx && ctx.waitUntil) ctx.waitUntil(cache.put(req, res.clone()));
+  if (cache && res.ok && shared && ctx && ctx.waitUntil) ctx.waitUntil(cache.put(makeUpstream(), res.clone()));
   return res;
 }
 
