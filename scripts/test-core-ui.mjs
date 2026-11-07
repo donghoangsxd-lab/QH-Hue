@@ -1124,6 +1124,11 @@ assert.match(read('docs/ui-spec.md'), /không nút nổi riêng|Không nút nổ
 const printDock = html.slice(html.indexOf('class="print-dock"'), html.indexOf('id="axisDock"'));
 assert.match(printDock, /id="printTitle"/);
 assert.match(printDock, /id="printNote"/);
+assert.match(printDock, /id="printShowGrid"/);
+assert.match(printDock, /id="printMapBanner"/);
+assert.match(read('docs/ui-spec.md'), /#printShowGrid/);
+assert.match(read('docs/ui-spec.md'), /#printMapBanner/);
+assert.match(css, /\.pa3-map-banner b[\s\S]*max-width:\s*66\.666%/);
 assert.match(printDock, /data-paper="a3"/);
 assert.match(printDock, /data-paper="2a0"/);
 assert.match(printDock, /data-paper="4a0"/);

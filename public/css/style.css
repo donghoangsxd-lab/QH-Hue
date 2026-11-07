@@ -3988,6 +3988,14 @@ table.ward-table th {
 .print-layout-live {
   font-size: var(--fs-xs); font-weight: 600; color: var(--accent-cyan); letter-spacing: 0.02em;
 }
+.print-opts { display: flex; flex-direction: column; gap: 4px; }
+.print-opt {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  font-size: var(--fs-sm); color: var(--text-main); cursor: pointer; user-select: none;
+}
+.print-opt input {
+  width: 14px; height: 14px; margin: 0; flex-shrink: 0; accent-color: var(--accent-cyan); cursor: pointer;
+}
 .print-sizes { display: flex; flex-wrap: wrap; gap: 4px; }
 .print-sizes button {
   flex: 1 1 calc(33.33% - 4px); min-width: 0; height: 28px; padding: 0;
@@ -4035,12 +4043,15 @@ table.ward-table th {
 .pa3-split-lbl { position: absolute; padding: 0.3em 0.8em; border-radius: 0.3em; background: rgba(15,23,42,0.82); color: #fff; font-size: 1.2em; font-weight: 700; letter-spacing: 0.06em; }
 .pa3-side { position: absolute; display: flex; flex-direction: column; gap: 0.7em; box-sizing: border-box; min-height: 0; }
 /* Dual: tiêu đề trên + dải dưới (chú giải gọn + ô ghi chú) */
+/* Tiêu đề lớn giữa phía trên vùng map: bề rộng chữ mặc định ~2/3 khung bản đồ */
+.pa3-map-banner,
 .pa3-plain-title {
-  position: absolute; z-index: 2; text-align: center; pointer-events: none;
+  position: absolute; z-index: 3; text-align: center; pointer-events: none; box-sizing: border-box;
 }
+.pa3-map-banner b,
 .pa3-plain-title b {
-  display: inline-block; max-width: 86%; padding: 0.28em 0.8em;
-  color: #fff; font-size: 1.7em; font-weight: 700; line-height: 1.25; text-transform: uppercase;
+  display: inline-block; max-width: 66.666%; box-sizing: border-box; padding: 0.32em 0.85em;
+  color: #fff; font-size: 2.35em; font-weight: 700; line-height: 1.2; text-transform: uppercase;
   background: rgba(15, 23, 42, 0.78); border-radius: 0.2em;
 }
 .pa3-dual-title {

@@ -91,6 +91,9 @@ let frameUser = null;
 let dockBound = false;
 let frameObserver = null;
 let classObserver = null;
+/** Tùy chọn dock: lưới VN-2000 và tiêu đề lớn giữa phía trên vùng map */
+let showGrid = true;
+let showMapBanner = false;
 
 const FRAME_LABEL = { plain: 'Khung trống', side: 'Ghi chú bên phải' };
 const DEFAULT_NOTE = 'Bản đồ phục vụ tham khảo, không thay thế hồ sơ quy hoạch được phê duyệt.';
@@ -498,11 +501,13 @@ function computeGrid(rect, m) {
   };
 }
 
-/** Lưới + vạch + số tọa độ + viền một khung bản đồ (mm). ticks = false khi ô hẹp (dual) để tránh chồng chữ */
-function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true } = {}) {
+/**
+ * Viền khung bản đồ (+ lưới / số tọa độ khi bật).
+ * gridLines: nét lưới trong khung; ticks: vạch + số kinh/vĩ độ (chỉ khi có lưới).
+ */
+function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true, gridLines = true } = {}) {
   const F = toMm(framePx);
   const cs = sheet.cs || 1;
-  // Nét lưới / khung theo chromeScale; chữ trục cùng cs với cột ghi chú (không * sheet.s)
   const u = cs * PX_MM;
   const fx = F.w / grid.size.w;
   const fy = F.h / grid.size.h;
@@ -510,51 +515,55 @@ function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true } = {}) {
     const m = new Map(b.map(p => [p.value, p.t]));
     return a.filter(p => m.has(p.value)).map(p => [p, m.get(p.value)]);
   };
-  withClip(pdf, F, () => {
-    pdf.setDrawColor(255, 255, 255);
-    pdf.setLineWidth(0.7 * u);
-    pdf.setLineCap('butt');
-    pdf.setLineDashPattern([6 * u, 4 * u], 0);
-    setAlpha(pdf, 1, 0.55);
-    pair(grid.top, grid.bottom).forEach(([p, tb]) => pdf.line(F.x + p.t * fx, F.y, F.x + tb * fx, F.y + F.h));
-    pair(grid.left, grid.right).forEach(([p, tr]) => pdf.line(F.x, F.y + p.t * fy, F.x + F.w, F.y + tr * fy));
-  });
-  pdf.setLineDashPattern([], 0);
-  setAlpha(pdf, 1, 1);
-  pdf.setDrawColor(...INK);
-  pdf.setTextColor(...INK);
-  pdf.setLineWidth(1 * u);
-  setFont(pdf, false, 9.5 * cs);
-  if (ticks) {
-    const tick = 5.5 * u;
-    const gap = 7 * u;
-    const sideGap = 12 * u;
-    const fontMm = 9.5 * u;
-    grid.top.forEach(p => {
-      const x = F.x + p.t * fx;
-      pdf.line(x, F.y - tick, x, F.y);
-      pdf.text(spaced(p.value), x, F.y - gap, { align: 'center', baseline: 'bottom' });
+  if (gridLines) {
+    withClip(pdf, F, () => {
+      pdf.setDrawColor(255, 255, 255);
+      pdf.setLineWidth(0.7 * u);
+      pdf.setLineCap('butt');
+      pdf.setLineDashPattern([6 * u, 4 * u], 0);
+      setAlpha(pdf, 1, 0.55);
+      pair(grid.top, grid.bottom).forEach(([p, tb]) => pdf.line(F.x + p.t * fx, F.y, F.x + tb * fx, F.y + F.h));
+      pair(grid.left, grid.right).forEach(([p, tr]) => pdf.line(F.x, F.y + p.t * fy, F.x + F.w, F.y + tr * fy));
     });
-    grid.bottom.forEach(p => {
-      const x = F.x + p.t * fx;
-      pdf.line(x, F.y + F.h, x, F.y + F.h + tick);
-      pdf.text(spaced(p.value), x, F.y + F.h + gap, { align: 'center', baseline: 'top' });
-    });
-    const sideLabel = (xc, y, value) => {
-      const str = spaced(value);
-      pdf.text(str, xc + fontMm * 0.36, y + pdf.getTextWidth(str) / 2, { angle: 90 });
-    };
-    grid.left.forEach(p => {
-      const y = F.y + p.t * fy;
-      pdf.line(F.x - tick, y, F.x, y);
-      sideLabel(F.x - sideGap, y, p.value);
-    });
-    grid.right.forEach(p => {
-      const y = F.y + p.t * fy;
-      pdf.line(F.x + F.w, y, F.x + F.w + tick, y);
-      sideLabel(F.x + F.w + sideGap, y, p.value);
-    });
+    pdf.setLineDashPattern([], 0);
+    setAlpha(pdf, 1, 1);
+    pdf.setDrawColor(...INK);
+    pdf.setTextColor(...INK);
+    pdf.setLineWidth(1 * u);
+    setFont(pdf, false, 9.5 * cs);
+    if (ticks) {
+      const tick = 5.5 * u;
+      const gap = 7 * u;
+      const sideGap = 12 * u;
+      const fontMm = 9.5 * u;
+      grid.top.forEach(p => {
+        const x = F.x + p.t * fx;
+        pdf.line(x, F.y - tick, x, F.y);
+        pdf.text(spaced(p.value), x, F.y - gap, { align: 'center', baseline: 'bottom' });
+      });
+      grid.bottom.forEach(p => {
+        const x = F.x + p.t * fx;
+        pdf.line(x, F.y + F.h, x, F.y + F.h + tick);
+        pdf.text(spaced(p.value), x, F.y + F.h + gap, { align: 'center', baseline: 'top' });
+      });
+      const sideLabel = (xc, y, value) => {
+        const str = spaced(value);
+        pdf.text(str, xc + fontMm * 0.36, y + pdf.getTextWidth(str) / 2, { angle: 90 });
+      };
+      grid.left.forEach(p => {
+        const y = F.y + p.t * fy;
+        pdf.line(F.x - tick, y, F.x, y);
+        sideLabel(F.x - sideGap, y, p.value);
+      });
+      grid.right.forEach(p => {
+        const y = F.y + p.t * fy;
+        pdf.line(F.x + F.w, y, F.x + F.w + tick, y);
+        sideLabel(F.x + F.w + sideGap, y, p.value);
+      });
+    }
   }
+  pdf.setDrawColor(...INK);
+  setAlpha(pdf, 1, 1);
   pdf.setLineJoin('miter');
   pdf.setLineWidth(1.4 * u);
   pdf.rect(F.x, F.y, F.w, F.h, 'S');
@@ -583,10 +592,19 @@ function drawPageChrome(pdf, sheet, { sideSep = true } = {}) {
   }
 }
 
-/** Lưới, vạch, số tọa độ, khung bản đồ và khung tờ (bố cục cột phải) */
+/** Lưới (nếu bật), viền khung bản đồ và khung tờ (bố cục cột phải) */
 function drawGridPdf(pdf, grid, sheet) {
-  drawFrameGrid(pdf, grid, sheet.frame, sheet, { ticks: true });
+  drawFrameGrid(pdf, grid, sheet.frame, sheet, { ticks: showGrid, gridLines: showGrid });
   drawPageChrome(pdf, sheet, { sideSep: sheet.SIDE_W > 0 });
+}
+
+/** Tiêu đề lớn giữa phía trên vùng map; max-width chữ ~2/3 chiều rộng khung */
+function mapBannerHtml(frame, title, cs) {
+  if (!showMapBanner || !title) return '';
+  const pad = 14 * (cs || 1);
+  return `<div class="pa3-map-banner" style="left:${frame.x}px; top:${frame.y + pad}px; width:${frame.w}px">
+      <b>${escapeHtml(title)}</b>
+    </div>`;
 }
 
 function drawMapCornerLabel(pdf, framePx, text, sheet) {
@@ -770,6 +788,7 @@ function sideHtml({ title, place, note, gridStep, splitX, frameW, scale, sheet }
     : '';
   return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * cs).toFixed(2)}px">
     ${compare}
+    ${mapBannerHtml(F, title, cs)}
     <div class="pa3-side" style="left:${sideX + pad}px; top:${sheet.M + pad}px; width:${sheet.SIDE_W - 2 * pad}px; height:${sheet.pageH - 2 * sheet.M - 2 * pad}px">
       <div class="pa3-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b><i class="pa3-org-rule"></i></div>
       <div class="pa3-title">${escapeHtml(title)}</div>
@@ -800,12 +819,19 @@ function dualPageHtml({ title, place, note, gridStep, scale, sheet }) {
   const pad = 8 * cs;
   const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 180 * cs).pop() || NICE_STEPS[0];
   const date = printStamp();
+  const bannerFrame = {
+    x: sheet.leftFrame.x,
+    y: sheet.leftFrame.y,
+    w: sheet.leftFrame.w + sheet.GUT_X + sheet.rightFrame.w,
+    h: sheet.leftFrame.h
+  };
   return `<div class="pa3-page pa3-vector pa3-dual" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * cs).toFixed(2)}px">
     <div class="pa3-dual-title" style="left:${T.x + pad}px; top:${T.y}px; width:${T.w - 2 * pad}px; height:${T.h}px">
       <div class="pa3-org pa3-dual-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b></div>
       <div class="pa3-title">${escapeHtml(title)}</div>
       <div class="pa3-place">${escapeHtml(place)}</div>
     </div>
+    ${mapBannerHtml(bannerFrame, title, cs)}
     <div class="pa3-dual-notes" style="left:${N.x + pad}px; top:${N.y + pad * 0.4}px; width:${N.w - 2 * pad}px; height:${N.h - pad * 0.8}px">
       <div class="pa3-legend">
         <div class="pa3-sec">CHÚ GIẢI</div>
@@ -831,9 +857,7 @@ function plainPageHtml({ title, sheet }) {
   const F = sheet.frame;
   const cs = sheet.cs || 1;
   return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(12 * cs).toFixed(2)}px">
-    <div class="pa3-plain-title" style="left:${F.x}px; top:${F.y + 14 * cs}px; width:${F.w}px">
-      <b>${escapeHtml(title)}</b>
-    </div>
+    ${mapBannerHtml(F, title, cs)}
   </div>`;
 }
 
@@ -1063,6 +1087,13 @@ function onMapView() {
   updateLiveScale();
 }
 
+function syncPrintOptsFromDock() {
+  const grid = $('printShowGrid');
+  const banner = $('printMapBanner');
+  if (grid) showGrid = !!grid.checked;
+  if (banner) showMapBanner = !!banner.checked;
+}
+
 function bindDock() {
   if (dockBound) return;
   dockBound = true;
@@ -1074,6 +1105,8 @@ function bindDock() {
     const btn = e.target.closest('button[data-frame]');
     if (btn) setFrameKind(btn.dataset.frame);
   });
+  $('printShowGrid')?.addEventListener('change', syncPrintOptsFromDock);
+  $('printMapBanner')?.addEventListener('change', syncPrintOptsFromDock);
   bindFrameResize();
   $('printCancel')?.addEventListener('click', closePreview);
   $('printGo')?.addEventListener('click', runExport);
@@ -1093,6 +1126,11 @@ function openPreview() {
   const input = $('printTitle');
   if (input && input.dataset.touched !== '1') input.value = defaultTitle();
   bindDock();
+  const gridChk = $('printShowGrid');
+  const bannerChk = $('printMapBanner');
+  if (gridChk) gridChk.checked = showGrid;
+  if (bannerChk) bannerChk.checked = showMapBanner;
+  syncPrintOptsFromDock();
   frameUser = null;
   setPaper(paperId);
   setFrameKind(frameKind);
@@ -1220,13 +1258,17 @@ async function drawMapFrameDual(pdf, sheet) {
     await waitTiles([map]);
     const full = { x: 0, y: 0, w: map.getSize().x, h: map.getSize().y };
     await paintMapCell(pdf, map, full, sheet.leftFrame, targetW);
-    drawFrameGrid(pdf, computeGrid(full, map), sheet.leftFrame, sheet, { ticks: false });
+    drawFrameGrid(pdf, computeGrid(full, map), sheet.leftFrame, sheet, {
+      ticks: false, gridLines: showGrid
+    });
 
     setViewExact(planMap, rightCenter, zoom1);
     await waitTiles([planMap]);
     const fullR = { x: 0, y: 0, w: planMap.getSize().x, h: planMap.getSize().y };
     await paintMapCell(pdf, planMap, fullR, sheet.rightFrame, targetW);
-    drawFrameGrid(pdf, computeGrid(fullR, planMap), sheet.rightFrame, sheet, { ticks: false });
+    drawFrameGrid(pdf, computeGrid(fullR, planMap), sheet.rightFrame, sheet, {
+      ticks: false, gridLines: showGrid
+    });
     drawMapCornerLabel(pdf, sheet.leftFrame, 'HIỆN TRẠNG', sheet);
     drawMapCornerLabel(pdf, sheet.rightFrame, 'QUY HOẠCH', sheet);
     drawPageChrome(pdf, sheet, { sideSep: false });
@@ -1275,6 +1317,7 @@ async function runExport() {
   const host = viewMap().getContainer();
   const rect = frameRectAgainst(host);
   if (!rect || rect.w < 40 || rect.h < 40) return;
+  syncPrintOptsFromDock();
   const input = $('printTitle');
   const title = input?.value.trim() || defaultTitle();
   const note = $('printNote')?.value.trim() || '';
