@@ -125,8 +125,11 @@ async function asJsonIfGatewayError(res) {
   if (type.includes('application/json')) return res;
   let snippet = '';
   try { snippet = (await res.text()).replace(/\s+/g, ' ').trim().slice(0, 160); } catch (e) { snippet = ''; }
-  const why = snippet || 'Cloud Run chưa kịp trả lời (cold start hoặc quá tải)';
-  return jsonGatewayError(res.status, `Cổng API ${res.status}: ${why}. Thử lại sau vài giây.`);
+  let why = snippet || 'Cloud Run chưa kịp trả lời (cold start hoặc quá tải)';
+  if (/ie\d+\s+oldie|\boldie\b|<!doctype html>/i.test(snippet)) {
+    why = 'Apps Script trả HTML (GAS_BASE_URL trên Cloud Run lệch URL /exec, hoặc Deploy sai). Manage deployments → Edit → New version; đối chiếu GAS_BASE_URL với Web app URL.';
+  }
+  return jsonGatewayError(res.status, `Cổng API ${res.status}: ${why}`);
 }
 
 export async function proxyApi(request, env, ctx, now = Date.now()) {

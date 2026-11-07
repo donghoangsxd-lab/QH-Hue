@@ -1166,6 +1166,11 @@ async function callAppsScript(params, body = null) {
   }
 
   const text = String(res.data || '');
+  // Trang HTML Google (ie6 oldie / doctype): URL /exec sai, tạo deployment mới làm lệch GAS_BASE_URL, hoặc web app lỗi
+  if (/<!doctype html>|ie\d+\s+oldie|\boldie\b|script\.google\.com\/macros/i.test(text)) {
+    throw httpError(502,
+      'Apps Script trả về trang HTML thay vì JSON. Trên Cloud Run, GAS_BASE_URL phải đúng URL Web app (.../exec) trong Sheet → Apps Script → Deploy → Manage deployments (Edit deployment hiện có → New version, không bấm New deployment).');
+  }
   let data = null;
   try { data = JSON.parse(text); } catch (e) {}
   if (data && typeof data === 'object') {
@@ -3099,6 +3104,18 @@ module.exports = async (req, res) => {
     const action = String(req.query.action || 'getInitData');
 
     // --- Thao tác không cần Earth Engine ---
+    // Kiểm tra GAS_BASE_URL còn khớp web app /exec (admin): phải trả script=retype-fast-5
+    if (action === 'gasScriptVersion') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const result = await callAppsScript({ action: 'scriptVersion' }, { action: 'scriptVersion' });
+      return res.status(200).json({
+        success: true,
+        script: result.script || '',
+        ok: result.script === 'retype-fast-5'
+      });
+    }
+
     if (action === 'verifyAdmin') {
       requirePostFromApp(req);
       const user = await requireAdmin(req);
