@@ -207,6 +207,25 @@ function loadGeom(file) {
   return geomPromises.get(file);
 }
 
+/** Tô ranh đô thị loại I (toàn thành phố) và phát GP_SCOPE_EVENT → urbanFocus tính phủ QHC/QHPK/QHCT như loại II/III. */
+function paintCityGeom(id, { name, geometry } = {}) {
+  const token = id;
+  const label = name || CITY_PLAN?.short || CITY_PLAN?.name || DVHC_CITY.name;
+  if (geometry) {
+    paintGeom(token, { type: 'Feature', properties: { id: token }, geometry }, { name: label, city: true });
+    return;
+  }
+  loadGeom(SCOPE_URL).then(fc => {
+    if (scopeId !== token) return;
+    const feature = (fc.features || []).find(f => f.properties && f.properties.id === 'hue');
+    if (!feature) { focusWard(DVHC_CITY.name); return; }
+    paintGeom(token, feature, { name: label, city: true });
+  }).catch(err => {
+    console.warn('Đô thị – không tải được ranh thành phố:', err);
+    focusWard(DVHC_CITY.name);
+  });
+}
+
 // Danh sách Đô thị: vẽ đúng polygon đã dẫn, hoặc ranh thành phố với dòng quy hoạch Huế.
 // Dòng chưa có ranh chỉ bỏ lớp cũ, không gọi showScope (showScope sẽ lấy ranh cả xã trong generalPlan).
 function showListGeom(id, { geom, cityPlan } = {}) {
@@ -215,7 +234,7 @@ function showListGeom(id, { geom, cityPlan } = {}) {
   if (!id) return;
   scopeId = id;
   if (cityPlan) {
-    focusWard(DVHC_CITY.name);
+    paintCityGeom(id);
     return;
   }
   if (!geom || !geom.file || !geom.id) return;
@@ -247,7 +266,7 @@ export function pickUrbanFromMap(u) {
   highlightWardBoundary('', { fitView: false });
   scopeId = u.id;
   setAreaFilter(city ? { ...AREA_TP } : { type: 'dothi', code: u.id, parent: 'TP' }, 'user');
-  if (city) focusWard(DVHC_CITY.name);
+  if (city) paintCityGeom(u.id, { name: u.name || u.id, geometry: u.geometry || null });
   else if (u.geometry) {
     paintGeom(u.id, { type: 'Feature', properties: { id: u.id }, geometry: u.geometry }, {
       name: u.name || u.id,
