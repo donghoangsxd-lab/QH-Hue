@@ -14,6 +14,7 @@
 // Sheet 15-DA (dự án kêu gọi đầu tư) không phải điểm hạ tầng: đóng gói mọi cột sang invest_calls.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Cloud Run chưa có quyền.
 // Admin sửa / đổi loại / xóa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow / retypeInfraRow / deleteInfraRow.
+// Các action này hẹn syncSheetsToGCS (scheduleSheetsSync), không đóng gói GeoJSON trong doPost — tránh 502 Worker/CF.
 // Gán hạ tầng hiện trạng cho thửa địa chính 2016: tab HaTangHienTrang, doPost saveHaTangHienTrang / deleteHaTangHienTrang / getHaTangHienTrang.
 // Khóa dòng là (số tờ, số thửa, xã/phường cũ). Điểm được đóng vào infrastructure_hue.json để tính độ phủ.
 // Bản web app phải Deploy lại (Manage deployments → Edit → New version) thì các action này mới chạy.
@@ -720,6 +721,34 @@ function scheduleWebappWarm() {
   } catch (err) {
     Logger.log("⚠ Không hẹn được lượt tính sẵn webapp: " + err.toString());
   }
+}
+
+// Đồng bộ Sheet → GCS ngoài doPost: đổi loại / sửa / xóa công trình trả JSON ngay (Worker/Cloud Run chỉ chờ ~25–55 s).
+// Gộp nhiều lần sửa liên tiếp vào 1 lượt; cờ CAD (Script Property) OR nếu bất kỳ lần nào cần cad_parcels.json.
+const SYNC_HANDLER = "runScheduledSheetsSync";
+const SYNC_DELAY_MS = 5 * 1000;
+const SYNC_CAD_PROP = "PENDING_SYNC_CAD";
+
+function scheduleSheetsSync(includeCad) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (includeCad) props.setProperty(SYNC_CAD_PROP, "1");
+    var pending = ScriptApp.getProjectTriggers().some(function(t) { return t.getHandlerFunction() === SYNC_HANDLER; });
+    if (!pending) ScriptApp.newTrigger(SYNC_HANDLER).timeBased().after(SYNC_DELAY_MS).create();
+  } catch (err) {
+    Logger.log("⚠ Không hẹn được đồng bộ bucket, chạy ngay: " + err.toString());
+    syncSheetsToGCS(includeCad);
+  }
+}
+
+function runScheduledSheetsSync() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === SYNC_HANDLER) ScriptApp.deleteTrigger(t);
+  });
+  var props = PropertiesService.getScriptProperties();
+  var includeCad = props.getProperty(SYNC_CAD_PROP) === "1";
+  props.deleteProperty(SYNC_CAD_PROP);
+  syncSheetsToGCS(includeCad);
 }
 
 function warmWebappCache() {
@@ -2894,7 +2923,7 @@ function editInfraRow(body) {
   if (!id) return { "error": "Thiếu ID công trình" };
   var done = writeInfraEdit(id, body.fields || {});
   if (!done.found) return { "error": "Không tìm thấy ID công trình: " + id };
-  syncSheetsToGCS(false);
+  scheduleSheetsSync(false);
   return { "success": true, "id": id, "tab": done.found, "missing": done.missing };
 }
 
@@ -3058,7 +3087,8 @@ function retypeInfraRow(body) {
 
   var f = body.fields || {};
   var missing = Object.keys(f).length ? writeInfraEdit(newId, f).missing : [];
-  syncSheetsToGCS(cadChanged > 0);
+  // Không syncSheetsToGCS đồng bộ: đóng gói infrastructure_hue.json dễ vượt 55 s → Worker/CF trả 502 rỗng
+  scheduleSheetsSync(cadChanged > 0);
   return {
     "success": true, "id": id, "newId": newId, "tab": target.getName(), "rows": moved,
     "dropped": dropped, "missing": missing
@@ -3074,7 +3104,7 @@ function deleteInfraRow(body) {
   if (!id) return { "error": "Thiếu ID công trình" };
   var done = removeInfraIds([id]);
   if (!done.rows) return { "error": "Không tìm thấy ID công trình: " + id };
-  syncSheetsToGCS(false);
+  scheduleSheetsSync(false);
   return { "success": true, "id": id, "rows": done.rows, "tabs": done.tabs };
 }
 
@@ -3087,7 +3117,7 @@ function deleteInfraRows(body) {
   if (!ids.length) return { "error": "Thiếu danh sách ID công trình" };
   if (ids.length > 500) return { "error": "Tối đa 500 mã mỗi lần" };
   var done = removeInfraIds(ids);
-  if (done.rows) syncSheetsToGCS(false);
+  if (done.rows) scheduleSheetsSync(false);
   return { "success": true, "rows": done.rows, "tabs": done.tabs, "missing": done.missing };
 }
 

@@ -153,7 +153,12 @@ async function postEdit(body, action = 'editLot') {
     signOutAdmin();
     throw new Error('Phiên Admin hết hạn — đăng nhập lại');
   }
-  if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+  if (!res.ok || !data.success) {
+    const fallback = (res.status === 502 || res.status === 504)
+      ? 'Máy chủ chờ quá lâu khi đồng bộ Sheet/bucket (502). Kiểm tra Sheet đã đổi mã chưa; nếu rồi, F5 sau khoảng 1 phút. Không bấm Lưu lại ngay nếu Sheet đã có mã mới.'
+      : `Lỗi máy chủ (${res.status})`;
+    throw new Error(data.message || fallback);
+  }
   return data;
 }
 
