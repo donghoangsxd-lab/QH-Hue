@@ -9,12 +9,12 @@ import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_
 import { kmlTextFromFile, sketchShapesFromKml, KML_MAX_BYTES } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
-import { exportKml, exportKmz, exportDxf, sketchShapesFromDxf } from './sketchExport.js';
+import { exportKml, exportKmz, exportDxf, sketchShapesFromDxf, densifySpline } from './sketchExport.js';
 import { createSketchEditSession, isVertexShape } from './sketchEdit.js';
 import { createVertexHandles, vertexMenuButton as menuButton } from './vertexHandles.js';
 
 const TOOLS = {
-  line: { label: 'Đường thẳng', hint: 'Click điểm đầu, rồi click điểm cuối', points: 2 },
+  spline: { label: 'Đường cong', hint: 'Click các điểm điều khiển · nháy đúp hoặc Enter để kết thúc', min: 2 },
   polyline: { label: 'Đường gấp khúc', hint: 'Click các đỉnh · nháy đúp hoặc Enter để kết thúc', min: 2 },
   polygon: { label: 'Đa giác', hint: 'Click các đỉnh · nháy đúp, Enter hoặc click đỉnh đầu để khép vùng', min: 3 },
   arrow: { label: 'Mũi tên', hint: 'Click điểm gốc, rồi click điểm mũi tên', points: 2 },
@@ -198,11 +198,12 @@ function shapeMeasure(tool, lls) {
   if (tool === 'polygon' && lls.length >= 3) {
     return `Diện tích ${fmtArea(polyArea(lls))} · chu vi ${fmtLen(pathLen([...lls, lls[0]]))}`;
   }
-  return `Dài ${fmtLen(pathLen(lls))}`;
+  const path = tool === 'spline' ? densifySpline(lls) : lls;
+  return `Dài ${fmtLen(pathLen(path))}`;
 }
 
 function shapeTip(tool, text) {
-  return text || TOOLS[tool]?.label || 'Hình';
+  return text || TOOLS[tool]?.label || (tool === 'line' ? 'Đường thẳng' : 'Hình');
 }
 
 function shapeLayers(tool, lls, c, preview, hostMap, dash) {
@@ -225,9 +226,14 @@ function shapeLayers(tool, lls, c, preview, hostMap, dash) {
     out.push(L.polygon(lls, { ...line, fillColor: c, fillOpacity: 0.15 }));
     return { layers: out, text: shapeMeasure(tool, lls) };
   }
-  out.push(L.polyline(lls, halo), L.polyline(lls, line));
+  // Spline: nét cong nội suy; khi preview vẽ thêm đa giác điều khiển nét đứt
+  const path = tool === 'spline' ? densifySpline(lls).map(p => L.latLng(p)) : lls;
+  if (tool === 'spline' && preview && lls.length >= 2) {
+    out.push(L.polyline(lls, { color: c, weight: 1.2, opacity: 0.4, dashArray: '3,4', interactive: false, ...draw }));
+  }
+  out.push(L.polyline(path, halo), L.polyline(path, line));
   // Nét trong suốt, rộng hơn nét thấy được, để rê chuột và chuột phải trúng đường mảnh
-  if (!preview) out.push(L.polyline(lls, { color: c, weight: 18, opacity: 0, interactive: true, className: 'sketch-hit sketch-shape', ...draw }));
+  if (!preview) out.push(L.polyline(path, { color: c, weight: 18, opacity: 0, interactive: true, className: 'sketch-hit sketch-shape', ...draw }));
   if (tool === 'arrow' && lls.length === 2) {
     const head = arrowHead(lls[0], lls[1]);
     if (head) {
@@ -382,7 +388,8 @@ function bindShapeMenu(fg) {
   });
   fg.on('click', (e) => {
     if (measureBlocksSketch()) return;
-    if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
+    // Đang chọn công cụ vẽ: để click xuống bản đồ (chấm đỉnh / đặt chữ), kể cả đè lên hình cũ
+    if (state.sketchTool) return;
     stopShapeEvent(e);
     // Tránh ô focus đen quanh path SVG sau khi click chọn
     e.originalEvent?.target?.blur?.();
@@ -391,7 +398,9 @@ function bindShapeMenu(fg) {
   });
   fg.on('contextmenu', (e) => {
     if (measureBlocksSketch()) return;
+    // Đang chấm nét: chuột phải xóa đỉnh gần con trỏ (onSketchContextMenu), không mở menu hình
     if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
+    if (state.sketchTool) return;
     stopShapeEvent(e);
     openShapeMenu(fg, e);
   });
@@ -449,6 +458,8 @@ function shapeAt(m, latlng) {
 function onShapePointerDown(ev, m) {
   if (ev.pointerType === 'mouse') return;
   if (measureBlocksSketch()) return;
+  // Đang vẽ: không chặn pointer — chạm trên hình cũ vẫn chấm được đỉnh
+  if (state.sketchTool) return;
   if (ev.target?.closest?.('.sketch-handle, .leaflet-popup, .map-ctx-menu, .sketch-menu')) return;
   const ll = m.mouseEventToLatLng(ev);
   const fg = shapeAt(m, ll);
@@ -458,7 +469,6 @@ function onShapePointerDown(ev, m) {
   const y = ev.clientY;
   let timer = setTimeout(() => {
     timer = 0;
-    if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
     openShapeMenu(fg, { latlng: m.mouseEventToLatLng({ clientX: x, clientY: y }) });
   }, 560);
   const clear = (e) => {

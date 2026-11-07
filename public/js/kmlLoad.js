@@ -108,7 +108,7 @@ export function sketchShapesFromKml(text) {
         const clean = cleanLine(line);
         if (!clean) { dropped++; continue; }
         ringsSeen.push(clean);
-        push(clean.length === 2 ? 'line' : 'polyline', clean, null, e.color);
+        push('polyline', clean, null, e.color);
       }
     } else if (e.kind === 'POINT') {
       const q = wgsPair(e.pt);

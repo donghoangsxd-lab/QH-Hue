@@ -124,6 +124,7 @@
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-sketch" viewBox="0 0 24 24"><path d="M3 17c3-5 5 2 8-3s4-6 6-3"/><path d="m14 21 6.5-6.5-2-2L12 19v2z"/></symbol>
     <symbol id="i-sk-line" viewBox="0 0 24 24"><path d="M5 19 19 5"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/><circle cx="19" cy="5" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-sk-spline" viewBox="0 0 24 24"><path d="M3.5 17.5c2.8-9 4.2 1 7.2-5.5S15.5 15 20.5 7"/><circle cx="3.5" cy="17.5" r="1.4" fill="currentColor"/><circle cx="20.5" cy="7" r="1.4" fill="currentColor"/></symbol>
     <symbol id="i-sk-polyline" viewBox="0 0 24 24"><path d="m3 18 6-9 5 6 7-10"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="14" cy="15" r="1.4" fill="currentColor"/></symbol>
     <symbol id="i-sk-polygon" viewBox="0 0 24 24"><path d="m4 9 7-5 9 4-2 11H7z" fill="currentColor" fill-opacity=".2"/></symbol>
     <symbol id="i-sk-arrow" viewBox="0 0 24 24"><path d="M4 20 18 6"/><path d="M10 5h9v9" fill="none"/></symbol>
@@ -332,7 +333,7 @@
       </div>
       <button type="button" class="ui-btn-format" id="btnFaq" title="Hỏi đáp số liệu đã tính sẵn: bấm câu trả lời để tô phường, xã trên bản đồ" aria-label="Hỏi đáp" aria-pressed="false" aria-controls="faqPanel"><svg class="ico"><use href="#i-faq"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnSketch" title="Phác thảo" aria-label="Phác thảo" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
-      <button type="button" class="ui-btn-format sketch-pin" id="btnSketchPin" hidden title="Mở lại bảng công cụ phác thảo" aria-label="Mở lại bảng công cụ phác thảo" aria-pressed="true" aria-expanded="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
+      <button type="button" class="ui-btn-format sketch-pin" id="btnSketchPin" hidden title="Mở lại bảng công cụ phác thảo" aria-label="Mở lại bảng công cụ phác thảo" aria-pressed="true" aria-expanded="false"><svg class="ico"><use href="#i-sk-spline"/></svg></button>
 
       <!-- BẢNG CÔNG CỤ PHÁC THẢO (sketchLayer.js) -->
       <div class="faq-panel" id="faqPanel" role="dialog" aria-labelledby="faqTitle" hidden>
@@ -376,7 +377,7 @@
           <button type="button" class="sketch-btn" data-dash="1" title="Nét đứt" aria-label="Nét đứt" aria-pressed="false"><svg class="ico"><use href="#i-sk-dash"/></svg></button>
         </div>
         <div class="sketch-row">
-          <button type="button" class="sketch-btn" data-tool="line" title="Đường thẳng" aria-label="Đường thẳng" aria-pressed="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="spline" title="Đường cong" aria-label="Đường cong" aria-pressed="false"><svg class="ico"><use href="#i-sk-spline"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="polyline" title="Đường gấp khúc" aria-label="Đường gấp khúc" aria-pressed="false"><svg class="ico"><use href="#i-sk-polyline"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
