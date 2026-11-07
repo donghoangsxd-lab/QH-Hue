@@ -675,7 +675,12 @@ function collectInvestCalls(ss) {
 function syncSheetsToGCS(includeCad) {
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(10000);
+    // Không waitLock dài: nếu admin đang đổi loại thì bỏ lượt này, trigger sẽ hẹn lại
+    if (!lock.tryLock(3000)) {
+      Logger.log("⚠ syncSheetsToGCS: đang khóa (đổi loại/sửa), hẹn lại");
+      scheduleSheetsSync(includeCad !== false);
+      return;
+    }
 
     Logger.log("=== BẮT ĐẦU ĐỒNG BỘ DỮ LIỆU SANG GCS ===");
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -731,7 +736,7 @@ const SYNC_DELAY_MS = 5 * 1000;
 const SYNC_CAD_PROP = "PENDING_SYNC_CAD";
 const SYNC_PENDING_PROP = "PENDING_SHEETS_SYNC";
 const RETYPE_MAP_PROP = "PENDING_RETYPE_MAP";
-const SCRIPT_BUILD = "retype-fast-4";
+const SCRIPT_BUILD = "retype-fast-5";
 
 function scheduleSheetsSync(includeCad) {
   var props = PropertiesService.getScriptProperties();
@@ -3106,7 +3111,10 @@ function retypeInfraRow(body) {
   var dropped = [];
 
   var lock = LockService.getScriptLock();
-  lock.waitLock(8000);
+  // tryLock ngắn: nếu sync GCS đang giữ khóa thì báo rõ (tránh chờ 8–30s rồi Worker/CF trả 502 rỗng)
+  if (!lock.tryLock(2500)) {
+    return { "error": "Sheet đang đồng bộ lên bản đồ hoặc có lệnh khác đang chạy. Đợi khoảng 30–60 giây rồi bấm Lưu lại." };
+  }
   try {
     target = ensureInfraSheet(ss, type);
     if (!target) return { "error": "Sheet chưa có tab " + type };

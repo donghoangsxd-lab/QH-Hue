@@ -148,16 +148,20 @@ async function postEdit(body, action = 'editLot') {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
     body: JSON.stringify(body)
   });
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch (e) { data = {}; }
   if (res.status === 401 || res.status === 403) {
     signOutAdmin();
     throw new Error('Phiên Admin hết hạn — đăng nhập lại');
   }
   if (!res.ok || !data.success) {
+    const fromServer = data.message || data.error || '';
     const fallback = (res.status === 502 || res.status === 504)
-      ? 'Máy chủ chờ quá lâu khi đồng bộ Sheet/bucket (502). Kiểm tra Sheet đã đổi mã chưa; nếu rồi, F5 sau khoảng 1 phút. Không bấm Lưu lại ngay nếu Sheet đã có mã mới.'
+      ? 'Máy chủ lỗi cổng (502). Nếu vừa đổi loại liên tiếp: đợi 1 phút rồi thử lại (Sheet có thể đang đồng bộ).'
       : `Lỗi máy chủ (${res.status})`;
-    throw new Error(data.message || fallback);
+    const hint = !fromServer && raw && raw.length < 240 && raw[0] !== '<' ? raw : '';
+    throw new Error(fromServer || hint || fallback);
   }
   return data;
 }
