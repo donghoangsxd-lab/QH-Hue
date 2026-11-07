@@ -1626,7 +1626,12 @@
           <span class="tp-note" id="tpNote"></span>
         </div>
         <div class="tp-stats" id="tpStats"></div>
-        <button type="button" class="bp-btn bp-icon" id="btnCloseProfile" title="Đóng lát cắt" aria-label="Đóng lát cắt"><svg class="ico"><use href="#i-close"/></svg></button>
+        <div class="tp-tools">
+          <label class="tp-scale-toggle" title="Cùng tỷ lệ mét trên trục ngang và trục đứng (1 m ngang = 1 m cao). Tắt thì trục cao độ phóng theo dải cao độ đường cắt cho dễ nhìn.">
+            <input type="checkbox" id="chkProfileScale1">Tỷ lệ 1:1
+          </label>
+          <button type="button" class="bp-btn bp-icon" id="btnCloseProfile" title="Đóng lát cắt" aria-label="Đóng lát cắt"><svg class="ico"><use href="#i-close"/></svg></button>
+        </div>
       </div>
       <div class="tp-chart">
         <canvas id="terrainProfileChart" aria-label="Biểu đồ lát cắt địa hình"></canvas>
