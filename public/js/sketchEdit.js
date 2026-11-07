@@ -1,13 +1,13 @@
 // Phiên chỉnh đỉnh phác thảo. Chỉ tọa độ {lat, lng}, không phụ thuộc Leaflet.
-// Đường (line, polyline, arrow) giữ ít nhất 2 đỉnh; đa giác giữ ít nhất 3.
+// Đường (spline, polyline, arrow; line cũ từ nhập) giữ ít nhất 2 đỉnh; đa giác giữ ít nhất 3.
 // Mũi tên và vòng tròn dịch được đỉnh định nghĩa; chỉ đường và đa giác có điểm giữa để chèn.
 
 export function isVertexShape(tool) {
-  return tool === 'line' || tool === 'polyline' || tool === 'polygon' || tool === 'arrow' || tool === 'circle';
+  return tool === 'spline' || tool === 'line' || tool === 'polyline' || tool === 'polygon' || tool === 'arrow' || tool === 'circle';
 }
 
 export function allowsMidpoints(tool) {
-  return tool === 'line' || tool === 'polyline' || tool === 'polygon';
+  return tool === 'spline' || tool === 'line' || tool === 'polyline' || tool === 'polygon';
 }
 
 export function minVertices(tool) {

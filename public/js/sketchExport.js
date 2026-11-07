@@ -1,13 +1,40 @@
 // Xuất/nhập lớp phác thảo: KML·KMZ (WGS84) và DXF R12 (VN-2000 TT-Huế KTT 107°00', mét).
-// items: [{ tool: 'line' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text', pts: [L.LatLng], color, head?, text?, heightM?, dash? }]
+// items: [{ tool: 'spline' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text' | 'line'?, pts: [L.LatLng], color, head?, text?, heightM?, dash? }]
 import { wgs84ToVn2000, vn2000ToWgs84 } from './cadImport.js';
 import { SKETCH_MAX_SHAPES, touchesHue } from './kmlLoad.js';
 
 const ACI = { '#f43f5e': 1, '#facc15': 2, '#22d3ee': 4, '#a3e635': 3, '#ffffff': 7 };
 const ACI_HEX = { 1: '#f43f5e', 2: '#facc15', 3: '#a3e635', 4: '#22d3ee', 7: '#ffffff' };
-const LABELS = { line: 'Đường thẳng', polyline: 'Đường gấp khúc', polygon: 'Đa giác', arrow: 'Mũi tên', circle: 'Vòng tròn', text: 'Chữ' };
+const LABELS = { spline: 'Đường cong', line: 'Đường thẳng', polyline: 'Đường gấp khúc', polygon: 'Đa giác', arrow: 'Mũi tên', circle: 'Vòng tròn', text: 'Chữ' };
 const CIRCLE_SEGMENTS = 72;
+const SPLINE_SEGS = 12; // số đoạn thẳng mỗi khoảng giữa 2 điểm điều khiển (~không gây giật khi kéo)
 const HUE_XY = { minE: 480000, maxE: 620000, minN: 1750000, maxN: 1900000 };
+
+/** Catmull-Rom → chuỗi điểm {lat,lng}. 2 điểm = đoạn thẳng; ≥3 điểm = đường cong. */
+export function densifySpline(pts, segs = SPLINE_SEGS) {
+  if (!pts || pts.length < 2) return (pts || []).map(p => ({ lat: +p.lat, lng: +p.lng }));
+  if (pts.length === 2) return [{ lat: +pts[0].lat, lng: +pts[0].lng }, { lat: +pts[1].lat, lng: +pts[1].lng }];
+  const at = (i) => {
+    const p = pts[Math.max(0, Math.min(pts.length - 1, i))];
+    return { lat: +p.lat, lng: +p.lng };
+  };
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    for (let s = 0; s < segs; s++) {
+      if (i > 0 && s === 0) continue;
+      const t = s / segs, t2 = t * t, t3 = t2 * t;
+      out.push({
+        lat: 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * t + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3),
+        lng: 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * t + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3)
+      });
+    }
+  }
+  out.push(at(pts.length - 1));
+  return out;
+}
+
+const exportPts = (it) => (it.tool === 'spline' ? densifySpline(it.pts) : it.pts);
 
 const stamp = () => {
   const d = new Date(), p = (n) => String(n).padStart(2, '0');
@@ -41,7 +68,8 @@ const polyKml = (coords) => `<Polygon><outerBoundaryIs><LinearRing><coordinates>
 
 function kmlPlacemark(it, i) {
   const style = `#c${it.color.slice(1)}`;
-  const name = it.tool === 'text' ? it.text.replace(/\s*\n\s*/g, ' ') : `${LABELS[it.tool]} ${i + 1}`;
+  const name = it.tool === 'text' ? it.text.replace(/\s*\n\s*/g, ' ') : `${LABELS[it.tool] || 'Hình'} ${i + 1}`;
+  const pts = exportPts(it);
   let geom;
   if (it.tool === 'text') geom = `<Point><coordinates>${coordsKml([it.pts[0]])}</coordinates></Point>`;
   else if (it.tool === 'polygon') geom = polyKml(coordsKml([...it.pts, it.pts[0]]));
@@ -49,7 +77,7 @@ function kmlPlacemark(it, i) {
   else if (it.tool === 'arrow' && it.head) {
     geom = `<MultiGeometry><LineString><coordinates>${coordsKml(it.pts)}</coordinates></LineString>`
       + `${polyKml(coordsKml([...it.head, it.head[0]]))}</MultiGeometry>`;
-  } else geom = `<LineString><coordinates>${coordsKml(it.pts)}</coordinates></LineString>`;
+  } else geom = `<LineString><coordinates>${coordsKml(pts)}</coordinates></LineString>`;
   const desc = it.tool === 'text' ? `<description>${xml(it.text)}</description>` : '';
   return `<Placemark><name>${xml(name)}</name>${desc}<styleUrl>${style}</styleUrl>${geom}</Placemark>`;
 }
@@ -156,7 +184,7 @@ function zipStore(files) {
 // ================== DXF R12 (AC1009) ==================
 // Chữ tiếng Việt ghi dạng \U+XXXX (AutoCAD / QCAD đọc được), kiểu chữ VN_ARIAL dùng arial.ttf có đủ dấu.
 // R12 không có MTEXT: mỗi dòng của khối chữ là 1 TEXT (AutoCAD: lệnh TXT2MTXT để gộp lại nếu cần).
-const LAYERS = { line: 'PHAC_THAO_DUONG', polyline: 'PHAC_THAO_DUONG', arrow: 'PHAC_THAO_DUONG', polygon: 'PHAC_THAO_VUNG', circle: 'PHAC_THAO_VUNG', text: 'PHAC_THAO_CHU' };
+const LAYERS = { spline: 'PHAC_THAO_DUONG', line: 'PHAC_THAO_DUONG', polyline: 'PHAC_THAO_DUONG', arrow: 'PHAC_THAO_DUONG', polygon: 'PHAC_THAO_VUNG', circle: 'PHAC_THAO_VUNG', text: 'PHAC_THAO_CHU' };
 const dxfText = (s) => [...s].map(ch => {
   const code = ch.codePointAt(0);
   return code < 128 ? ch : `\\U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
@@ -193,7 +221,7 @@ function dxfEntities(items) {
     } else if (it.tool === 'polygon') {
       polyline(it, it.pts.map(xy), true);
     } else {
-      polyline(it, it.pts.map(xy), false);
+      polyline(it, exportPts(it).map(xy), false);
       if (it.tool === 'arrow' && it.head) {
         const [a, b, c] = it.head.map(xy);
         head('SOLID', it, false);
@@ -428,7 +456,7 @@ export function sketchShapesFromDxf(text) {
         return;
       }
     }
-    push(ln.pts.length === 2 ? 'line' : 'polyline', ln.pts, { color: ln.color, dash: ln.dash });
+    push('polyline', ln.pts, { color: ln.color, dash: ln.dash });
   });
   polys.forEach(p => push('polygon', p.pts, { color: p.color, dash: p.dash }));
   circles.forEach(c => push('circle', [c.c, [c.c[0] + c.r, c.c[1]]], { color: c.color, dash: c.dash }));
