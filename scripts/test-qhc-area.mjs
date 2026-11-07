@@ -14,6 +14,7 @@ assert.match(zoneAreaHtml({ a: 8.2 }, 0), /8,2 ha/);
 assert.equal(zoneAreaHtml({}, 0), '');
 
 const layer = fs.readFileSync(new URL('../public/js/qhc2045Layer.js', import.meta.url), 'utf8');
-assert.match(layer, /zoneAreaHtml\(f\.properties, areaM2\)/);
-assert.match(layer, /row\('Diện tích', `\$\{fmtNum\(p\.a\)\} ha`\)/);
+// Thẻ vùng 1/25.000: hecta qua zoneAreaHa (a hoặc turf.area); 1/10.000: fmtNum(p.a) trong metricCellsHtml
+assert.match(layer, /zoneAreaHa\(f\.properties, areaM2\)/);
+assert.match(layer, /label:\s*'Diện tích',\s*value:\s*`\$\{fmtNum\(p\.a\)\} ha`/);
 console.log('ok');

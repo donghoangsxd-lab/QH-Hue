@@ -42,6 +42,7 @@ assert.throws(() => stageSpec({
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const gee = read('api/gee.js');
 const entry = read('public/js/entryFlows.js');
+const steps = read('public/js/entrySteps.js');
 const store = read('services/projectStore.js');
 const script = read('apps-script/Code.gs');
 const queue = read('public/js/reviewQueue.js');
@@ -52,9 +53,11 @@ assert.match(gee, /readPendingPdf/);
 assert.match(entry, /submitChoDuyetPdf/);
 assert.match(entry, /kind: 'quy-che'/);
 assert.match(entry, /kind: 'van-ban'/);
-assert.match(entry, /label: 'Quyết định'/);
-assert.match(entry, /label: 'Quy chế'/);
-assert.match(entry, /docRole: 'quy-dinh'/);
+// Nhãn bước hồ sơ nằm ở entrySteps (entryFlows chỉ gọi step.docRole / submitChoDuyetPdf)
+assert.match(steps, /label: 'Quyết định'/);
+assert.match(steps, /label: 'Quy chế'/);
+assert.match(steps, /docRole: 'quy-dinh'/);
+assert.doesNotMatch(steps, /Quy định quản lý/);
 assert.doesNotMatch(entry, /Quy định quản lý/);
 const card = read('public/js/projectLayer.js');
 assert.match(card, /'quy-dinh': \{ short: 'QC', label: 'Quy chế' \}/);
