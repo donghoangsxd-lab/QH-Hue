@@ -2,8 +2,9 @@
 // lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật và cấp quy hoạch đang chọn.
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ô vệ tinh / canvas đường phố, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
-// Chữ và cột ghi chú dùng chromeScale (tăng chậm theo khổ) để A0/4A0 không phình chữ như khi nhân tuyến tính theo bề ngang tờ.
-// Khổ lớn hơn → khung xem trước mặc định nhỏ hơn (tỷ lệ cạnh A3): tránh khung full màn hình khiến zoom thấp, không thấy hoa văn TT16.
+// Cột ghi chú giữ chromeScale theo khổ (không nới rộng trên A0+). Khung chọn trên bản đồ phải theo
+// tỷ lệ vùng map còn lại của khổ đang chọn — nếu giữ 1:1 / A3 sẽ hụt, để khoảng trắng khi in.
+// Chữ lưới VN-2000 cũng chromeScale, không nhân tuyến tính theo bề ngang tờ.
 // Khi xuất: ép hoa văn TT16 lên canvas Leaflet rồi chụp canvas đó vào PDF (vector không vẽ lại được CanvasPattern).
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
@@ -36,10 +37,9 @@ const PAPERS = [
   { id: '2a0', label: '2A0', wMm: 1682, hMm: 1189 },
   { id: '4a0', label: '4A0', wMm: 2378, hMm: 1682 }
 ];
-const FRAME_ASPECT = (A3.pageW - A3.side - 2 * A3.m - 2 * A3.gutX) / (A3.pageH - 2 * A3.m - 2 * A3.gutY);
-/** Hệ số chữ + bề rộng cột ghi chú: tăng chậm theo khổ (A0 ~1.4× A3, không ~2.8×) */
+/** Chữ / bề rộng cột ghi chú / số lưới: tăng chậm theo khổ (không nhân đủ theo bề ngang tờ) */
 function chromeScale(s) {
-  return Math.pow(Math.max(s, 1e-6), 0.35);
+  return Math.pow(Math.max(s, 1e-6), 0.4);
 }
 // Bố cục hai ô (chia đôi): dải tiêu đề ~8%, dải ghi chú gọn ~14%, phần giữa chia đôi cho HT | QH
 const A3_DUAL = (() => {
@@ -118,22 +118,20 @@ function sheetOf(id, kind = frameKind) {
       frame: { x: M + gut + (maxW - w) / 2, y: M + gut + (maxH - h) / 2, w, h }
     };
   }
-  // Cột ghi chú: bề rộng theo chromeScale, tối đa ~22% tờ — khổ lớn không chiếm gần 1/3 trang
+  // Cột ghi chú giữ chromeScale theo khổ (không nới rộng). Vùng map = chỗ còn lại → quyết định tỷ lệ khung chọn.
   const SIDE_W = Math.min(A3.side * cs, pageW * 0.22);
   const maxW = pageW - SIDE_W - 2 * M - 2 * GUT_X;
   const maxH = pageH - 2 * M - 2 * GUT_Y;
-  let w = maxW;
-  let h = w / FRAME_ASPECT;
-  if (h > maxH) { h = maxH; w = h * FRAME_ASPECT; }
   return {
     paper, pageW, pageH, s, cs, M, SIDE_W, GUT_X, GUT_Y, dual: false, kind: 'side', notesBand: null,
-    frame: { x: M + GUT_X + (maxW - w) / 2, y: M + GUT_Y + (maxH - h) / 2, w, h }
+    frame: { x: M + GUT_X, y: M + GUT_Y, w: maxW, h: maxH }
   };
 }
 
+/** Tỷ lệ khung chọn trên bản đồ = đúng vùng map của khổ/dạng khung đang chọn (không 1:1, không khóa A3) */
 function previewAspect() {
   if (dualLayout()) return FRAME_ASPECT_DUAL;
-  const frame = sheetOf('a3', frameKind).frame;
+  const frame = sheetOf(paperId, frameKind).frame;
   return frame.w / frame.h;
 }
 
@@ -503,7 +501,9 @@ function computeGrid(rect, m) {
 /** Lưới + vạch + số tọa độ + viền một khung bản đồ (mm). ticks = false khi ô hẹp (dual) để tránh chồng chữ */
 function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true } = {}) {
   const F = toMm(framePx);
-  const u = sheet.s * PX_MM;
+  const cs = sheet.cs || 1;
+  // Nét lưới / khung theo chromeScale; chữ trục cùng cs với cột ghi chú (không * sheet.s)
+  const u = cs * PX_MM;
   const fx = F.w / grid.size.w;
   const fy = F.h / grid.size.h;
   const pair = (a, b) => {
@@ -524,12 +524,12 @@ function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true } = {}) {
   pdf.setDrawColor(...INK);
   pdf.setTextColor(...INK);
   pdf.setLineWidth(1 * u);
-  setFont(pdf, false, 10 * sheet.s);
+  setFont(pdf, false, 9.5 * cs);
   if (ticks) {
-    const tick = 7 * u;
-    const gap = 9 * u;
-    const sideGap = 17 * u;
-    const fontMm = 10 * u;
+    const tick = 5.5 * u;
+    const gap = 7 * u;
+    const sideGap = 12 * u;
+    const fontMm = 9.5 * u;
     grid.top.forEach(p => {
       const x = F.x + p.t * fx;
       pdf.line(x, F.y - tick, x, F.y);
@@ -561,7 +561,7 @@ function drawFrameGrid(pdf, grid, framePx, sheet, { ticks = true } = {}) {
 }
 
 function drawPageChrome(pdf, sheet, { sideSep = true } = {}) {
-  const u = sheet.s * PX_MM;
+  const u = (sheet.cs || 1) * PX_MM;
   const M = sheet.M * PX_MM;
   const W = sheet.pageW * PX_MM;
   const H = sheet.pageH * PX_MM;
@@ -591,8 +591,9 @@ function drawGridPdf(pdf, grid, sheet) {
 
 function drawMapCornerLabel(pdf, framePx, text, sheet) {
   const F = toMm(framePx);
-  const u = sheet.s * PX_MM;
-  setFont(pdf, true, 11 * sheet.s);
+  const cs = sheet.cs || 1;
+  const u = cs * PX_MM;
+  setFont(pdf, true, 11 * cs);
   const padX = 4 * u;
   const padY = 2.2 * u;
   const tw = pdf.getTextWidth(cleanText(text));
@@ -870,7 +871,13 @@ function syncLayoutFromView() {
   if (right) right.hidden = !dual;
   if (tag) tag.textContent = dual ? 'Hiện trạng' : 'Vùng in';
   const live = $('printLayoutLive');
-  if (live) live.textContent = dual ? 'Bố cục: Hai ô so sánh' : `Bố cục: ${FRAME_LABEL[frameKind] || FRAME_LABEL.side}`;
+  if (live) {
+    if (dual) live.textContent = 'Bố cục: Hai ô so sánh';
+    else {
+      const a = previewAspect();
+      live.textContent = `Bố cục: ${FRAME_LABEL[frameKind] || FRAME_LABEL.side} · khung ${a.toFixed(2)}:1`;
+    }
+  }
 }
 
 /** Khung mặc định co theo khổ: A3 đầy chỗ trống; A0/4A0 nhỏ hơn để phóng đúng tỷ lệ in và thấy hoa văn TT16 */
