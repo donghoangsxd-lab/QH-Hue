@@ -3004,7 +3004,8 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
   transition: transform 0.25s ease, opacity 0.2s ease, visibility 0s linear 0.25s;
 }
 
-/* Lát cắt địa hình: phủ đúng panel dưới khi công cụ đang bật */
+/* Lát cắt địa hình: phủ đúng panel dưới khi công cụ đang bật.
+   Phải trên .bp-body (z-index 0) — sticky thead bảng đồ án có z-index tới 15 bên trong. */
 .tp-host {
   position: absolute;
   inset: 0;
@@ -3031,7 +3032,18 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
 .tp-stat { display: inline-flex; flex-direction: column; line-height: 1.15; }
 .tp-stat small { font-size: var(--fs-xs); color: var(--text-muted); }
 .tp-stat b { font-size: var(--fs-sm); color: var(--accent-cyan); font-variant-numeric: tabular-nums; }
-.profile-head .bp-btn { margin-left: auto; }
+.tp-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tp-scale-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--text-main);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.tp-scale-toggle input { accent-color: #fb923c; cursor: pointer; }
 .tp-chart { position: relative; flex: 1; min-height: 0; padding: 2px 6px 4px; }
 .tp-hint {
   position: absolute;
@@ -3084,13 +3096,15 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
   pointer-events: none;
 }
 
-/* 2 PHẦN: CƠ CẤU ĐẤT (HẸP) | BẢNG TỔNG HỢP (CO GIÃN) */
+/* 2 PHẦN: CƠ CẤU ĐẤT (HẸP) | BẢNG TỔNG HỢP (CO GIÃN)
+   z-index 0: cô lập sticky thead (11–15) để .tp-host không bị đè */
 .bp-body {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   box-sizing: border-box;
+  z-index: 0;
 }
 .bp-part { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .bp-part2 { border-left: 1px solid var(--border-color); }

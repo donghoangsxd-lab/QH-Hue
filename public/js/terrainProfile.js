@@ -1,6 +1,6 @@
 // Lát cắt địa hình trên panel dưới. Cao độ đọc từ ô Terrarium FABDEM (terrainLayer.js), bước ~30 m
-// đúng độ phân giải gốc. Trục X luôn 0 → chiều dài đường cắt; trục Y ôm dải cao độ của chính đường đó
-// (cửa sổ tối thiểu 4 m để đoạn đồng bằng không bị nhiễu DEM phóng thành núi).
+// đúng độ phân giải gốc. Trục X luôn 0 → chiều dài đường cắt. Mặc định trục Y ôm dải cao độ
+// (cửa sổ tối thiểu 4 m). Tick «Tỷ lệ 1:1» thì mét/pixel trục Y = trục X theo kích thước chartArea.
 import { loadElevTile, NATIVE_MAX_ZOOM, elevationSourceLabel } from './terrainLayer.js';
 import { setBottomPanelCollapsed } from './uiComponents.js';
 import { startTaskProgress } from './utils.js';
@@ -32,6 +32,10 @@ let timer = 0;
 let chart = null;
 let cursorKey = '';
 let loadTask = null;
+let trueScale = false;
+let lastProfile = null;
+let lastWin = null;
+let scalePending = false;
 const cursors = [];
 
 function cancelProgress() {
@@ -73,6 +77,14 @@ export function initTerrainProfile(mapList) {
   (mapList || []).filter(Boolean).forEach(m => {
     cursors.push({ layer: L.layerGroup().addTo(m) });
   });
+  const box = $('chkProfileScale1');
+  if (box) {
+    trueScale = !!box.checked;
+    box.addEventListener('change', () => {
+      trueScale = !!box.checked;
+      refreshYScale();
+    });
+  }
 }
 
 function fmtDist(m) {
@@ -134,6 +146,8 @@ function showCursor(sample) {
 function clearChart() {
   chart?.destroy();
   chart = null;
+  lastProfile = null;
+  lastWin = null;
   hideCursor();
 }
 
@@ -293,6 +307,53 @@ function yWindow(samples) {
   return { lo, hi, min: mid - span / 2 - pad, max: mid + span / 2 + pad };
 }
 
+/** Cửa sổ Y sao cho 1 m trên trục đứng = 1 m trên trục ngang theo pixel chartArea. */
+function yWindowTrue(samples, length, area) {
+  const fit = yWindow(samples);
+  if (!fit || !area || !(area.width > 0) || !(area.height > 0) || !(length > 0)) return fit;
+  const span = length * (area.height / area.width);
+  const mid = (fit.lo + fit.hi) / 2;
+  return { lo: fit.lo, hi: fit.hi, min: mid - span / 2, max: mid + span / 2 };
+}
+
+function yTitle() {
+  return trueScale ? 'Cao độ (m) · tỷ lệ 1:1' : 'Cao độ (m)';
+}
+
+function applyYScale(c) {
+  if (!lastProfile || !lastWin) return false;
+  const area = c.chartArea;
+  const win = trueScale ? yWindowTrue(lastProfile.samples, lastProfile.length, area) : lastWin;
+  if (!win) return false;
+  const y = c.options.scales.y;
+  const same = Math.abs(y.min - win.min) < 1e-6 && Math.abs(y.max - win.max) < 1e-6;
+  const title = yTitle();
+  const titleSame = y.title?.text === title;
+  if (same && titleSame) return false;
+  y.min = win.min;
+  y.max = win.max;
+  if (y.title) y.title.text = title;
+  return true;
+}
+
+function refreshYScale() {
+  if (!chart) return;
+  if (applyYScale(chart)) chart.update('none');
+}
+
+const trueScalePlugin = {
+  id: 'tpTrueScale',
+  afterLayout(c) {
+    if (!trueScale || !lastProfile || scalePending) return;
+    if (!applyYScale(c)) return;
+    scalePending = true;
+    requestAnimationFrame(() => {
+      scalePending = false;
+      if (chart === c && trueScale) c.update('none');
+    });
+  }
+};
+
 function axisColor(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
@@ -331,15 +392,21 @@ function drawChart(profile, win) {
     setHint('Không vẽ được biểu đồ.');
     return;
   }
+  lastProfile = profile;
+  lastWin = win;
   const data = profile.samples.map(s => ({ x: s.d, y: s.z }));
+  const yWin = trueScale && chart?.chartArea
+    ? (yWindowTrue(profile.samples, profile.length, chart.chartArea) || win)
+    : win;
   if (chart) {
     chart.$samples = profile.samples;
     chart.$length = profile.length;
     chart.data.datasets[0].data = data;
     chart.options.scales.x.max = profile.length;
     chart.options.scales.x.title.text = profile.length >= 1000 ? 'Khoảng cách (km)' : 'Khoảng cách (m)';
-    chart.options.scales.y.min = win.min;
-    chart.options.scales.y.max = win.max;
+    chart.options.scales.y.min = yWin.min;
+    chart.options.scales.y.max = yWin.max;
+    chart.options.scales.y.title.text = yTitle();
     hideCursor();
     chart.update('none');
     return;
@@ -367,7 +434,7 @@ function drawChart(profile, win) {
         clip: 6
       }]
     },
-    plugins: [crosshair],
+    plugins: [crosshair, trueScalePlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -434,11 +501,11 @@ function drawChart(profile, win) {
           grid: { color: 'rgba(255,255,255,0.06)' }
         },
         y: {
-          min: win.min,
-          max: win.max,
+          min: yWin.min,
+          max: yWin.max,
           title: {
             display: true,
-            text: 'Cao độ (m)',
+            text: yTitle(),
             color: muted,
             font: { family: font, size: 11 }
           },
