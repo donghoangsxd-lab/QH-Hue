@@ -298,12 +298,12 @@ const PT_PX = 1.6;
 const LINE_PT = 0.72;
 const DOT_R_PT = 0.36;
 // Khung ô ký hiệu Phụ lục: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt.
-// Trên bản đồ không lấy 2.76pt (≈ 4.4px) vì nét đó che lô hẹp. Trước khi làm sáng viền, quy hoạch là 1.8px
-// và hiện trạng là 1px, cùng màu tô. 1.8px thành lưới khi nhiều lô, nên quy hoạch còn 0.8px cùng màu tô.
+// Trên bản đồ không lấy 2.76pt (≈ 4.4px) vì nét đó che lô hẹp. Hiện trạng 1px; quy hoạch (QHDD/QHDH) 2px
+// cùng màu tô — dày hơn HT để phân biệt (có thể thành lưới khi nhiều lô hẹp).
 // Năm nhóm tối (an ninh, quốc phòng, ba loại rừng) trên nền vệ tinh dùng một nét 0.7px sáng hơn cùng hue, không quầng.
 const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
-const FRAME_PX = 0.8;
+const FRAME_PX = 2;
 const HT_FRAME_PX = 1;
 const THIN_LIGHT_PX = 0.7;
 const THIN_LIGHT_KEYS = new Set([
