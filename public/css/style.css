@@ -1187,12 +1187,13 @@ body.compare-on .map-title-split { display: inline-flex; }
   right: calc(var(--tb-btn) + 8px);
   top: calc(var(--info-top) - 12px);
   z-index: 2;
+  width: max-content;
   max-width: calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 36px);
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 6px;
   background: var(--bg-dark);
   backdrop-filter: var(--panel-blur);
   -webkit-backdrop-filter: var(--panel-blur);
@@ -1204,7 +1205,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 /* Công cụ đang bật: một nút ngay cạnh nút Phác thảo, cùng cỡ nút thanh công cụ */
 .sketch-pin { position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); z-index: 1; }
 .sketch-pin[hidden] { display: none !important; }
-.sketch-row { display: flex; align-items: center; gap: 2px; }
+.sketch-row { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
 .sketch-btn {
   width: 30px; height: 30px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1221,8 +1222,6 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .sketch-color.active { box-shadow: 0 0 0 2px var(--accent-cyan); }
 .sketch-sep { width: 1px; height: 20px; margin: 0 3px; background: var(--border-color); }
-.sketch-hint { max-width: 420px; padding: 0 4px 2px; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.35; }
-.sketch-hint:empty { display: none; }
 #map.sketch-mode, #mapPlan.sketch-mode { cursor: crosshair !important; }
 #map.sketch-text-mode, #mapPlan.sketch-text-mode { cursor: text !important; }
 .sketch-popup .leaflet-popup-content { margin: 6px; }
@@ -1262,7 +1261,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
 .sketch-sub select { height: 24px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); }
-.sketch-btn.sketch-telex, .sketch-btn.sketch-export, .sketch-btn.sketch-dash { width: auto; height: 24px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
+.sketch-btn.sketch-telex, .sketch-btn.sketch-export { width: auto; height: 28px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
 #map.sketch-moving, #mapPlan.sketch-moving { cursor: move !important; }
 /* Chữ phác thảo: cỡ cố định trên màn hình, viền tối để đọc được trên ảnh vệ tinh */
 .sketch-text { background: none; border: none; }
@@ -6905,7 +6904,7 @@ body.project-review.la-page #projectReviewHost {
     bottom: calc(50dvh + max(8px, var(--safe-bottom)));
     max-height: calc(50dvh - var(--info-top) - 16px);
   }
-  .sketch-palette { right: auto; width: min(360px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px)); flex-direction: row; flex-wrap: wrap; }
+  .sketch-palette { right: auto; width: min(280px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px)); flex-direction: column; flex-wrap: nowrap; }
   body .urban-focus-bar { top: calc(var(--info-top) + var(--stack-urban, 0px)) !important; }
   body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
   body #mapArea > .project-brief,

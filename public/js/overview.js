@@ -389,7 +389,7 @@ const SECTIONS = [
           '<b>Định vị GPS</b>: nhảy tới vị trí máy. <b>Chụp ảnh bản đồ</b>: lưu PNG khung đang xem.',
           '<b>Chép link khung nhìn</b>: chép đường dẫn vị trí, mức phóng, lớp đang bật và đồ án đang mở. Link không lưu trên máy chủ.',
           '<b>Đo diện tích</b> và <b>Đo chiều dài</b>: chấm đỉnh trên bản đồ. Bấm một phép đo đã xong để chọn, phím Delete để xóa phép đo đó. Bấm lại nút đo đang bật để xóa mọi kết quả. Backspace xóa đỉnh vừa chấm; đỉnh gần con trỏ sáng thì chuột phải xóa đỉnh đó. <b>Lát cắt địa hình</b>: chấm dọc tuyến, biểu đồ hiện ở panel dưới, tiêu đề <b>LÁT CẮT ĐỊA HÌNH</b>.',
-          '<b>Phác thảo</b>: mở bảng công cụ (đường, đa giác, chữ, màu, nét liền hoặc nét đứt). Bấm một hình để chọn (viền sáng), phím Delete để xóa hình đó. Chuột phải hình: <b>Di chuyển</b> rồi giữ chuột kéo cả hình. <b>Lưu phác thảo</b> rồi chọn <b>KML</b> hoặc <b>DXF</b>. Hình chỉ có trong phiên này.',
+          '<b>Phác thảo</b>: bảng nút biểu tượng (dụng cụ, màu, nét, nhập/lưu). Bấm hình để chọn, Delete để xóa. Chuột phải hình: <b>Di chuyển</b>. Lưu chọn <b>KML</b> hoặc <b>DXF</b>. Chỉ trong phiên này.',
           '<b>Xuất bản đồ</b>: khung xem trước hiện trên bản đồ. Chọn khổ <b>A4</b> đến <b>A0</b> và một dạng khung: trống, ghi chú bên phải, hoặc ghi chú ngang bên dưới. Sửa ô <b>Tiêu đề</b>, kéo bản đồ vào khung, kéo góc khung để đổi cỡ (giữ tỷ lệ, không lớn hơn màn hình), bấm <b>Xuất PDF</b>. <b>Hủy</b> để đóng. Đang chia đôi thì PDF có hai ô Hiện trạng và Quy hoạch.'
         ],
         facts: [

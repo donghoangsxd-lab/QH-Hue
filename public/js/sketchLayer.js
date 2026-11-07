@@ -62,20 +62,7 @@ const pxDist = (a, b) => {
 };
 const metersPerPixel = (lat, m) => 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, (m || map).getZoom() + 8);
 const textSize = () => Number($('sketchTextSize')?.value) || 16;
-const stateName = (m) => (m === planMap ? 'quy hoạch' : 'hiện trạng');
 const offsetSplit = () => isSplitOn() && getSplitKind() === 'offset';
-
-function targetPhrase() {
-  const shown = shownMaps();
-  if (shown.length > 1) return 'bản đồ đang bấm (quy hoạch hoặc hiện trạng)';
-  return shown[0] === planMap ? 'bản đồ quy hoạch' : 'bản đồ hiện trạng';
-}
-
-function toolHint(tool) {
-  if (!tool) return '';
-  const del = tool === 'text' ? '' : ' · đỉnh sáng gần con trỏ: chuột phải để xóa';
-  return `${TOOLS[tool].hint}${del} · vẽ trên ${targetPhrase()}`;
-}
 
 function hostOf(m) {
   if (!m) return null;
@@ -295,12 +282,11 @@ function renderDraft() {
   if (!draft) return;
   draft.clearLayers();
   const tool = TOOLS[state.sketchTool];
-  if (!tool || !pts.length) return setHint(tool ? toolHint(state.sketchTool) : '');
+  if (!tool || !pts.length) return;
   const lls = cursor ? [...pts, cursor] : pts.slice();
   if (lls.length >= 2) {
-    const { layers, text } = shapeLayers(state.sketchTool, lls, color, true, drawMap, dashed);
+    const { layers } = shapeLayers(state.sketchTool, lls, color, true, drawMap, dashed);
     layers.forEach(l => l.addTo(draft));
-    setHint(`${tool.label}: ${text} · ${stateName(drawMap)} · đỉnh sáng: chuột phải để xóa`);
   }
   const draw = { renderer: drawToolRenderer(drawMap), pane: DRAW_TOOL_PANE };
   pts.forEach((p, i) => L.circleMarker(p, {
@@ -457,13 +443,7 @@ function setEditChrome(on, m) {
   m?.getContainer()?.classList.toggle('sketch-editing', !!on);
 }
 
-function showEditHint() {
-  if (!live?.session.isEditing()) return;
-  const fg = live.fg;
-  const text = shapeMeasure(fg.sketch.tool, fg.sketch.pts);
-  const label = TOOLS[fg.sketch.tool]?.label || 'Hình';
-  setHint(`${label}: ${text}. Kéo đỉnh để dịch, kéo điểm giữa để chèn. Chuột phải đỉnh: Xóa đỉnh. Enter, bấm vùng trống hoặc Xong để ghi. Esc để hủy.`);
-}
+function showEditHint() {}
 
 function paintShape(fg) {
   const s = fg.sketch;
@@ -540,8 +520,6 @@ function finishAdjust() {
   clearHandles();
   setEditChrome(false, m);
   m.closePopup();
-  if (state.sketchTool) setHint(toolHint(state.sketchTool));
-  else setHint('');
 }
 
 function cancelAdjust() {
@@ -553,7 +531,6 @@ function cancelAdjust() {
   clearHandles();
   setEditChrome(false, m);
   m.closePopup();
-  setHint('Đã hủy điều chỉnh. Hình trở lại như lúc bắt đầu.');
 }
 
 function dropAdjust() {
@@ -589,16 +566,14 @@ function endMove(keep) {
   if (!keep) {
     session.fg.sketch.pts = session.base.map(p => L.latLng(p.lat, p.lng));
     placeMoved(session.fg);
-    setHint('Đã hủy di chuyển. Hình trở lại chỗ cũ.');
     return;
   }
-  setHint('Đã đặt hình.');
 }
 
 function startMove(fg) {
   if (!fg?.sketch) return;
   if (pts.length) {
-    setHint('Hãy kết thúc nét đang vẽ trước khi di chuyển hình.');
+    showToast('Hãy kết thúc nét đang vẽ trước khi di chuyển hình.', 'warn');
     return;
   }
   if (moveSession) endMove(true);
@@ -638,7 +613,6 @@ function startMove(fg) {
   document.addEventListener('mouseup', session.up, true);
   el.classList.add('sketch-moving');
   moveSession = session;
-  setHint('Giữ chuột và kéo để dịch cả hình. Thả để đặt. Esc để hủy.');
 }
 
 /** Click vùng trống khi đang Điều chỉnh: ghi hình và không chuyển tiếp cho công cụ khác. */
@@ -842,11 +816,6 @@ function onDblClick(e) {
   finish();
 }
 
-function setHint(text) {
-  const el = $('sketchHint');
-  if (el) el.textContent = text || (state.sketchTool ? '' : `Chọn công cụ để vẽ trên ${targetPhrase()} · hình chỉ có trong phiên này, người khác không thấy · bấm Lưu để tải KML / DXF`);
-}
-
 function syncButtons() {
   document.querySelectorAll('#sketchPalette [data-tool]').forEach(b => {
     const on = b.dataset.tool === state.sketchTool;
@@ -933,7 +902,7 @@ function syncBar() {
       const use = pin.querySelector('use');
       if (href && use) use.setAttribute('href', href);
       const label = TOOLS[state.sketchTool]?.label || 'Phác thảo';
-      pin.title = `${label} đang bật · bấm để mở lại bảng công cụ`;
+      pin.title = label;
       pin.setAttribute('aria-label', `${label}, mở lại bảng công cụ phác thảo`);
     }
   }
@@ -957,7 +926,6 @@ function setTool(tool) {
   syncMapChrome();
   setDrawAssist('sketch', !!tool && tool !== 'text');
   renderDraft();
-  setHint(tool ? toolHint(tool) : '');
   syncButtons();
 }
 
@@ -985,7 +953,6 @@ function setOpen(on) {
     collapsed = false;
     setTool(null);
   }
-  setHint('');
   syncButtons();
 }
 
@@ -995,7 +962,6 @@ async function importKmlFile(file) {
     pack = sketchShapesFromKml(await kmlTextFromFile(file));
   } catch (err) {
     const msg = err.message || 'Không nhập được file KML/KMZ.';
-    setHint(msg);
     showToast(`❌ ${msg}`, 'error');
     return;
   }
@@ -1016,10 +982,8 @@ async function importKmlFile(file) {
   const bounds = L.latLngBounds(pack.shapes.flatMap(s => s.pts.map(p => [p.lat, p.lng])));
   if (bounds.isValid()) host.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
   if (!open) setOpen(true);
-  const extra = pack.dropped ? ` Bỏ qua ${pack.dropped} hình (lỗi tọa độ hoặc vượt 400 hình).` : '';
-  const msg = `Đã nhập ${pack.shapes.length} hình từ ${file.name} vào phác thảo (chỉ phiên này).${extra}`;
-  setHint(msg);
-  showToast(`✓ Đã nhập ${pack.shapes.length} hình KML/KMZ`, 'success');
+  const extra = pack.dropped ? ` · bỏ qua ${pack.dropped}` : '';
+  showToast(`✓ Đã nhập ${pack.shapes.length} hình KML/KMZ${extra}`, 'success');
 }
 
 function saveAs(kind) {
@@ -1027,9 +991,7 @@ function saveAs(kind) {
   const items = shapes.map(fg => fg.sketch).filter(Boolean);
   if (!items.length) return;
   if (kind === 'dxf') exportDxf(items); else exportKml(items);
-  setHint(kind === 'dxf'
-    ? `Đã tải DXF (${items.length} hình, VN-2000 TT-Huế KTT 107°00', mét)`
-    : `Đã tải KML (${items.length} hình, WGS84)`);
+  showToast(`✓ Đã tải ${kind === 'dxf' ? 'DXF' : 'KML'} (${items.length} hình)`, 'success');
   const row = $('sketchSaveRow');
   if (row) row.hidden = true;
   syncButtons();
@@ -1051,8 +1013,6 @@ export function initSketchLayer() {
       drawMap = null;
       syncButtons();
     }
-    if (state.sketchTool && !pts.length && !editor) setHint(toolHint(state.sketchTool));
-    else if (open && !state.sketchTool && !pts.length) setHint('');
   });
 
   document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'sketch') tuckSketchBar(); });
