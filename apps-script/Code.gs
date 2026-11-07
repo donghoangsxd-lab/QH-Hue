@@ -730,6 +730,8 @@ const SYNC_HANDLER = "runScheduledSheetsSync";
 const SYNC_DELAY_MS = 5 * 1000;
 const SYNC_CAD_PROP = "PENDING_SYNC_CAD";
 const SYNC_PENDING_PROP = "PENDING_SHEETS_SYNC";
+const RETYPE_MAP_PROP = "PENDING_RETYPE_MAP";
+const SCRIPT_BUILD = "retype-fast-4";
 
 function scheduleSheetsSync(includeCad) {
   var props = PropertiesService.getScriptProperties();
@@ -747,6 +749,63 @@ function scheduleSheetsSync(includeCad) {
   }
 }
 
+function queueRetypeFollowup(fromId, toId, tabName) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var list = [];
+    try { list = JSON.parse(props.getProperty(RETYPE_MAP_PROP) || "[]") || []; } catch (e) { list = []; }
+    list.push({ from: fromId, to: toId, tab: String(tabName || "") });
+    props.setProperty(RETYPE_MAP_PROP, JSON.stringify(list));
+    props.setProperty(SYNC_CAD_PROP, "1");
+  } catch (err) {
+    Logger.log("⚠ queueRetypeFollowup: " + err.toString());
+  }
+}
+
+/** Đổi mã CAD_Polygon + DoAn_SaoLuu sau retype (chạy ngoài doPost). */
+function applyPendingRetypes(ss) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty(RETYPE_MAP_PROP);
+  if (!raw) return false;
+  props.deleteProperty(RETYPE_MAP_PROP);
+  var list = [];
+  try { list = JSON.parse(raw) || []; } catch (e) { return false; }
+  if (!list.length) return false;
+  var cadChanged = false;
+  list.forEach(function(item) {
+    var fromId = String(item.from || "").trim();
+    var toId = String(item.to || "").trim();
+    var tabName = String(item.tab || "").trim();
+    if (!fromId || !toId) return;
+    var suffixOf = function(v) {
+      var s = String(v || "").trim();
+      if (s === fromId) return "";
+      var rest = s.indexOf(fromId + ".") === 0 ? s.slice(fromId.length + 1) : "";
+      return /^\d+$/.test(rest) ? "." + rest : null;
+    };
+    if (rewriteColumn(ss.getSheetByName(CAD_SHEET_NAME), 0, function(v) {
+      var sfx = suffixOf(v);
+      return sfx === null ? null : toId + sfx;
+    }) > 0) cadChanged = true;
+    var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
+    if (bak && bak.getLastRow() > 1) {
+      var tabCol = BACKUP_HEADERS.indexOf("Tab");
+      var range = bak.getRange(2, tabCol + 1, bak.getLastRow() - 1, 2);
+      var pairs = range.getValues();
+      var changed = false;
+      pairs.forEach(function(p) {
+        var sfx = suffixOf(p[1]);
+        if (sfx === null) return;
+        if (tabName) p[0] = tabName;
+        p[1] = toId + sfx;
+        changed = true;
+      });
+      if (changed) range.setValues(pairs);
+    }
+  });
+  return cadChanged;
+}
+
 function runScheduledSheetsSync() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === SYNC_HANDLER) ScriptApp.deleteTrigger(t);
@@ -755,6 +814,8 @@ function runScheduledSheetsSync() {
   var includeCad = props.getProperty(SYNC_CAD_PROP) === "1";
   props.deleteProperty(SYNC_CAD_PROP);
   props.deleteProperty(SYNC_PENDING_PROP);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (applyPendingRetypes(ss)) includeCad = true;
   syncSheetsToGCS(includeCad);
 }
 
@@ -768,8 +829,27 @@ function flushSheetsSync(body) {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === SYNC_HANDLER) ScriptApp.deleteTrigger(t);
   });
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (applyPendingRetypes(ss)) includeCad = true;
   syncSheetsToGCS(includeCad);
-  return { "success": true, "synced": true, "includeCad": includeCad };
+  return { "success": true, "synced": true, "includeCad": includeCad, "script": SCRIPT_BUILD };
+}
+
+/** Tab có thể chứa ID (THCS-001 → tab 5-THCS) — tránh đọc mọi tab hạ tầng. */
+function candidateSheetsForId(ss, id) {
+  var code = String(id || "").trim().split("-")[0];
+  var out = [];
+  var seen = {};
+  VALID_PREFIXES.forEach(function(prefix) {
+    var mid = prefix.indexOf("-") >= 0 ? prefix.slice(prefix.indexOf("-") + 1) : prefix;
+    if (code !== mid && String(id).indexOf(mid + "-") !== 0 && String(id).indexOf(prefix) !== 0) return;
+    var sh = findInfraSheet(ss, prefix);
+    if (sh && !seen[sh.getSheetId()]) {
+      seen[sh.getSheetId()] = true;
+      out.push(sh);
+    }
+  });
+  return out;
 }
 
 function warmWebappCache() {
@@ -1893,7 +1973,7 @@ function doPost(e) {
     if (action === "saveHaTangHienTrang") return jsonOutput(saveHaTangHienTrang(body));
     if (action === "deleteHaTangHienTrang") return jsonOutput(deleteHaTangHienTrang(body));
     if (action === "getHaTangHienTrang") return jsonOutput(listHaTangHienTrang());
-    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "retype-defer-sync-3" });
+    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": SCRIPT_BUILD });
     if (action === "flushSheetsSync") return jsonOutput(flushSheetsSync(body));
     if (action === "runScheduledSheetsSync") return jsonOutput(flushSheetsSync(body));
     if (action === "addPendingPoints") {
@@ -3024,24 +3104,35 @@ function retypeInfraRow(body) {
   var target = null;
   var moved = 0;
   var dropped = [];
-  var cadChanged = 0;
 
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  lock.waitLock(8000);
   try {
     target = ensureInfraSheet(ss, type);
     if (!target) return { "error": "Sheet chưa có tab " + type };
-    var source = null, src = null, srcCol = null, rows = [];
-    var sheets = ss.getSheets();
-    for (var s = 0; s < sheets.length && !source; s++) {
-      var sh = sheets[s];
-      if (!isValidInfraSheet(sh.getName()) || sh.getLastRow() < 2) continue;
+    var source = null, src = null, srcFormulas = null, srcCol = null, rows = [];
+    // Chỉ đọc tab khớp tiền tố ID (không quét cả workbook — dễ vượt 30s Worker/CF)
+    var candidates = candidateSheetsForId(ss, id);
+    if (!candidates.length) {
+      ss.getSheets().forEach(function(sh) {
+        if (isValidInfraSheet(sh.getName()) && sh.getLastRow() >= 2) candidates.push(sh);
+      });
+    }
+    for (var s = 0; s < candidates.length && !source; s++) {
+      var sh = candidates[s];
+      if (sh.getLastRow() < 2) continue;
       var data = sh.getDataRange().getValues();
       var col = getColumnMap(data[0]);
       if (col.id < 0) continue;
       var hit = [];
       for (var r = 1; r < data.length; r++) if (suffixOf(data[r][col.id]) !== null) hit.push(r);
-      if (hit.length) { source = sh; src = data; srcCol = col; rows = hit; }
+      if (hit.length) {
+        source = sh;
+        src = data;
+        srcCol = col;
+        rows = hit;
+        srcFormulas = sh.getDataRange().getFormulas();
+      }
     }
     if (!source) return { "error": "Không tìm thấy ID công trình: " + id };
     if (source.getSheetId() === target.getSheetId()) return { "error": "Công trình " + id + " đã thuộc tab " + target.getName() };
@@ -3052,17 +3143,15 @@ function retypeInfraRow(body) {
     if (tgtCol.id < 0) return { "error": "Tab " + target.getName() + " thiếu cột ID_DoiTuong" };
     var tgtNorm = tgtHeaders.map(normalizeHeader);
     var srcNorm = src[0].map(normalizeHeader);
-    // Cột cùng nghĩa khác tên (QuyMo_S / QuyMo_HT, Note / GhiChu) khớp qua COLUMN_ALIASES, còn lại theo tên tiêu đề
     var colMap = {};
     srcNorm.forEach(function(h, i) { if (h && tgtNorm.indexOf(h) >= 0) colMap[i] = tgtNorm.indexOf(h); });
     Object.keys(COLUMN_ALIASES).forEach(function(k) { if (srcCol[k] >= 0 && tgtCol[k] >= 0) colMap[srcCol[k]] = tgtCol[k]; });
     newId = nextIdForSheet(target.getDataRange().getValues(), tgtCol.id, type.split('-')[1]);
 
     var width = src[0].length;
-    // Ghi fields kèm (nhóm, tên…) ngay khi chuyển tab — tránh writeInfraEdit quét lại toàn bộ sheet (dễ quá hạn doPost)
     var f = body.fields || {};
     var out = rows.map(function(r) {
-      var formulas = source.getRange(r + 1, 1, 1, width).getFormulas()[0];
+      var formulas = (srcFormulas && srcFormulas[r]) || [];
       var row = tgtHeaders.map(function() { return ''; });
       for (var i = 0; i < width; i++) {
         var v = formulas[i] || src[r][i];
@@ -3088,43 +3177,23 @@ function retypeInfraRow(body) {
     });
     var start = target.getLastRow() + 1;
     ensureSheetSize(target, start + out.length - 1, tgtHeaders.length);
-    // Ô văn bản: tọa độ không bị locale vi-VN đọc dấu chấm thành phân cách nghìn, GeoJSON không bị cắt
     ['lat', 'lng', 'geojson'].forEach(function(k) {
       if (tgtCol[k] >= 0) target.getRange(start, tgtCol[k] + 1, out.length, 1).setNumberFormat('@');
     });
     target.getRange(start, 1, out.length, tgtHeaders.length).setValues(out);
     deleteRowBlocks(source, rows.map(function(r) { return r + 1; }));
     moved = out.length;
-
-    cadChanged = rewriteColumn(ss.getSheetByName(CAD_SHEET_NAME), 0, function(v) {
-      var sfx = suffixOf(v);
-      return sfx === null ? null : newId + sfx;
-    });
-    var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
-    if (bak && bak.getLastRow() > 1) {
-      var tabCol = BACKUP_HEADERS.indexOf("Tab");
-      var range = bak.getRange(2, tabCol + 1, bak.getLastRow() - 1, 2);
-      var pairs = range.getValues();
-      var changed = false;
-      pairs.forEach(function(p) {
-        var sfx = suffixOf(p[1]);
-        if (sfx === null) return;
-        p[0] = String(target.getName()).trim();
-        p[1] = newId + sfx;
-        changed = true;
-      });
-      if (changed) range.setValues(pairs);
-    }
+    // CAD + backup + syncSheetsToGCS: để trigger nền (tránh 502 Worker ~30s)
+    queueRetypeFollowup(id, newId, target.getName());
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
-  // Không syncSheetsToGCS / writeInfraEdit đồng bộ trong doPost
-  scheduleSheetsSync(cadChanged > 0);
+  scheduleSheetsSync(true);
   return {
     "success": true, "id": id, "newId": newId, "tab": target.getName(), "rows": moved,
-    "dropped": dropped, "missing": [], "script": "retype-defer-sync-3"
+    "dropped": dropped, "missing": [], "script": SCRIPT_BUILD
   };
 }
 
