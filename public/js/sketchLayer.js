@@ -1,15 +1,15 @@
 // Phác thảo trên bản đồ đang xem (quy hoạch hoặc hiện trạng): đường thẳng, đường gấp khúc, đa giác, mũi tên, vòng tròn, chữ (nhiều dòng, gõ Telex).
 // Hình chỉ nằm trong bộ nhớ trang: không gửi máy chủ, không ghi Sheet / bucket / localStorage → người khác không thấy,
-// đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML hoặc DXF (sketchExport.js).
+// đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML / KMZ / DXF (sketchExport.js).
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
 import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_EVENT, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
-import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
+import { kmlTextFromFile, sketchShapesFromKml, KML_MAX_BYTES } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
-import { exportKml, exportDxf } from './sketchExport.js';
+import { exportKml, exportKmz, exportDxf, sketchShapesFromDxf } from './sketchExport.js';
 import { createSketchEditSession, isVertexShape } from './sketchEdit.js';
 import { createVertexHandles, vertexMenuButton as menuButton } from './vertexHandles.js';
 
@@ -61,7 +61,16 @@ const pxDist = (a, b) => {
   return m.latLngToContainerPoint(a).distanceTo(m.latLngToContainerPoint(b));
 };
 const metersPerPixel = (lat, m) => 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, (m || map).getZoom() + 8);
+const TEXT_SIZES = [
+  { v: 12, label: 'Nhỏ' },
+  { v: 16, label: 'Vừa' },
+  { v: 22, label: 'Lớn' },
+  { v: 30, label: 'Rất lớn' }
+];
 const textSize = () => Number($('sketchTextSize')?.value) || 16;
+const sizeLabel = () => TEXT_SIZES.find(o => o.v === textSize())?.label || 'Vừa';
+/** Cỡ đầu mũi tên tỉ lệ với cỡ chữ (mốc Vừa = 16px) */
+const arrowSizeScale = () => textSize() / 16;
 const offsetSplit = () => isSplitOn() && getSplitKind() === 'offset';
 
 function hostOf(m) {
@@ -141,15 +150,44 @@ function setSnap(index, m) {
   });
 }
 
-/** Đầu mũi tên (tam giác) tại b, cỡ theo chiều dài thân và vĩ độ (tính trên mặt phẳng Mercator) */
+/** Đầu mũi tên (tam giác) tại b; cỡ theo thân, vĩ độ và nút cỡ chữ */
 function arrowHead(a, b) {
   const pa = proj(a), pb = proj(b);
   const len = pa.distanceTo(pb);
   if (!len) return null;
-  const size = Math.min(len * 0.28, Math.max(len * 0.12, 12 / Math.cos(b.lat * Math.PI / 180)));
+  const scale = arrowSizeScale();
+  const size = Math.min(len * 0.28, Math.max(len * 0.12, 12 / Math.cos(b.lat * Math.PI / 180))) * scale;
   const ux = (pb.x - pa.x) / len, uy = (pb.y - pa.y) / len;
   const bx = pb.x - ux * size, by = pb.y - uy * size, w = size * 0.55;
   return [b, unproj(L.point(bx - uy * w, by + ux * w)), unproj(L.point(bx + uy * w, by - ux * w))];
+}
+
+function syncSizeBtn() {
+  const btn = $('btnSketchSize');
+  if (!btn) return;
+  const tip = `Cỡ chữ / đầu mũi tên: ${sizeLabel()}`;
+  btn.title = tip;
+  btn.setAttribute('aria-label', tip);
+}
+
+function applySketchSize() {
+  if (editor) { editor.sizePx = textSize(); refocusEditor(); }
+  if (pts.length) renderDraft();
+  shapes.forEach(fg => {
+    if (fg?.sketch?.tool !== 'arrow' || !fg.sketch.lls || fg.sketch.lls.length < 2) return;
+    fg.sketch.head = arrowHead(fg.sketch.lls[0], fg.sketch.lls[1]);
+    paintShape(fg);
+  });
+  syncSizeBtn();
+}
+
+function cycleSketchSize() {
+  const sel = $('sketchTextSize');
+  if (!sel) return;
+  const i = TEXT_SIZES.findIndex(o => o.v === textSize());
+  const next = TEXT_SIZES[(i + 1) % TEXT_SIZES.length];
+  sel.value = String(next.v);
+  applySketchSize();
 }
 
 function shapeMeasure(tool, lls) {
@@ -842,6 +880,7 @@ function syncButtons() {
     telexBtn.classList.toggle('active', telexOn);
     telexBtn.setAttribute('aria-pressed', String(telexOn));
   }
+  syncSizeBtn();
   const btn = $('btnSketch');
   if (btn) {
     btn.classList.toggle('active', open);
@@ -956,12 +995,20 @@ function setOpen(on) {
   syncButtons();
 }
 
-async function importKmlFile(file) {
+async function importSketchFile(file) {
+  const name = String(file.name || '');
   let pack;
+  let kind = 'KML/KMZ';
   try {
-    pack = sketchShapesFromKml(await kmlTextFromFile(file));
+    if (/\.dxf$/i.test(name)) {
+      kind = 'DXF';
+      if (file.size > KML_MAX_BYTES) throw new Error('File lớn hơn 8 MB. Rút gọn hình rồi nhập lại.');
+      pack = sketchShapesFromDxf(await file.text());
+    } else {
+      pack = sketchShapesFromKml(await kmlTextFromFile(file));
+    }
   } catch (err) {
-    const msg = err.message || 'Không nhập được file KML/KMZ.';
+    const msg = err.message || `Không nhập được file ${kind}.`;
     showToast(`❌ ${msg}`, 'error');
     return;
   }
@@ -976,6 +1023,7 @@ async function importKmlFile(file) {
     const { layers, text } = shapeLayers(s.tool, lls, c, false, host, !!s.dash);
     const fg = L.featureGroup(layers);
     fg.sketch = { tool: s.tool, pts: lls, color: c, dash: !!s.dash };
+    if (s.tool === 'arrow' && lls.length === 2) fg.sketch.head = arrowHead(lls[0], lls[1]);
     fg.bindTooltip(shapeTip(s.tool, text), { sticky: true, className: 'sketch-tip' });
     addShape(fg, host);
   }
@@ -983,15 +1031,18 @@ async function importKmlFile(file) {
   if (bounds.isValid()) host.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
   if (!open) setOpen(true);
   const extra = pack.dropped ? ` · bỏ qua ${pack.dropped}` : '';
-  showToast(`✓ Đã nhập ${pack.shapes.length} hình KML/KMZ${extra}`, 'success');
+  showToast(`✓ Đã nhập ${pack.shapes.length} hình ${kind}${extra}`, 'success');
 }
 
 function saveAs(kind) {
   closeEditor(true);
   const items = shapes.map(fg => fg.sketch).filter(Boolean);
   if (!items.length) return;
-  if (kind === 'dxf') exportDxf(items); else exportKml(items);
-  showToast(`✓ Đã tải ${kind === 'dxf' ? 'DXF' : 'KML'} (${items.length} hình)`, 'success');
+  if (kind === 'dxf') exportDxf(items);
+  else if (kind === 'kmz') exportKmz(items);
+  else exportKml(items);
+  const label = kind === 'dxf' ? 'DXF' : kind === 'kmz' ? 'KMZ' : 'KML';
+  showToast(`✓ Đã tải ${label} (${items.length} hình)`, 'success');
   const row = $('sketchSaveRow');
   if (row) row.hidden = true;
   syncButtons();
@@ -1031,9 +1082,7 @@ export function initSketchLayer() {
     if (e.detail === 'measure') releaseSketchSelection();
   });
   document.addEventListener('keydown', onSketchDeleteKey);
-  $('sketchTextSize')?.addEventListener('change', () => {
-    if (editor) { editor.sizePx = textSize(); refocusEditor(); }
-  });
+  $('sketchTextSize')?.addEventListener('change', applySketchSize);
   pal?.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tool]');
     if (t) { setTool(state.sketchTool === t.dataset.tool ? null : t.dataset.tool); return; }
@@ -1084,13 +1133,14 @@ export function initSketchLayer() {
       }
       return;
     }
+    if (e.target.closest('#btnSketchSize')) { cycleSketchSize(); return; }
     if (e.target.closest('#btnSketchImport')) {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz';
+      input.accept = '.kml,.kmz,.dxf,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/dxf,image/vnd.dxf';
       input.addEventListener('change', () => {
         const file = input.files && input.files[0];
-        if (file) importKmlFile(file);
+        if (file) importSketchFile(file);
       });
       input.click();
       return;
