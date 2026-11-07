@@ -1,7 +1,10 @@
-// Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A4–A0,
+// Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A3–4A0,
 // lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật và cấp quy hoạch đang chọn.
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ô vệ tinh / canvas đường phố, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
+// Chữ và cột ghi chú dùng chromeScale (tăng chậm theo khổ) để A0/4A0 không phình chữ như khi nhân tuyến tính theo bề ngang tờ.
+// Khổ lớn hơn → khung xem trước mặc định nhỏ hơn (tỷ lệ cạnh A3): tránh khung full màn hình khiến zoom thấp, không thấy hoa văn TT16.
+// Khi xuất: ép hoa văn TT16 lên canvas Leaflet rồi chụp canvas đó vào PDF (vector không vẽ lại được CanvasPattern).
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { map, popLayerMeta } from './mapEngine.js';
@@ -12,7 +15,7 @@ import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
 import { basemapLabel, isLightBasemap, whenBasemapSettled } from './basemap.js';
 import { getLevel, levelChk, LEVELS } from './mapLevel.js';
-import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss } from './tt16Symbols.js';
+import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss, setPrintTt16Detail, tt16Detailed } from './tt16Symbols.js';
 import {
   PX_MM, loadPrintFonts, createPdf, cleanText, setFont, setAlpha, withClip, parseColor,
   vectorContainers, captureVectorGroups, drawMapPaths, drawDom
@@ -22,24 +25,29 @@ import { escapeHtml, distanceMeters, loadHtml2Canvas, loadJsPdf, showToast, inli
 const CITY_NAME = 'Thành phố Huế';
 const SKIP_CLASSES = ['leaflet-control-container', 'leaflet-popup-pane', 'leaflet-tooltip-pane'];
 
-// Tờ A3 ngang ở 96 dpi (420 × 297 mm); khổ lớn hơn nhân theo bề ngang tờ, khung bản đồ giữ đúng tỷ lệ A3
+// Tờ A3 ngang ở 96 dpi (420 × 297 mm); khổ lớn hơn nhân lề/khung theo bề ngang; chữ và cột ghi chú dùng chromeScale
 const DPI = 96;
 const A3 = { pageW: 1587, pageH: 1122, m: 24, side: 372, gutX: 44, gutY: 36 };
 const PAPERS = [
   { id: 'a3', label: 'A3', wMm: 420, hMm: 297 },
-  { id: 'a4', label: 'A4', wMm: 297, hMm: 210 },
   { id: 'a2', label: 'A2', wMm: 594, hMm: 420 },
   { id: 'a1', label: 'A1', wMm: 841, hMm: 594 },
-  { id: 'a0', label: 'A0', wMm: 1189, hMm: 841 }
+  { id: 'a0', label: 'A0', wMm: 1189, hMm: 841 },
+  { id: '2a0', label: '2A0', wMm: 1682, hMm: 1189 },
+  { id: '4a0', label: '4A0', wMm: 2378, hMm: 1682 }
 ];
 const FRAME_ASPECT = (A3.pageW - A3.side - 2 * A3.m - 2 * A3.gutX) / (A3.pageH - 2 * A3.m - 2 * A3.gutY);
-// Bố cục hai ô (chia đôi): dải tiêu đề ~8%, ghi chú ~23%, phần giữa chia đôi cho HT | QH
+/** Hệ số chữ + bề rộng cột ghi chú: tăng chậm theo khổ (A0 ~1.4× A3, không ~2.8×) */
+function chromeScale(s) {
+  return Math.pow(Math.max(s, 1e-6), 0.35);
+}
+// Bố cục hai ô (chia đôi): dải tiêu đề ~8%, dải ghi chú gọn ~14%, phần giữa chia đôi cho HT | QH
 const A3_DUAL = (() => {
   const { pageW, pageH, m: M } = A3;
   const gap = A3.gutX;
   const sec = 20;
   const titleH = Math.round((pageH - 2 * M) * 0.08);
-  const notesH = Math.round((pageH - 2 * M) * 0.23);
+  const notesH = Math.round((pageH - 2 * M) * 0.14);
   const mapsY = M + titleH + sec;
   const notesY = pageH - M - notesH;
   const mapsH = notesY - mapsY - sec;
@@ -84,13 +92,15 @@ let dockBound = false;
 let frameObserver = null;
 let classObserver = null;
 
-const FRAME_LABEL = { plain: 'Khung trống', side: 'Ghi chú bên phải', bottom: 'Ghi chú bên dưới' };
+const FRAME_LABEL = { plain: 'Khung trống', side: 'Ghi chú bên phải' };
+const DEFAULT_NOTE = 'Bản đồ phục vụ tham khảo, không thay thế hồ sơ quy hoạch được phê duyệt.';
 
 function sheetOf(id, kind = frameKind) {
   const paper = PAPERS.find(p => p.id === id) || PAPERS[0];
   const pageW = Math.floor(paper.wMm / 25.4 * DPI);
   const pageH = Math.floor(paper.hMm / 25.4 * DPI);
   const s = pageW / A3.pageW;
+  const cs = chromeScale(s);
   const M = A3.m * s;
   const GUT_X = A3.gutX * s;
   const GUT_Y = A3.gutY * s;
@@ -103,30 +113,20 @@ function sheetOf(id, kind = frameKind) {
     let h = w / aspect;
     if (h > maxH) { h = maxH; w = h * aspect; }
     return {
-      paper, pageW, pageH, s, M, SIDE_W: 0, GUT_X: gut, GUT_Y: gut, dual: false, kind,
+      paper, pageW, pageH, s, cs, M, SIDE_W: 0, GUT_X: gut, GUT_Y: gut, dual: false, kind,
       notesBand: null,
       frame: { x: M + gut + (maxW - w) / 2, y: M + gut + (maxH - h) / 2, w, h }
     };
   }
-  if (kind === 'bottom') {
-    const notesH = Math.round((pageH - 2 * M) * 0.26);
-    const gap = 18 * s;
-    const notesY = pageH - M - notesH;
-    const y = M + GUT_Y;
-    return {
-      paper, pageW, pageH, s, M, SIDE_W: 0, GUT_X, GUT_Y, dual: false, kind,
-      notesBand: { x: M, y: notesY, w: pageW - 2 * M, h: notesH },
-      frame: { x: M + GUT_X, y, w: pageW - 2 * M - 2 * GUT_X, h: notesY - gap - y }
-    };
-  }
-  const SIDE_W = A3.side * s;
+  // Cột ghi chú: bề rộng theo chromeScale, tối đa ~22% tờ — khổ lớn không chiếm gần 1/3 trang
+  const SIDE_W = Math.min(A3.side * cs, pageW * 0.22);
   const maxW = pageW - SIDE_W - 2 * M - 2 * GUT_X;
   const maxH = pageH - 2 * M - 2 * GUT_Y;
   let w = maxW;
   let h = w / FRAME_ASPECT;
   if (h > maxH) { h = maxH; w = h * FRAME_ASPECT; }
   return {
-    paper, pageW, pageH, s, M, SIDE_W, GUT_X, GUT_Y, dual: false, kind, notesBand: null,
+    paper, pageW, pageH, s, cs, M, SIDE_W, GUT_X, GUT_Y, dual: false, kind: 'side', notesBand: null,
     frame: { x: M + GUT_X + (maxW - w) / 2, y: M + GUT_Y + (maxH - h) / 2, w, h }
   };
 }
@@ -142,11 +142,12 @@ function sheetOfDual(id) {
   const pageW = Math.floor(paper.wMm / 25.4 * DPI);
   const pageH = Math.floor(paper.hMm / 25.4 * DPI);
   const s = pageW / A3.pageW;
+  const cs = chromeScale(s);
   const sc = (r) => ({ x: r.x * s, y: r.y * s, w: r.w * s, h: r.h * s });
   const left = sc(A3_DUAL.left);
   const right = sc(A3_DUAL.right);
   return {
-    paper, pageW, pageH, s,
+    paper, pageW, pageH, s, cs,
     M: A3.m * s, SIDE_W: 0, GUT_X: A3_DUAL.gap * s, GUT_Y: A3_DUAL.sec * s, dual: true,
     titleBand: sc(A3_DUAL.title),
     notesBand: sc(A3_DUAL.notes),
@@ -684,7 +685,7 @@ function legendRows(s) {
   return level.join('') + (rest ? `<div class="pa3-lg-head">Hạ tầng và lớp chuyên đề</div>${rest}` : '');
 }
 
-/** Thu cỡ chữ chú giải đến khi vừa khung; dual (ngang) thử từ 3–5 cột */
+/** Thu cỡ chữ chú giải đến khi vừa khung; ưu tiên nhiều cột để chừa chỗ ô ghi chú */
 function fitLegend(page, dual = false) {
   const box = page.querySelector('.pa3-legend');
   const lg = page.querySelector('.pa3-lg');
@@ -692,11 +693,11 @@ function fitLegend(page, dual = false) {
   const fits = () => box.scrollHeight <= box.clientHeight + 1;
   if (fits()) return;
   const plans = dual
-    ? [[4, 0.7], [5, 0.55], [3, 0.55]]
-    : [[2, 0.85], [3, 0.6]];
+    ? [[5, 0.55], [6, 0.5], [4, 0.55], [3, 0.5]]
+    : [[3, 0.7], [2, 0.75], [4, 0.55]];
   for (const [cols, min] of plans) {
     lg.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-    for (let f = dual ? 1.05 : 1.15; f >= min - 1e-6; f -= 0.05) {
+    for (let f = dual ? 0.95 : 1.05; f >= min - 1e-6; f -= 0.05) {
       lg.style.fontSize = `${f.toFixed(2)}em`;
       if (fits()) return;
     }
@@ -731,12 +732,19 @@ function scaleBarHtml(lenM, px) {
 
 function printMetaHtml(sheet, gridStep, date) {
   return `<div class="pa3-info">
-        <div><b>Khổ giấy:</b> ${sheet.paper.label} ngang</div>
-        <div><b>Hệ tọa độ:</b> VN-2000, KTT 107°00', múi 3° – lưới ${dotted(gridStep)} m</div>
-        <div><b>Ảnh nền:</b> ${escapeHtml(basemapLabel())}</div>
-        <div><b>Dữ liệu:</b> Hạ tầng đô thị TP. Huế (Sở Xây dựng), mạng lưới đường OpenStreetMap</div>
-        <div><b>Ngày xuất:</b> ${date}</div>
-        <div class="pa3-note">Bản đồ phục vụ tham khảo, không thay thế hồ sơ quy hoạch được phê duyệt.</div>
+        <div><b>Khổ:</b> ${sheet.paper.label} ngang</div>
+        <div><b>TN:</b> VN-2000, KTT 107°00', múi 3° – lưới ${dotted(gridStep)} m</div>
+        <div><b>Nền:</b> ${escapeHtml(basemapLabel())}</div>
+        <div><b>Nguồn:</b> Hạ tầng đô thị TP. Huế (Sở XD), OSM</div>
+        <div><b>Ngày:</b> ${date}</div>
+      </div>`;
+}
+
+function notesBoxHtml(note) {
+  const text = (note || '').trim() || DEFAULT_NOTE;
+  return `<div class="pa3-notes-box">
+        <div class="pa3-sec">GHI CHÚ</div>
+        <div class="pa3-notes-body">${escapeHtml(text)}</div>
       </div>`;
 }
 
@@ -747,18 +755,19 @@ function printStamp() {
 }
 
 /** Phần HTML của tờ in (cột thông tin, nhãn so sánh); dàn trang bằng font in rồi chép sang PDF qua drawDom */
-function sideHtml({ title, place, gridStep, splitX, frameW, scale, sheet }) {
+function sideHtml({ title, place, note, gridStep, splitX, frameW, scale, sheet }) {
   const F = sheet.frame;
-  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 260 * sheet.s).pop() || NICE_STEPS[0];
+  const cs = sheet.cs || 1;
+  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 260 * cs).pop() || NICE_STEPS[0];
   const date = printStamp();
   const sideX = sheet.pageW - sheet.M - sheet.SIDE_W;
-  const pad = 16 * sheet.s;
+  const pad = 12 * cs;
   const compare = splitX != null
     ? `<div class="pa3-split" style="left:${F.x + splitX * F.w / frameW}px; top:${F.y}px; height:${F.h}px"></div>
-       <div class="pa3-split-lbl" style="left:${F.x + 10 * sheet.s}px; top:${F.y + 10 * sheet.s}px">HIỆN TRẠNG</div>
-       <div class="pa3-split-lbl" style="left:${F.x + F.w - 10 * sheet.s}px; top:${F.y + 10 * sheet.s}px; transform:translateX(-100%)">QUY HOẠCH</div>`
+       <div class="pa3-split-lbl" style="left:${F.x + 10 * cs}px; top:${F.y + 10 * cs}px">HIỆN TRẠNG</div>
+       <div class="pa3-split-lbl" style="left:${F.x + F.w - 10 * cs}px; top:${F.y + 10 * cs}px; transform:translateX(-100%)">QUY HOẠCH</div>`
     : '';
-  return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * sheet.s).toFixed(2)}px">
+  return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * cs).toFixed(2)}px">
     ${compare}
     <div class="pa3-side" style="left:${sideX + pad}px; top:${sheet.M + pad}px; width:${sheet.SIDE_W - 2 * pad}px; height:${sheet.pageH - 2 * sheet.M - 2 * pad}px">
       <div class="pa3-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b><i class="pa3-org-rule"></i></div>
@@ -774,27 +783,33 @@ function sideHtml({ title, place, gridStep, splitX, frameW, scale, sheet }) {
       </div>
       <div class="pa3-legend">
         <div class="pa3-sec">CHÚ GIẢI</div>
-        <div class="pa3-lg">${legendRows(sheet.s) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
+        <div class="pa3-lg">${legendRows(cs) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
       </div>
+      ${notesBoxHtml(note)}
       ${printMetaHtml(sheet, gridStep, date)}
     </div>
   </div>`;
 }
 
-/** Tờ dual: tiêu đề trên, ghi chú ngang dưới (cùng nội dung cột phải, xếp ngang) */
-function dualPageHtml({ title, place, gridStep, scale, sheet }) {
+/** Tờ dual: tiêu đề trên; dải dưới = chú giải gọn + ô ghi chú + meta */
+function dualPageHtml({ title, place, note, gridStep, scale, sheet }) {
   const T = sheet.titleBand;
   const N = sheet.notesBand;
-  const pad = 10 * sheet.s;
-  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 180 * sheet.s).pop() || NICE_STEPS[0];
+  const cs = sheet.cs || 1;
+  const pad = 8 * cs;
+  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 180 * cs).pop() || NICE_STEPS[0];
   const date = printStamp();
-  return `<div class="pa3-page pa3-vector pa3-dual" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * sheet.s).toFixed(2)}px">
+  return `<div class="pa3-page pa3-vector pa3-dual" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * cs).toFixed(2)}px">
     <div class="pa3-dual-title" style="left:${T.x + pad}px; top:${T.y}px; width:${T.w - 2 * pad}px; height:${T.h}px">
       <div class="pa3-org pa3-dual-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b></div>
       <div class="pa3-title">${escapeHtml(title)}</div>
       <div class="pa3-place">${escapeHtml(place)}</div>
     </div>
     <div class="pa3-dual-notes" style="left:${N.x + pad}px; top:${N.y + pad * 0.4}px; width:${N.w - 2 * pad}px; height:${N.h - pad * 0.8}px">
+      <div class="pa3-legend">
+        <div class="pa3-sec">CHÚ GIẢI</div>
+        <div class="pa3-lg">${legendRows(cs) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
+      </div>
       <div class="pa3-dual-meta">
         <div class="pa3-scale-block pa3-dual-scale">
           <div class="pa3-north">${NORTH_SVG}</div>
@@ -804,11 +819,8 @@ function dualPageHtml({ title, place, gridStep, scale, sheet }) {
             <div class="pa3-ratio-note">(khi in đúng khổ ${sheet.paper.label})</div>
           </div>
         </div>
+        ${notesBoxHtml(note)}
         ${printMetaHtml(sheet, gridStep, date)}
-      </div>
-      <div class="pa3-legend">
-        <div class="pa3-sec">CHÚ GIẢI</div>
-        <div class="pa3-lg">${legendRows(sheet.s) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
       </div>
     </div>
   </div>`;
@@ -816,44 +828,16 @@ function dualPageHtml({ title, place, gridStep, scale, sheet }) {
 
 function plainPageHtml({ title, sheet }) {
   const F = sheet.frame;
-  return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(12 * sheet.s).toFixed(2)}px">
-    <div class="pa3-plain-title" style="left:${F.x}px; top:${F.y + 14 * sheet.s}px; width:${F.w}px">
+  const cs = sheet.cs || 1;
+  return `<div class="pa3-page pa3-vector" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(12 * cs).toFixed(2)}px">
+    <div class="pa3-plain-title" style="left:${F.x}px; top:${F.y + 14 * cs}px; width:${F.w}px">
       <b>${escapeHtml(title)}</b>
-    </div>
-  </div>`;
-}
-
-function bottomPageHtml({ title, place, gridStep, scale, sheet }) {
-  const N = sheet.notesBand;
-  const pad = 10 * sheet.s;
-  const lenM = NICE_STEPS.filter(step => step / scale.mPerFramePx <= 180 * sheet.s).pop() || NICE_STEPS[0];
-  const date = printStamp();
-  return `<div class="pa3-page pa3-vector pa3-dual" style="width:${sheet.pageW}px; height:${sheet.pageH}px; font-size:${(10 * sheet.s).toFixed(2)}px">
-    <div class="pa3-dual-notes" style="left:${N.x + pad}px; top:${N.y + pad * 0.4}px; width:${N.w - 2 * pad}px; height:${N.h - pad * 0.8}px">
-      <div class="pa3-bottom-id">
-        <div class="pa3-org pa3-dual-org"><div>UBND THÀNH PHỐ HUẾ</div><b>SỞ XÂY DỰNG</b></div>
-        <div class="pa3-title">${escapeHtml(title)}</div>
-        <div class="pa3-place">${escapeHtml(place)}</div>
-        <div class="pa3-scale-block pa3-dual-scale">
-          <div class="pa3-north">${NORTH_SVG}</div>
-          <div class="pa3-scale">
-            <div class="pa3-ratio">Tỷ lệ 1:${dotted(scale.ratio)}</div>
-            ${scaleBarHtml(lenM, lenM / scale.mPerFramePx)}
-          </div>
-        </div>
-      </div>
-      <div class="pa3-legend">
-        <div class="pa3-sec">CHÚ GIẢI</div>
-        <div class="pa3-lg">${legendRows(sheet.s) || '<div class="pa3-lg-row">Không bật lớp chuyên đề nào</div>'}</div>
-      </div>
-      ${printMetaHtml(sheet, gridStep, date)}
     </div>
   </div>`;
 }
 
 function pageHtml(kind, pack) {
   if (kind === 'plain') return plainPageHtml(pack);
-  if (kind === 'bottom') return bottomPageHtml(pack);
   return sideHtml(pack);
 }
 
@@ -889,6 +873,13 @@ function syncLayoutFromView() {
   if (live) live.textContent = dual ? 'Bố cục: Hai ô so sánh' : `Bố cục: ${FRAME_LABEL[frameKind] || FRAME_LABEL.side}`;
 }
 
+/** Khung mặc định co theo khổ: A3 đầy chỗ trống; A0/4A0 nhỏ hơn để phóng đúng tỷ lệ in và thấy hoa văn TT16 */
+function paperFrameScale() {
+  const paper = PAPERS.find(p => p.id === paperId) || PAPERS[0];
+  const a3 = PAPERS.find(p => p.id === 'a3') || PAPERS[0];
+  return Math.min(1, a3.wMm / paper.wMm);
+}
+
 function placeFrame() {
   if (!previewOn || busy) return;
   const area = $('mapArea');
@@ -900,22 +891,25 @@ function placeFrame() {
   const areaRect = area.getBoundingClientRect();
   const panel = $('rightPanel');
   let padR = 16;
+  if (dock) {
+    const dr = dock.getBoundingClientRect();
+    if (dr.width > 40 && dr.left < areaRect.right) padR = Math.max(padR, areaRect.right - dr.left + 12);
+  }
   if (panel && !document.body.classList.contains('right-collapsed')) {
     const pr = panel.getBoundingClientRect();
-    if (pr.width > 20 && pr.left < areaRect.right) padR = Math.max(16, areaRect.right - pr.left + 10);
+    if (pr.width > 20 && pr.left < areaRect.right) padR = Math.max(padR, areaRect.right - pr.left + 10);
   }
   const padT = 72;
   const padL = 64;
   if (document.body.classList.contains('bottom-collapsed')) padR = Math.max(padR, 72);
-  const padB = (dock?.offsetHeight || 120) + 20;
+  const padB = 20;
   if (dock) {
-    const freeW = Math.max(220, area.clientWidth - padL - padR);
-    const dockW = Math.min(520, freeW);
-    dock.style.left = `${padL + (freeW - dockW) / 2}px`;
-    dock.style.width = `${dockW}px`;
-    dock.style.right = 'auto';
-    dock.style.transform = 'none';
+    dock.style.left = '';
+    dock.style.width = '';
+    dock.style.right = '';
+    dock.style.transform = '';
   }
+  const paperScale = paperFrameScale();
   const availH = Math.max(120, area.clientHeight - padT - padB);
   const setBox = (el, x, y, w, h) => {
     el.style.left = `${x}px`;
@@ -934,7 +928,8 @@ function placeFrame() {
     const rightW = Math.max(80, area.clientWidth - padR - rightX);
     const aspect = previewAspect();
     const maxW = Math.min(leftW, rightW);
-    let w = frameUser ? frameUser.w : maxW;
+    const defW = Math.max(160, maxW * paperScale);
+    let w = frameUser ? frameUser.w : defW;
     let h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
     if (w > maxW) { w = maxW; h = w / aspect; }
@@ -946,7 +941,8 @@ function placeFrame() {
   } else {
     const availW = Math.max(120, area.clientWidth - padL - padR);
     const aspect = previewAspect();
-    let w = frameUser ? frameUser.w : availW;
+    const defW = Math.max(160, Math.min(availW, availW * paperScale));
+    let w = frameUser ? frameUser.w : defW;
     let h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
     if (w > availW) { w = availW; h = w / aspect; }
@@ -972,24 +968,30 @@ function updateLiveScale() {
   if (!rect || rect.w < 20) return;
   const sheet = activeSheet();
   const scale = scaleInfo(rect, sheet.frame.w);
-  el.textContent = `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)}`;
+  const z = viewMap()?.getZoom?.() ?? 0;
+  const needZoom = scale.ratio <= 5000 && !tt16Detailed(z);
+  el.textContent = needZoom
+    ? `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)} · phóng gần hơn để thấy hoa văn`
+    : `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)}`;
 }
 
 function setPaper(id) {
   if (!PAPERS.some(p => p.id === id)) return;
   paperId = id;
+  frameUser = null;
   document.querySelectorAll('.print-sizes button[data-paper]').forEach(btn => {
     btn.setAttribute('aria-pressed', String(btn.dataset.paper === id));
   });
-  updateLiveScale();
+  if (previewOn) placeFrame();
+  else updateLiveScale();
 }
 
 function setFrameKind(id) {
-  if (!FRAME_LABEL[id]) return;
-  frameKind = id;
+  const kind = FRAME_LABEL[id] ? id : 'side';
+  frameKind = kind;
   frameUser = null;
   document.querySelectorAll('.print-frames button').forEach(btn => {
-    btn.setAttribute('aria-pressed', String(btn.dataset.frame === id));
+    btn.setAttribute('aria-pressed', String(btn.dataset.frame === kind));
   });
   if (previewOn) placeFrame();
 }
@@ -1118,24 +1120,65 @@ function closePreview() {
 }
 
 /** Nét SVG phác thảo / đo vẽ sau ảnh icon: chữ phác thảo là marker, nằm trong ảnh đó */
-function paintVectors(pdf, m, full, F, groups) {
+function paintVectors(pdf, m, full, F, groups, opts) {
   if (!groups.length) return;
-  withClip(pdf, F, () => drawMapPaths(pdf, m, full, F, groups));
+  withClip(pdf, F, () => drawMapPaths(pdf, m, full, F, groups, opts));
 }
 
-/** Vẽ một ô bản đồ (nền + vector + icon) vào framePx */
+/** Canvas renderer Leaflet (tô đất / hoa văn TT16) — chụp vào PDF vì jsPDF không vẽ CanvasPattern */
+function leafletPathCanvases(m) {
+  const seen = new Set();
+  const out = [];
+  m?.eachLayer(l => {
+    if (!(l instanceof L.Path)) return;
+    const c = l._renderer?._container;
+    if (!c || c.tagName !== 'CANVAS' || seen.has(c)) return;
+    seen.add(c);
+    const pane = c.closest?.('.leaflet-pane');
+    const z = pane ? (parseInt(getComputedStyle(pane).zIndex, 10) || 0) : 0;
+    out.push({ canvas: c, z });
+  });
+  return out.sort((a, b) => a.z - b.z);
+}
+
+function placePathCanvases(pdf, m, frameMm, rect) {
+  const host = m.getContainer();
+  const hr = host.getBoundingClientRect();
+  leafletPathCanvases(m).forEach(({ canvas }) => {
+    if (!canvas.width || !canvas.height) return;
+    try {
+      const cr = canvas.getBoundingClientRect();
+      const sx = canvas.width / Math.max(1, cr.width);
+      const sy = canvas.height / Math.max(1, cr.height);
+      const x = Math.max(0, Math.round((hr.left + rect.x - cr.left) * sx));
+      const y = Math.max(0, Math.round((hr.top + rect.y - cr.top) * sy));
+      const w = Math.max(1, Math.min(Math.round(rect.w * sx), canvas.width - x));
+      const h = Math.max(1, Math.min(Math.round(rect.h * sy), canvas.height - y));
+      if (w < 2 || h < 2) return;
+      const slice = document.createElement('canvas');
+      slice.width = w;
+      slice.height = h;
+      slice.getContext('2d').drawImage(canvas, x, y, w, h, 0, 0, w, h);
+      pdf.addImage(slice.toDataURL('image/png'), 'PNG', frameMm.x, frameMm.y, frameMm.w, frameMm.h, undefined, 'FAST');
+    } catch (e) { /* canvas khác nguồn */ }
+  });
+}
+
+/** Vẽ một ô bản đồ (nền + hoa văn canvas + vector + icon) vào framePx */
 async function paintMapCell(pdf, m, full, framePx, targetW) {
   const F = toMm(framePx);
   const size = m.getSize();
   const groups = captureVectorGroups(m);
+  const hatch = tt16Detailed(m.getZoom());
   const base = await captureOneMap(m, rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
   placeRaster(pdf, base, 'JPEG', F);
-  paintVectors(pdf, m, full, F, groups.filter(g => !g.overlay));
+  if (hatch) placePathCanvases(pdf, m, F, full);
+  paintVectors(pdf, m, full, F, groups.filter(g => !g.overlay), { patternFromRaster: hatch });
   if (hasTopIcons([m])) {
     const top = await captureOneMap(m, rasterScale(size, targetW, TOP_MAX_PIXELS), 'top');
     placeRaster(pdf, top, 'PNG', F);
   }
-  paintVectors(pdf, m, full, F, groups.filter(g => g.overlay));
+  paintVectors(pdf, m, full, F, groups.filter(g => g.overlay), { patternFromRaster: hatch });
 }
 
 /**
@@ -1193,7 +1236,7 @@ async function drawMapFrameDual(pdf, sheet) {
   }
 }
 
-/** Vùng bản đồ trong khung in → 3 tầng trong PDF; trả về { grid, splitRel } */
+/** Vùng bản đồ trong khung in → nền + hoa văn canvas + vector; trả về { grid, splitRel } */
 async function drawMapFrame(pdf, rect, sheet) {
   const F = toMm(sheet.frame);
   const targetW = F.w / 25.4 * RASTER_DPI;
@@ -1202,14 +1245,16 @@ async function drawMapFrame(pdf, rect, sheet) {
     const size = staged.size;
     const full = { x: 0, y: 0, w: size.x, h: size.y };
     const groups = captureVectorGroups(staged.map);
+    const hatch = tt16Detailed(staged.map.getZoom());
     const base = await captureMapCanvas(rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
     placeRaster(pdf, base.canvas, 'JPEG', F);
-    paintVectors(pdf, staged.map, full, F, groups.filter(g => !g.overlay));
+    if (hatch) placePathCanvases(pdf, staged.map, F, full);
+    paintVectors(pdf, staged.map, full, F, groups.filter(g => !g.overlay), { patternFromRaster: hatch });
     if (hasTopIcons([staged.map])) {
       const top = await captureMapCanvas(rasterScale(size, targetW, TOP_MAX_PIXELS), 'top');
       placeRaster(pdf, top.canvas, 'PNG', F);
     }
-    paintVectors(pdf, staged.map, full, F, groups.filter(g => g.overlay));
+    paintVectors(pdf, staged.map, full, F, groups.filter(g => g.overlay), { patternFromRaster: hatch });
     return { grid: computeGrid(full), splitRel: null };
   } finally {
     staged.restore();
@@ -1225,6 +1270,7 @@ async function runExport() {
   if (!rect || rect.w < 40 || rect.h < 40) return;
   const input = $('printTitle');
   const title = input?.value.trim() || defaultTitle();
+  const note = $('printNote')?.value.trim() || '';
   const city = !state.selectedWard || state.selectedWard === CITY_NAME;
   const place = city ? 'THÀNH PHỐ HUẾ' : state.selectedWard.toUpperCase();
   busy = true;
@@ -1235,8 +1281,11 @@ async function runExport() {
   try {
     showToast(`⏳ Đang dựng bản đồ ${sheet.paper.label}${dual ? ' (hai ô so sánh)' : ''}...`);
     const [fonts] = await Promise.all([loadPrintFonts(), loadJsPdf(), loadHtml2Canvas()]);
+    // Ép hoa văn TT16 trước khi phóng khung: khổ lớn + khung màn hình thường dưới zoom 17
+    setPrintTt16Detail(true);
+    await sleep(80);
     const seen = scaleInfo(rect, sheet.frame.w);
-    const pdf = createPdf(sheet.paper.id, fonts);
+    const pdf = createPdf(sheet.paper, fonts);
     let grid;
     if (dual) {
       ({ grid } = await drawMapFrameDual(pdf, sheet));
@@ -1247,12 +1296,12 @@ async function runExport() {
 
     holder = document.createElement('div');
     holder.className = 'pa3-holder';
-    const pack = { title, place, gridStep: grid.step, splitX: null, frameW: rect.w, scale: seen, sheet };
+    const pack = { title, place, note, gridStep: grid.step, splitX: null, frameW: rect.w, scale: seen, sheet };
     holder.innerHTML = dual ? dualPageHtml(pack) : pageHtml(frameKind, pack);
     document.body.appendChild(holder);
     const page = holder.firstElementChild;
     await document.fonts.ready;
-    fitLegend(page, dual || frameKind === 'bottom');
+    fitLegend(page, dual);
     await drawDom(pdf, page, page);
 
     const stamp = new Date().toISOString().slice(0, 10);
@@ -1265,6 +1314,7 @@ async function runExport() {
     console.error('In bản đồ lỗi:', err);
     showToast(`❌ Không xuất được bản đồ ${sheet.paper.label}: ${err.message || err}`, 'error');
   } finally {
+    setPrintTt16Detail(false);
     holder?.remove();
     busy = false;
     if (go) go.disabled = false;
@@ -1273,7 +1323,7 @@ async function runExport() {
   }
 }
 
-/** Mở khung xem trước để căn vùng in, rồi xuất PDF khổ A3 / A2 / A1 / A0 */
+/** Mở khung xem trước để căn vùng in, rồi xuất PDF khổ A3 → 4A0 */
 document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'print') closePreview(); });
 
 export function exportMapA3() {

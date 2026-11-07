@@ -18,7 +18,7 @@ import { map, wardNameAt, outerWardLines, openOutlinedPopup, openDockPopup, atta
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
-import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
+import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, PRINT_TT16_DETAIL_EVENT, tt16Detailed, getLotOpacity } from './tt16Symbols.js';
 import { BASEMAP_EVENT } from './basemap.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { setOutsideMask, PROJECT_UNFOCUS_EVENT } from './projectLayer.js';
@@ -677,7 +677,7 @@ async function setLand(on) {
     both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame']); });
     now.forEach(m => {
       use(m);
-      detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
+      detailed = tt16Detailed(m.getZoom());
       if (!collapsed()) drawLand();
       else dropLand();
       if (placeLots && !isLevelPair()) {
@@ -1434,7 +1434,7 @@ export function initQhc2045Layer() {
   document.addEventListener(ROAD_FOCUS_EVENT, (e) => { if (e.detail) focusRoads(String(e.detail.scale), e.detail.key); });
   const onZoom = (host) => {
     use(host);
-    const d = host.getZoom() >= TT16_PATTERN_ZOOM;
+    const d = tt16Detailed(host.getZoom());
     if (d !== detailed) { detailed = d; restyleLand(); }
     if (active.layers.frame && host.hasLayer(active.layers.frame)) zoomFrame();
     // Lần vẽ trước bị zoom cắt ngang: ô vẫn bật nhưng không còn lớp trên bản đồ
@@ -1457,6 +1457,12 @@ export function initQhc2045Layer() {
   });
   window.addEventListener(LOT_OPACITY_EVENT, restyleLand);
   window.addEventListener(BASEMAP_EVENT, restyleLand);
+  window.addEventListener(PRINT_TT16_DETAIL_EVENT, () => {
+    const host = active?.map || map;
+    const d = tt16Detailed(host?.getZoom?.() ?? 0);
+    if (d !== detailed) { detailed = d; restyleLand(); }
+    else if (d) restyleLand();
+  });
   document.addEventListener(LEVEL_EVENT, () => { if (!isLevelPair() && !placeLots) applyCore(); });
   onSplitPair(() => syncQhc());
   bindCoreHover(map);

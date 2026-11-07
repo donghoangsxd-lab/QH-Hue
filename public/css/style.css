@@ -131,7 +131,7 @@ table { font-variant-numeric: tabular-nums; }
 /* Khai báo trên body (không phải :root) để nhận --bottom-h theo màn hình / thẩm định.
    --bottom-gap: phần đáy dành cho panel dưới; --side-gap: đáy panel phải (thu gọn panel dưới thì chừa nút mở lại) */
 body { --bottom-gap: var(--bottom-h); --side-gap: var(--bottom-h); }
-body:has(#printPreview:not([hidden])) { --info-bottom: 248px; }
+/* Dock xuất bản đồ neo phải — không đẩy đáy bản đồ */
 body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0px; --side-gap: calc(var(--tb-btn) + 12px); }
 #mapArea {
   position: absolute;
@@ -3965,45 +3965,53 @@ table.ward-table th {
 .print-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; cursor: nesw-resize; }
 .print-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; cursor: nwse-resize; }
 .print-frames { flex-wrap: wrap; }
-.print-frames button { flex: 1 1 30%; font-size: var(--fs-sm); padding: 0 4px; }
+.print-frames button { flex: 1 1 40%; font-size: var(--fs-sm); padding: 0 4px; }
+/* Bảng xuất bản đồ: cột phải gọn, phía trên bảng tổng hợp (ui-spec) */
 .print-dock {
   position: absolute; z-index: 2;
-  left: var(--info-left); right: calc(var(--tb-btn) + 24px); bottom: 12px;
-  width: min(520px, calc(100% - var(--info-left) - var(--tb-btn) - 36px));
-  margin-inline: auto; transform: none;
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px 12px; pointer-events: auto; box-sizing: border-box;
+  top: calc(var(--info-top) - 12px);
+  right: calc(var(--tb-btn) + 8px);
+  left: auto; bottom: auto;
+  width: min(300px, calc(100vw - var(--info-left) - var(--info-col, 0px) - var(--tb-btn) - 48px));
+  max-height: calc(100vh - var(--info-top) - var(--bottom-gap) - 16px);
+  overflow: auto; margin: 0; transform: none;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px; pointer-events: auto; box-sizing: border-box;
   background: var(--bg-dark);
   backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--border-color); border-radius: var(--r-lg);
   box-shadow: var(--panel-shadow); color: var(--text-main);
 }
-.print-dock-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.print-dock-head b { font-size: var(--fs-lg); color: var(--text-strong); }
-.print-scale-live { font-size: var(--fs-sm); font-weight: 700; color: var(--accent-cyan); text-align: right; }
+.print-dock-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.print-dock-head b { font-size: var(--fs-md); color: var(--text-strong); }
+.print-scale-live { font-size: var(--fs-xs); font-weight: 700; color: var(--accent-cyan); text-align: right; }
 .print-layout-live {
-  font-size: var(--fs-sm); font-weight: 600; color: var(--accent-cyan); letter-spacing: 0.02em;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--accent-cyan); letter-spacing: 0.02em;
 }
-.print-sizes { display: flex; gap: 4px; }
+.print-sizes { display: flex; flex-wrap: wrap; gap: 4px; }
 .print-sizes button {
-  flex: 1; height: 30px; padding: 0;
+  flex: 1 1 calc(33.33% - 4px); min-width: 0; height: 28px; padding: 0;
   border: 1px solid var(--border-color); border-radius: var(--r-md);
   background: transparent; color: var(--text-main);
-  font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+  font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
 }
 .print-sizes button:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 .print-sizes button[aria-pressed="true"] {
   background: var(--accent-cyan); border-color: var(--accent-cyan); color: var(--text-on-accent);
 }
-.print-title-lbl { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
-.print-title-lbl input {
-  height: 30px; padding: 0 8px; box-sizing: border-box;
-  font-size: var(--fs-md); font-weight: 600; color: var(--text-strong);
+.print-title-lbl { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-sm); color: var(--text-muted); }
+.print-title-lbl input,
+.print-title-lbl textarea {
+  width: 100%; padding: 6px 8px; box-sizing: border-box; resize: vertical;
+  font: inherit; font-size: var(--fs-md); font-weight: 600; color: var(--text-strong);
   background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-md);
 }
-.print-title-lbl input:focus { outline: none; border-color: var(--accent-cyan); }
-.print-hint { margin: 0; font-size: var(--fs-sm); line-height: 1.35; color: var(--text-muted); }
-.print-dock-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.print-title-lbl input { height: 30px; padding: 0 8px; }
+.print-title-lbl textarea { min-height: 64px; font-weight: 500; line-height: 1.35; }
+.print-title-lbl input:focus,
+.print-title-lbl textarea:focus { outline: none; border-color: var(--accent-cyan); }
+.print-hint { margin: 0; font-size: var(--fs-xs); line-height: 1.35; color: var(--text-muted); }
+.print-dock-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
 .print-btn {
   height: 30px; padding: 0 14px;
   border: 1px solid var(--border-color); border-radius: var(--r-md);
@@ -4015,7 +4023,7 @@ table.ward-table th {
 .print-btn-go:hover:not(:disabled) { filter: brightness(1.08); color: var(--text-on-accent); }
 .print-btn:disabled { opacity: 0.45; cursor: default; }
 
-/* TỜ IN (printLayout.js): cỡ chữ theo em của .pa3-page (10px ở khổ A3, nhân theo khổ lớn hơn).
+/* TỜ IN (printLayout.js): cỡ chữ gốc theo chromeScale (A3 = 10px); không nhân tuyến tính theo bề ngang tờ.
    Tạm phóng khung bản đồ theo vùng trong khung xem trước để tải ảnh nền đủ nét.
    Cột thông tin dàn trang bằng font in PrintVN (printVector.js) để vị trí chữ khớp với PDF. */
 #mapArea.print-staging { right: auto; bottom: auto; width: var(--print-w); height: var(--print-h); }
@@ -4025,8 +4033,8 @@ table.ward-table th {
 .pa3-vector, .pa3-vector * { font-family: 'PrintVN', Arial, sans-serif !important; font-kerning: none; font-variant-ligatures: none; }
 .pa3-split { position: absolute; width: 0; border-left: 0.2em solid #fff; box-shadow: 0 0 0.3em rgba(0,0,0,0.7); }
 .pa3-split-lbl { position: absolute; padding: 0.3em 0.8em; border-radius: 0.3em; background: rgba(15,23,42,0.82); color: #fff; font-size: 1.2em; font-weight: 700; letter-spacing: 0.06em; }
-.pa3-side { position: absolute; display: flex; flex-direction: column; gap: 1.4em; box-sizing: border-box; }
-/* Dual: tiêu đề trên + ghi chú ngang dưới (cùng nội dung cột phải) */
+.pa3-side { position: absolute; display: flex; flex-direction: column; gap: 0.7em; box-sizing: border-box; min-height: 0; }
+/* Dual: tiêu đề trên + dải dưới (chú giải gọn + ô ghi chú) */
 .pa3-plain-title {
   position: absolute; z-index: 2; text-align: center; pointer-events: none;
 }
@@ -4035,12 +4043,6 @@ table.ward-table th {
   color: #fff; font-size: 1.7em; font-weight: 700; line-height: 1.25; text-transform: uppercase;
   background: rgba(15, 23, 42, 0.78); border-radius: 0.2em;
 }
-.pa3-bottom-id {
-  flex: 0 0 28%; max-width: 34%; display: flex; flex-direction: column; justify-content: center;
-  gap: 0.2em; min-width: 0; text-align: center;
-}
-.pa3-bottom-id .pa3-title { font-size: 1.45em; }
-.pa3-bottom-id .pa3-scale-block { justify-content: center; }
 .pa3-dual-title {
   position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.15em; box-sizing: border-box; text-align: center;
@@ -4051,56 +4053,68 @@ table.ward-table th {
 .pa3-dual .pa3-title { margin-top: 0; font-size: 1.85em; }
 .pa3-dual .pa3-place { font-size: 1.25em; }
 .pa3-dual-notes {
-  position: absolute; display: flex; flex-direction: row; align-items: stretch; gap: 1.2em;
+  position: absolute; display: flex; flex-direction: row; align-items: stretch; gap: 0.8em;
   box-sizing: border-box; min-height: 0; overflow: hidden;
 }
 .pa3-dual-meta {
-  flex: 0 0 22%; max-width: 26%; display: flex; flex-direction: column; gap: 0.6em; min-width: 0;
+  flex: 0 0 28%; max-width: 32%; display: flex; flex-direction: column; gap: 0.45em; min-width: 0; min-height: 0;
 }
-.pa3-dual-scale { padding: 0.4em 0; border-top: 0; border-bottom: 0.1em solid #cbd5e1; }
+.pa3-dual-scale { padding: 0.25em 0; border-top: 0; border-bottom: 0.1em solid #cbd5e1; }
 .pa3-dual-notes .pa3-legend { flex: 1; min-width: 0; min-height: 0; }
-.pa3-dual-notes .pa3-info { padding-top: 0; border-top: 0; font-size: 0.95em; line-height: 1.35; }
-.pa3-dual-notes .pa3-lg { grid-template-columns: repeat(4, minmax(0, 1fr)); font-size: 1em; }
-.pa3-org { text-align: center; font-size: 1.3em; line-height: 1.4; }
+.pa3-dual-notes .pa3-info { padding-top: 0; border-top: 0; font-size: 0.9em; line-height: 1.3; }
+.pa3-dual-notes .pa3-lg { grid-template-columns: repeat(5, minmax(0, 1fr)); font-size: 0.92em; gap: 0.22em 0.4em; }
+.pa3-dual-notes .pa3-notes-box { flex: 1 1 auto; min-height: 0; max-height: none; }
+.pa3-org { text-align: center; font-size: 1.15em; line-height: 1.3; }
 .pa3-org b { display: block; font-size: 1.1538em; }
-.pa3-org-rule { display: block; width: 6.15em; margin: 0.3em auto 0; border-top: 0.08em solid #0f172a; }
-.pa3-title { margin-top: 0.27em; text-align: center; font-size: 2.2em; font-weight: 700; line-height: 1.25; text-transform: uppercase; color: #991b1b; }
-.pa3-place { text-align: center; font-size: 1.5em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.pa3-scale-block { display: flex; align-items: center; gap: 1.6em; padding: 1em 0.4em; border-top: 0.1em solid #cbd5e1; border-bottom: 0.1em solid #cbd5e1; }
-.pa3-north-svg { width: 4em; height: 6em; display: block; }
-.pa3-ratio { font-size: 1.4em; font-weight: 700; margin-bottom: 0.43em; }
-.pa3-scalebar { display: flex; height: 0.7em; border: 0.1em solid #0f172a; }
+.pa3-org-rule { display: block; width: 6.15em; margin: 0.25em auto 0; border-top: 0.08em solid #0f172a; }
+.pa3-title { margin-top: 0.15em; text-align: center; font-size: 1.85em; font-weight: 700; line-height: 1.2; text-transform: uppercase; color: #991b1b; }
+.pa3-place { text-align: center; font-size: 1.25em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.pa3-scale-block { display: flex; align-items: center; gap: 1em; padding: 0.55em 0.2em; border-top: 0.1em solid #cbd5e1; border-bottom: 0.1em solid #cbd5e1; }
+.pa3-north-svg { width: 3.2em; height: 4.8em; display: block; }
+.pa3-ratio { font-size: 1.25em; font-weight: 700; margin-bottom: 0.3em; }
+.pa3-scalebar { display: flex; height: 0.65em; border: 0.1em solid #0f172a; }
 .pa3-scalebar i { flex: 1; }
 .pa3-scalebar i.b { background: #0f172a; }
 .pa3-scalebar i.w { background: #fff; }
-.pa3-scalebar-lbl { display: flex; justify-content: space-between; margin-top: 0.3em; font-size: 1em; }
-.pa3-ratio-note { margin-top: 0.4em; font-size: 1em; font-style: italic; color: #64748b; }
-.pa3-legend { flex: 1; min-height: 0; overflow: hidden; }
-.pa3-sec { margin-bottom: 0.57em; padding-bottom: 0.21em; border-bottom: 0.11em solid #0f172a; font-size: 1.4em; font-weight: 700; letter-spacing: 0.08em; }
-.pa3-lg { display: grid; grid-template-columns: 1fr 1fr; gap: 0.52em 0.87em; font-size: 1.15em; line-height: 1.2; }
-.pa3-lg-row { display: flex; align-items: center; gap: 0.52em; }
-.pa3-lg-icon { height: 1.74em; width: auto; flex-shrink: 0; }
-.pa3-lg-sym { display: inline-block; width: 2.26em; height: 1.13em; flex-shrink: 0; box-sizing: border-box; }
-.pa3-lg-buffer { border: 0.13em dashed #0284c7; border-radius: 0.61em; background: rgba(56,189,248,0.22); }
-.pa3-lg-ward { border: 0.16em solid #ff1f1f; background: rgba(255,31,31,0.1); }
-.pa3-lg-bound { height: 0.43em; background: #fde68a; border: 0.09em solid #64748b; }
+.pa3-scalebar-lbl { display: flex; justify-content: space-between; margin-top: 0.22em; font-size: 0.95em; }
+.pa3-ratio-note { margin-top: 0.28em; font-size: 0.9em; font-style: italic; color: #64748b; }
+.pa3-legend { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.pa3-sec { margin-bottom: 0.35em; padding-bottom: 0.15em; border-bottom: 0.1em solid #0f172a; font-size: 1.15em; font-weight: 700; letter-spacing: 0.06em; }
+.pa3-lg { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.28em 0.45em; font-size: 0.95em; line-height: 1.15; }
+.pa3-lg-row { display: flex; align-items: center; gap: 0.35em; min-width: 0; }
+.pa3-lg-row > :not(.pa3-lg-icon):not(.pa3-lg-sym):not(.ua-badge):not(.ua-sw):not(.ua-sw-line) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pa3-lg-icon { height: 1.35em; width: auto; flex-shrink: 0; }
+.pa3-lg-sym { display: inline-block; width: 1.7em; height: 0.95em; flex-shrink: 0; box-sizing: border-box; }
+.pa3-lg-buffer { border: 0.12em dashed #0284c7; border-radius: 0.5em; background: rgba(56,189,248,0.22); }
+.pa3-lg-ward { border: 0.14em solid #ff1f1f; background: rgba(255,31,31,0.1); }
+.pa3-lg-bound { height: 0.38em; background: #fde68a; border: 0.08em solid #64748b; }
 .pa3-lg-line { height: 0; border-top: var(--w) solid var(--c); }
 .pa3-lg-dash { border-top-style: dashed; }
-.pa3-lg-head { grid-column: 1 / -1; margin-top: 0.4em; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #991b1b; }
+.pa3-lg-head { grid-column: 1 / -1; margin-top: 0.25em; font-size: 0.95em; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #991b1b; }
 .pa3-lg-head:first-child { margin-top: 0; }
-.pa3-lg-group { grid-column: 1 / -1; padding-bottom: 0.1em; border-bottom: 0.08em solid #cbd5e1; font-weight: 700; color: #334155; }
-.pa3-lg-land { border: 0.1em solid; }
-.pa3-lg-ua .ua-badge { position: static; transform: none; flex-shrink: 0; width: 2em; height: 2em; border-width: 0.2em; box-shadow: none; font-size: 0.8em; font-weight: 700; cursor: default; }
-.pa3-lg-ua .ua-sw { flex-shrink: 0; width: 2.26em; height: 1.13em; }
-.pa3-lg-ua .ua-sw-line { flex-shrink: 0; width: 2.26em; border-top-color: #475569; }
-.pa3-lg-ramp { grid-column: 1 / -1; margin-top: 0.35em; }
-.pa3-lg-ramp-title { margin-bottom: 0.26em; font-weight: 700; }
-.pa3-lg-bar { height: 0.87em; border: 0.09em solid #475569; }
+.pa3-lg-group { grid-column: 1 / -1; padding-bottom: 0.05em; border-bottom: 0.06em solid #cbd5e1; font-size: 0.9em; font-weight: 700; color: #334155; }
+.pa3-lg-land { border: 0.08em solid; }
+.pa3-lg-ua .ua-badge { position: static; transform: none; flex-shrink: 0; width: 1.6em; height: 1.6em; border-width: 0.15em; box-shadow: none; font-size: 0.75em; font-weight: 700; cursor: default; }
+.pa3-lg-ua .ua-sw { flex-shrink: 0; width: 1.7em; height: 0.95em; }
+.pa3-lg-ua .ua-sw-line { flex-shrink: 0; width: 1.7em; border-top-color: #475569; }
+.pa3-lg-ramp { grid-column: 1 / -1; margin-top: 0.2em; }
+.pa3-lg-ramp-title { margin-bottom: 0.18em; font-weight: 700; }
+.pa3-lg-bar { height: 0.7em; border: 0.08em solid #475569; }
 .pa3-lg-heat { background: linear-gradient(to right, #5dade2, #2ecc71, #f1c40f, #f39c12, #e67e22, #d35400, #e74c3c, #900c3f); }
 .pa3-lg-pop, .pop-legend-bar { background: linear-gradient(to right, #fff5eb, #fee6ce, #fdd0a2, #fdae6b, #fd8d3c, #f16913, #d94801, #7f2704); }
-.pa3-lg-ticks { display: flex; justify-content: space-between; margin-top: 0.17em; font-size: 0.87em; }
-.pa3-info { padding-top: 0.73em; border-top: 0.09em solid #cbd5e1; font-size: 1.1em; line-height: 1.5; color: #334155; }
-.pa3-note { margin-top: 0.36em; font-style: italic; color: #64748b; }
+.pa3-lg-ticks { display: flex; justify-content: space-between; margin-top: 0.12em; font-size: 0.85em; }
+.pa3-notes-box {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.25em;
+  min-height: 5.5em; max-height: 26%; padding: 0.4em 0.5em; box-sizing: border-box;
+  border: 0.1em solid #94a3b8; border-radius: 0.15em; background: #f8fafc; overflow: hidden;
+}
+.pa3-notes-box .pa3-sec { margin-bottom: 0; }
+.pa3-notes-body {
+  flex: 1; min-height: 0; font-size: 1em; line-height: 1.35; color: #334155;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.pa3-info { padding-top: 0.4em; border-top: 0.08em solid #cbd5e1; font-size: 0.95em; line-height: 1.35; color: #334155; }
+.pa3-note { margin-top: 0.25em; font-style: italic; color: #64748b; }
 
 /* ===================== POPUP & THẺ GỢI Ý ===================== */
 .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: var(--fs-xs); font-weight: bold; padding: 1px 4px; border-radius: var(--r-sm); text-transform: uppercase; margin-left: 4px; }
@@ -6989,16 +7003,17 @@ body.project-review.la-page #projectReviewHost {
   .ov-primary, .ov-ghost, .ov-back, .ov-btn { height: 40px; font-size: 13px; }
   .ov-csd-wrap { max-height: 28dvh; }
   .print-dock {
-    left: var(--phone-tool-left); right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px); width: auto; transform: none;
-    bottom: var(--phone-dock-bottom);
-    max-height: min(46dvh, 240px);
+    top: var(--info-top);
+    left: var(--phone-tool-left); right: calc(max(8px, var(--safe-right)) + var(--tb-btn) + 8px);
+    width: auto; bottom: auto; transform: none;
+    max-height: min(52dvh, calc(100dvh - var(--info-top) - var(--phone-dock-bottom) - 8px));
     overflow: auto;
   }
   body:not(.right-collapsed) .print-dock {
-    bottom: calc(50dvh + max(8px, var(--safe-bottom)));
-    max-height: min(40dvh, calc(50dvh - var(--info-top) - 16px));
+    max-height: min(42dvh, calc(50dvh - var(--info-top) - 16px));
   }
   .print-btn, .print-sizes button, .print-title-lbl input { min-height: 40px; height: 40px; }
+  .print-title-lbl textarea { min-height: 72px; }
   .auth-modal { width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; }
   .tour-card { width: min(340px, calc(100vw - 16px)); padding: 10px 12px; }
   .tour-text { font-size: 13px; }
@@ -7150,9 +7165,10 @@ body.project-review.la-page #projectReviewHost {
   .sv-panel { bottom: max(4px, env(safe-area-inset-bottom)); height: min(200px, 42dvh); }
   body:not(.right-collapsed) .sv-panel { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); bottom: max(4px, env(safe-area-inset-bottom)); }
   .print-dock {
+    top: var(--info-top);
     right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px);
-    bottom: max(4px, env(safe-area-inset-bottom));
-    max-height: min(42dvh, calc(100dvh - var(--info-top) - 16px));
+    bottom: auto;
+    max-height: min(48dvh, calc(100dvh - var(--info-top) - 16px));
   }
   body.right-collapsed .print-dock { right: calc(max(4px, var(--safe-right)) + var(--tb-btn) + 8px); }
   #tabAdd.propose-sheet {

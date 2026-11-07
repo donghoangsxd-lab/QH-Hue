@@ -1121,4 +1121,20 @@ assert.match(read('docs/ui-spec.md'), /viewport-fit=cover/);
 assert.match(read('docs/ui-spec.md'), /không nằm ở đáy/);
 assert.match(read('docs/ui-spec.md'), /không nút nổi riêng|Không nút nổi riêng/);
 
+const printDock = html.slice(html.indexOf('class="print-dock"'), html.indexOf('id="axisDock"'));
+assert.match(printDock, /id="printTitle"/);
+assert.match(printDock, /id="printNote"/);
+assert.match(printDock, /data-paper="a3"/);
+assert.match(printDock, /data-paper="2a0"/);
+assert.match(printDock, /data-paper="4a0"/);
+assert.doesNotMatch(printDock, /data-paper="a4"/);
+assert.doesNotMatch(printDock, /Ghi chú dưới/);
+assert.match(css, /\.print-dock\s*\{[^}]*right:\s*calc\(var\(--tb-btn\) \+ 8px\)/);
+assert.match(read('public/js/printLayout.js'), /function chromeScale/);
+assert.match(read('public/js/printLayout.js'), /id: '2a0'/);
+assert.match(read('public/js/printLayout.js'), /id: '4a0'/);
+assert.doesNotMatch(read('public/js/printLayout.js'), /id: 'a4'/);
+assert.match(read('docs/ui-spec.md'), /2A0, 4A0 \(không A4\)/);
+assert.match(read('docs/ui-spec.md'), /chromeScale/);
+
 console.log('core ui ok');

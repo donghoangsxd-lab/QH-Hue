@@ -15,7 +15,7 @@ import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
 import { clipPathAtParcel, accessLabelAnchor } from './accessRouteGeom.js';
-import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT, PRINT_TT16_DETAIL_EVENT, tt16Detailed } from './tt16Symbols.js';
 import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap, BASEMAP_EVENT, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
@@ -286,6 +286,11 @@ export function initMap() {
   initLegendPanel();
   window.addEventListener(LOT_OPACITY_EVENT, () => { redrawParcels(); redrawLands(); });
   window.addEventListener(BASEMAP_EVENT, () => { redrawParcels(); redrawLands(); });
+  window.addEventListener(PRINT_TT16_DETAIL_EVENT, () => {
+    try { leftRenderer.refreshPoints(); } catch (e) { /* chưa sẵn */ }
+    try { planRenderer.refreshPoints(); } catch (e) { /* chưa mở QH */ }
+    redrawLands();
+  });
 
   return map;
 }
@@ -1970,7 +1975,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     // Ranh lô vẽ cùng marker trong nhóm công trình nên bật lớp nào hiện lô lớp đó; bản đồ quy hoạch lấy lô QH (parcelFor)
     const wantParcels = state.cadParcels.size > 0
       && ((state.showParcels && zoom >= parcelMinZoom(m, groups)) || (state.showProjects && zoom >= PARCEL_MIN_ZOOM));
-    const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
+    const detail = tt16Detailed(m.getZoom());
     if (nextMode !== mode || wantParcels !== parcelsOn) {
       clearPoints();
       mode = nextMode;
@@ -2749,7 +2754,7 @@ function drawLandsOn(m, list, infra = []) {
   }
   if (!list.length && !infra.length) return;
   const group = L.featureGroup();
-  const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
+  const detailed = tt16Detailed(m.getZoom());
   const ordered = [
     ...list.map(p => ({ p, rank: landPatternKey(p.layer, p.name) === 'GT' ? LOT_RANK_TRAFFIC : LOT_RANK_LAND })),
     ...infra.map(p => ({ p, rank: LOT_RANK_INFRA }))
@@ -2890,7 +2895,7 @@ function redrawLands() {
   const notOwn = (list) => (own ? list.filter(l => l.file !== own) : list);
   const landAll = notOwn(lotsInWardScope(state.landParcels));
   const infraAll = notOwn(infraLotsInWardScope(state.projectInfraLots));
-  landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
+  landsDetailed = map ? tt16Detailed(map.getZoom()) : null;
   const pick = (list, phase) => list.filter(p => p.phase === phase);
   if (isLevelPair()) {
     const legacyLand = state.showLand ? landAll : landAll.filter(l => projectLotsDrawn(l.file));
@@ -3020,7 +3025,7 @@ function redrawNets() {
 // Qua ngưỡng hoa văn TT16: vẽ lại lô hạ tầng đồ án để đổi kiểu tô
 function redrawLandsOnPattern() {
   if (!map || (!state.projectInfraLots.length && !state.landParcels.length)) return;
-  const detailed = map.getZoom() >= PARCEL_PATTERN_ZOOM;
+  const detailed = tt16Detailed(map.getZoom());
   if (detailed !== landsDetailed) redrawLands();
 }
 

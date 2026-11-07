@@ -45,7 +45,15 @@ export function loadPrintFonts() {
   return fontsPromise;
 }
 
-export function createPdf(format, fonts) {
+/**
+ * Khổ in ngang. paperOrFormat: id jsPDF ('a3'…) hoặc { wMm, hMm }.
+ * Mảng kích thước gửi vào jsPDF là khổ đứng; orientation landscape đổi cạnh — tránh truyền sẵn khổ ngang kẻo bị đảo hai lần.
+ */
+export function createPdf(paperOrFormat, fonts) {
+  let format = paperOrFormat;
+  if (paperOrFormat && typeof paperOrFormat === 'object' && !Array.isArray(paperOrFormat) && paperOrFormat.wMm && paperOrFormat.hMm) {
+    format = [paperOrFormat.hMm, paperOrFormat.wMm];
+  }
   const pdf = new window.jspdf.jsPDF({ unit: 'mm', format, orientation: 'landscape', compress: true });
   fonts.forEach(f => {
     pdf.addFileToVFS(f.file, f.b64);
@@ -219,8 +227,14 @@ function drawPath(pdf, l, alpha, ctx) {
   let fAlpha = 0;
   if (o.fill) {
     const solid = typeof o.fillColor === 'string';
-    fill = parseColor(solid ? o.fillColor : o.color);
-    if (fill) fAlpha = (o.fillOpacity ?? 0.2) * fill.a * alpha * (solid ? 1 : PATTERN_FILL_ALPHA);
+    // Hoa văn CanvasPattern đã chụp từ canvas Leaflet → bỏ tô đặc thay thế trong PDF
+    if (ctx.patternFromRaster && !solid) {
+      fill = null;
+      fAlpha = 0;
+    } else {
+      fill = parseColor(solid ? o.fillColor : o.color);
+      if (fill) fAlpha = (o.fillOpacity ?? 0.2) * fill.a * alpha * (solid ? 1 : PATTERN_FILL_ALPHA);
+    }
   }
   const doStroke = sAlpha > 0.01;
   const doFill = fAlpha > 0.01;
@@ -277,7 +291,7 @@ function drawPath(pdf, l, alpha, ctx) {
  * Vẽ mọi L.Path đang hiện của bản đồ m vào khung giấy.
  * rect: vùng in theo px khung bản đồ m; frame: vị trí trên giấy (mm). Nét theo px bản đồ × (mm / px) để đồng bộ với icon.
  */
-export function drawMapPaths(pdf, m, rect, frame, groups) {
+export function drawMapPaths(pdf, m, rect, frame, groups, { patternFromRaster = false } = {}) {
   const k = frame.w / rect.w;
   const zoom = m.getZoom();
   const origin = m.getPixelOrigin();
@@ -290,6 +304,7 @@ export function drawMapPaths(pdf, m, rect, frame, groups) {
   const ctx = {
     k,
     bounds,
+    patternFromRaster,
     state: { dash: '' },
     toMm: (ll) => {
       const p = m.project(ll, zoom);

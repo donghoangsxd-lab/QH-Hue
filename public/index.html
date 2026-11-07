@@ -399,7 +399,7 @@
       <button type="button" class="ui-btn-format tb-rotate" id="btnRotateScreen" title="Xoay màn hình" aria-label="Xoay màn hình" aria-pressed="false"><svg class="ico"><use href="#i-rotate"/></svg></button>
     </div>
 
-    <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A4 → A0 -->
+    <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A3 → 4A0 -->
     <div class="print-preview" id="printPreview" hidden>
       <div class="print-frame" id="printFrame">
         <span class="print-frame-tag" id="printFrameTag">Vùng in</span>
@@ -423,22 +423,25 @@
           <span class="print-scale-live" id="printScaleLive"></span>
         </div>
         <div class="print-sizes" role="radiogroup" aria-label="Khổ giấy ngang">
-          <button type="button" data-paper="a4" aria-pressed="false">A4</button>
           <button type="button" data-paper="a3" aria-pressed="true">A3</button>
           <button type="button" data-paper="a2" aria-pressed="false">A2</button>
           <button type="button" data-paper="a1" aria-pressed="false">A1</button>
           <button type="button" data-paper="a0" aria-pressed="false">A0</button>
+          <button type="button" data-paper="2a0" aria-pressed="false">2A0</button>
+          <button type="button" data-paper="4a0" aria-pressed="false">4A0</button>
         </div>
         <div class="print-sizes print-frames" role="radiogroup" aria-label="Dạng khung bản vẽ">
           <button type="button" data-frame="plain" aria-pressed="false">Khung trống</button>
           <button type="button" data-frame="side" aria-pressed="true">Ghi chú phải</button>
-          <button type="button" data-frame="bottom" aria-pressed="false">Ghi chú dưới</button>
         </div>
         <div class="print-layout-live" id="printLayoutLive">Bố cục: Ghi chú bên phải</div>
         <label class="print-title-lbl">Tiêu đề
           <input id="printTitle" type="text" maxlength="140" autocomplete="off" spellcheck="false">
         </label>
-        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Kéo một góc khung để đổi cỡ: tỷ lệ giữ theo dạng khung đang chọn, khung không lớn hơn màn hình. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn. Đang chia đôi màn hình thì PDF tự xuất hai ô Hiện trạng | Quy hoạch.</p>
+        <label class="print-title-lbl">Ghi chú
+          <textarea id="printNote" rows="3" maxlength="600" autocomplete="off" spellcheck="true" placeholder="Ghi chú in trên bản đồ (ô Ghi chú)"></textarea>
+        </label>
+        <p class="print-hint">Kéo bản đồ vào khung; kéo góc để đổi cỡ. Khổ lớn hơn → khung mặc định nhỏ hơn (đúng tỷ lệ in, dễ thấy hoa văn TT16). Chia đôi màn hình → PDF hai ô HT | QH.</p>
         <div class="print-dock-actions">
           <button type="button" class="print-btn" id="printCancel">Hủy</button>
           <button type="button" class="print-btn print-btn-go" id="printGo">Xuất PDF</button>

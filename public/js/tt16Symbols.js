@@ -271,8 +271,25 @@ export function setLotOpacity(v) {
   window.dispatchEvent(new CustomEvent(LOT_OPACITY_EVENT, { detail: next }));
 }
 
-// Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu
+// Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu.
+// In PDF: setPrintTt16Detail(true) ép hoa văn dù zoom khung xem trước còn thấp (khổ lớn, khung gần full màn hình).
 export const TT16_PATTERN_ZOOM = 17;
+export const PRINT_TT16_DETAIL_EVENT = 'qh:print-tt16-detail';
+let printForceDetail = false;
+
+export function setPrintTt16Detail(on) {
+  const next = !!on;
+  if (next === printForceDetail) return;
+  printForceDetail = next;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(PRINT_TT16_DETAIL_EVENT, { detail: next }));
+  }
+}
+
+/** true khi phải tô hoa văn TT16 (đủ zoom hoặc đang xuất PDF) */
+export function tt16Detailed(zoom) {
+  return printForceDetail || Number(zoom) >= TT16_PATTERN_ZOOM;
+}
 const FILL_OPACITY = 0.3;
 const PATTERN_BG_ALPHA = 0.25;
 
