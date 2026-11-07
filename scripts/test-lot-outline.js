@@ -1,4 +1,4 @@
-// Viền lô: quy hoạch 0.8px cùng màu tô; hiện trạng 1px cùng màu tô.
+// Viền lô: quy hoạch 2px cùng màu tô; hiện trạng 1px cùng màu tô.
 // Chỉ an ninh, quốc phòng và ba loại rừng trên nền vệ tinh có một nét 0.7px sáng hơn cùng hue, không quầng.
 import { lightenTone, thinLightOutline, tt16SymbolStyle, landParcelStyle, isTransportLand, isNarrowStrip, TT16_STYLES } from '../public/js/tt16Symbols.js';
 import { selectBasemap, isLightBasemap, basemapLabel, preferVietnameseLabels } from '../public/js/basemap.js';
@@ -54,14 +54,14 @@ for (const key of ['AN', 'RSX', 'RPH', 'RDD']) {
 }
 
 const tree = tt16SymbolStyle('1-CV', '#66cc00', 'QHDD_DAT_HTXH_CayxanhCC', { scenario: 'QH', detailed: false });
-assert(tree.color === '#66cc00' && tree.weight === 0.8, 'cây xanh nét mảnh cùng màu tô');
+assert(tree.color === '#66cc00' && tree.weight === 2, 'cây xanh nét quy hoạch cùng màu tô');
 noHalo(tree, 'cây xanh không quầng');
 
 const hamlet = tt16SymbolStyle('O-LX', '#7f7f40', 'QHDD_DAT_O_Langxom', { scenario: 'QH', detailed: false });
-assert(hamlet.color === '#7f7f40' && hamlet.weight === 0.8, 'làng xóm tối vẫn nét cùng màu tô');
+assert(hamlet.color === '#7f7f40' && hamlet.weight === 2, 'làng xóm tối vẫn nét quy hoạch cùng màu tô');
 
 const pending = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: false });
-assert(pending.color === '#f87171' && pending.dashArray === '4,4' && pending.weight === 0.8, 'chờ duyệt giữ viền đỏ nét đứt');
+assert(pending.color === '#f87171' && pending.dashArray === '4,4' && pending.weight === 2, 'chờ duyệt giữ viền đỏ nét đứt');
 noHalo(pending, 'chờ duyệt không quầng');
 
 const ht = tt16SymbolStyle('QP', dark, 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false, approved: true });
@@ -74,13 +74,13 @@ const qhdh = tt16SymbolStyle('QP', dark, 'QHDH_DAT_Quocphong', { scenario: 'QH',
 assert(qhdh.dashArray === '2.7,1.4' && qhdh.weight === 0.7 && qhdh.color === lit, 'dài hạn quốc phòng: nét đứt mỏng, sáng, không quầng');
 noHalo(qhdh, 'dài hạn không quầng');
 const qhdhLight = tt16SymbolStyle('1-CV', '#66cc00', 'QHDH_DAT_HTXH_CayxanhCC', { scenario: 'QH', detailed: false });
-assert(qhdhLight.dashArray === '3.1,1.6' && qhdhLight.color === '#66cc00' && qhdhLight.weight === 0.8, 'dài hạn khác: nét đứt 0.8px cùng màu tô');
+assert(qhdhLight.dashArray === '7.7,3.9' && qhdhLight.color === '#66cc00' && qhdhLight.weight === 2, 'dài hạn khác: nét đứt 2px cùng màu tô');
 
 selectBasemap('positron');
 assert(basemapLabel() === 'Bản đồ đường phố', 'nhãn nền đường phố');
 assert(isLightBasemap() && !thinLightOutline('QP'), 'nền đường phố không viền sáng');
 const onLight = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
-assert(onLight.color === dark && onLight.weight === 0.8, 'quốc phòng trên nền nhạt: nét cùng màu tô');
+assert(onLight.color === dark && onLight.weight === 2, 'quốc phòng trên nền nhạt: nét cùng màu tô');
 noHalo(onLight, 'nền nhạt không quầng');
 const htLight = tt16SymbolStyle('QP', dark, 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false });
 assert(htLight.color === dark && htLight.weight === 1, 'hiện trạng trên nền nhạt giữ màu gốc');
@@ -90,7 +90,7 @@ assert(back.color === lit && back.weight === 0.7, 'đổi lại vệ tinh thì n
 noHalo(back, 'vệ tinh không quầng');
 
 const bare = landParcelStyle('QH_Dat_khac_khong_ma', { phase: 'QH', detailed: false });
-assert(bare.weight === 0.8 && bare.color === bare.fillColor, 'lô không khóa: nét mảnh cùng màu tô');
+assert(bare.weight === 2 && bare.color === bare.fillColor, 'lô không khóa: nét quy hoạch cùng màu tô');
 noHalo(bare, 'lô không khóa không quầng');
 
 function noRoadStroke(style, msg) {
@@ -124,7 +124,7 @@ const block = {
 assert(isNarrowStrip(strip), 'dải hẹp');
 assert(!isNarrowStrip(block), 'lô vuông không phải dải');
 const canal = tt16SymbolStyle('SS', '#0066cc', 'QHDD_DAT_KHAC_Songsuoi', { scenario: 'QH', detailed: false, geometry: strip });
-assert(canal.color === '#0066cc' && canal.weight === 0.8, 'mặt nước nét cùng màu tô');
+assert(canal.color === '#0066cc' && canal.weight === 2, 'mặt nước nét quy hoạch cùng màu tô');
 noHalo(canal, 'mặt nước không quầng');
 
 const viStyle = preferVietnameseLabels({
