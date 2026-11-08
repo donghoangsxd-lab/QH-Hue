@@ -85,8 +85,8 @@ function markerLatLng(it) {
   return null;
 }
 
-function paintLegend() {
-  document.querySelectorAll('.apt-mark').forEach(el => {
+export function paintAptLegendMarks(root = document) {
+  root.querySelectorAll('.apt-mark').forEach(el => {
     if (el.dataset.drawn) return;
     el.innerHTML = dropletSvg(el.dataset.kind, el.dataset.plan === '1');
     el.dataset.drawn = '1';
@@ -455,7 +455,7 @@ export function countApartments() {
 
 export function initApartmentLayer() {
   if (!map) return;
-  paintLegend();
+  paintAptLegendMarks();
   restorePopMethod();
   if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
   setWardPopHtml(name => {

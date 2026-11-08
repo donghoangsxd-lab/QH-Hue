@@ -1,4 +1,4 @@
-// Bảng danh mục độc lập: đồ án quy hoạch (B) và dự án đầu tư (F).
+// Bảng danh mục độc lập: trục B mở đồ án quy hoạch; trục F mở dự án đầu tư (không chung tab nguồn).
 // Dùng #bottomPanel + bottom-max; không gọi Cloud Run mới.
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, loadHtml2Pdf, inlineSpriteIcons } from './utils.js';
@@ -43,6 +43,21 @@ function syncMaxBtn() {
   btn.setAttribute('aria-label', btn.title);
 }
 
+function paintChrome() {
+  const title = $('catalogTableTitle');
+  const colName = $('catalogColName');
+  const colScale = $('catalogColScale');
+  if (source === 'invest') {
+    if (title) title.textContent = 'DANH MỤC DỰ ÁN ĐẦU TƯ';
+    if (colName) colName.textContent = 'Tên dự án';
+    if (colScale) colScale.textContent = 'Quy mô';
+  } else {
+    if (title) title.textContent = 'DANH MỤC ĐỒ ÁN QUY HOẠCH';
+    if (colName) colName.textContent = 'Tên quy hoạch';
+    if (colScale) colScale.textContent = 'Cấp';
+  }
+}
+
 function paintFilterOptions() {
   const sel = $('catalogFilter');
   if (!sel) return;
@@ -54,18 +69,6 @@ function paintFilterOptions() {
   if (![...sel.options].some(o => o.value === cur)) {
     filterLevel = '';
     sel.value = '';
-  }
-}
-
-function paintTabs() {
-  document.querySelectorAll('.catalog-src-btn').forEach(btn => {
-    const on = btn.dataset.catalogSrc === source;
-    btn.classList.toggle('is-on', on);
-    btn.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  const title = $('catalogTableTitle');
-  if (title) {
-    title.textContent = source === 'invest' ? 'DANH MỤC DỰ ÁN ĐẦU TƯ' : 'DANH MỤC ĐỒ ÁN QUY HOẠCH';
   }
 }
 
@@ -88,7 +91,8 @@ function paintTable() {
   visibleRows = filterCatalogRows(rowsCache, { query, level: filterLevel });
   const body = $('catalogTableBody');
   const count = $('catalogCount');
-  if (count) count.textContent = `${visibleRows.length} / ${rowsCache.length} dòng`;
+  const unit = source === 'invest' ? 'dự án' : 'đồ án';
+  if (count) count.textContent = `${visibleRows.length} / ${rowsCache.length} ${unit}`;
   if (!body) return;
   if (!visibleRows.length) {
     body.innerHTML = `<tr><td colspan="6" class="catalog-empty">Không có dòng khớp bộ lọc.</td></tr>`;
@@ -110,7 +114,7 @@ function paintTable() {
 }
 
 async function refresh() {
-  paintTabs();
+  paintChrome();
   paintFilterOptions();
   await ensureData();
   paintTable();
@@ -146,7 +150,7 @@ function exportCsv() {
     return;
   }
   const name = source === 'invest' ? 'danh-muc-du-an-dau-tu.csv' : 'danh-muc-do-an-quy-hoach.csv';
-  downloadCsv(name, rowsToCsv(visibleRows));
+  downloadCsv(name, rowsToCsv(visibleRows, source));
 }
 
 async function exportPdf() {
@@ -198,18 +202,6 @@ export function initCatalogTable() {
   $('btnOpenCatalogInvest')?.addEventListener('click', () => {
     void openCatalogTable({ source: 'invest' });
   });
-  $('catalogTabPlan')?.addEventListener('click', () => {
-    if (source === 'plan') return;
-    source = 'plan';
-    filterLevel = filterKeyFromMapLevel(getLevel());
-    void refresh();
-  });
-  $('catalogTabInvest')?.addEventListener('click', () => {
-    if (source === 'invest') return;
-    source = 'invest';
-    filterLevel = document.querySelector('#levelPickDt .level-pick-btn.is-on')?.dataset?.dtTab || '';
-    void refresh();
-  });
   $('catalogSearch')?.addEventListener('input', (e) => {
     query = e.target.value || '';
     paintTable();
@@ -233,7 +225,6 @@ export function initCatalogTable() {
     if (!btn) return;
     void onZoom(btn.dataset.catalogZoom);
   });
-  // Đóng chế độ danh mục khi thu panel tổng hợp cũ (nút expand mở lại thống kê).
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => {
     if (document.body.classList.contains('catalog-table-on')) closeCatalogTable();
   });

@@ -1,10 +1,7 @@
 // Ghép hiệu chỉnh admin (invest_edits) lên danh sách sheet 15-DA phía client —
 // tránh chờ Cloud Run trên đường tải lạnh trục F.
 import { sheetProjectName } from './investMatch.js';
-
-const GROUP_IDS = new Set([
-  'dvtm', 'congnghiep', 'nangluong', 'khudothi', 'chungcu', 'nongnghiep', 'vanhoaxahoi', 'khac'
-]);
+import { normalizeInvestGroupId } from './investClassify.js';
 
 export function sheetSig(rows) {
   const list = Array.isArray(rows) ? rows : [];
@@ -27,8 +24,8 @@ export function parseInvestEditsStore(data) {
       match: String(it.match || '').trim().slice(0, 200),
       fields: it.fields
     };
-    const groupId = String(it.groupId || '').trim();
-    if (GROUP_IDS.has(groupId)) row.groupId = groupId;
+    const groupId = normalizeInvestGroupId(it.groupId);
+    if (groupId) row.groupId = groupId;
     if (it.geometry && (it.geometry.type === 'Polygon' || it.geometry.type === 'MultiPolygon')) {
       row.geometry = it.geometry;
     } else if (it.geometry === null) {

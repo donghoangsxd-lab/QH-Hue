@@ -849,7 +849,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 #levelPickDt {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   flex-wrap: nowrap;
   overflow: visible;
@@ -859,15 +859,19 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   flex: none;
   width: 100%;
   min-width: 0;
+  min-height: calc(32px * var(--k));
+  height: auto;
   justify-content: center;
-  padding: 0 3px;
+  align-items: center;
+  padding: 3px 4px;
 }
 #levelPickDt .level-pick-btn span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  text-align: center;
   font-size: 10px;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 #axisDauTu .dt-invest-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
@@ -3032,23 +3036,41 @@ body.catalog-table-on .bp-body {
   display: flex;
   flex-direction: column;
 }
-.catalog-table-head { gap: 8px; flex-wrap: wrap; }
+/* Một hàng cố định: tiêu đề + tìm + lọc co giãn; nút CSV/PDF/max/đóng luôn neo phải, không bị đẩy ẩn. */
+.catalog-table-head {
+  height: auto;
+  min-height: var(--bp-head-h);
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
 .catalog-table-titles {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  white-space: normal;
 }
-.catalog-src-tabs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.catalog-src-btn.is-on {
-  background: var(--accent-orange, #f97316);
-  color: #111;
-  border-color: transparent;
+.catalog-table-titles .bp-part-title {
+  flex: 0 0 auto;
+  max-width: min(280px, 36vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.catalog-table-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  position: relative;
+  z-index: 2;
 }
 .catalog-search {
-  width: min(220px, 40vw);
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 96px;
+  max-width: 220px;
   height: calc(22px * var(--k));
   padding: 0 6px;
   font-size: var(--fs-sm);
@@ -3058,8 +3080,23 @@ body.catalog-table-on .bp-body {
   border: 1px solid var(--border-color);
   border-radius: var(--r-sm);
 }
-.catalog-filter { max-width: 160px; }
-.catalog-count { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
+.catalog-filter {
+  flex: 0 1 120px;
+  width: auto;
+  min-width: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.catalog-count {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12em;
+}
 .catalog-table-scroll {
   flex: 1;
   min-height: 0;
@@ -7568,8 +7605,34 @@ body.project-review.la-page #projectReviewHost {
 #legendDauTu { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 2px; }
 #legendDauTu[hidden] { display: none !important; }
 #legendDauTu .layer-type-icon,
-#legendDauTu .apt-legend { flex: 0 0 auto; }
+#legendDauTu .apt-legend,
+#legendDauTu .invest-legend-drop,
+#legendDauTu .invest-bound-swatch { flex: 0 0 auto; }
 #legendDauTu .apt-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+#legendDauTu .invest-legend-block { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px; }
+#legendDauTu .invest-legend-h {
+  margin: 4px 0 2px;
+  font-family: var(--axis-font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--axis-color-muted, var(--text-muted));
+}
+#legendDauTu .invest-legend-row { cursor: default; }
+#legendDauTu .invest-legend-row.is-sub { padding-left: 14px; }
+#legendDauTu .invest-legend-drop {
+  width: 14px;
+  height: 19px;
+  display: block;
+}
+#legendDauTu .invest-bound-swatch {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px dashed #ff00ff;
+  background: rgba(255, 0, 255, 0.14);
+  border-radius: 2px;
+}
 #tabLegend.is-dt .legend-display,
 #tabLegend.is-dt .legend-main,
 #tabLegend.is-dt .legend-find,

@@ -10,6 +10,8 @@ import { LEVEL_EVENT } from './mapLevel.js';
 import { renderRoadSections } from './roadSections.js';
 import { renderTrafficLegend } from './qhcRoads.js';
 import { BUFFER_COLORS, BUFFER_KEYS } from './state.js';
+import { investLegendHtml } from './investLayer.js';
+import { paintAptLegendMarks } from './apartmentLayer.js';
 
 const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
@@ -36,23 +38,13 @@ const SOCIAL_LEGEND = [
   ['chk_c9', 'Unused.png', 'Cơ sở chưa sử dụng', '12-CSD']
 ];
 
-const DAU_TU_LEGEND = [
-  ['chk_c14', 'Noxh.svg', 'Chung cư'],
-  ['chk_invest', '', 'Dự án kêu gọi đầu tư']
-];
-
 function dauTuLegendHtml() {
-  const rows = DAU_TU_LEGEND.filter(([id]) => document.getElementById(id)?.checked).map(([id, file, label]) => {
-    const mark = file
-      ? `<img class="layer-type-icon" src="./icons/${file}" alt="" width="14" height="16">`
-      : `<svg class="ico" aria-hidden="true"><use href="#i-coverage"/></svg>`;
-    return `<label class="htkt-legend-row">${mark}<span>${label}</span><input type="checkbox" data-xh-mirror="${id}" checked aria-label="${label}"></label>`;
-  }).join('');
-  if (!rows) return '<p class="cn-empty">Bật lớp trong tab đang chọn để xem ký hiệu.</p>';
-  const apt = document.getElementById('chk_c14')?.checked
-    ? (document.querySelector('#aptBox .apt-legend')?.outerHTML || '')
-    : '';
-  return rows + apt;
+  // Đủ ký hiệu nhóm; bật/tắt lớp invest ở panel F / nút mắt nhóm, không mirror trong Chú giải.
+  const invest = investLegendHtml();
+  const aptOn = !!document.getElementById('chk_c14')?.checked;
+  const aptRow = `<label class="htkt-legend-row"><img class="layer-type-icon" src="./icons/Noxh.svg" alt="" width="14" height="16"><span>Chung cư (điểm)</span><input type="checkbox" data-xh-mirror="chk_c14"${aptOn ? ' checked' : ''} aria-label="Chung cư"></label>`;
+  const aptKinds = document.querySelector('#aptBox .apt-legend')?.outerHTML || '';
+  return `${invest}<div class="invest-legend-block"><b class="invest-legend-h">Chung cư</b>${aptRow}${aptKinds}</div>`;
 }
 
 function bufferPressed(bufKey) {
@@ -275,7 +267,10 @@ export function initLegendPanel() {
     const dtLegend = document.getElementById('legendDauTu');
     if (dtLegend) {
       dtLegend.hidden = !dautu;
-      if (dautu) dtLegend.innerHTML = dauTuLegendHtml();
+      if (dautu) {
+        dtLegend.innerHTML = dauTuLegendHtml();
+        paintAptLegendMarks(dtLegend);
+      }
     }
     const main = frame.querySelector('.legend-main');
     if (main) main.hidden = (xahoi || dautu) ? true : (hatang ? false : !symbols);

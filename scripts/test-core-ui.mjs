@@ -252,20 +252,19 @@ const dtPick = innerById(html, 'levelPickDt');
 assert.match(html, /class="level-pick level-pick-dt"/);
 let dtAt = 0;
 for (const [id, label] of [
-  ['dvtm', 'DVTM'],
-  ['congnghiep', 'Công nghiệp'],
-  ['nangluong', 'Năng lượng'],
-  ['khudothi', 'Đô thị'],
-  ['chungcu', 'Chung cư'],
+  ['dvtm', 'Dịch vụ, thương mại'],
+  ['congnghiep', 'Công nghiệp, năng lượng'],
+  ['khudothi', 'Đô thị, nhà ở'],
   ['nongnghiep', 'Nông nghiệp'],
-  ['vanhoaxahoi', 'VHXH'],
+  ['vanhoaxahoi', 'Văn hóa - Y tế - Giáo dục'],
   ['khac', 'Dự án khác']
 ]) {
   const at = dtPick.indexOf(`data-dt-tab="${id}"`);
   assert.ok(at > dtAt, `sai thứ tự tab ${label}`);
   dtAt = at;
-  assert.ok(dtPick.slice(at, at + 280).includes(label), `thiếu nhãn ${label}`);
+  assert.ok(dtPick.slice(at, at + 320).includes(label), `thiếu nhãn ${label}`);
 }
+assert.doesNotMatch(dtPick, /data-dt-tab="nangluong"|data-dt-tab="chungcu"/);
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
 assert.match(dauTu, /class="dt-invest-check"/);
@@ -281,7 +280,10 @@ assert.match(dauTu, /id="aptBox"/);
 assert.match(dauTu, /id="aptList"/);
 assert.match(dauTu, /id="investList-dvtm"/);
 assert.match(dauTu, /id="investList-khac"/);
-assert.match(dauTu, /id="investList-chungcu"/);
+assert.match(dauTu, /id="investList-khudothi"/);
+assert.doesNotMatch(dauTu, /id="investList-chungcu"|id="investList-nangluong"|data-dt-pane="chungcu"|data-dt-pane="nangluong"/);
+assert.match(read('docs/ui-spec.md'), /sáu tab nhóm|lưới hai hàng ba cột/);
+assert.match(read('public/css/style.css'), /#levelPickDt[\s\S]*repeat\(3/);
 assert.match(dauTu, /id="dtListPane"/);
 assert.match(dauTu, /id="btnOpenCatalogInvest"/);
 assert.match(plan, /id="btnOpenCatalogPlan"/);
@@ -289,9 +291,13 @@ assert.match(html, /id="catalogTableHost"/);
 assert.match(html, /id="btnCatalogExportCsv"/);
 assert.match(html, /id="btnCatalogExportPdf"/);
 assert.match(html, /id="catalogTableBody"/);
+assert.doesNotMatch(html, /id="catalogTabPlan"|id="catalogTabInvest"|catalog-src-tabs/);
 assert.match(read('public/js/catalogTable.js'), /openCatalogTable|initCatalogTable/);
+assert.doesNotMatch(read('public/js/catalogTable.js'), /catalogTabPlan|catalogTabInvest/);
 assert.match(read('public/js/app.js'), /initCatalogTable/);
 assert.match(read('docs/ui-spec.md'), /catalogTableHost|btnOpenCatalogPlan|btnOpenCatalogInvest/);
+assert.match(read('docs/ui-spec.md'), /chỉ ở chế độ.*Dự án đầu tư|không tab Đồ án quy hoạch/);
+assert.match(read('docs/ui-spec.md'), /không có tab chuyển sang dự án đầu tư/);
 assert.match(dauTu, /id="investInfoSlot"/);
 assert.match(dauTu, /id="investLoad"/);
 assert.match(read('public/js/investLayer.js'), /startLoadMeter|showInvestLoad|primeInvestLoad/);
@@ -309,9 +315,11 @@ assert.match(read('public/css/style.css'), /body\.invest-info-open #investInfoSl
 assert.match(read('docs/ui-spec.md'), /investInfoSlot|#investCard/);
 assert.match(read('public/js/investLayer.js'), /dt-area|areaTextOf/);
 assert.match(read('public/js/investLayer.js'), /data-dvtm-fold|DVTM_SUBGROUPS/);
+assert.match(read('public/js/investLayer.js'), /toggleInvestAxisAll|investAxisAllOn/);
+assert.match(read('public/js/chuyenNganh.js'), /toggleInvestAxisAll/);
 assert.match(read('public/js/investClassify.js'), /classifyDvtmSub/);
 assert.match(read('docs/ui-spec.md'), /cuối dòng hiện diện tích/);
-assert.match(read('docs/ui-spec.md'), /Tab DVTM chia 5 nhóm con/);
+assert.match(read('docs/ui-spec.md'), /Tab Dịch vụ, thương mại chia 5 nhóm con/);
 assert.match(read('docs/ui-spec.md'), /cùng kiểu công trình kiến trúc Pháp/);
 assert.match(dauTu, /class="level-pick level-pick-dt"/);
 assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);
@@ -321,9 +329,14 @@ assert.ok(axisDock.indexOf('data-axis-dock="kientruc"') < axisDock.indexOf('data
 assert.match(axisDock, /title="F\. Dự án đầu tư"/);
 assert.match(read('public/js/facetStore.js'), /F\. Dự án đầu tư/);
 assert.match(read('public/js/chuyenNganh.js'), /'dautu'/);
-assert.match(read('public/js/legendPanel.js'), /dauTuLegendHtml/);
+assert.match(read('public/js/legendPanel.js'), /dauTuLegendHtml|investLegendHtml/);
+assert.doesNotMatch(read('public/js/legendPanel.js'), /data-xh-mirror="chk_invest"/);
+assert.doesNotMatch(read('public/js/legendPanel.js'), /\['chk_invest'/);
+assert.match(read('public/js/investLayer.js'), /export function investLegendHtml/);
+assert.match(read('public/js/investLayer.js'), /DVTM_SUBGROUPS|GROUP_LOOK/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /LEGEND_OFF = new Set\(\[[^\]]*dautu/);
 assert.match(read('docs/ui-spec.md'), /F\. Dự án đầu tư/);
+assert.match(read('docs/ui-spec.md'), /Không checkbox «Dự án kêu gọi đầu tư»/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
 assert.doesNotMatch(plan, /id="inputIsoRadius"/);
