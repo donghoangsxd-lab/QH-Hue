@@ -8,6 +8,8 @@ export function cacheControlFor(name) {
   const n = String(name || '').replace(/^\/+/, '');
   if (!n || n.includes('..') || n.includes('\\')) return 'private, no-store';
   if (n === 'infrastructure_hue.json') return INFRA_JSON;
+  // Sheet 15-DA / hiệu chỉnh admin: ghi đè cùng khóa (Apps Script + saveInvest*).
+  if (n === 'invest_calls.json' || n === 'invest_edits.json') return INFRA_JSON;
   if (n === 'cadastre/thuadat-2016.pmtiles') return IMMUTABLE;
   if (n === 'gba/buildings.pmtiles') return IMMUTABLE;
   if (n.startsWith('cache/sat/v1/') && n.endsWith('.png')) return IMMUTABLE;

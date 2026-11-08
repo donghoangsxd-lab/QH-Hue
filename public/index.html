@@ -548,7 +548,9 @@
         <!-- Vùng danh sách: bảng lô quy hoạch (#planInfoSlot) phủ lên vùng này khi mở -->
         <div id="planListPane" class="plan-list-pane">
         <div id="planInfoSlot" class="plan-info-slot" hidden></div>
-        <div class="cn-tools" id="axisToolsQuyHoach"></div>
+        <div class="cn-tools" id="axisToolsQuyHoach">
+          <button type="button" class="bp-btn catalog-open-btn" id="btnOpenCatalogPlan" title="Mở bảng danh mục đồ án quy hoạch (xuất CSV/PDF, phóng toàn màn hình)" aria-label="Bảng danh mục đồ án"><svg class="ico"><use href="#i-table"/></svg>Bảng danh mục</button>
+        </div>
         <span class="layer-main-count" id="planTabCount" hidden title="Số đồ án đang hiện / tổng số"></span>
         <div hidden>
           <input type="checkbox" id="chk_projects" title="QHPK 1/2.000: ranh mọi đồ án. Tick một đồ án hoặc bấm ranh để hiện lô bên trong.">
@@ -719,6 +721,9 @@
               <!-- Vùng danh sách: bảng thông tin dự án (#investInfoSlot) phủ lên vùng này khi mở — cùng logic #planInfoSlot -->
               <div id="dtListPane" class="dt-list-pane">
                 <div id="investInfoSlot" class="invest-info-slot" hidden></div>
+                <div class="cn-tools catalog-dt-tools">
+                  <button type="button" class="bp-btn catalog-open-btn" id="btnOpenCatalogInvest" title="Mở bảng danh mục dự án đầu tư (xuất CSV/PDF, phóng toàn màn hình)" aria-label="Bảng danh mục dự án"><svg class="ico"><use href="#i-table"/></svg>Bảng danh mục</button>
+                </div>
                 <div id="dtList" class="project-list">
                   <div data-dt-pane="dvtm"><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
@@ -1498,6 +1503,42 @@
     </div>
     <div class="bp-body" id="bpBody">
       <div id="projectReviewHost"></div>
+      <!-- Chế độ danh mục đồ án (B) / dự án đầu tư (F): tách khỏi thống kê phường; full màn hình qua bottom-max -->
+      <div id="catalogTableHost" class="catalog-table-host" hidden>
+        <div class="bp-part-head catalog-table-head">
+          <div class="bp-title-wrap catalog-table-titles">
+            <b class="bp-part-title" id="catalogTableTitle">DANH MỤC</b>
+            <div class="catalog-src-tabs" role="tablist" aria-label="Nguồn danh mục">
+              <button type="button" class="bp-btn catalog-src-btn is-on" role="tab" id="catalogTabPlan" data-catalog-src="plan" aria-selected="true">Đồ án quy hoạch</button>
+              <button type="button" class="bp-btn catalog-src-btn" role="tab" id="catalogTabInvest" data-catalog-src="invest" aria-selected="false">Dự án đầu tư</button>
+            </div>
+            <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, phường/xã…" aria-label="Tìm trong danh mục">
+            <select id="catalogFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc danh mục"></select>
+            <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
+          </div>
+          <div class="bp-actions" data-html2canvas-ignore="true">
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogExportCsv" title="Xuất CSV" aria-label="Xuất CSV"><svg class="ico"><use href="#i-file"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogExportPdf" title="Xuất PDF danh mục" aria-label="Xuất PDF danh mục"><svg class="ico"><use href="#i-printer"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogClose" title="Đóng bảng danh mục" aria-label="Đóng bảng danh mục"><svg class="ico"><use href="#i-close"/></svg></button>
+          </div>
+        </div>
+        <div class="catalog-table-scroll" id="catalogTableScroll">
+          <table class="data-table catalog-data-table" id="catalogTable">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Tên quy hoạch / dự án</th>
+                <th>Phường / xã</th>
+                <th>Quy mô</th>
+                <th>Ranh giới</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody id="catalogTableBody"></tbody>
+          </table>
+        </div>
+      </div>
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
       <!-- Khối xoay 3 mặt: cơ cấu theo diện tích → số lượng 9 loại hạ tầng → hệ thống giao thông (phóng to: xếp chồng) -->
       <div class="bp-part bp-part1">
