@@ -1665,8 +1665,6 @@ function paint() {
   paintAxisAll();
   paintForeignAxes();
   syncViewSwitchVisibility();
-  const tools = document.getElementById('axisToolsQuyHoach');
-  if (tools) tools.hidden = true;
   applyLayerQuery();
   publishSectorLegend(false);
   document.dispatchEvent(new CustomEvent('qh:legend-sync'));
