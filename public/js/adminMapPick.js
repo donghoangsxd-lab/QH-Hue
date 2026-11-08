@@ -211,54 +211,24 @@ export function selectAdminUrban(u, { infoEv } = {}) {
   if (infoEv) openAdminInfoCard({ kind: 'urban', urban: u }, infoEv);
 }
 
-function openChooser(hits, latlng, m, ev) {
-  closeAdminChooser();
-  const { wardLabel, urbanLabel } = adminHitLabels(hits);
-  const el = document.createElement('div');
-  el.className = 'map-ctx-menu admin-pick-chooser';
-  el.setAttribute('role', 'menu');
-  el.innerHTML = [
-    `<div class="map-ctx-note">Chọn loại ranh tại điểm</div>`,
-    `<button type="button" class="map-ctx-item" role="menuitem" data-pick="ward">${ico('map')}<span>Phường/xã: ${escapeHtml(shortPlaceName(wardLabel))}</span></button>`,
-    urbanLabel
-      ? `<button type="button" class="map-ctx-item" role="menuitem" data-pick="urban">${ico('layers')}<span>Đô thị: ${escapeHtml(urbanLabel)}</span></button>`
-      : `<button type="button" class="map-ctx-item" role="menuitem" disabled>${ico('layers')}<span>Không có đô thị tại đây</span></button>`
-  ].join('');
-  document.body.appendChild(el);
-  chooserEl = el;
-  clampBox(el, ev?.clientX ?? 80, ev?.clientY ?? 80);
-  el.addEventListener('click', (e) => {
-    const pick = e.target.closest('[data-pick]')?.dataset.pick;
-    if (!pick) return;
-    closeAdminChooser();
-    // Chuột trái: chỉ tô ranh + đổi tab; thẻ HT|QH dành cho chuột phải.
-    if (pick === 'ward') selectAdminWard(hits.ward.name, { tipAt: latlng });
-    else if (pick === 'urban' && hits.urban) selectAdminUrban(hits.urban);
-  });
-}
-
-/** Chuột trái hỗn hợp trên tab ĐVHC / Đô thị. */
+/**
+ * Chuột trái trên tab ĐVHC / Đô thị — khóa theo tab đang mở (không nhảy tab):
+ * Đô thị chỉ chọn đô thị; ĐVHC chỉ chọn phường/xã. Chuột phải vẫn mở menu hai lựa chọn.
+ */
 export async function consumeAdminHybridClick(latlng, m, ev) {
   if (!isDvhcBrowse() && !isDothiBrowse()) return false;
   if (!latlng) return false;
   closeAdminChooser();
   const hits = await resolveAdminHits(latlng, m || map);
-  const hasUrban = !!hits.urban;
-  if (hasUrban && hits.hasWardGeom) {
-    openChooser(hits, latlng, m, ev);
+
+  if (isDothiBrowse()) {
+    if (hits.urban) selectAdminUrban(hits.urban);
+    else clearUrbanMapPick();
     return true;
   }
-  if (hasUrban) {
-    selectAdminUrban(hits.urban);
-    return true;
-  }
-  if (hits.hasWardGeom) {
-    selectAdminWard(hits.ward.name, { tipAt: latlng });
-    return true;
-  }
-  // Ngoài 40 đơn vị: về thành phố; tab đô thị thì bỏ chọn đô thị.
-  if (isDothiBrowse() && !isDvhcBrowse()) clearUrbanMapPick();
-  selectAdminWard(DVHC_CITY.name, { tipAt: latlng });
+
+  if (hits.hasWardGeom) selectAdminWard(hits.ward.name, { tipAt: latlng });
+  else selectAdminWard(DVHC_CITY.name, { tipAt: latlng });
   return true;
 }
 
