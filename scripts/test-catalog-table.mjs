@@ -38,5 +38,9 @@ assert.match(csv, /Chưa/);
 
 assert.ok(catalogFilterOptions('plan').some(o => o.value === 'QHPK'));
 assert.ok(catalogFilterOptions('invest').some(o => o.value === 'dvtm'));
+assert.equal(catalogFilterOptions('invest').find(o => o.value === 'dvtm').label, 'Dịch vụ, thương mại');
+
+const csvInvest = rowsToCsv(filterCatalogRows(invest, {}), 'invest');
+assert.match(csvInvest, /Tên dự án/);
 
 console.log('test-catalog-table: ok');

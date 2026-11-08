@@ -192,12 +192,14 @@ function parseInvestCalls(text) {
 }
 
 const INVEST_GROUP_IDS = new Set([
-  'dvtm', 'congnghiep', 'nangluong', 'khudothi', 'chungcu', 'nongnghiep', 'vanhoaxahoi', 'khac'
+  'dvtm', 'congnghiep', 'khudothi', 'nongnghiep', 'vanhoaxahoi', 'khac'
 ]);
+const INVEST_GROUP_LEGACY = { nangluong: 'congnghiep', chungcu: 'khudothi' };
 
 function cleanInvestGroupId(value) {
   const id = cleanInvestText(value, 40);
-  return INVEST_GROUP_IDS.has(id) ? id : '';
+  const mapped = INVEST_GROUP_LEGACY[id] || id;
+  return INVEST_GROUP_IDS.has(mapped) ? mapped : '';
 }
 
 function cleanInvestGeometry(raw) {

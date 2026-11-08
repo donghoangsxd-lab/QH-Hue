@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import {
-  classifyInvestGroup, classifyDvtmSub, isInvestGroupId, INVEST_GROUPS,
-  DVTM_SUBGROUPS, DVTM_SUB_DEFAULT
+  classifyInvestGroup, classifyDvtmSub, isInvestGroupId, normalizeInvestGroupId,
+  INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT
 } from '../public/js/investClassify.js';
 
-assert.equal(INVEST_GROUPS.length, 8);
+assert.equal(INVEST_GROUPS.length, 6);
 assert.equal(INVEST_GROUPS[0].id, 'dvtm');
-assert.equal(INVEST_GROUPS[7].id, 'khac');
+assert.equal(INVEST_GROUPS[5].id, 'khac');
+assert.equal(INVEST_GROUPS[1].label, 'Công nghiệp, năng lượng');
+assert.equal(INVEST_GROUPS[2].label, 'Đô thị, nhà ở');
+assert.equal(INVEST_GROUPS[4].label, 'Văn hóa - Y tế - Giáo dục');
 assert.ok(isInvestGroupId('nangluong'));
+assert.equal(normalizeInvestGroupId('nangluong'), 'congnghiep');
+assert.equal(normalizeInvestGroupId('chungcu'), 'khudothi');
 assert.equal(isInvestGroupId('dien'), false);
 assert.equal(DVTM_SUBGROUPS.length, 5);
 assert.equal(DVTM_SUB_DEFAULT, 'sangon');
@@ -32,7 +37,7 @@ assert.equal(classifyInvestGroup(row('Dịch vụ đô thị', 'Công viên ngh�
 assert.equal(classifyInvestGroup(row('Công nghệ thông tin', 'Trung tâm CNTT')), 'khac');
 assert.equal(classifyInvestGroup(row('Thương mại, Dịch vụ và Du lịch; BĐS', 'Hỗn hợp')), 'khac');
 
-assert.equal(classifyInvestGroup(row('Năng lượng', 'Nhà máy điện mặt trời')), 'nangluong');
+assert.equal(classifyInvestGroup(row('Năng lượng', 'Nhà máy điện mặt trời')), 'congnghiep');
 assert.equal(classifyInvestGroup(row('Công nghiệp', 'Cụm CN')), 'congnghiep');
 assert.equal(classifyInvestGroup(row('Nông nghiệp', 'Trồng sen')), 'nongnghiep');
 assert.equal(classifyInvestGroup(row('Giáo dục - đào tạo', 'Trường học')), 'vanhoaxahoi');
@@ -45,7 +50,17 @@ assert.equal(classifyInvestGroup(row('Thương mại, Dịch vụ và Du lịch'
 assert.equal(classifyInvestGroup(row('Du lịch', 'Resort')), 'dvtm');
 assert.equal(classifyInvestGroup(row('Dịch vụ', 'Bãi đỗ xe')), 'dvtm');
 
-assert.equal(classifyInvestGroup(row('Bất động sản', 'Chung cư mẫu NOXH')), 'chungcu');
-assert.equal(classifyInvestGroup(row('Công nghiệp', 'X'), 'X', 'nangluong'), 'nangluong');
+assert.equal(classifyInvestGroup(row('Bất động sản', 'Chung cư mẫu NOXH')), 'khudothi');
+assert.equal(classifyInvestGroup(row('Công nghiệp', 'X'), 'X', 'nangluong'), 'congnghiep');
+assert.equal(classifyInvestGroup(row('Công nghiệp', 'Y'), 'Y', 'chungcu'), 'khudothi');
+
+// Nhà ở nổi trội hơn lĩnh vực giáo dục; trường học thuần vẫn VHXH.
+assert.equal(classifyInvestGroup(row('Giáo dục - đào tạo', 'Khu nhà ở sinh viên (nhà ở cho thuê)')), 'khudothi');
+assert.equal(classifyInvestGroup(row('Giáo dục - đào tạo', 'Ký túc xá sinh viên phía Nam')), 'khudothi');
+assert.equal(classifyInvestGroup(row('Giáo dục và Đào tạo', 'Khu trường học chất lượng cao Thủy Dương')), 'vanhoaxahoi');
+assert.equal(
+  classifyInvestGroup(row('Giáo dục - đào tạo', 'Các dự án đầu tư cơ sở đào tạo và phát triển nguồn nhân lực chất lượng cao')),
+  'vanhoaxahoi'
+);
 
 console.log('test-invest-classify: ok');

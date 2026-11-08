@@ -3,7 +3,9 @@ import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
 import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 
-export const CATALOG_HEADERS = ['STT', 'Tên quy hoạch / dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
+export const CATALOG_HEADERS_PLAN = ['STT', 'Tên quy hoạch', 'Phường / xã', 'Cấp', 'Ranh giới', 'Ghi chú'];
+export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
+export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
 
 const LEVEL_SCALE = {
   QHC: 'QHC',
@@ -94,8 +96,9 @@ export function filterCatalogRows(rows, { query = '', level = '' } = {}) {
 
 export function catalogFilterOptions(source) {
   if (source === 'invest') {
+    // Nhãn ngắn (DVTM…) để ô lọc không tràn toolbar; title dài chỉ dùng title attribute ngoài UI này.
     return [{ value: '', label: 'Tất cả nhóm' }].concat(
-      INVEST_GROUPS.map(g => ({ value: g.id, label: g.title || g.label }))
+      INVEST_GROUPS.map(g => ({ value: g.id, label: g.label || g.title }))
     );
   }
   return [
@@ -106,12 +109,13 @@ export function catalogFilterOptions(source) {
   ];
 }
 
-export function rowsToCsv(rows) {
+export function rowsToCsv(rows, source = 'plan') {
   const escape = (v) => {
     const s = String(v ?? '');
     return /["\n\r,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const lines = [CATALOG_HEADERS.join(',')];
+  const headers = source === 'invest' ? CATALOG_HEADERS_INVEST : CATALOG_HEADERS_PLAN;
+  const lines = [headers.join(',')];
   (rows || []).forEach((r, i) => {
     lines.push([
       i + 1,

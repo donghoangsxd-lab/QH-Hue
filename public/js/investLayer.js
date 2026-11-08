@@ -60,13 +60,11 @@ const SECTORS = [
   [/bất động sản|đô thị|dân cư|nhà ở|chung cư/i, 'home', '#0ea5e9', '#0369a1']
 ];
 const GROUP_LOOK = {
-  dvtm: { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'DVTM' },
-  congnghiep: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Công nghiệp' },
-  nangluong: { icon: 'bolt', color: '#f59e0b', edge: '#b45309', label: 'Năng lượng' },
-  khudothi: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Đô thị' },
-  chungcu: { icon: 'home', color: '#2563eb', edge: '#1e3a8a', label: 'Chung cư' },
+  dvtm: { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'Dịch vụ, thương mại' },
+  congnghiep: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Công nghiệp, năng lượng' },
+  khudothi: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Đô thị, nhà ở' },
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
-  vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'VHXH' },
+  vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
   khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' }
 };
 const DVTM_LOOK = {
@@ -294,6 +292,50 @@ function dvtmSubMapOn(subId, items) {
   return items.some(p => !investHidden.has(projectKey(p)));
 }
 
+/** Nút #btnAxisAll trên F: cả dự án thuộc tab đang chọn (không chỉ nhóm DVTM đang mở danh sách). */
+export function investAxisAllOn() {
+  if (!$('chk_invest')?.checked) return false;
+  const items = projectsForTab();
+  if (!items.length) return true;
+  return items.every(p => {
+    const id = projectKey(p);
+    return id && !investHidden.has(id);
+  });
+}
+
+export function investAxisAllTip() {
+  return investAxisAllOn()
+    ? 'Tắt mọi dự án của nhóm đang xem trên bản đồ'
+    : 'Bật mọi dự án của nhóm đang xem trên bản đồ';
+}
+
+export function toggleInvestAxisAll() {
+  const tab = activeDtTab();
+  const items = projectsForTab(tab);
+  const turnOn = !investAxisAllOn();
+  if (turnOn) {
+    items.forEach(p => {
+      const id = projectKey(p);
+      if (id) investHidden.delete(id);
+    });
+    if (tab === 'dvtm') DVTM_SUBGROUPS.forEach(s => dvtmFoldOpen.add(s.id));
+    const box = $('chk_invest');
+    if (box && !box.checked) {
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      queueInvestDraw();
+    }
+  } else {
+    items.forEach(p => {
+      const id = projectKey(p);
+      if (id) investHidden.add(id);
+    });
+    queueInvestDraw();
+  }
+  paintInvestList({ tab, counts: false });
+}
+
 function toolBusy() {
   return !!(state.sketchTool || state.adminDrawMode || state.isPickMode || state.activeMeasureType || state.isInspectMode);
 }
@@ -331,16 +373,37 @@ function sectorOf(text, groupId, dvtmSub) {
 }
 
 /** Giọt nước SVG: thân màu ngành, vòng trắng + glyph (cùng mô típ Noxh / HTXH). */
-function sectorDropSvg(sector) {
+function sectorDropSvg(sector, className = 'invest-drop') {
   const fill = sector?.color || '#64748b';
   const edge = sector?.edge || '#334155';
   const raw = DROP_GLYPH[sector?.icon] || DROP_GLYPH.layers;
   const glyph = raw.replaceAll('C', fill).replaceAll('E', edge);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 96" class="invest-drop" aria-hidden="true">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 96" class="${className}" aria-hidden="true">
     <path d="${DROP_PATH}" fill="${fill}" stroke="${edge}" stroke-width="1.5"/>
     <circle cx="35" cy="35" r="26" fill="#fff"/>
     <g transform="translate(23 23)">${glyph}</g>
   </svg>`;
+}
+
+/** Chú giải trục F: đủ giọt nước từng nhóm (+ nhóm con DVTM) và swatch ranh; không checkbox lớp. */
+export function investLegendHtml() {
+  const row = (look, label, nested = false) =>
+    `<div class="htkt-legend-row invest-legend-row${nested ? ' is-sub' : ''}">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${escapeHtml(label)}</span></div>`;
+  const bound = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch" aria-hidden="true"></i><span>Ranh dự án</span></div>`;
+  let html = `<div class="invest-legend-block"><b class="invest-legend-h">Ký hiệu chung</b>${bound}</div>`;
+  html += '<div class="invest-legend-block"><b class="invest-legend-h">Nhóm dự án</b>';
+  for (const g of INVEST_GROUPS) {
+    const look = GROUP_LOOK[g.id] || lookOf('layers', '#64748b', '#334155', g.label);
+    html += row(look, g.label || g.title || g.id);
+    if (g.id === 'dvtm') {
+      for (const s of DVTM_SUBGROUPS) {
+        const sub = DVTM_LOOK[s.id] || lookOf('shop', '#ec4899', '#9d174d', s.label);
+        html += row(sub, s.label || s.title || s.id, true);
+      }
+    }
+  }
+  html += '</div>';
+  return html;
 }
 
 function entry(row, re) {
@@ -750,7 +813,7 @@ function groupCounts() {
   const all = projectList(pack || []);
   const counts = Object.fromEntries(INVEST_GROUPS.map(g => [g.id, 0]));
   all.forEach(p => { if (counts[p.dtGroup] != null) counts[p.dtGroup] += 1; });
-  counts.chungcu += countApartments();
+  counts.khudothi += countApartments();
   return counts;
 }
 

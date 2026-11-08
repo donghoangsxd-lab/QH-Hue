@@ -700,13 +700,11 @@
             <div id="axisDauTu">
               <div class="level-host" id="levelHostDt">
                 <div class="level-pick level-pick-dt" id="levelPickDt" role="listbox" aria-label="Nhóm dự án đầu tư">
-                  <button type="button" class="level-pick-btn is-on" role="option" data-dt-tab="dvtm" aria-selected="true" title="Thương mại, dịch vụ và du lịch"><span>DVTM</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="congnghiep" aria-selected="false" title="Công nghiệp"><span>Công nghiệp</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="nangluong" aria-selected="false" title="Năng lượng"><span>Năng lượng</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khudothi" aria-selected="false" title="Khu đô thị"><span>Đô thị</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="chungcu" aria-selected="false" title="Chung cư"><span>Chung cư</span></button>
+                  <button type="button" class="level-pick-btn is-on" role="option" data-dt-tab="dvtm" aria-selected="true" title="Dịch vụ, thương mại"><span>Dịch vụ, thương mại</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="congnghiep" aria-selected="false" title="Công nghiệp, năng lượng"><span>Công nghiệp, năng lượng</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khudothi" aria-selected="false" title="Đô thị, nhà ở"><span>Đô thị, nhà ở</span></button>
                   <button type="button" class="level-pick-btn" role="option" data-dt-tab="nongnghiep" aria-selected="false" title="Nông nghiệp"><span>Nông nghiệp</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="vanhoaxahoi" aria-selected="false" title="Văn hóa xã hội"><span>VHXH</span></button>
+                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="vanhoaxahoi" aria-selected="false" title="Văn hóa - Y tế - Giáo dục"><span>Văn hóa - Y tế - Giáo dục</span></button>
                   <button type="button" class="level-pick-btn" role="option" data-dt-tab="khac" aria-selected="false" title="Dự án khác"><span>Dự án khác</span></button>
                 </div>
               </div>
@@ -727,9 +725,7 @@
                 <div id="dtList" class="project-list">
                   <div data-dt-pane="dvtm"><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="nangluong" hidden><div id="investList-nangluong" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="khudothi" hidden><div id="investList-khudothi" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="chungcu" hidden>
+                  <div data-dt-pane="khudothi" hidden>
                     <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
                     <div class="flood-box" id="aptBox" style="display:none;">
                       <div class="apt-legend" aria-label="Chú giải chung cư">
@@ -749,7 +745,7 @@
                       <p id="aptStatus" class="apt-status"></p>
                     </div>
                     <div id="aptList" class="project-list"></div>
-                    <div id="investList-chungcu" class="project-list invest-tab-list"></div>
+                    <div id="investList-khudothi" class="project-list invest-tab-list"></div>
                   </div>
                   <div data-dt-pane="nongnghiep" hidden><div id="investList-nongnghiep" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="vanhoaxahoi" hidden><div id="investList-vanhoaxahoi" class="project-list invest-tab-list"></div></div>
@@ -1503,20 +1499,16 @@
     </div>
     <div class="bp-body" id="bpBody">
       <div id="projectReviewHost"></div>
-      <!-- Chế độ danh mục đồ án (B) / dự án đầu tư (F): tách khỏi thống kê phường; full màn hình qua bottom-max -->
+      <!-- Chế độ danh mục: B mở đồ án, F mở dự án — không chung tab nguồn; full màn hình qua bottom-max -->
       <div id="catalogTableHost" class="catalog-table-host" hidden>
         <div class="bp-part-head catalog-table-head">
           <div class="bp-title-wrap catalog-table-titles">
             <b class="bp-part-title" id="catalogTableTitle">DANH MỤC</b>
-            <div class="catalog-src-tabs" role="tablist" aria-label="Nguồn danh mục">
-              <button type="button" class="bp-btn catalog-src-btn is-on" role="tab" id="catalogTabPlan" data-catalog-src="plan" aria-selected="true">Đồ án quy hoạch</button>
-              <button type="button" class="bp-btn catalog-src-btn" role="tab" id="catalogTabInvest" data-catalog-src="invest" aria-selected="false">Dự án đầu tư</button>
-            </div>
             <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, phường/xã…" aria-label="Tìm trong danh mục">
             <select id="catalogFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc danh mục"></select>
             <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
           </div>
-          <div class="bp-actions" data-html2canvas-ignore="true">
+          <div class="bp-actions catalog-table-actions" data-html2canvas-ignore="true">
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportCsv" title="Xuất CSV" aria-label="Xuất CSV"><svg class="ico"><use href="#i-file"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportPdf" title="Xuất PDF danh mục" aria-label="Xuất PDF danh mục"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
@@ -1528,9 +1520,9 @@
             <thead>
               <tr>
                 <th>STT</th>
-                <th>Tên quy hoạch / dự án</th>
+                <th id="catalogColName">Tên</th>
                 <th>Phường / xã</th>
-                <th>Quy mô</th>
+                <th id="catalogColScale">Quy mô</th>
                 <th>Ranh giới</th>
                 <th>Ghi chú</th>
               </tr>

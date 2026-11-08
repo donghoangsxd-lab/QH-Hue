@@ -6,6 +6,7 @@ import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './pl
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
 import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers } from './projectLayer.js';
+import { investAxisAllOn, investAxisAllTip, toggleInvestAxisAll } from './investLayer.js';
 import { clearChamDiemMap } from './chamDiemMap.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -1279,6 +1280,14 @@ function paintAxisAll() {
     btn.setAttribute('aria-label', planLevelAllTip());
     return;
   }
+  if (browseState().axis === 'dautu') {
+    const on = investAxisAllOn();
+    const tip = investAxisAllTip();
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = tip;
+    btn.setAttribute('aria-label', tip);
+    return;
+  }
   const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
   if (!pane) return;
   const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
@@ -1570,6 +1579,13 @@ function toggleAxisAll() {
       const listed = qhc25PhaseLayers();
       listed.forEach(l => setLayerOn(l, !wasOn));
     }
+    paintAxisAll();
+    paintForeignAxes();
+    return;
+  }
+  // F: mọi dự án tab đang chọn (DVTM gồm đủ 5 nhóm con), không chỉ checkbox trong khối đang mở.
+  if (browseState().axis === 'dautu') {
+    toggleInvestAxisAll();
     paintAxisAll();
     paintForeignAxes();
     return;
