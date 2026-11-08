@@ -25,6 +25,7 @@ import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 import { startLoadMeter } from './loadProgress.js';
+import { WARD_NAMES } from './facetStore.js';
 
 const INVEST_SHEET_URL = './data/invest-sheet.json';
 const INVEST_BOUND_URL = './data/invest-boundary.geojson';
@@ -250,8 +251,40 @@ export function primeInvestLoad() {
   beginInvestLoad();
 }
 
+let dtScopeWard = '';
+
+const foldPlace = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
 function activeDtTab() {
-  return document.querySelector('#levelPickDt .level-pick-btn.is-on')?.dataset?.dtTab || 'dvtm';
+  return document.getElementById('dtGroupPick')?.value || 'dvtm';
+}
+
+function activeDtScope() {
+  return dtScopeWard || document.getElementById('dtScopePick')?.value || '';
+}
+
+function fillDtScopePick() {
+  const sel = document.getElementById('dtScopePick');
+  if (!sel || sel.dataset.filled === '1') return;
+  const cur = sel.value || '';
+  const opt = (value, label, on) =>
+    `<option value="${escapeHtml(value)}"${on ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  sel.innerHTML = [opt('', 'Thành phố Huế', !cur)]
+    .concat(WARD_NAMES.map(name => opt(name, name, name === cur)))
+    .join('');
+  sel.dataset.filled = '1';
+}
+
+function projectPlace(p) {
+  return entry(p?.sheet, /địa điểm/i);
+}
+
+function placeMatchesScope(p, ward) {
+  if (!ward) return true;
+  const place = foldPlace(projectPlace(p));
+  if (!place) return false;
+  const needle = foldPlace(ward);
+  return place.includes(needle) || needle.includes(place);
 }
 
 function rowAlias(row) {
@@ -539,7 +572,8 @@ function projectList(features) {
 
 function projectsForTab(tab) {
   const id = tab || activeDtTab();
-  return projectList().filter(p => p.dtGroup === id);
+  const ward = activeDtScope();
+  return projectList().filter(p => p.dtGroup === id && placeMatchesScope(p, ward));
 }
 
 function planMapLive() {
@@ -823,10 +857,8 @@ function paintDtCounts() {
   INVEST_GROUPS.forEach(g => {
     const n = counts[g.id] || 0;
     total += n;
-    const btn = document.querySelector(`#levelPickDt [data-dt-tab="${g.id}"]`);
-    const span = btn?.querySelector('span');
-    if (span) span.textContent = `${g.label} (${n})`;
-    if (btn) btn.title = `${g.title} (${n})`;
+    const opt = document.querySelector(`#dtGroupPick option[value="${g.id}"]`);
+    if (opt) opt.textContent = `${g.label} (${n})`;
   });
   const mag = $('dtMagLabel');
   const magBtn = document.querySelector('#layerMagTrack [data-main-tab="dautu"]');
@@ -1090,9 +1122,12 @@ function projectKey(p) {
 
 function shownPack(features) {
   const tab = activeDtTab();
+  const ward = activeDtScope();
   const drop = new Set();
   projectList(features).forEach(p => {
-    if (p.dtGroup !== tab || investHidden.has(projectKey(p))) p.members.forEach(f => drop.add(f));
+    if (p.dtGroup !== tab || !placeMatchesScope(p, ward) || investHidden.has(projectKey(p))) {
+      p.members.forEach(f => drop.add(f));
+    }
   });
   return features.filter(f => f.geometry && !drop.has(f));
 }
@@ -1971,14 +2006,19 @@ function paintInvestList(opts = {}) {
   groups.forEach(g => {
     const host = $(`investList-${g.id}`);
     if (!host) return;
-    const items = all.filter(p => p.dtGroup === g.id).sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+    const ward = activeDtScope();
+    const items = all
+      .filter(p => p.dtGroup === g.id && placeMatchesScope(p, ward))
+      .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
     if (g.id === 'dvtm') {
       paintDvtmList(host, items);
       return;
     }
     host.innerHTML = items.length
       ? items.map((p, i) => investRow(p, i + 1)).join('')
-      : (pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '');
+      : (pack || sheetRows.length
+        ? `<div class="project-empty">${ward ? `Không có dự án tại ${escapeHtml(ward)}.` : 'Chưa có đồ án.'}</div>`
+        : '');
   });
   if (scroller) scroller.scrollTop = y;
   if (opts.counts !== false) refreshHint();
@@ -2045,7 +2085,11 @@ export async function focusInvest(id) {
   paintInvestList();
   if (!p) return;
   if (p.dtGroup && p.dtGroup !== activeDtTab()) {
-    document.querySelector(`#levelPickDt [data-dt-tab="${p.dtGroup}"]`)?.click();
+    const sel = $('dtGroupPick');
+    if (sel) {
+      sel.value = p.dtGroup;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
   if (p.dtGroup === 'dvtm' && p.dvtmSub) dvtmFoldOpen.add(p.dvtmSub);
   const box = $('chk_invest');
@@ -2098,6 +2142,7 @@ async function setVisible(on) {
 
 export function initInvestLayer() {
   if (!map) return;
+  fillDtScopePick();
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
   document.addEventListener('auth:change', () => {
     if (ready) void flushPending();
@@ -2187,9 +2232,17 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:dt-tab', () => {
     ensureInvestOn();
-    // Danh sách HTML theo từng pane đã dựng sẵn — đổi tab chỉ cần vẽ lại ranh nhóm đang chọn.
+    // Danh sách HTML theo từng pane đã dựng sẵn — đổi nhóm chỉ cần vẽ lại ranh nhóm đang chọn.
     if (!pack) void ensureInvestList();
-    else queueInvestDraw();
+    else {
+      paintInvestList({ counts: false });
+      queueInvestDraw();
+    }
+  });
+  document.addEventListener('qh:dt-scope', (e) => {
+    dtScopeWard = String(e.detail?.ward || '');
+    paintInvestList({ counts: false });
+    queueInvestDraw();
   });
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id === 'dautu') {

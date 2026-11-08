@@ -807,9 +807,12 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   padding-left: 2px;
   padding-right: 2px;
 }
-#levelHostQh,
-#levelHostDt {
+#levelHostQh {
   padding: 4px 0;
+}
+#dtPicks.dt-picks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 4px 2px 6px;
 }
 .level-host-label {
   flex: 0 0 auto;
@@ -845,34 +848,6 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 #levelPickQh { width: 100%; overflow: visible; padding: 4px 0; }
 #levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
 #levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
-#levelHostDt .level-host-label { display: none; }
-#levelPickDt {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  flex-wrap: nowrap;
-  overflow: visible;
-  padding: 4px 0;
-}
-#levelPickDt .level-pick-btn {
-  flex: none;
-  width: 100%;
-  min-width: 0;
-  min-height: calc(32px * var(--k));
-  height: auto;
-  justify-content: center;
-  align-items: center;
-  padding: 3px 4px;
-}
-#levelPickDt .level-pick-btn span {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  text-align: center;
-  font-size: 10px;
-  line-height: 1.25;
-}
 #axisDauTu .dt-invest-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #axisDauTu [data-dt-pane][hidden] { display: none !important; }
 /* Thanh tiến độ khi mở trục F (tải ranh + sheet + vẽ bản đồ) — sticky dưới tab, dễ thấy. */
@@ -959,9 +934,8 @@ body.invest-loading #titleProgress.done {
   color: var(--text-on-accent);
 }
 body.view-ht .level-host { display: none; }
-body.view-ht #levelHostDt { display: flex; }
 body.compare-on .level-pick { display: none; }
-body.compare-on #levelPickDt { display: grid; }
+body.compare-on #dtPicks { display: grid; }
 .invest-admin-tools {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin: 8px 0; padding: 8px; border: 1px solid var(--border, #334155); border-radius: 6px;

@@ -1850,6 +1850,11 @@ function showDauTuTab(id) {
 }
 
 function initDauTuTabs() {
+  // Mặc định hiện pane nhóm đầu; sync từ #dtGroupPick nếu HTML đổi selected.
+  const start = document.getElementById('dtGroupPick')?.value || 'dvtm';
+  document.querySelectorAll('#axisDauTu [data-dt-pane]').forEach(pane => {
+    pane.hidden = pane.dataset.dtPane !== start;
+  });
   document.getElementById('dtPicks')?.addEventListener('change', (e) => {
     if (e.target.matches('[data-dt-group-pick]')) showDauTuTab(e.target.value);
     if (e.target.matches('[data-dt-scope-pick]')) {

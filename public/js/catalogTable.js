@@ -314,7 +314,7 @@ export async function openCatalogTable(opts = {}) {
   } else {
     filterLevel = opts.group != null
       ? String(opts.group)
-      : (document.querySelector('#levelPickDt .level-pick-btn.is-on')?.dataset?.dtTab || '');
+      : (document.getElementById('dtGroupPick')?.value || '');
   }
   setCatalogMode(true);
   setBottomPanelCollapsed(false);

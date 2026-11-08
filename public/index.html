@@ -695,15 +695,22 @@
           </div>
           <div class="layer-main-pane" id="layerPaneDauTu" data-main-pane="dautu" role="tabpanel" hidden>
             <div id="axisDauTu">
-              <div class="level-host" id="levelHostDt">
-                <div class="level-pick level-pick-dt" id="levelPickDt" role="listbox" aria-label="Nhóm dự án đầu tư">
-                  <button type="button" class="level-pick-btn is-on" role="option" data-dt-tab="dvtm" aria-selected="true" title="Dịch vụ, thương mại"><span>Dịch vụ, thương mại</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="congnghiep" aria-selected="false" title="Công nghiệp, năng lượng"><span>Công nghiệp, năng lượng</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khudothi" aria-selected="false" title="Đô thị, nhà ở"><span>Đô thị, nhà ở</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="nongnghiep" aria-selected="false" title="Nông nghiệp"><span>Nông nghiệp</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="vanhoaxahoi" aria-selected="false" title="Văn hóa - Y tế - Giáo dục"><span>Văn hóa - Y tế - Giáo dục</span></button>
-                  <button type="button" class="level-pick-btn" role="option" data-dt-tab="khac" aria-selected="false" title="Dự án khác"><span>Dự án khác</span></button>
-                </div>
+              <div id="dtPicks" class="cn-picks dt-picks">
+                <label><span>Nhóm dự án</span>
+                  <select id="dtGroupPick" data-dt-group-pick aria-label="Nhóm dự án">
+                    <option value="dvtm" selected>Dịch vụ, thương mại</option>
+                    <option value="congnghiep">Công nghiệp, năng lượng</option>
+                    <option value="khudothi">Đô thị, nhà ở</option>
+                    <option value="nongnghiep">Nông nghiệp</option>
+                    <option value="vanhoaxahoi">Văn hóa - Y tế - Giáo dục</option>
+                    <option value="khac">Dự án khác</option>
+                  </select>
+                </label>
+                <label><span>Phạm vi</span>
+                  <select id="dtScopePick" data-dt-scope-pick aria-label="Phạm vi">
+                    <option value="" selected>Thành phố Huế</option>
+                  </select>
+                </label>
               </div>
               <input type="checkbox" id="chk_invest" class="dt-invest-check" hidden aria-hidden="true" tabindex="-1">
               <div id="investLoad" class="invest-load" hidden role="status" aria-live="polite" aria-atomic="true">
