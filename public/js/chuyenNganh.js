@@ -407,31 +407,31 @@ function qhc25SectorLayers(sector, kind) {
     .filter(layer => formAllows(layer, geomOn, false));
 }
 
-/** Lớp GIS giao thông của qhc-hue-2045 — con của chk_gt25; chỉ tải khi tick riêng. */
+/** Lớp GIS giao thông qhc-hue-2045 theo phase; chỉ tải khi tick riêng. */
 function qhc25GtChildLayers(kind) {
-  const rows = qhc25SectorLayers(QHC25_GT_SECTOR, kind);
-  if (kind) return rows;
-  return ['hien-trang', 'quy-hoach'].flatMap(k => qhc25SectorLayers(QHC25_GT_SECTOR, k));
+  return qhc25SectorLayers(QHC25_GT_SECTOR, kind);
 }
 
 function qhc25PhaseLayers(kind = qhc25PhaseKind()) {
   const seen = new Set();
-  return QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind)).filter(layer => {
+  const extra = kind === 'hien-trang' ? qhc25GtChildLayers('hien-trang') : [];
+  return [...extra, ...QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind))].filter(layer => {
     if (seen.has(layer.id)) return false;
     seen.add(layer.id);
     return true;
   });
 }
 
-function qhc25SectorBlock(sec, kind) {
+function qhc25SectorBlock(sec, kind, labelOverride) {
   const rows = qhc25SectorLayers(sec.id, kind);
   if (!rows.length) return '';
   const on = rows.every(layer => isLayerOn(layer.id));
   const some = rows.some(layer => isLayerOn(layer.id));
   const open = qhc25OpenSectors.has(sec.id);
+  const label = labelOverride || sec.label;
   return `<div class="cn-scheme qhc25-sector" data-qhc25-sector-row="${escapeHtml(sec.id)}">
     <div class="cn-scheme-row">
-      <label><input type="checkbox" data-qhc25-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(sec.label)}</span></label>
+      <label><input type="checkbox" data-qhc25-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(label)}</span></label>
       <button type="button" class="cn-fold" data-qhc25-fold="${escapeHtml(sec.id)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
     </div>
     ${open ? `<div class="cn-groups">${rows.map(layer => layerRow(layer, false)).join('')}</div>` : ''}
@@ -446,9 +446,14 @@ function paintQhc25HtktBox(boxId, kind) {
     box.innerHTML = '';
     return;
   }
+  // Nhóm a: Hiện trạng giao thông đứng đầu; nhóm b không còn lớp HT giao thông.
+  const gtHt = kind === 'hien-trang'
+    ? qhc25SectorBlock({ id: QHC25_GT_SECTOR, label: 'Hiện trạng giao thông' }, 'hien-trang', 'Hiện trạng giao thông')
+    : '';
   const sectors = QHC25_SECTORS.map(sec => qhc25SectorBlock(sec, kind)).filter(Boolean).join('');
+  const body = `${gtHt}${sectors}`;
   box.hidden = false;
-  box.innerHTML = sectors || `<p class="cn-empty">Chưa có lớp hạ tầng (${escapeHtml(QHC25_PHASE_TITLE[kind] || kind)}).</p>`;
+  box.innerHTML = body || `<p class="cn-empty">Chưa có lớp hạ tầng (${escapeHtml(QHC25_PHASE_TITLE[kind] || kind)}).</p>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
 }
 
@@ -465,23 +470,22 @@ function paintGt25Children() {
     }
     return;
   }
-  const groups = ['hien-trang', 'quy-hoach'].map(kind => {
-    const rows = qhc25GtChildLayers(kind);
-    if (!rows.length) return '';
-    return `<div class="cn-status"><b>${KIND_LABEL[kind]}</b>${rows.map(layer => layerRow(layer, false)).join('')}</div>`;
-  }).filter(Boolean).join('');
-  box.innerHTML = groups || '<p class="cn-empty">Chưa có lớp GIS thành phần.</p>';
+  // Chỉ lớp GIS quy hoạch; lớp hiện trạng nằm ở nhóm a → Hiện trạng giao thông.
+  const rows = qhc25GtChildLayers('quy-hoach');
+  box.innerHTML = rows.length
+    ? rows.map(layer => layerRow(layer, false)).join('')
+    : '<p class="cn-empty">Chưa có lớp GIS quy hoạch thành phần.</p>';
   box.hidden = !gt25ChildrenOpen;
   if (btn) {
     btn.classList.toggle('open', gt25ChildrenOpen);
     btn.setAttribute('aria-expanded', String(gt25ChildrenOpen));
-    btn.title = gt25ChildrenOpen ? 'Ẩn lớp thành phần giao thông' : 'Xem lớp thành phần giao thông';
+    btn.title = gt25ChildrenOpen ? 'Ẩn lớp GIS quy hoạch thành phần' : 'Xem lớp GIS quy hoạch thành phần';
   }
 }
 
 function paintQhc25Htkt() {
   // Cây a/b luôn hiện đủ hiện trạng và quy hoạch (không lọc theo nút HT/QH toàn cục).
-  // Giao thông: chỉ dòng chk_gt25; lớp catalog nằm trong #gt25Children (xổ mới thấy, tick mới tải).
+  // a: Hiện trạng giao thông + ngành khác; b: chk_gt25 (+ lớp QH GIS trong #gt25Children) + ngành khác.
   paintQhc25HtktBox('qhc25HtktHt', 'hien-trang');
   paintQhc25HtktBox('qhc25HtktQh', 'quy-hoach');
   paintGt25Children();
@@ -2140,6 +2144,8 @@ export function initChuyenNganh() {
   });
   document.addEventListener(LEVEL_EVENT, (e) => {
     paintForeignAxes();
+    // QHC 1/25.000 chỉ một đồ án: luôn xổ cây a/b; lớp thành phần bên trong vẫn mặc định thu.
+    if (e.detail?.level === 'qhc25') openQhc25Layers();
     if (!listenLevel) return;
     const { level, prev } = e.detail || {};
     if (!level || level === prev) return;

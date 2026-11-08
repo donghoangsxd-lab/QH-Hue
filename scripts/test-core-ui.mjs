@@ -242,9 +242,16 @@ assert.match(read('docs/bon-truc.md'), /#qhc25HtktHt/);
 assert.match(read('docs/bon-truc.md'), /#gt25Children/);
 assert.match(read('public/js/chuyenNganh.js'), /function paintGt25Children\(/);
 assert.match(read('public/js/chuyenNganh.js'), /gt25ChildrenOpen/);
+assert.match(read('public/js/chuyenNganh.js'), /Hiện trạng giao thông/);
+assert.match(read('public/js/chuyenNganh.js'), /qhc25GtChildLayers\('quy-hoach'\)/);
+assert.match(read('public/js/chuyenNganh.js'), /level === 'qhc25'\) openQhc25Layers/);
 assert.match(read('public/js/chuyenNganh.js'), /const qhc25OpenSectors = new Set\(\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /qhc25OpenSectors = new Set\(QHC25_SECTORS/);
+assert.match(plan, /id="qhc25Layers"(?![^>]*\bhidden\b)/);
+assert.match(plan, /data-qhc-expand="25"[^>]*aria-expanded="true"/);
 assert.match(read('public/css/style.css'), /\.gt25-children/);
+assert.match(read('docs/ui-spec.md'), /Hiện trạng giao thông/);
+assert.match(read('docs/bon-truc.md'), /Hiện trạng giao thông/);
 
 const tech = innerById(html, 'layerPaneHaTang');
 const social = innerById(html, 'layerPaneXaHoi');

@@ -65,7 +65,7 @@ function socialLegendHtml() {
       : '<span class="htkt-legend-buf-slot" aria-hidden="true"></span>';
     return `<div class="htkt-legend-row">${mark}<span>${label}</span>${buf}<input type="checkbox" data-xh-mirror="${id}"${on ? ' checked' : ''} aria-label="${label}"></div>`;
   }).join('');
-  const status = `<div class="legend-status"><span><img class="layer-type-icon" src="./icons/Park.png" alt="" width="14" height="16">Đã phê duyệt</span><span><img class="layer-type-icon" src="./icons/Park2.png" alt="" width="14" height="16">Chờ duyệt</span></div>`;
+  const status = `<div class="legend-status"><span class="legend-status-label">Trạng thái điểm:</span><span><img class="layer-type-icon" src="./icons/Park.png" alt="" width="14" height="16">Đã phê duyệt</span><span><img class="layer-type-icon" src="./icons/Park2.png" alt="" width="14" height="16">Chưa phê duyệt</span></div>`;
   return rows + status;
 }
 

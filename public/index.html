@@ -564,12 +564,12 @@
               <label class="project-name" title="Bật cả sơ đồ phát triển không gian và quy hoạch giao thông tỷ lệ 1/25.000. Mở mũi tên để bật từng lớp.">
                 <input type="checkbox" id="chk_qhc25head" data-qhc-head="25"><span>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></span></label>
               <span class="project-tools">
-                <button type="button" class="project-btn project-expand" data-qhc-expand="25" aria-expanded="false" aria-controls="qhc25Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                <button type="button" class="project-btn project-expand open" data-qhc-expand="25" aria-expanded="true" aria-controls="qhc25Layers" title="Ẩn các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
                 <button type="button" class="project-btn" data-qhc-info="25" title="Thông tin chi tiết đồ án (chỉ tiêu QĐ 108/QĐ-TTg) ở bảng brief" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
                 <span data-dossier-layer-host="qhc-2045"></span>
               </span>
             </div>
-            <div class="project-layers" id="qhc25Layers" hidden>
+            <div class="project-layers" id="qhc25Layers">
               <div class="project-map-group" data-map-phase="HT">
                 <div class="project-map-group-title">a. Các bản đồ hiện trạng</div>
                 <div id="qhc25HtktHt" class="qhc25-htkt" hidden></div>
@@ -582,13 +582,13 @@
                 </div>
                 <div class="project-gt25">
                   <div class="project-layer">
-                    <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Xổ mũi tên để xem lớp GIS thành phần; chỉ tải khi tick từng lớp con.">
+                    <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Xổ mũi tên để xem lớp GIS quy hoạch thành phần; chỉ tải khi tick từng lớp con. Lớp hiện trạng giao thông nằm ở nhóm a.">
                       <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
                     <label class="project-rail" title="Đường sắt">
                       <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
                       <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
                     </label>
-                    <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp thành phần giao thông" aria-label="Lớp thành phần giao thông"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                    <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
                   </div>
                   <div id="gt25Children" class="gt25-children" hidden></div>
                 </div>
@@ -781,10 +781,14 @@
           </div>
           <div id="legendXh" hidden>
             <div id="legendXhRows"></div>
+            <div class="rp-inline-field legend-iso-radius" id="isoRadiusField">
+              <label for="inputIsoRadius"><svg class="ico ico-layer"><use href="#i-radius"/></svg>Giả lập bán kính chung (m)</label>
+              <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" aria-label="Giả lập bán kính chung (m)">
+            </div>
             <div id="xahoiHeat">
               <div class="layer-row">
-                <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
-                <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
+                <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ nhiệt mức độ đáp ứng hạ tầng</label></div>
+                <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ nhiệt" aria-label="Độ trong suốt bản đồ nhiệt"></span>
               </div>
               <div class="heat-legend" id="heatLegend" hidden>
                 <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>

@@ -13,10 +13,15 @@ assert.match(html, /id="qhc25HtktHt"/);
 assert.match(html, /id="qhc25HtktQh"/);
 assert.match(html, /id="gt25Children"/);
 assert.match(html, /data-gt25-fold/);
+assert.match(html, /id="qhc25Layers"(?![^>]*\bhidden\b)/);
+assert.match(html, /data-qhc-expand="25"[^>]*aria-expanded="true"/);
 assert.match(html, /a\. Các bản đồ hiện trạng/);
 assert.match(html, /b\. Các bản đồ quy hoạch/);
 assert.doesNotMatch(html, /id="qhc25Scale"/);
 assert.doesNotMatch(html, /id="qhc10Brief"/);
+assert.match(read('public/js/chuyenNganh.js'), /Hiện trạng giao thông/);
+assert.match(read('public/js/chuyenNganh.js'), /qhc25GtChildLayers\('quy-hoach'\)/);
+assert.match(read('public/js/chuyenNganh.js'), /level === 'qhc25'\) openQhc25Layers/);
 
 assert.match(layer, /a\. Các bản đồ hiện trạng/);
 assert.match(layer, /b\. Các bản đồ quy hoạch/);
