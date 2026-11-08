@@ -3028,20 +3028,26 @@ body.catalog-table-on .bp-body {
   display: flex;
   flex-direction: column;
 }
-/* Một hàng cố định: tiêu đề + tìm + lọc co giãn; nút CSV/PDF/max/đóng luôn neo phải, không bị đẩy ẩn. */
-.catalog-table-head {
+/* Head cao theo nội dung — .bp-part-head cố định --bp-head-h sẽ cắt/tràn select đè lên bảng. */
+.bp-part-head.catalog-table-head {
   height: auto;
   min-height: var(--bp-head-h);
   gap: 8px;
-  flex-wrap: nowrap;
-  overflow: visible;
+  flex-wrap: wrap;
+  align-items: center;
+  overflow: hidden;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  position: relative;
+  z-index: 2;
+  background: var(--bg-panel);
 }
 .catalog-table-titles {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   min-width: 0;
   flex: 1 1 auto;
   white-space: normal;
@@ -3073,10 +3079,11 @@ body.catalog-table-on .bp-body {
   border-radius: var(--r-sm);
 }
 .catalog-filter {
-  flex: 0 1 120px;
+  flex: 0 0 auto;
   width: auto;
-  min-width: 0;
-  max-width: 140px;
+  min-width: 7.5em;
+  max-width: 11em;
+  height: calc(22px * var(--k));
   overflow: hidden;
   text-overflow: ellipsis;
 }

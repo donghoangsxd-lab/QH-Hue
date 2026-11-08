@@ -7,7 +7,7 @@ import {
 } from './soTayMatch.js';
 
 export const CATALOG_HEADERS_PLAN = [
-  'STT', 'Tên quy hoạch', 'Phường / xã', 'Cấp', 'Diện tích (ha)', 'Trạng thái', 'Ranh giới', 'Ghi chú'
+  'STT', 'Tên quy hoạch', 'Đơn vị', 'Cấp', 'Diện tích (ha)', 'Trạng thái', 'Ranh', 'Ghi chú'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;

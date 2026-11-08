@@ -6,18 +6,18 @@ import {
 } from './uiComponents.js';
 import { loadCatalog, projectAreaOf } from './projectFiles.js';
 import { openProjectByName } from './projectLayer.js';
-import { getLevel } from './mapLevel.js';
 import {
   listInvestCatalogItems, focusInvest, primeInvestLoad, ensureInvestCatalogLoaded
 } from './investLayer.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogStatusStats,
-  filterKeyFromMapLevel, rowsToCsv, downloadCsv, STATUS
+  rowsToCsv, downloadCsv, STATUS
 } from './catalogTableCore.js';
 
 const $ = (id) => document.getElementById(id);
-const SO_TAY_URL = './data/qh-so-tay.json';
+/* ?v= đổi khi rebuild catalog để trình duyệt/SW không giữ bản JSON cũ. */
+const SO_TAY_URL = './data/qh-so-tay.json?v=20261108a';
 
 let source = 'plan';
 let filterLevel = '';
@@ -134,6 +134,7 @@ async function loadSoTay() {
     })
     .catch((err) => {
       console.warn('Không tải được sổ tay QH:', err);
+      showToast('Chưa tải được sổ tay đồ án từ sheet — đang hiện danh mục bản đồ', 'info');
       soTayItems = [];
       return soTayItems;
     });
@@ -310,11 +311,12 @@ export async function openCatalogTable(opts = {}) {
   const search = $('catalogSearch');
   if (search) search.value = '';
   if (source === 'plan') {
-    filterLevel = opts.level != null ? String(opts.level) : filterKeyFromMapLevel(getLevel());
+    // Mặc định «Tất cả cấp» để hiện đủ sổ tay; chỉ lọc khi gọi kèm opts.level.
+    filterLevel = opts.level != null ? String(opts.level) : '';
   } else {
     filterLevel = opts.group != null
       ? String(opts.group)
-      : (document.getElementById('dtGroupPick')?.value || '');
+      : '';
   }
   setCatalogMode(true);
   setBottomPanelCollapsed(false);
