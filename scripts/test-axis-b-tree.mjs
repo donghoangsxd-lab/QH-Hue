@@ -11,6 +11,8 @@ const css = read('public/css/style.css');
 
 assert.match(html, /id="qhc25HtktHt"/);
 assert.match(html, /id="qhc25HtktQh"/);
+assert.match(html, /id="gt25Children"/);
+assert.match(html, /data-gt25-fold/);
 assert.match(html, /a\. Các bản đồ hiện trạng/);
 assert.match(html, /b\. Các bản đồ quy hoạch/);
 assert.doesNotMatch(html, /id="qhc25Scale"/);
@@ -28,6 +30,8 @@ assert.match(brief, /openProjectBriefDetail/);
 assert.match(spec, /data-brief-help/);
 assert.match(spec, /#qhc25HtktHt/);
 assert.match(spec, /#qhc25HtktQh/);
+assert.match(spec, /#gt25Children/);
+assert.match(css, /\.gt25-children/);
 assert.match(css, /\.project-map-group-title/);
 assert.match(css, /\.project-brief-tool\.is-on/);
 assert.match(css, /#planListPane > #projectList/);

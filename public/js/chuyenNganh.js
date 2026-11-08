@@ -51,7 +51,9 @@ const QHC25_PHASE_TITLE = {
   'hien-trang': 'Bản đồ hiện trạng tỷ lệ 1/25.000',
   'quy-hoach': 'Bản đồ quy hoạch tỷ lệ 1/25.000'
 };
-const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe);
+// Trên B → QHC 1/25.000: giao thông không thành ngành ngang hàng; lớp catalog là con của chk_gt25.
+const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe && g.id !== 'giao-thong');
+const QHC25_GT_SECTOR = 'giao-thong';
 
 const ICONS = {
   'giao-thong': '<path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/>',
@@ -94,7 +96,9 @@ const openSchemes = new Set([
   'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c',
   'qhc-xa-thuong-long-3f2c4da4'
 ]);
-const qhc25OpenSectors = new Set(QHC25_SECTORS.map(s => s.id));
+// Mặc định thu: chỉ hiện tên ngành / GT25; xổ mới thấy lớp con (không tải cho đến khi tick).
+const qhc25OpenSectors = new Set();
+let gt25ChildrenOpen = false;
 const capOpen = new Set();
 let layerQuery = '';
 let applying = false;
@@ -403,6 +407,13 @@ function qhc25SectorLayers(sector, kind) {
     .filter(layer => formAllows(layer, geomOn, false));
 }
 
+/** Lớp GIS giao thông của qhc-hue-2045 — con của chk_gt25; chỉ tải khi tick riêng. */
+function qhc25GtChildLayers(kind) {
+  const rows = qhc25SectorLayers(QHC25_GT_SECTOR, kind);
+  if (kind) return rows;
+  return ['hien-trang', 'quy-hoach'].flatMap(k => qhc25SectorLayers(QHC25_GT_SECTOR, k));
+}
+
 function qhc25PhaseLayers(kind = qhc25PhaseKind()) {
   const seen = new Set();
   return QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind)).filter(layer => {
@@ -441,10 +452,39 @@ function paintQhc25HtktBox(boxId, kind) {
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
 }
 
+function paintGt25Children() {
+  const box = document.getElementById('gt25Children');
+  const btn = document.querySelector('[data-gt25-fold]');
+  if (!box) return;
+  if (!ready) {
+    box.hidden = true;
+    box.innerHTML = '';
+    if (btn) {
+      btn.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    return;
+  }
+  const groups = ['hien-trang', 'quy-hoach'].map(kind => {
+    const rows = qhc25GtChildLayers(kind);
+    if (!rows.length) return '';
+    return `<div class="cn-status"><b>${KIND_LABEL[kind]}</b>${rows.map(layer => layerRow(layer, false)).join('')}</div>`;
+  }).filter(Boolean).join('');
+  box.innerHTML = groups || '<p class="cn-empty">Chưa có lớp GIS thành phần.</p>';
+  box.hidden = !gt25ChildrenOpen;
+  if (btn) {
+    btn.classList.toggle('open', gt25ChildrenOpen);
+    btn.setAttribute('aria-expanded', String(gt25ChildrenOpen));
+    btn.title = gt25ChildrenOpen ? 'Ẩn lớp thành phần giao thông' : 'Xem lớp thành phần giao thông';
+  }
+}
+
 function paintQhc25Htkt() {
   // Cây a/b luôn hiện đủ hiện trạng và quy hoạch (không lọc theo nút HT/QH toàn cục).
+  // Giao thông: chỉ dòng chk_gt25; lớp catalog nằm trong #gt25Children (xổ mới thấy, tick mới tải).
   paintQhc25HtktBox('qhc25HtktHt', 'hien-trang');
   paintQhc25HtktBox('qhc25HtktQh', 'quy-hoach');
+  paintGt25Children();
   // Host cũ (nếu còn trong DOM / test) — không dùng cho UI mới.
   const legacy = document.getElementById('qhc25Htkt');
   if (legacy) {
@@ -1337,7 +1377,7 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
-  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktHt .cn-layer, #qhc25HtktQh .cn-scheme, #qhc25HtktQh .cn-layer').forEach(el => {
+  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktHt .cn-layer, #qhc25HtktQh .cn-scheme, #qhc25HtktQh .cn-layer, #gt25Children .cn-layer, #gt25Children .cn-status').forEach(el => {
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
   document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktQh .cn-scheme').forEach(scheme => {
@@ -1346,6 +1386,13 @@ function applyLayerQuery() {
     const any = layers.some(row => !row.classList.contains('is-filter-hide'));
     scheme.classList.toggle('is-filter-hide', !!q && !any);
   });
+  const gtKids = document.getElementById('gt25Children');
+  if (gtKids && q) {
+    const any = [...gtKids.querySelectorAll('.cn-layer')].some(row => !row.classList.contains('is-filter-hide'));
+    gtKids.classList.toggle('is-filter-hide', !any);
+  } else if (gtKids) {
+    gtKids.classList.remove('is-filter-hide');
+  }
   document.querySelectorAll('#dtList .project-row').forEach(el => {
     const blob = el.getAttribute('data-dt-text') || el.textContent;
     const hide = !!q && !foldQuery(blob).includes(q);
@@ -1359,7 +1406,7 @@ function applyLayerQuery() {
         .map(el => el.getAttribute('data-dt-text') || el.textContent).join(' ');
       return foldQuery(blob).includes(q);
     });
-    if (hit) document.querySelector(`#levelPickDt [data-dt-tab="${hit.dataset.dtPane}"]`)?.click();
+    if (hit) showDauTuTab(hit.dataset.dtPane);
   }
   if (q && browseState().axis === 'kientruc' && archTab !== 'congtrinh') {
     const hit = archItems().some(it => foldQuery([it.ten, it.diaChi, it.coQuan, it.phuong, it.chatLuong].filter(Boolean).join(' ')).includes(q));
@@ -1702,11 +1749,12 @@ function leaveAdminMap() {
   refreshSplitPair();
 }
 
-function placeIsoRadius(axis) {
-  if (axis !== 'xahoi') return;
+function placeIsoRadius() {
+  // Ô giả lập bán kính nằm cố định trong Chú giải HTXH (#legendXh), ngay trên bản đồ nhiệt.
   const field = document.getElementById('isoRadiusField');
-  const slot = document.getElementById('isoSlotXaHoi');
-  if (field && slot && field.parentElement !== slot) slot.append(field);
+  const legend = document.getElementById('legendXh');
+  const heat = document.getElementById('xahoiHeat');
+  if (field && legend && heat && field.parentElement !== legend) legend.insertBefore(field, heat);
 }
 
 function releaseAdminAnchor() {
@@ -1724,7 +1772,7 @@ function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}
     releaseAdminAnchor();
   } else enterAdminMap();
   if (id === 'quyhoach') ensurePlanTab('qhc25');
-  placeIsoRadius(id);
+  placeIsoRadius();
   setBrowseState({ axis: id }, { url });
   openingAxis = true;
   document.querySelector(`[data-main-tab="${id}"]`)?.click();
@@ -1785,15 +1833,13 @@ async function loadKienTruc() {
 }
 
 function showDauTuTab(id) {
-  const pick = document.getElementById('levelPickDt');
-  if (!pick || !id) return;
-  const cur = pick.querySelector('[data-dt-tab].is-on')?.dataset?.dtTab;
+  if (!id) return;
+  const sel = document.getElementById('dtGroupPick');
+  const cur = document.querySelector('#axisDauTu [data-dt-pane]:not([hidden])')?.dataset?.dtPane
+    || sel?.value
+    || '';
+  if (sel && sel.value !== id) sel.value = id;
   if (cur === id) return;
-  pick.querySelectorAll('[data-dt-tab]').forEach(btn => {
-    const on = btn.dataset.dtTab === id;
-    btn.classList.toggle('is-on', on);
-    btn.setAttribute('aria-selected', String(on));
-  });
   document.querySelectorAll('#axisDauTu [data-dt-pane]').forEach(pane => {
     pane.hidden = pane.dataset.dtPane !== id;
   });
@@ -1802,9 +1848,11 @@ function showDauTuTab(id) {
 }
 
 function initDauTuTabs() {
-  document.getElementById('levelPickDt')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-dt-tab]');
-    if (btn) showDauTuTab(btn.dataset.dtTab);
+  document.getElementById('dtPicks')?.addEventListener('change', (e) => {
+    if (e.target.matches('[data-dt-group-pick]')) showDauTuTab(e.target.value);
+    if (e.target.matches('[data-dt-scope-pick]')) {
+      document.dispatchEvent(new CustomEvent('qh:dt-scope', { detail: { ward: e.target.value || '' } }));
+    }
   });
 }
 
@@ -1966,6 +2014,13 @@ export function initChuyenNganh() {
       const slug = fold.dataset.cnFold;
       if (openSchemes.has(slug)) openSchemes.delete(slug); else openSchemes.add(slug);
       paint();
+      return;
+    }
+    const gt25Fold = e.target.closest('[data-gt25-fold]');
+    if (gt25Fold) {
+      gt25ChildrenOpen = !gt25ChildrenOpen;
+      paintGt25Children();
+      applyLayerQuery();
       return;
     }
     const qhc25Fold = e.target.closest('[data-qhc25-fold]');

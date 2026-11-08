@@ -206,10 +206,18 @@ for (const [roadId, railId, label] of [
   assert.match(row, /title="Đường sắt"/);
   assert.match(row, /aria-label="Đường sắt"/);
   assert.match(row, /href="#i-rail"/);
-  assert.doesNotMatch(row, /project-layer-sub|<button/);
   assert.ok(row.indexOf('project-layer-name') < row.indexOf('project-rail'), `icon đường sắt phải đứng sau tên ${label}`);
-  assert.match(row, /class="project-rail"[\s\S]*<\/label>\s*<\/div>\s*$/, `icon đường sắt phải là phần cuối dòng ${label}`);
+  if (roadId === 'chk_gt25') {
+    assert.match(row, /data-gt25-fold/);
+    assert.match(row, /aria-controls="gt25Children"/);
+    assert.ok(row.indexOf('project-rail') < row.indexOf('data-gt25-fold'), 'nút xổ lớp con đứng sau icon đường sắt');
+  } else {
+    assert.doesNotMatch(row, /project-layer-sub|<button/);
+    assert.match(row, /class="project-rail"[\s\S]*<\/label>\s*<\/div>\s*$/, `icon đường sắt phải là phần cuối dòng ${label}`);
+  }
 }
+assert.match(plan, /id="gt25Children"/);
+assert.match(plan, /class="project-gt25"/);
 assert.doesNotMatch(plan, /project-layer-sub/);
 assert.doesNotMatch(plan, /id="gt25RailHint"|id="gt10RailHint"/);
 assert.match(plan, /id="qhc25HtktHt"/);
@@ -228,8 +236,15 @@ assert.match(read('public/css/style.css'), /\.project-map-group-title/);
 assert.match(read('docs/ui-spec.md'), /Đường sắt/);
 assert.match(read('docs/ui-spec.md'), /#qhc25HtktHt/);
 assert.match(read('docs/ui-spec.md'), /#qhc25HtktQh/);
+assert.match(read('docs/ui-spec.md'), /#gt25Children/);
 assert.match(read('docs/ui-spec.md'), /data-brief-help/);
 assert.match(read('docs/bon-truc.md'), /#qhc25HtktHt/);
+assert.match(read('docs/bon-truc.md'), /#gt25Children/);
+assert.match(read('public/js/chuyenNganh.js'), /function paintGt25Children\(/);
+assert.match(read('public/js/chuyenNganh.js'), /gt25ChildrenOpen/);
+assert.match(read('public/js/chuyenNganh.js'), /const qhc25OpenSectors = new Set\(\)/);
+assert.doesNotMatch(read('public/js/chuyenNganh.js'), /qhc25OpenSectors = new Set\(QHC25_SECTORS/);
+assert.match(read('public/css/style.css'), /\.gt25-children/);
 
 const tech = innerById(html, 'layerPaneHaTang');
 const social = innerById(html, 'layerPaneXaHoi');
@@ -237,9 +252,7 @@ assert.doesNotMatch(tech, /id="axisEnvFold"/);
 assert.doesNotMatch(tech, /id="chk_terrain"/);
 assert.doesNotMatch(tech, /id="isoSlotHaTang"/);
 assert.doesNotMatch(tech, /Giả lập bán kính/);
-assert.match(social, /id="isoSlotXaHoi"/);
-assert.match(social, /id="inputIsoRadius"/);
-assert.match(social, /Giả lập bán kính chung/);
+assert.doesNotMatch(social, /id="isoSlotXaHoi"|id="inputIsoRadius"|Giả lập bán kính/);
 assert.match(social, /id="planPoints"/);
 assert.match(social, /Quỹ đất và công trình/);
 assert.match(social, /id="chk_c9"/);
@@ -248,8 +261,10 @@ assert.doesNotMatch(social, /id="chk_invest"/);
 assert.match(social, /id="chk_c1"/);
 const dauTu = innerById(html, 'layerPaneDauTu');
 assert.ok(main.indexOf('id="layerPaneKienTruc"') < main.indexOf('id="layerPaneDauTu"'), 'Dự án đầu tư đứng sau Kiến trúc');
-const dtPick = innerById(html, 'levelPickDt');
-assert.match(html, /class="level-pick level-pick-dt"/);
+const dtPick = innerById(html, 'dtPicks');
+assert.match(html, /id="dtPicks"[^>]*class="cn-picks dt-picks"/);
+assert.match(html, /id="dtGroupPick"/);
+assert.match(html, /id="dtScopePick"/);
 let dtAt = 0;
 for (const [id, label] of [
   ['dvtm', 'Dịch vụ, thương mại'],
@@ -259,12 +274,12 @@ for (const [id, label] of [
   ['vanhoaxahoi', 'Văn hóa - Y tế - Giáo dục'],
   ['khac', 'Dự án khác']
 ]) {
-  const at = dtPick.indexOf(`data-dt-tab="${id}"`);
-  assert.ok(at > dtAt, `sai thứ tự tab ${label}`);
+  const at = dtPick.indexOf(`value="${id}"`);
+  assert.ok(at > dtAt, `sai thứ tự nhóm ${label}`);
   dtAt = at;
   assert.ok(dtPick.slice(at, at + 320).includes(label), `thiếu nhãn ${label}`);
 }
-assert.doesNotMatch(dtPick, /data-dt-tab="nangluong"|data-dt-tab="chungcu"/);
+assert.doesNotMatch(dtPick, /value="nangluong"|value="chungcu"|data-dt-tab=/);
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
 assert.match(dauTu, /class="dt-invest-check"/);
@@ -282,8 +297,8 @@ assert.match(dauTu, /id="investList-dvtm"/);
 assert.match(dauTu, /id="investList-khac"/);
 assert.match(dauTu, /id="investList-khudothi"/);
 assert.doesNotMatch(dauTu, /id="investList-chungcu"|id="investList-nangluong"|data-dt-pane="chungcu"|data-dt-pane="nangluong"/);
-assert.match(read('docs/ui-spec.md'), /sáu tab nhóm|lưới hai hàng ba cột/);
-assert.match(read('public/css/style.css'), /#levelPickDt[\s\S]*repeat\(3/);
+assert.match(read('docs/ui-spec.md'), /hai droplist|#dtPicks|#dtGroupPick|#dtScopePick/);
+assert.match(read('public/css/style.css'), /#dtPicks\.dt-picks[\s\S]*repeat\(2/);
 assert.match(dauTu, /id="dtListPane"/);
 assert.match(dauTu, /id="btnOpenCatalogInvest"/);
 assert.match(plan, /id="btnOpenCatalogPlan"/);
@@ -319,9 +334,9 @@ assert.match(read('public/js/investLayer.js'), /toggleInvestAxisAll|investAxisAl
 assert.match(read('public/js/chuyenNganh.js'), /toggleInvestAxisAll/);
 assert.match(read('public/js/investClassify.js'), /classifyDvtmSub/);
 assert.match(read('docs/ui-spec.md'), /cuối dòng hiện diện tích/);
-assert.match(read('docs/ui-spec.md'), /Tab Dịch vụ, thương mại chia 5 nhóm con/);
+assert.match(read('docs/ui-spec.md'), /Nhóm Dịch vụ, thương mại chia 5 nhóm con/);
 assert.match(read('docs/ui-spec.md'), /cùng kiểu công trình kiến trúc Pháp/);
-assert.match(dauTu, /class="level-pick level-pick-dt"/);
+assert.match(dauTu, /id="dtPicks"|class="cn-picks dt-picks"/);
 assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);
 assert.match(html, /id="legendDauTu"/);
 const axisDock = innerById(html, 'axisDock');
@@ -333,10 +348,13 @@ assert.match(read('public/js/legendPanel.js'), /dauTuLegendHtml|investLegendHtml
 assert.doesNotMatch(read('public/js/legendPanel.js'), /data-xh-mirror="chk_invest"/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /\['chk_invest'/);
 assert.match(read('public/js/investLayer.js'), /export function investLegendHtml/);
+assert.match(read('public/js/investLayer.js'), /data-invest-legend-group|data-invest-legend-sub/);
+assert.match(read('public/js/investLayer.js'), /applyInvestLegendToggle|setGroupMap/);
 assert.match(read('public/js/investLayer.js'), /DVTM_SUBGROUPS|GROUP_LOOK/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /LEGEND_OFF = new Set\(\[[^\]]*dautu/);
 assert.match(read('docs/ui-spec.md'), /F\. Dự án đầu tư/);
 assert.match(read('docs/ui-spec.md'), /Không checkbox «Dự án kêu gọi đầu tư»/);
+assert.match(read('docs/ui-spec.md'), /đồng bộ với tick\/mắt trên danh sách/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
 assert.doesNotMatch(plan, /id="inputIsoRadius"/);
@@ -552,8 +570,8 @@ assert.match(levelJs, /listed\.clear\(\);\s*listed\.add\(id\)/);
 assert.doesNotMatch(levelJs, /keepOthers/);
 assert.match(levelJs, /ensurePlanTab/);
 assert.doesNotMatch(levelJs, /getElementById\('levelPick'\)/);
-assert.match(read('public/js/chuyenNganh.js'), /isoSlotXaHoi/);
-assert.doesNotMatch(read('public/js/chuyenNganh.js'), /isoSlotHaTang/);
+assert.match(read('public/js/chuyenNganh.js'), /placeIsoRadius|legendXh|isoRadiusField/);
+assert.doesNotMatch(read('public/js/chuyenNganh.js'), /isoSlotHaTang|isoSlotXaHoi/);
 
 const cn = read('public/js/chuyenNganh.js');
 assert.match(cn, /releaseAdminAnchor/);
@@ -890,9 +908,15 @@ assert.match(social, /id="chk_c9"/);
 assert.doesNotMatch(social, /id="xahoiHeat"|id="chk_heat"/);
 const legendXh = innerById(html, 'legendXh');
 assert.match(legendXh, /id="legendXhRows"/);
+assert.match(legendXh, /id="isoRadiusField"/);
+assert.match(legendXh, /id="inputIsoRadius"/);
+assert.match(legendXh, /Giả lập bán kính chung/);
 assert.match(legendXh, /id="xahoiHeat"/);
 assert.match(legendXh, /id="chk_heat"/);
+assert.match(legendXh, /Bản đồ nhiệt mức độ đáp ứng hạ tầng/);
 assert.match(legendXh, /id="heatLegend"/);
+assert.ok(legendXh.indexOf('id="isoRadiusField"') < legendXh.indexOf('id="xahoiHeat"'), 'bán kính đứng trên bản đồ nhiệt');
+assert.match(read('public/js/legendPanel.js'), /Trạng thái điểm:.*Đã phê duyệt.*Chưa phê duyệt/s);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.match(read('public/js/legendPanel.js'), /data-buffer/);
@@ -956,7 +980,8 @@ assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES/);
 assert.match(read('docs/ui-spec.md'), /Ba droplist cùng kiểu HTKT/);
-assert.match(read('docs/ui-spec.md'), /Bản đồ độ phủ hạ tầng/);
+assert.match(read('docs/ui-spec.md'), /Bản đồ nhiệt mức độ đáp ứng hạ tầng/);
+assert.match(read('docs/ui-spec.md'), /Trạng thái điểm:.*Đã phê duyệt|Giả lập bán kính chung/);
 assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261091'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
