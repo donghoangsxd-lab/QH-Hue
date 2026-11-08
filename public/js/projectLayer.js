@@ -402,6 +402,22 @@ function openProject(p) {
   document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
 }
 
+/** Bảng danh mục: phóng tới ranh đồ án theo tên (tenQH). */
+export function openProjectByName(name) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return false;
+  if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
+  const p = projects.find(x => x.name === wanted || x.slug === wanted || x.short === wanted);
+  if (!p) return false;
+  openProject(p);
+  return true;
+}
+
+export function listPlanCatalogProjects() {
+  if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
+  return projects.slice();
+}
+
 // Link chia sẻ: mở đúng đồ án (bỏ ẩn, hiện lô, viền đậm, panel dưới) nhưng giữ nguyên khung nhìn URL
 export function shareOpenProject(name) {
   const wanted = String(name || '').trim();

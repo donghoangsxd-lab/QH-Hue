@@ -88,6 +88,7 @@ import { initViolateLayer } from './violateLayer.js';
 import { initApartmentLayer } from './apartmentLayer.js';
 import { initParcelInfra } from './parcelInfra.js';
 import { initInvestLayer, primeInvestLoad } from './investLayer.js';
+import { initCatalogTable } from './catalogTable.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initTerrainProfile, syncTerrainProfile } from './terrainProfile.js';
 import { initDrainageLayer } from './drainageLayer.js';
@@ -638,6 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initApartmentLayer();
   initParcelInfra();
   initInvestLayer();
+  initCatalogTable();
   initUrbanAreaLayer();
   initLayerDecisions();
   initQhc2045Layer();

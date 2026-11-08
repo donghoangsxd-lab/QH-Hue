@@ -4,7 +4,7 @@
 import { map } from './mapEngine.js';
 import { signOutAdmin } from './uiComponents.js';
 import { planMap, onCompareChange, isCompareOn, isSplitOn } from './planMap.js';
-import { geeApi } from './api.js';
+import { geeApi, gcsUrl } from './api.js';
 import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -15,6 +15,9 @@ import {
   classifyInvestGroup, classifyDvtmSub, INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT,
   isInvestGroupId, investGroupLabel
 } from './investClassify.js';
+import {
+  sheetSig, parseInvestEditsStore, applyInvestEditsClient, editsWorthApplying
+} from './investEdits.js';
 import { readDrawingFile } from './drawingReaders.js';
 import { countApartments } from './apartmentLayer.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies, landGeomsOf } from './planLandStats.js';
@@ -22,6 +25,11 @@ import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 import { startLoadMeter } from './loadProgress.js';
+
+const INVEST_SHEET_URL = './data/invest-sheet.json';
+const INVEST_BOUND_URL = './data/invest-boundary.geojson';
+const INVEST_GCS_SHEET = 'invest_calls.json';
+const INVEST_GCS_EDITS = 'invest_edits.json';
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -139,13 +147,16 @@ let landFill = null;
 let openSeq = 0;
 let drawToken = 0;
 let groups = [];
+/** Ranh KML gốc (chưa ghép sheet) — dùng lại khi soft-refresh. */
+let boundBase = null;
+let softRefreshStarted = false;
 /** Meter thanh tiêu đề + panel F khi nạp lần đầu / vẽ lớp. */
 let loadMeter = null;
 let loadGen = 0;
 let loadHideTimer = 0;
 let loadStartedAt = 0;
-const LOAD_MIN_MS = 1200;
-const LOAD_DONE_HOLD_MS = 1400;
+const LOAD_MIN_MS = 200;
+const LOAD_DONE_HOLD_MS = 300;
 
 const yieldUi = () => new Promise((resolve) => {
   requestAnimationFrame(() => { requestAnimationFrame(() => setTimeout(resolve, 0)); });
@@ -857,40 +868,122 @@ function rebuildSheetOnly(features, rows) {
   });
 }
 
+function snapshotBoundBase(features) {
+  boundBase = (features || []).map(f => ({
+    type: 'Feature',
+    geometry: f.geometry,
+    properties: {
+      name: f.properties?.name || '',
+      folder: f.properties?.folder || '',
+      kml: f.properties?.kml || {}
+    }
+  }));
+}
+
+function cloneBoundBase() {
+  return (boundBase || []).map(f => ({
+    type: 'Feature',
+    geometry: f.geometry,
+    properties: {
+      name: f.properties?.name || '',
+      folder: f.properties?.folder || '',
+      kml: f.properties?.kml || {}
+    }
+  }));
+}
+
+function bindPack(features, rows, loaded = {}) {
+  const list = rows || [];
+  sheetRows = list;
+  const detail = matchInvestDetail(features, list);
+  features.forEach((f, i) => {
+    f.properties = f.properties || {};
+    f.properties._key = featureKey(f);
+    f.properties.sheet = detail[i].index >= 0 ? list[detail[i].index] : null;
+    f.properties._ambiguous = !!detail[i].ambiguous;
+    f.properties._sheetOnly = false;
+  });
+  attachAdminBoundaries(features, list, loaded.boundaries);
+  pack = features;
+  adoptGroups(loaded.groups);
+  stampGroups();
+  rebuildSheetOnly(pack, list);
+  refreshHint();
+  return features;
+}
+
+async function fetchJsonOk(url) {
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/** Đường nóng: chỉ asset tĩnh — không gọi Cloud Run. */
+async function loadRows() {
+  const data = await fetchJsonOk(INVEST_SHEET_URL);
+  if (!data || !Array.isArray(data.rows)) return { rows: [], groups: null, boundaries: [] };
+  return { rows: data.rows, groups: null, boundaries: [] };
+}
+
+async function softRefreshInvest() {
+  if (softRefreshStarted || !boundBase) return;
+  softRefreshStarted = true;
+  try {
+    const [gcsSheet, editsRaw] = await Promise.all([
+      fetchJsonOk(gcsUrl(INVEST_GCS_SHEET)).catch(() => null),
+      fetchJsonOk(gcsUrl(INVEST_GCS_EDITS)).catch(() => null)
+    ]);
+    let rows = sheetRows;
+    let changed = false;
+    if (gcsSheet && Array.isArray(gcsSheet.rows) && gcsSheet.rows.length) {
+      if (sheetSig(gcsSheet.rows) !== sheetSig(sheetRows)) {
+        rows = gcsSheet.rows;
+        changed = true;
+      }
+    }
+    const store = parseInvestEditsStore(editsRaw);
+    let groups = null;
+    let boundaries = [];
+    if (editsWorthApplying(store)) {
+      const merged = applyInvestEditsClient({ rows }, store.items);
+      rows = merged.rows;
+      boundaries = merged.boundaries || [];
+      groups = store.groups;
+      changed = true;
+    }
+    if (!changed) return;
+    const features = bindPack(cloneBoundBase(), rows, { groups, boundaries });
+    paintInvestList();
+    if (visible) redrawMaps();
+    if (isAdmin()) {
+      try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu */ }
+    }
+    return features;
+  } catch {
+    softRefreshStarted = false;
+  }
+}
+
 async function loadPack() {
   if (!ready) {
     const ui = beginInvestLoad();
     ready = (async () => {
       try {
         await ui.step(8, 'Đang tải ranh dự án…');
-        const boundP = fetch('./data/invest-boundary.geojson')
+        const boundP = fetch(INVEST_BOUND_URL)
           .then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh'))));
         await ui.step(18, 'Đang tải danh sách dự án…');
-        const rowsP = loadRows();
-        const [fc, loaded] = await Promise.all([boundP, rowsP]);
+        const [fc, loaded] = await Promise.all([boundP, loadRows()]);
         await ui.step(48, 'Đang ghép ranh với danh sách…');
         const features = (fc && fc.features) || [];
-        const rows = loaded.rows || [];
-        sheetRows = rows;
-        const detail = matchInvestDetail(features, rows);
-        features.forEach((f, i) => {
-          f.properties = f.properties || {};
-          f.properties._key = featureKey(f);
-          f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
-          f.properties._ambiguous = !!detail[i].ambiguous;
-          f.properties._sheetOnly = false;
-        });
-        await ui.step(62, 'Đang gắn ranh đã tải lên…');
-        attachAdminBoundaries(features, rows, loaded.boundaries);
-        pack = features;
-        adoptGroups(loaded.groups);
+        snapshotBoundBase(features);
+        await ui.step(62, 'Đang phân nhóm dự án…');
+        bindPack(features, loaded.rows || [], loaded);
         if (isAdmin()) {
           try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
         }
-        await ui.step(72, 'Đang phân nhóm dự án…');
-        stampGroups();
-        rebuildSheetOnly(pack, rows);
-        refreshHint();
+        await ui.step(72, 'Đang dựng danh sách…');
+        queueMicrotask(() => { void softRefreshInvest(); });
         return features;
       } catch (err) {
         ui.finish(false);
@@ -903,26 +996,6 @@ async function loadPack() {
     });
   }
   return ready;
-}
-
-async function loadRows() {
-  try {
-    const res = await fetch(geeApi('action=getInvestCalls'));
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.rows) && data.rows.length) {
-        return {
-          rows: data.rows,
-          groups: Array.isArray(data.groups) ? data.groups : null,
-          boundaries: Array.isArray(data.boundaries) ? data.boundaries : []
-        };
-      }
-    }
-  } catch { /* bản đóng gói theo file Excel hiện có */ }
-  const res = await fetch('./data/invest-sheet.json');
-  if (!res.ok) return { rows: [], groups: null, boundaries: [] };
-  const data = await res.json();
-  return { rows: data.rows || [], groups: null, boundaries: [] };
 }
 
 function ensurePane(m, name, z) {
@@ -1879,7 +1952,27 @@ async function ensureInvestList() {
   paintInvestList();
 }
 
-async function focusInvest(id) {
+export function listInvestCatalogItems() {
+  return projectList().map(p => ({
+    id: projectKey(p),
+    title: p.title || '',
+    sheet: p.sheet || null,
+    hasBoundary: !!p.hasBoundary,
+    sheetOnly: !!p.sheetOnly,
+    matched: !!p.matched,
+    areaText: p.areaText || '',
+    dtGroup: p.dtGroup || 'khac',
+    sector: p.sector || null
+  }));
+}
+
+/** Bảng danh mục F: nạp pack tĩnh nếu chưa có (không bật lớp bản đồ). */
+export async function ensureInvestCatalogLoaded() {
+  try { await loadPack(); } catch { /* loadPack đã toast */ }
+  return listInvestCatalogItems();
+}
+
+export async function focusInvest(id) {
   investHidden.delete(id);
   investOpen.add(id);
   investPicked = id;
