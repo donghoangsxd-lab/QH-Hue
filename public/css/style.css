@@ -1741,9 +1741,29 @@ body.plan-info-open #planInfoSlot .leaflet-popup-content {
 .view-switch button { display: inline-flex; align-items: center; justify-content: center; width: var(--axis-head-h); height: var(--axis-head-h); padding: 0; border: 0; background: transparent; color: var(--axis-color-muted); cursor: pointer; }
 .view-switch button .ico { width: 16px; height: 16px; margin: 0; }
 .view-switch button.active { background: var(--accent-cyan); color: var(--text-on-accent); }
-.view-switch button:focus-visible, #btnAxisAll:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+.view-switch button:focus-visible, #btnAxisAll:focus-visible, .layer-catalog-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 #btnAxisAll { flex: 0 0 var(--axis-head-h); width: var(--axis-head-h); height: var(--axis-head-h); padding: 0; justify-content: center; }
 #btnAxisAll .ico { margin: 0; }
+/* Bảng danh mục B/F: icon sau ô tìm, cùng cỡ nút mắt; chỉ hiện đúng trục. */
+.layer-catalog-btn {
+  display: none;
+  flex: 0 0 var(--axis-head-h);
+  align-items: center;
+  justify-content: center;
+  width: var(--axis-head-h);
+  height: var(--axis-head-h);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--axis-chip-border);
+  border-radius: var(--r-sm);
+  background: var(--bg-input);
+  color: var(--axis-color);
+  cursor: pointer;
+}
+.layer-catalog-btn .ico { width: 15px; height: 15px; margin: 0; }
+.layer-catalog-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+#layerMain[data-active="quyhoach"] #btnOpenCatalogPlan,
+#layerMain[data-active="dautu"] #btnOpenCatalogInvest { display: inline-flex; }
 #layerMain:not([data-active="hanhchinh"]) > .admin-tabs { display: none; }
 .admin-tabs { flex: 0 0 auto; display: flex; gap: 0; margin: 0; padding: 0 6px; border-bottom: 1px solid var(--border-soft); }
 #adminTabs { padding: 0 4px; overflow-x: auto; scrollbar-width: thin; }
@@ -3018,8 +3038,6 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ===================== BẢNG DANH MỤC B/F ===================== */
-.catalog-open-btn { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 6px; font-size: var(--fs-sm); }
-.catalog-dt-tools { padding: 0 2px; }
 .catalog-table-host {
   display: none;
   flex-direction: column;
