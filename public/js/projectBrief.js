@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
-import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecision } from './projectLayer.js';
+import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
@@ -18,6 +18,8 @@ const WAIT = '<span class="project-brief-wait">…</span>';
 
 let seq = 0;
 let openName = '';
+let detailOpen = false;
+let lastCard = null;
 const coverCache = new Map();
 
 const ha = (m2) => HA.format((Number(m2) || 0) / 10000);
@@ -201,6 +203,7 @@ function metersOf(card) {
 
 function briefTools(card, { pdf = true, info = true } = {}) {
   const hasDecision = !!(card.entry && card.entry.decision);
+  const helpBtn = `<button type="button" class="project-brief-tool${detailOpen ? ' is-on' : ''}" data-brief-help aria-expanded="${detailOpen}" title="${detailOpen ? 'Ẩn thông tin chi tiết đồ án' : 'Xem thông tin chi tiết đồ án'}" aria-label="Thông tin chi tiết đồ án">${ico('faq')}</button>`;
   const pdfBtn = pdf
     ? `<button type="button" class="project-brief-tool" data-brief-pdf data-brief-name="${escapeHtml(card.name)}"${hasDecision ? '' : ' disabled'} title="${hasDecision ? 'Xem PDF quyết định phê duyệt' : 'Chưa có PDF quyết định'}" aria-label="Xem PDF quyết định">${ico('file')}</button>`
     : '';
@@ -208,9 +211,25 @@ function briefTools(card, { pdf = true, info = true } = {}) {
     ? `<button type="button" class="project-brief-tool" data-brief-info data-brief-name="${escapeHtml(card.name)}" title="Xem bảng thông tin đồ án" aria-label="Xem bảng thông tin đồ án">${ico('table')}</button>`
     : '';
   return `<div class="project-brief-tools">
-      ${pdfBtn}${infoBtn}
+      ${helpBtn}${pdfBtn}${infoBtn}
       <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
     </div>`;
+}
+
+function detailBodyHtml(card) {
+  if (card.qhcCity) {
+    const scale = card.qhcScale || (getLevel() === 'qhc10' ? '10' : '25');
+    const body = scale === '10' ? qhc10CenterBriefHtml() : qhcScaleBriefHtml();
+    return `<div class="project-brief-detail">${body}</div>`;
+  }
+  const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
+  const dossier = projectDossierSummaryHtmlByName(card.name);
+  return `<div class="project-brief-detail">
+    <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
+    ${popRows(card.pop || { ht: 0, qh: 0 })}
+    <div class="project-brief-meters">${metersOf(card).join('')}</div>
+    ${dossier}
+  </div>`;
 }
 
 function popRows(pop) {
@@ -244,39 +263,38 @@ function renderQhcCity(card) {
   const stamp = is10 ? 'QHC 1/10.000' : 'QHC 1/25.000';
   el.dataset.level = 'QHC';
   el.dataset.qhcScale = scale;
+  el.classList.toggle('is-detail-open', detailOpen);
   el.hidden = false;
   const sub = is10
     ? `${escapeHtml(QHC2045.status)} · Quy hoạch chung 1/10.000 khu vực đô thị trung tâm`
     : `${escapeHtml(QHC2045.status)} · Sơ đồ tổ chức không gian 1/25.000`;
-  const body = is10 ? qhc10CenterBriefHtml() : qhcScaleBriefHtml();
   el.innerHTML = `<div class="project-brief-head">
       <h2 class="project-brief-name"><span class="project-brief-level">${stamp}</span>${escapeHtml(QHC2045.short)}</h2>
       ${briefTools(card, { pdf: false, info: true })}
     </div>
     <p class="project-brief-sub" title="${escapeHtml(QHC2045.name)}">${sub}</p>
-    <div class="project-brief-scale">${body}</div>`;
+    ${detailOpen ? detailBodyHtml(card) : ''}`;
   syncBriefStack();
 }
 
 function render(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
+  lastCard = card;
   if (card.qhcCity) {
     renderQhcCity(card);
     return;
   }
   const level = PLAN_LEVELS.find(item => item.key === card.level);
-  const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
   const title = briefTitle(card.name);
   el.dataset.level = card.level || '';
+  el.classList.toggle('is-detail-open', detailOpen);
   el.hidden = false;
   el.innerHTML = `<div class="project-brief-head">
       <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(title)}</h2>
       ${briefTools(card)}
     </div>
-    <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
-    ${popRows(card.pop)}
-    <div class="project-brief-meters">${metersOf(card).join('')}</div>`;
+    ${detailOpen ? detailBodyHtml(card) : ''}`;
   syncBriefStack();
 }
 
@@ -311,11 +329,20 @@ function renderStack(cards) {
 function hide() {
   seq += 1;
   openName = '';
+  detailOpen = false;
+  lastCard = null;
   const el = document.getElementById('projectBrief');
   if (!el) return;
   el.hidden = true;
+  el.classList.remove('is-detail-open');
   el.innerHTML = '';
   syncBriefStack();
+}
+
+function toggleDetail() {
+  detailOpen = !detailOpen;
+  if (lastCard) render(lastCard);
+  else if (openName) show(openName);
 }
 
 async function fillCover(card, token) {
@@ -351,11 +378,15 @@ async function showStack(peers) {
   renderStack(cards);
 }
 
-async function show(name) {
+async function show(name, { openDetail = false } = {}) {
   const project = String(name || '').trim();
   const peers = inspectPeers();
   if (project && peers.some(p => p.name === project)) return showStack(peers);
   if (!project) { hide(); return; }
+  const sameBrief = project === openName
+    || (isQhcStaticName(project) && openName === QHC2045.short);
+  if (openDetail) detailOpen = true;
+  else if (!sameBrief) detailOpen = false;
   const token = ++seq;
   openName = project;
   // QHC đô thị tĩnh: brief theo cấp đang xem (1/25.000 = QĐ 108; 1/10.000 = quy mô).
@@ -386,13 +417,11 @@ async function show(name) {
   render(base);
 }
 
-function paintQhc10BriefHost() {
-  const host = document.getElementById('qhc10Brief');
-  if (host) host.innerHTML = qhc10CenterBriefHtml();
+export function openProjectBriefDetail(name) {
+  return show(name || openName || QHC2045.short, { openDetail: true });
 }
 
 export function initProjectBrief() {
-  paintQhc10BriefHost();
   const host = document.getElementById('mapArea');
   if (!host || document.getElementById('projectBrief')) return;
   const el = document.createElement('aside');
@@ -404,6 +433,7 @@ export function initProjectBrief() {
   host.appendChild(el);
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-brief-close]')) { hide(); return; }
+    if (e.target.closest('[data-brief-help]')) { toggleDetail(); return; }
     const pdf = e.target.closest('[data-brief-pdf]');
     if (pdf && !pdf.disabled) {
       openInspectDecision(pdf.getAttribute('data-brief-name'));

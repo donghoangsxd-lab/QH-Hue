@@ -1380,7 +1380,7 @@ function initQhcRows() {
       btn.title = open ? 'Ẩn các lớp dữ liệu' : 'Xem các lớp dữ liệu';
     });
   });
-  document.querySelector('[data-qhc-info="10"]')?.addEventListener('click', () => {
+  document.querySelector('[data-qhc-info="10"]')?.addEventListener('click', async () => {
     const land = $('chk_qhc10');
     if (land && !land.checked) {
       land.checked = true;
@@ -1388,8 +1388,9 @@ function initQhcRows() {
     }
     ensurePlanView();
     fitCenter();
-    // Brief quy mô 1/10.000 + bảng cơ cấu đất trung tâm ở panel dưới.
-    syncQhcCityBrief();
+    // Brief chi tiết (?) + bảng cơ cấu đất trung tâm ở panel dưới.
+    const { openProjectBriefDetail } = await import('./projectBrief.js');
+    await openProjectBriefDetail(QHC2045.short);
     document.dispatchEvent(new Event(QHC_CENTER_INFO_EVENT));
   });
   ['25', '10'].forEach(syncQhcHead);

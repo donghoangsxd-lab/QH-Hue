@@ -5,11 +5,10 @@
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link xem được trong khung).
-// Mở đồ án: bốn dòng hồ sơ — quyết định phê duyệt, quy định quản lý (role quy-dinh), hệ thống bản vẽ, điều chỉnh cục bộ.
+// Mũi tên cuối tên đồ án xổ cây bản đồ: a. Hiện trạng / b. Quy hoạch (PROJECT_LAYERS + mạng hạ tầng).
+// Hồ sơ (quyết định, quy định, điều chỉnh, chỉ tiêu) nằm ở brief — bấm ? trên bảng thông tin đồ án.
 // Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
-// Mũi tên cuối tên đồ án mở bốn dòng hồ sơ. Dòng bản vẽ mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng.
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
-// Điều chỉnh cục bộ: tóm tắt làm nhãn, xem quyết định và bản vẽ scan. Ranh bật trong danh sách con.
 // Mỗi đồ án một màu viền + nền mờ nhẹ (cùng kiểu wash vùng trung tâm QHC), nhãn tên ở giữa ranh.
 // Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
 // QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
@@ -51,8 +50,6 @@ import {
   parseNameList, durableLayerKeys, isBoundaryLayerKey
 } from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
-import { capacityPanelHtml } from './congSuatUi.js';
-import { schemeSlug } from './congSuat.js';
 import { sameLevelOverlaps } from './qhpkOverlap.js';
 
 const HIDDEN_KEY = HIDDEN_PROJECTS_KEY;
@@ -106,9 +103,6 @@ const fallbackCache = new Map();
 const expanded = new Set();
 const layerInfo = new Map();
 let layerBusy = null;
-const adjOpen = new Set();
-const drawOpen = new Set();
-
 // ============================ RANH TỔNG ĐỒ ÁN ============================
 
 const round6 = (c) => (typeof c[0] === 'number' ? [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6] : c.map(round6));
@@ -1118,12 +1112,7 @@ function rowHtml(p, idx, admin, labelNo = null) {
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? capacityPanelHtml({
-      schemeId: p.slug || schemeSlug(p.name),
-      schemeName: p.short || p.name,
-      cap: p.level === 'QHPK' ? 'QHPK' : p.level === 'QHCT' ? 'QHCT' : p.level === 'QHC' ? 'QHC10' : '',
-      sector: null
-    }) + dossierHtml(p, idx, admin, on) : ''}`;
+    </div>${open ? layersHtml(p, idx, on, admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -1194,16 +1183,19 @@ function extraRoleButtons(p, idx, role) {
   }).join('');
 }
 
-function dossierHtml(p, idx, admin, projectOn) {
+/** Tóm tắt hồ sơ đồ án cho brief chi tiết (không còn trong danh sách). */
+export function projectDossierSummaryHtmlByName(name) {
+  const idx = projects.findIndex(x => x && x.name === name);
+  if (idx < 0) return '';
+  return projectDossierSummaryHtml(projects[idx], idx, isAdmin());
+}
+
+function projectDossierSummaryHtml(p, idx, admin) {
+  if (!p) return '';
   const cite = decisionLine(p);
   const reg = latestDoc(p, 'quy-dinh');
-  const info = layerInfo.get(p.name);
-  const drawN = !info || info.loading ? null : (info.list || []).filter(g => g.present).length;
-  const drawLabel = drawN == null ? 'đang tải' : `${fmtNum(drawN)} bản vẽ`;
-  const drawingsOpen = drawOpen.has(p.name);
   const adjusts = dossierAdjustments(p.name, admin);
   const sites = adjustmentSiteCount(adjusts.filter(it => it.status !== 'pending'));
-  const adjustsOpen = adjOpen.has(p.name);
   const wait = p.proposal
     ? dossierBtn('Chờ duyệt', `data-propose="${idx}"`, true, p.proposal.name || 'Quyết định đang chờ')
     : '';
@@ -1218,9 +1210,21 @@ function dossierHtml(p, idx, admin, projectOn) {
       </select>
       <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>
     </div>` : '';
-  const drawNest = drawingsOpen ? `<div class="project-dossier-nest">${layersHtml(p, idx, projectOn, admin)}</div>` : '';
-  const adjNest = adjustsOpen ? `<div class="project-dossier-nest">${adjustNestHtml(p, idx, projectOn, adjusts)}</div>` : '';
-  return `<div class="project-dossier">
+  const on = !isLayerHidden(p.name, ADJUST_LAYER_KEY);
+  const anyBound = adjusts.some(it => it.boundary);
+  const adjRows = adjusts.map((it, i) => {
+    const title = it.title || it.summary || 'Điều chỉnh cục bộ';
+    const pending = it.status === 'pending' ? ' (chờ duyệt)' : '';
+    const label = `${i + 1}. ${title}${pending}`;
+    const name = it.boundary
+      ? `<button type="button" class="project-lot-hit" data-adj-act="locate" data-adj-id="${escapeHtml(it.id)}" data-adj-project="${idx}" title="Phóng tới ranh điều chỉnh"><span>${escapeHtml(label)}</span></button>`
+      : `<span class="project-dossier-item">${escapeHtml(label)}</span>`;
+    return `<div class="project-adj-item">${name}
+      ${dossierBtn('Xem QĐ', `data-adj-act="pdf" data-adj-id="${escapeHtml(it.id)}"`, !!it.pdf, it.pdf ? 'Xem quyết định điều chỉnh' : 'Chưa có PDF')}
+      ${dossierBtn('Bản vẽ scan', `data-adj-act="scan" data-adj-id="${escapeHtml(it.id)}"`, !!it.scan, it.scan ? 'Hiện bản vẽ scan' : 'Chưa có bản vẽ scan')}
+    </div>`;
+  }).join('');
+  return `<div class="project-brief-dossier">
     <div class="project-dossier-row">
       <span class="project-dossier-label">Quyết định phê duyệt</span>
       <span class="project-dossier-meta">${escapeHtml(cite || 'chưa gắn')}</span>
@@ -1236,40 +1240,14 @@ function dossierHtml(p, idx, admin, projectOn) {
       ${dossierBtn('Xem PDF', `data-dossier-doc="quy-dinh" data-dossier-idx="${idx}"`, !!reg, reg ? (reg.name || 'Xem quy định quản lý') : 'Chưa có PDF')}
     </div>
     <div class="project-dossier-row">
-      <span class="project-dossier-label">Hệ thống bản vẽ</span>
-      <span class="project-dossier-meta">${escapeHtml(drawLabel)}</span>
-      <button type="button" class="project-btn project-expand${drawingsOpen ? ' open' : ''}" data-draw-open="${idx}" title="${drawingsOpen ? 'Ẩn' : 'Mở'} danh sách bản vẽ" aria-expanded="${drawingsOpen}">${ico('chev-down')}</button>
-    </div>
-    ${drawNest}
-    <div class="project-dossier-row">
       <span class="project-dossier-label">Điều chỉnh cục bộ</span>
       <span class="project-dossier-meta">${fmtNum(sites)} vị trí</span>
-      <button type="button" class="project-btn project-expand${adjustsOpen ? ' open' : ''}" data-adj-open="${idx}" title="${adjustsOpen ? 'Ẩn' : 'Mở'} danh sách điều chỉnh cục bộ" aria-expanded="${adjustsOpen}">${ico('chev-down')}</button>
     </div>
-    ${adjNest}
+    <label class="project-dossier-check" title="Hiện ranh điều chỉnh cục bộ trên bản đồ">
+      <input type="checkbox" data-adj-layer="${idx}"${on ? ' checked' : ''}${anyBound ? '' : ' disabled'}>Hiện ranh trên bản đồ</label>
+    ${adjRows || '<div class="project-empty">Chưa có vị trí điều chỉnh cục bộ.</div>'}
     ${add}
   </div>`;
-}
-
-function adjustNestHtml(p, idx, projectOn, list) {
-  const on = !isLayerHidden(p.name, ADJUST_LAYER_KEY);
-  const anyBound = list.some(it => it.boundary);
-  const rows = list.map((it, i) => {
-    const title = it.title || it.summary || 'Điều chỉnh cục bộ';
-    const wait = it.status === 'pending' ? ' (chờ duyệt)' : '';
-    const label = `${i + 1}. ${title}${wait}`;
-    const name = it.boundary
-      ? `<button type="button" class="project-lot-hit" data-adj-act="locate" data-adj-id="${escapeHtml(it.id)}" data-adj-project="${idx}" title="Phóng tới ranh điều chỉnh"><span>${escapeHtml(label)}</span></button>`
-      : `<span class="project-dossier-item">${escapeHtml(label)}</span>`;
-    return `<div class="project-adj-item">${name}
-      ${dossierBtn('Xem QĐ', `data-adj-act="pdf" data-adj-id="${escapeHtml(it.id)}"`, !!it.pdf, it.pdf ? 'Xem quyết định điều chỉnh' : 'Chưa có PDF')}
-      ${dossierBtn('Bản vẽ scan', `data-adj-act="scan" data-adj-id="${escapeHtml(it.id)}"`, !!it.scan, it.scan ? 'Hiện bản vẽ scan' : 'Chưa có bản vẽ scan')}
-    </div>`;
-  }).join('');
-  const empty = list.length ? '' : '<div class="project-empty">Chưa có vị trí điều chỉnh cục bộ.</div>';
-  return `<label class="project-dossier-check" title="Hiện ranh điều chỉnh cục bộ trên bản đồ">
-      <input type="checkbox" data-adj-layer="${idx}"${on && projectOn ? ' checked' : ''}${anyBound ? '' : ' disabled'}>Hiện ranh trên bản đồ</label>
-    ${rows}${empty}`;
 }
 
 // ============================ LỚP DỮ LIỆU TRONG ĐỒ ÁN ============================
@@ -1290,38 +1268,57 @@ function layerCount(g) {
   return { short: fmtNum(g.count), full: parts.join(' · ') };
 }
 
+function layerRowHtml(p, idx, projectOn, admin, g, li, { note = false } = {}) {
+  if (g.kind === 'net' && !g.present && !admin) return '';
+  const key = layerKey(p.name, g.key);
+  const on = g.kind === 'net' ? state.shownProjectNets.has(key) : !state.hiddenProjectLayers.has(key);
+  const toggleable = g.present || g.kind === 'boundary';
+  const count = layerCount(g);
+  const deleting = layerBusy === key;
+  const tip = g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng';
+  const noteHtml = note
+    ? '<div class="project-net-note">Bản vẽ hạ tầng theo đồ án — bật để xem cùng lớp sử dụng đất</div>'
+    : '';
+  const addNet = admin && g.kind === 'net' && !p.legacy
+    ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${g.present ? 'Thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${g.present ? 'Thay bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico('save')}</button>`
+    : '';
+  const kmlBtn = admin && g.kind === 'boundary' && !p.legacy
+    ? `<button type="button" class="project-kml-btn" data-kml-boundary="${idx}" title="Nhập file KML hoặc KMZ (WGS84) làm ranh đồ án. Không ghi lại các lô."${layerBusy || busy ? ' disabled' : ''}>Nhập KML/KMZ</button>`
+    : '';
+  return `${noteHtml}<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
+    <label class="project-layer-name" title="${escapeHtml(g.label)} (${tip}) — ${escapeHtml(count.full)}">
+      <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
+      <i class="project-layer-dot ${g.kind}" style="--dot:${g.kind === 'boundary' ? p.color : g.color}"></i>
+      <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
+    ${addNet}
+    ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
+  </div>${kmlBtn}`;
+}
+
 function layersHtml(p, idx, projectOn, admin) {
   const info = layerInfo.get(p.name);
   if (!info || info.loading) return '<div class="project-layers"><div class="project-empty">Đang tải các lớp…</div></div>';
   if (info.error) return `<div class="project-layers"><div class="project-empty">Không tải được lớp: ${escapeHtml(info.error)}</div></div>`;
   if (!info.list.length) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
+  const groups = [
+    { phase: 'HT', title: 'a. Các bản đồ hiện trạng' },
+    { phase: 'QH', title: 'b. Các bản đồ quy hoạch' }
+  ];
   let netNoted = false;
-  const rows = info.list.map((g, li) => {
-    if (g.kind === 'net' && !g.present && !admin) return '';
-    const key = layerKey(p.name, g.key);
-    const on = g.kind === 'net' ? state.shownProjectNets.has(key) : !state.hiddenProjectLayers.has(key);
-    // Ranh tạm (bao lồi) vẫn bật/tắt được dù chưa có file ranh
-    const toggleable = g.present || g.kind === 'boundary';
-    const count = layerCount(g);
-    const deleting = layerBusy === key;
-    const note = g.kind === 'net' && !netNoted
-      ? (netNoted = true, '<div class="project-net-note">Bản vẽ hạ tầng theo đồ án — bật để xem cùng lớp sử dụng đất</div>')
-      : '';
-    const addNet = admin && g.kind === 'net' && !p.legacy
-      ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${g.present ? 'Thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${g.present ? 'Thay bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico('save')}</button>`
-      : '';
-    const kmlBtn = admin && g.kind === 'boundary' && !p.legacy
-      ? `<button type="button" class="project-kml-btn" data-kml-boundary="${idx}" title="Nhập file KML hoặc KMZ (WGS84) làm ranh đồ án. Không ghi lại các lô."${layerBusy || busy ? ' disabled' : ''}>Nhập KML/KMZ</button>`
-      : '';
-    return `${note}<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
-      <label class="project-layer-name" title="${escapeHtml(g.label)} (${g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) — ${escapeHtml(count.full)}">
-        <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
-        <i class="project-layer-dot ${g.kind}" style="--dot:${g.kind === 'boundary' ? p.color : g.color}"></i>
-        <b class="project-phase ${g.phase === 'QH' ? 'qh' : 'ht'}">${g.phase}</b>
-        <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
-      ${addNet}
-      ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
-    </div>${kmlBtn}`;
+  const body = groups.map(({ phase, title }) => {
+    const rows = info.list.map((g, li) => {
+      if (g.phase !== phase) return '';
+      const html = layerRowHtml(p, idx, projectOn, admin, g, li, {
+        note: g.kind === 'net' && !netNoted
+      });
+      if (html && g.kind === 'net') netNoted = true;
+      return html;
+    }).filter(Boolean).join('');
+    if (!rows && !admin) return '';
+    return `<div class="project-map-group" data-map-phase="${phase}">
+      <div class="project-map-group-title">${escapeHtml(title)}</div>
+      ${rows || '<div class="project-empty">Chưa có lớp ở nhóm này.</div>'}
+    </div>`;
   }).join('');
   const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
@@ -1329,7 +1326,7 @@ function layersHtml(p, idx, projectOn, admin) {
         placeholder="Tìm trong ${fmtNum(lotsN)} lô: ký hiệu, tên, loại đất…" aria-label="Tìm lô trong đồ án ${escapeHtml(p.name)}">
       <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
     </div>` : '';
-  return `<div class="project-layers">${rows}${search}</div>`;
+  return `<div class="project-layers">${body || '<div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div>'}${search}</div>`;
 }
 
 function setAdjustOn(p, on) {
@@ -2804,7 +2801,8 @@ export function initProjectLayer(opts = {}) {
     const g = p && layerInfo.get(p.name)?.list?.[li];
     return g ? { p, g } : null;
   };
-  $('projectList')?.addEventListener('change', (e) => {
+  // Cùng pane với #planBriefSlot để hồ sơ trong brief (?) vẫn bấm được (PDF, điều chỉnh…).
+  $('axisQuyHoach')?.addEventListener('change', (e) => {
     const layerBox = e.target.closest('[data-layer]');
     if (layerBox) {
       const hit = layerOf(layerBox.dataset.layer);
@@ -2840,7 +2838,7 @@ export function initProjectLayer(opts = {}) {
     refreshAll();
   });
   // Gõ tìm lô chỉ vẽ lại khung kết quả (vẽ lại cả danh sách sẽ mất con trỏ trong ô tìm)
-  $('projectList')?.addEventListener('input', (e) => {
+  $('axisQuyHoach')?.addEventListener('input', (e) => {
     const box = e.target.closest('[data-lot-search]');
     const idx = box ? Number(box.dataset.lotSearch) : -1;
     const p = projects[idx];
@@ -2849,7 +2847,7 @@ export function initProjectLayer(opts = {}) {
     const out = $('projectList').querySelector(`[data-lot-results="${idx}"]`);
     if (out) out.innerHTML = lotResultsHtml(p, idx);
   });
-  $('projectList')?.addEventListener('click', (e) => {
+  $('axisQuyHoach')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
     const group = e.target.closest('[data-group-toggle]');
     if (group) {
@@ -2934,28 +2932,11 @@ export function initProjectLayer(opts = {}) {
     }
     const expand = e.target.closest('[data-expand]');
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
-    const drawToggle = e.target.closest('[data-draw-open]');
-    if (drawToggle) {
-      const p = projects[Number(drawToggle.dataset.drawOpen)];
-      if (!p) return;
-      if (drawOpen.has(p.name)) drawOpen.delete(p.name);
-      else drawOpen.add(p.name);
-      renderList();
-      return;
-    }
     const dossierDoc = e.target.closest('[data-dossier-doc]');
     if (dossierDoc) {
       const p = projects[Number(dossierDoc.dataset.dossierIdx)];
       const doc = p && latestDoc(p, dossierDoc.dataset.dossierDoc);
       if (p && doc) openDecision(docTarget(p, doc, doc.role));
-      return;
-    }
-    const adjToggle = e.target.closest('[data-adj-open]');
-    if (adjToggle) {
-      const p = projects[Number(adjToggle.dataset.adjOpen)];
-      if (!p) return;
-      if (adjOpen.has(p.name)) adjOpen.delete(p.name); else adjOpen.add(p.name);
-      renderList();
       return;
     }
     // Phóng tới hồ sơ do adjustLayer.js xử lý (bắt ở document); ở đây chỉ bật lại đồ án / lớp đang ẩn để ranh hiện

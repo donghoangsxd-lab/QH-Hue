@@ -124,12 +124,6 @@ export function qhc25ScaleHtml() {
   </div>`;
 }
 
-function paintHost() {
-  const host = document.getElementById('qhc25Scale');
-  if (!host) return;
-  host.innerHTML = qhc25ScaleHtml();
-}
-
 export async function loadQhc25Scale() {
   if (doc) return doc;
   if (task) return task;
@@ -140,54 +134,33 @@ export async function loadQhc25Scale() {
     })
     .then(json => {
       doc = json;
-      paintHost();
       return doc;
     })
     .catch(err => {
       task = null;
-      const host = document.getElementById('qhc25Scale');
-      if (host) host.innerHTML = `<p class="qhc25-scale-empty">Không tải được chỉ tiêu quy mô (${escapeHtml(err.message)}).</p>`;
       console.warn('QHC25 scale', err);
       throw err;
     });
   return task;
 }
 
-function openLayers() {
-  const box = document.getElementById('qhc25Layers');
-  const btn = document.querySelector('[data-qhc-expand="25"]');
-  if (box) box.hidden = false;
-  if (btn) {
-    btn.classList.add('open');
-    btn.setAttribute('aria-expanded', 'true');
-    btn.title = 'Ẩn các lớp dữ liệu';
-  }
-}
-
-/** HTML chỉ tiêu QĐ 108 (đã load). Chỉ dùng brief / danh sách lớp QHC 1/25.000. */
+/** HTML chỉ tiêu QĐ 108 (đã load). Dùng trong brief chi tiết (?). */
 export function qhcScaleBriefHtml() {
+  if (!doc) return '<p class="qhc25-scale-empty">Đang tải chỉ tiêu quy mô…</p>';
   return qhc25ScaleHtml();
 }
 
-export function revealQhc25Scale() {
+export async function revealQhc25Scale() {
   setLevel('qhc25', { keepView: true });
   if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
-  openLayers();
-  paintHost();
-  const host = document.getElementById('qhc25Scale');
-  if (host) {
-    host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    host.classList.add('is-flash');
-    window.setTimeout(() => host.classList.remove('is-flash'), 1200);
-  }
+  try { await loadQhc25Scale(); } catch (e) { /* brief hiện empty/error text */ }
+  const { openProjectBriefDetail } = await import('./projectBrief.js');
+  openProjectBriefDetail();
 }
 
 export function initQhc25Scale() {
-  if (!document.getElementById('qhc25Scale')) return;
-  paintHost();
-  loadQhc25Scale().catch(() => { /* đã hiện lỗi trên host */ });
+  loadQhc25Scale().catch(() => {});
   document.querySelector('[data-qhc-info="25"]')?.addEventListener('click', () => {
-    revealQhc25Scale();
-    loadQhc25Scale().catch(() => {});
+    revealQhc25Scale().catch(() => {});
   });
 }

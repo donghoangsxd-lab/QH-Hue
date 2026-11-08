@@ -564,27 +564,31 @@
                 <input type="checkbox" id="chk_qhc25head" data-qhc-head="25"><span>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></span></label>
               <span class="project-tools">
                 <button type="button" class="project-btn project-expand" data-qhc-expand="25" aria-expanded="false" aria-controls="qhc25Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
-                <button type="button" class="project-btn" data-qhc-info="25" title="Chỉ tiêu quy mô dân số và đất đai theo QĐ 108/QĐ-TTg (mở trong danh sách lớp)" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
+                <button type="button" class="project-btn" data-qhc-info="25" title="Thông tin chi tiết đồ án (chỉ tiêu QĐ 108/QĐ-TTg) ở bảng brief" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
                 <span data-dossier-layer-host="qhc-2045"></span>
               </span>
             </div>
             <div class="project-layers" id="qhc25Layers" hidden>
-              <div id="qhc25Scale" class="qhc25-scale" aria-label="Chỉ tiêu quy mô QHC 1/25.000"></div>
-              <div data-cs-host="qhc-hue-2045" data-cs-cap="QHC25" data-cs-name="QHC đô thị Thừa Thiên Huế 1/25.000"></div>
-              <div class="project-layer">
-                <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
-                  <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
+              <div class="project-map-group" data-map-phase="HT">
+                <div class="project-map-group-title">a. Các bản đồ hiện trạng</div>
+                <div id="qhc25HtktHt" class="qhc25-htkt" hidden></div>
               </div>
-              <div class="project-layer">
-                <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến">
-                  <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
-                <label class="project-rail" title="Đường sắt">
-                  <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
-                  <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                </label>
+              <div class="project-map-group" data-map-phase="QH">
+                <div class="project-map-group-title">b. Các bản đồ quy hoạch</div>
+                <div class="project-layer">
+                  <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
+                    <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
+                </div>
+                <div class="project-layer">
+                  <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến">
+                    <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
+                  <label class="project-rail" title="Đường sắt">
+                    <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
+                    <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                  </label>
+                </div>
+                <div id="qhc25HtktQh" class="qhc25-htkt" hidden></div>
               </div>
-              <!-- HTKT đồ án QHC 1/25.000: hiện theo nút HT/QH; cùng lớp với trục C -->
-              <div id="qhc25Htkt" class="qhc25-htkt" hidden></div>
             </div>
           </div>
           <div class="plan-static" data-plan-static="QHC">
@@ -593,24 +597,29 @@
                 <input type="checkbox" id="chk_qhc10head" data-qhc-head="10"><span>QHC đô thị TTHuế 2045 <small class="layer-hint" id="qhc10Hint">(Trung tâm)</small></span></label>
               <span class="project-tools">
                 <button type="button" class="project-btn project-expand" data-qhc-expand="10" aria-expanded="false" aria-controls="qhc10Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
-                <button type="button" class="project-btn" data-qhc-info="10" title="Thông tin đồ án: quy mô khu vực đô thị trung tâm 1/10.000 và bảng cơ cấu sử dụng đất / QCVN 01:2026 ở panel dưới" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
+                <button type="button" class="project-btn" data-qhc-info="10" title="Thông tin chi tiết đồ án ở bảng brief và bảng cơ cấu / QCVN 01:2026 ở panel dưới" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
                 <span data-dossier-layer-host="qhc-2045"></span>
               </span>
             </div>
             <div class="project-layers" id="qhc10Layers" hidden>
-              <div id="qhc10Brief" class="qhc25-scale" aria-label="Thông tin QHC 1/10.000 khu vực đô thị trung tâm"></div>
-              <div data-cs-host="qhc-trung-tam" data-cs-cap="QHC10" data-cs-name="QHC đô thị trung tâm Thừa Thiên Huế 1/10.000"></div>
-              <div class="project-layer">
-                <label class="project-layer-name" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu">
-                  <input type="checkbox" id="chk_qhc10" data-qhc-child="10"><i class="project-layer-dot" style="--dot:#38bdf8"></i><span>QH sử dụng đất (trung tâm)</span></label>
+              <div class="project-map-group" data-map-phase="HT">
+                <div class="project-map-group-title">a. Các bản đồ hiện trạng</div>
+                <div class="project-empty">Lô hiện trạng xem bằng bộ lọc giai đoạn dưới lớp sử dụng đất (khi lớp quy hoạch đang bật).</div>
               </div>
-              <div class="project-layer">
-                <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
-                  <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
-                <label class="project-rail" title="Đường sắt">
-                  <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked aria-label="Đường sắt">
-                  <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                </label>
+              <div class="project-map-group" data-map-phase="QH">
+                <div class="project-map-group-title">b. Các bản đồ quy hoạch</div>
+                <div class="project-layer">
+                  <label class="project-layer-name" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu">
+                    <input type="checkbox" id="chk_qhc10" data-qhc-child="10"><i class="project-layer-dot" style="--dot:#38bdf8"></i><span>Quy hoạch sử dụng đất (trung tâm)</span></label>
+                </div>
+                <div class="project-layer">
+                  <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
+                    <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
+                  <label class="project-rail" title="Đường sắt">
+                    <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked aria-label="Đường sắt">
+                    <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                  </label>
+                </div>
               </div>
             </div>
             <div class="qhc-stages" id="qhcStages" role="group" aria-label="Giai đoạn lô, tuyến giao thông và ranh mở rộng QHC 1/10.000" hidden></div>
