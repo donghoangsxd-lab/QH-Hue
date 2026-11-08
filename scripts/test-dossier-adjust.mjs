@@ -55,7 +55,7 @@ const imp = read('public/js/adjustImport.js');
 const adj = read('public/js/adjustLayer.js');
 const html = read('public/index.html');
 
-for (const label of ['Quyết định phê duyệt', 'Quy định quản lý', 'Hệ thống bản vẽ', 'Điều chỉnh cục bộ']) {
+for (const label of ['Quyết định phê duyệt', 'Quy định quản lý', 'Điều chỉnh cục bộ', 'Các bản đồ hiện trạng', 'Các bản đồ quy hoạch']) {
   assert.match(layer, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 assert.match(layer, /bản vẽ/);
@@ -69,10 +69,11 @@ assert.match(layer, /'quy-dinh': \{ short: 'QC', label: 'Quy chế' \}/);
 assert.match(layer, /<option value="quy-dinh">Quy chế<\/option>/);
 assert.match(layer, /data-dossier-menu/);
 assert.match(layer, /openDossierPick/);
+assert.match(layer, /projectDossierSummaryHtmlByName/);
 assert.match(read('public/js/dossierAttach.js'), /DOSSIER_ATTACH/);
 assert.match(read('services/projectStore.js'), /docsView\(d \|\| \{\}\)/);
 assert.match(read('api/gee.js'), /layer, role, url, replaceId/);
-assert.match(layer, /capacityPanelHtml/);
+assert.doesNotMatch(layer, /capacityPanelHtml/);
 assert.doesNotMatch(entry, /Quy định quản lý/);
 assert.match(entry, /Ghi bổ sung hồ sơ điều chỉnh cục bộ/);
 assert.match(entry, /pdfOnly: true/);

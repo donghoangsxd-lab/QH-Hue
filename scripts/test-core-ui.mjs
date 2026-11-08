@@ -195,8 +195,8 @@ function projectLayerAround(src, id) {
 }
 
 for (const [roadId, railId, label] of [
-  ['chk_gt25', 'chk_gt25rail', 'QH giao thông (toàn TP)'],
-  ['chk_gt10', 'chk_gt10rail', 'QH giao thông (trung tâm)']
+  ['chk_gt25', 'chk_gt25rail', 'Quy hoạch giao thông (toàn TP)'],
+  ['chk_gt10', 'chk_gt10rail', 'Quy hoạch giao thông (trung tâm)']
 ]) {
   const row = projectLayerAround(plan, roadId);
   assert.match(row, new RegExp(label.replace(/[()]/g, '\\$&')));
@@ -212,18 +212,24 @@ for (const [roadId, railId, label] of [
 }
 assert.doesNotMatch(plan, /project-layer-sub/);
 assert.doesNotMatch(plan, /id="gt25RailHint"|id="gt10RailHint"/);
-assert.match(plan, /id="qhc25Htkt"/);
+assert.match(plan, /id="qhc25HtktHt"/);
+assert.match(plan, /id="qhc25HtktQh"/);
 assert.match(plan, /class="qhc25-htkt"/);
-assert.match(plan, /id="qhc25Scale"/);
+assert.match(plan, /project-map-group-title/);
+assert.match(plan, /a\. Các bản đồ hiện trạng/);
+assert.match(plan, /b\. Các bản đồ quy hoạch/);
+assert.doesNotMatch(plan, /id="qhc25Scale"/);
 assert.match(plan, /data-qhc-info="25"/);
 assert.match(plan, /data-qhc-info="10"/);
 assert.match(read('public/css/style.css'), /\.project-rail \{[^}]*width: 18px/);
 assert.match(read('public/css/style.css'), /\.project-rail \.ico \{[^}]*width: 13px/);
 assert.match(read('public/css/style.css'), /\.qhc25-htkt \{/);
-assert.match(read('docs/ui-spec.md'), /icon «Đường sắt»/);
-assert.match(read('docs/ui-spec.md'), /#qhc25Htkt/);
-assert.match(read('docs/ui-spec.md'), /Bản đồ hiện trạng tỷ lệ 1\/25\.000/);
-assert.match(read('docs/bon-truc.md'), /#qhc25Htkt/);
+assert.match(read('public/css/style.css'), /\.project-map-group-title/);
+assert.match(read('docs/ui-spec.md'), /Đường sắt/);
+assert.match(read('docs/ui-spec.md'), /#qhc25HtktHt/);
+assert.match(read('docs/ui-spec.md'), /#qhc25HtktQh/);
+assert.match(read('docs/ui-spec.md'), /data-brief-help/);
+assert.match(read('docs/bon-truc.md'), /#qhc25HtktHt/);
 
 const tech = innerById(html, 'layerPaneHaTang');
 const social = innerById(html, 'layerPaneXaHoi');
@@ -1092,7 +1098,8 @@ assert.match(read('public/js/chuyenNganh.js'), /Bản đồ hiện trạng tỷ 
 assert.match(read('public/js/chuyenNganh.js'), /Bản đồ quy hoạch tỷ lệ 1\/25\.000/);
 assert.match(read('public/js/app.js'), /initQhc25Scale/);
 assert.match(read('public/js/qhc25Scale.js'), /Quy mô dân số/);
-assert.match(read('docs/ui-spec.md'), /#qhc25Scale/);
+assert.match(read('public/js/projectBrief.js'), /data-brief-help/);
+assert.match(read('docs/ui-spec.md'), /qhcScaleBriefHtml/);
 assert.match(read('public/js/chuyenNganh.js'), /localStorage\.removeItem\(STORE_KEY\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /function applySavedLayers|function readSaved|localStorage\.setItem\(STORE_KEY/);
 assert.match(read('docs/bon-truc.md'), /Không khôi phục lớp/);

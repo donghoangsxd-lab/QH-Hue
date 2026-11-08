@@ -491,6 +491,9 @@ body.compare-on .map-title {
   cursor: default;
 }
 .project-brief-tool:disabled:hover { color: var(--text-muted); background: transparent; }
+.project-brief-tool.is-on { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); }
+.project-brief-detail { margin-top: 4px; }
+.project-brief-dossier { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border-color); }
 .project-brief-sub {
   margin: 2px 0 4px;
   font-size: var(--fs-xs);
@@ -1354,6 +1357,31 @@ body.right-collapsed .right-panel {
   flex-direction: column;
   overflow: hidden;
 }
+/* Trục B: danh mục luôn giãn lấp khoảng trống phía trên #rpDock (dock mở ~1/3 hoặc đã thu). */
+#layerPaneQuyHoach:not([hidden]),
+#axisQuyHoach {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+#axisQuyHoach > #levelHostQh,
+#axisQuyHoach > .level-host,
+#axisQuyHoach > #planBriefSlot {
+  flex: 0 0 auto;
+}
+#planListPane > #projectSearch,
+#planListPane > .cn-tools,
+#planListPane > .layer-main-count {
+  flex: 0 0 auto;
+}
+#planListPane > #projectList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 /* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief / bốn tab cấp / droplist B. */
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
@@ -1930,7 +1958,7 @@ body.plan-info-open #planInfoSlot .leaflet-popup-content {
 .project-search { display: block; width: 100%; box-sizing: border-box; height: var(--axis-head-h); margin: 2px 0; padding: 0 8px; border: 1px solid var(--axis-chip-border); border-radius: var(--r-md); background: var(--bg-input); color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-row); }
 .project-search[hidden] { display: none; }
 .project-search:focus { outline: none; border-color: rgb(var(--project-rgb)); }
-.project-list { margin: 2px 0 4px; padding: 0; }
+.project-list { margin: 2px 0 0; padding: 0; }
 .project-list.is-off .project-row { opacity: 0.55; }
 .project-empty { padding: 3px 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .project-scope { display: flex; align-items: center; gap: 5px; margin: 2px 0 3px; padding: 3px 6px; border-left: 2px solid var(--accent-orange); background: rgba(var(--orange-rgb), 0.08); color: var(--text-muted); font-size: var(--fs-xs); }
@@ -2193,6 +2221,14 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-expand.open { color: var(--accent-cyan); }
 .project-expand.open .ico { transform: rotate(180deg); }
 .project-layers { margin: 1px 0 4px 9px; padding: 2px 0 2px 8px; border-left: 1px dashed rgba(var(--project-rgb), 0.45); }
+.project-map-group { margin: 0 0 4px; }
+.project-map-group-title {
+  margin: 2px 0 2px;
+  font-family: var(--axis-font);
+  font-size: var(--axis-fs-row);
+  font-weight: 700;
+  color: var(--axis-color-strong);
+}
 .project-layer { display: flex; align-items: center; gap: 4px; min-height: var(--axis-row-h); font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); }
 .project-layer.is-off .project-layer-name span, .project-layer.is-off .project-layer-dot { opacity: 0.45; }
 .project-layer-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--axis-color); }
@@ -7473,10 +7509,9 @@ body.project-review.la-page #projectReviewHost {
 .cn-groups { margin: 0 0 2px 16px; }
 .cn-status { margin-top: 2px; }
 .cn-status b { display: block; font-family: var(--axis-font); font-size: var(--axis-fs-header); color: var(--axis-color-muted); margin-bottom: 1px; }
-/* HTKT trong đồ án QHC 1/25.000 (panel B): thụt theo .project-layers, cùng token trục */
-.qhc25-htkt { margin: 4px 0 2px; padding-top: 4px; border-top: 1px solid var(--axis-line); }
+/* HTKT trong đồ án QHC 1/25.000 (panel B): nằm trong nhóm a/b, cùng token trục */
+.qhc25-htkt { margin: 2px 0; }
 .qhc25-htkt[hidden] { display: none; }
-.qhc25-htkt .qhc25-phase > b { color: var(--axis-color-strong); font-weight: 700; }
 .qhc25-htkt .cn-scheme { margin-left: 0; }
 .qhc25-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
 .cn-layer { display: flex; align-items: center; gap: 6px; margin: 0; min-height: var(--axis-row-h); font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); }
@@ -8161,6 +8196,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   }
   .axis-area-list,
   #gpList,
+  #planListPane,
   #projectList,
   #dtListPane,
   #dtList,
@@ -8169,6 +8205,16 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
     flex: 1 1 auto;
     min-height: 0;
     max-height: none;
+    overflow: auto;
+  }
+  #planListPane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #planListPane > #projectList {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
   }
   #dtListPane > #dtList {

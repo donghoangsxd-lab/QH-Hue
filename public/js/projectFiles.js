@@ -228,26 +228,26 @@ export function byProjectAreaDesc(a, b) {
 // Mỗi lớp = 1 file. Khớp LAYER_ROLES / NET_ROLES trong services/projectStore.js.
 export const NET_LAYERS = [
   { key: 'ht-giao-thong', phase: 'HT', group: 'giao-thong', label: 'Giao thông', color: '#fbbf24' },
-  { key: 'qh-giao-thong', phase: 'QH', group: 'giao-thong', label: 'Giao thông', color: '#f59e0b' },
+  { key: 'qh-giao-thong', phase: 'QH', group: 'giao-thong', label: 'Quy hoạch giao thông', color: '#f59e0b' },
   { key: 'ht-cap-nuoc', phase: 'HT', group: 'cap-nuoc', label: 'Cấp nước', color: '#38bdf8' },
-  { key: 'qh-cap-nuoc', phase: 'QH', group: 'cap-nuoc', label: 'Cấp nước', color: '#0284c7' },
+  { key: 'qh-cap-nuoc', phase: 'QH', group: 'cap-nuoc', label: 'Quy hoạch cấp nước', color: '#0284c7' },
   { key: 'ht-thoat-nuoc', phase: 'HT', group: 'thoat-nuoc', label: 'Thoát nước', color: '#2dd4bf' },
-  { key: 'qh-thoat-nuoc', phase: 'QH', group: 'thoat-nuoc', label: 'Thoát nước', color: '#0f766e' },
+  { key: 'qh-thoat-nuoc', phase: 'QH', group: 'thoat-nuoc', label: 'Quy hoạch thoát nước', color: '#0f766e' },
   { key: 'ht-cap-dien', phase: 'HT', group: 'cap-dien', label: 'Cấp điện', color: '#e879f9' },
-  { key: 'qh-cap-dien', phase: 'QH', group: 'cap-dien', label: 'Cấp điện', color: '#a21caf' },
+  { key: 'qh-cap-dien', phase: 'QH', group: 'cap-dien', label: 'Quy hoạch cấp điện', color: '#a21caf' },
   { key: 'ht-san-nen', phase: 'HT', group: 'san-nen', label: 'San nền và thoát nước mưa', color: '#86efac' },
-  { key: 'qh-san-nen', phase: 'QH', group: 'san-nen', label: 'San nền và thoát nước mưa', color: '#16a34a' },
+  { key: 'qh-san-nen', phase: 'QH', group: 'san-nen', label: 'Quy hoạch san nền và thoát nước mưa', color: '#16a34a' },
   { key: 'ht-thoat-thai', phase: 'HT', group: 'thoat-thai', label: 'Thoát nước thải', color: '#67e8f9' },
-  { key: 'qh-thoat-thai', phase: 'QH', group: 'thoat-thai', label: 'Thoát nước thải', color: '#0e7490' },
+  { key: 'qh-thoat-thai', phase: 'QH', group: 'thoat-thai', label: 'Quy hoạch thoát nước thải', color: '#0e7490' },
   { key: 'ht-chat-thai', phase: 'HT', group: 'chat-thai', label: 'Chất thải rắn và nghĩa trang', color: '#fdba74' },
-  { key: 'qh-chat-thai', phase: 'QH', group: 'chat-thai', label: 'Chất thải rắn và nghĩa trang', color: '#c2410c' },
+  { key: 'qh-chat-thai', phase: 'QH', group: 'chat-thai', label: 'Quy hoạch chất thải rắn và nghĩa trang', color: '#c2410c' },
   { key: 'ht-vien-thong', phase: 'HT', group: 'vien-thong', label: 'Thông tin liên lạc', color: '#c4b5fd' },
-  { key: 'qh-vien-thong', phase: 'QH', group: 'vien-thong', label: 'Thông tin liên lạc', color: '#6d28d9' }
+  { key: 'qh-vien-thong', phase: 'QH', group: 'vien-thong', label: 'Quy hoạch thông tin liên lạc', color: '#6d28d9' }
 ];
 export const PROJECT_LAYERS = [
-  { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Sử dụng đất quy hoạch', color: '#fb923c' },
+  { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Quy hoạch sử dụng đất', color: '#fb923c' },
   { key: 'ranh-gioi', phase: 'QH', kind: 'boundary', label: 'Ranh giới quy hoạch', color: '#e879f9' },
-  { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Sử dụng đất hiện trạng', color: '#22d3ee' },
+  { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Hiện trạng sử dụng đất', color: '#22d3ee' },
   ...NET_LAYERS.map(d => ({ ...d, kind: 'net' }))
 ];
 const LOT_LAYER = { HT: 'hien-trang', QH: 'su-dung-dat' };
