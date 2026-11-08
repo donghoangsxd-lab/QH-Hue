@@ -35,7 +35,7 @@ import { isQhcStaticName } from './qhc2045.js';
 import { getLevel, setLevel, withLevelLock, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 import { browseState } from './facetStore.js';
-import { pickUrbanFromMap, clearUrbanMapPick } from './generalPlanUi.js';
+import { pickUrbanFromMap, clearUrbanMapPick, urbanMapPicked } from './generalPlanUi.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Về toàn TP chỉ tắt lớp phụ; ô tùy chọn con (ranh lô công trình, lô hạ tầng đồ án, đổ bóng) không tự vẽ gì nên giữ.
@@ -416,11 +416,12 @@ function closeQhcPopup() {
 function syncEscHint() {
   const hint = document.getElementById('escHint');
   if (!hint) return;
-  const on = !!(state.focusedProject || isCoreOpen() || !isCity(state.selectedWard) || urbanFocused() || qhcPopupOpen());
+  const on = !!(state.focusedProject || isCoreOpen() || !isCity(state.selectedWard)
+    || urbanFocused() || urbanMapPicked() || qhcPopupOpen());
   hint.hidden = !on;
 }
 
-// Lớp trong cùng thoát trước: popup vùng QHC → đồ án → lô lõi QHC → ranh phường xã → đô thị
+// Lớp trong cùng thoát trước: popup vùng QHC → đồ án → lô lõi QHC → đô thị (tab Đô thị) → ranh phường xã
 function onEscape(e) {
   if (e.key !== 'Escape' || e.defaultPrevented || escBusy()) return;
   if (closeQhcPopup()) {
@@ -441,14 +442,17 @@ function onEscape(e) {
     syncEscHint();
     return;
   }
+  // Tab Đô thị / đang xem phủ QHC·QHPK·QHCT: Esc chỉ bỏ chọn đô thị, giữ tab Đô thị (không nhảy ĐVHC).
+  if (urbanFocused() || urbanMapPicked()) {
+    e.preventDefault();
+    clearUrbanFocus();
+    clearUrbanMapPick();
+    syncEscHint();
+    return;
+  }
   if (!isCity(state.selectedWard)) {
     e.preventDefault();
     selectWardDetail(CITY_NAME);
-    return;
-  }
-  if (urbanFocused()) {
-    e.preventDefault();
-    clearUrbanFocus();
   }
 }
 

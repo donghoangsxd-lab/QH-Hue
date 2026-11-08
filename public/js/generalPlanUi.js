@@ -286,6 +286,11 @@ export function clearUrbanMapPick() {
   pick(null);
 }
 
+/** Đang có đô thị được tô từ danh sách / bấm bản đồ (tab Đô thị). */
+export function urbanMapPicked() {
+  return !!(picked || scopeId);
+}
+
 /** Mở hồ sơ một QHC ở trang Quy hoạch chung (bảng dưới) và vẽ phạm vi */
 export const showGeneralPlan = (id) => pick(id, { page: true });
 
