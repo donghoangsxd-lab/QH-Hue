@@ -2,10 +2,17 @@
 import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
 import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
+import {
+  matchSoTayToCatalog, classifyPlanStatus, missingLabel, STATUS
+} from './soTayMatch.js';
 
-export const CATALOG_HEADERS_PLAN = ['STT', 'Tên quy hoạch', 'Phường / xã', 'Cấp', 'Ranh giới', 'Ghi chú'];
+export const CATALOG_HEADERS_PLAN = [
+  'STT', 'Tên quy hoạch', 'Phường / xã', 'Cấp', 'Diện tích (ha)', 'Trạng thái', 'Ranh giới', 'Ghi chú'
+];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
+
+export { STATUS };
 
 const LEVEL_SCALE = {
   QHC: 'QHC',
@@ -22,31 +29,102 @@ export function filterKeyFromMapLevel(levelId) {
   return '';
 }
 
-export function planRowsFromCatalog(catalog) {
+function webAreaHa(p, areaHaOf) {
+  if (typeof areaHaOf === 'function') {
+    const n = areaHaOf(p);
+    if (Number.isFinite(n) && n > 0 && n < 1e9) return n;
+  }
+  return null;
+}
+
+function formatHa(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  return Number(n).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+}
+
+/** Ghép sổ tay + catalog webapp thành hàng bảng danh mục trục B. */
+export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
   const list = Array.isArray(catalog) ? catalog : [];
-  return list.map((p, i) => {
+  const items = Array.isArray(sheetItems) ? sheetItems : [];
+  const areaHaOf = opts.areaHaOf;
+  const { matches, orphans } = matchSoTayToCatalog(items, list, {
+    levelOf: (p) => planLevelOf(p.tenQH || namesOfProject(p).tenQH),
+    areaHaOf: (p) => webAreaHa(p, areaHaOf)
+  });
+
+  const rows = [];
+  for (const item of items) {
+    const hit = matches.get(item.ma);
+    const p = hit?.project || null;
+    const names = p ? namesOfProject(p) : { tenQH: item.ten, tenRutGon: item.ten };
+    const level = item.cap || (p ? planLevelOf(p.tenQH || names.tenQH) : '');
+    const hasBoundary = !!(p && p.boundary);
+    const { status, missing } = classifyPlanStatus(item, hit, hasBoundary);
+    const notes = [];
+    if (missing.length) notes.push(missingLabel(missing));
+    if (item.soDccb) notes.push(`${item.soDccb} ĐCCB`);
+    if (item.quyetDinh) notes.push(item.quyetDinh);
+    if (p?.legacy) notes.push('Đồ án cũ trên bản đồ');
+    rows.push({
+      id: item.ma,
+      source: 'plan',
+      name: item.ten || names.tenRutGon || names.tenQH || '',
+      fullName: names.tenQH || item.ten || '',
+      ward: item.dvhc || item.diaDiem || '',
+      scale: LEVEL_SCALE[level] || level || '',
+      level,
+      areaHa: item.dienTichHa,
+      areaText: item.dienTichText || formatHa(item.dienTichHa),
+      status,
+      statusLabel: STATUS[status]?.label || status,
+      hasBoundary,
+      note: notes.join(' · '),
+      zoomKey: hasBoundary ? (names.tenQH || '') : '',
+      maDoAn: item.ma,
+      quyetDinh: item.quyetDinh || '',
+      linkGis: item.linkGis || '',
+      matched: !!hit
+    });
+  }
+
+  for (const p of orphans) {
     const names = namesOfProject(p);
     const level = planLevelOf(p.tenQH || names.tenQH);
     const hasBoundary = !!(p && p.boundary);
-    const wards = Array.isArray(p.wards) ? p.wards.filter(Boolean) : [];
+    const ha = webAreaHa(p, areaHaOf);
+    const { status, missing } = classifyPlanStatus(null, { project: p }, hasBoundary);
     const notes = [];
-    if (!hasBoundary) notes.push('Chỉ danh sách, chưa gán ranh');
+    if (missing.length) notes.push(missingLabel(missing));
+    notes.push('Có trên bản đồ, chưa thấy trong sổ tay');
     if (p.legacy) notes.push('Đồ án cũ');
-    if (p.decision && (p.decision.name || p.decision.slug)) notes.push(p.decision.name || 'Có quyết định');
-    if (p.time) notes.push(String(p.time));
-    return {
-      id: String(p.slug || names.tenQH || i),
+    rows.push({
+      id: `web:${p.slug || names.tenQH}`,
       source: 'plan',
       name: names.tenRutGon || names.tenQH || '',
-      fullName: names.tenQH || names.tenDayDu || '',
-      ward: wards.join(', '),
+      fullName: names.tenQH || '',
+      ward: Array.isArray(p.wards) ? p.wards.filter(Boolean).join(', ') : '',
       scale: LEVEL_SCALE[level] || level || '',
       level,
+      areaHa: ha,
+      areaText: formatHa(ha),
+      status,
+      statusLabel: STATUS[status]?.label || status,
       hasBoundary,
       note: notes.join(' · '),
-      zoomKey: names.tenQH || ''
-    };
-  }).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      zoomKey: hasBoundary ? (names.tenQH || '') : '',
+      maDoAn: '',
+      quyetDinh: p.decision?.name || '',
+      linkGis: '',
+      matched: false
+    });
+  }
+
+  return rows.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+}
+
+/** Giữ API cũ: chỉ catalog webapp (không sổ tay). */
+export function planRowsFromCatalog(catalog) {
+  return planRowsFromSoTay([], catalog);
 }
 
 function sheetEntry(row, re) {
@@ -76,6 +154,9 @@ export function investRowsFromItems(items) {
       ward: place || '',
       scale: p.areaText || investGroupLabel(p.dtGroup) || '',
       level: p.dtGroup || 'khac',
+      areaText: p.areaText || '',
+      status: '',
+      statusLabel: '',
       hasBoundary: !!p.hasBoundary,
       note: notes.join(' · '),
       zoomKey: String(p.id || '')
@@ -83,20 +164,21 @@ export function investRowsFromItems(items) {
   }).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
 
-export function filterCatalogRows(rows, { query = '', level = '' } = {}) {
+export function filterCatalogRows(rows, { query = '', level = '', status = '' } = {}) {
   const q = String(query || '').trim().toLowerCase();
   const lv = String(level || '').trim();
+  const st = String(status || '').trim();
   return (rows || []).filter(r => {
     if (lv && r.level !== lv) return false;
+    if (st && r.status !== st) return false;
     if (!q) return true;
-    const blob = `${r.name} ${r.fullName} ${r.ward} ${r.scale} ${r.note}`.toLowerCase();
+    const blob = `${r.name} ${r.fullName} ${r.ward} ${r.scale} ${r.statusLabel} ${r.note} ${r.quyetDinh || ''}`.toLowerCase();
     return blob.includes(q);
   });
 }
 
 export function catalogFilterOptions(source) {
   if (source === 'invest') {
-    // Nhãn ngắn (DVTM…) để ô lọc không tràn toolbar; title dài chỉ dùng title attribute ngoài UI này.
     return [{ value: '', label: 'Tất cả nhóm' }].concat(
       INVEST_GROUPS.map(g => ({ value: g.id, label: g.label || g.title }))
     );
@@ -109,19 +191,49 @@ export function catalogFilterOptions(source) {
   ];
 }
 
+export function catalogStatusOptions() {
+  return [
+    { value: '', label: 'Mọi trạng thái' },
+    ...Object.values(STATUS).map((s) => ({ value: s.id, label: s.label }))
+  ];
+}
+
+export function catalogStatusStats(rows) {
+  const by = { du: 0, thieu: 0, chi_so_tay: 0, chi_ban_do: 0 };
+  const byLevel = { QHC: 0, QHPK: 0, QHCT: 0, khac: 0 };
+  for (const r of rows || []) {
+    if (by[r.status] != null) by[r.status] += 1;
+    const lv = r.level || 'khac';
+    if (byLevel[lv] != null) byLevel[lv] += 1;
+    else byLevel.khac += 1;
+  }
+  return { byStatus: by, byLevel, total: (rows || []).length };
+}
+
 export function rowsToCsv(rows, source = 'plan') {
   const escape = (v) => {
     const s = String(v ?? '');
     return /["\n\r,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const headers = source === 'invest' ? CATALOG_HEADERS_INVEST : CATALOG_HEADERS_PLAN;
-  const lines = [headers.join(',')];
+  if (source === 'invest') {
+    const lines = [CATALOG_HEADERS_INVEST.join(',')];
+    (rows || []).forEach((r, i) => {
+      lines.push([
+        i + 1, r.name, r.ward, r.scale,
+        r.hasBoundary ? 'Có' : 'Chưa', r.note
+      ].map(escape).join(','));
+    });
+    return `\uFEFF${lines.join('\r\n')}`;
+  }
+  const lines = [CATALOG_HEADERS_PLAN.join(',')];
   (rows || []).forEach((r, i) => {
     lines.push([
       i + 1,
       r.name,
       r.ward,
       r.scale,
+      r.areaText || '',
+      r.statusLabel || '',
       r.hasBoundary ? 'Có' : 'Chưa',
       r.note
     ].map(escape).join(','));

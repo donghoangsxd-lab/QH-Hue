@@ -1502,8 +1502,9 @@
         <div class="bp-part-head catalog-table-head">
           <div class="bp-title-wrap catalog-table-titles">
             <b class="bp-part-title" id="catalogTableTitle">DANH MỤC</b>
-            <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, phường/xã…" aria-label="Tìm trong danh mục">
-            <select id="catalogFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc danh mục"></select>
+            <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, đơn vị, quyết định…" aria-label="Tìm trong danh mục">
+            <select id="catalogFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc theo cấp"></select>
+            <select id="catalogStatusFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>
             <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
           </div>
           <div class="bp-actions catalog-table-actions" data-html2canvas-ignore="true">
@@ -1512,6 +1513,17 @@
             <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogClose" title="Đóng bảng danh mục" aria-label="Đóng bảng danh mục"><svg class="ico"><use href="#i-close"/></svg></button>
           </div>
+        </div>
+        <div class="catalog-charts" id="catalogCharts" hidden>
+          <div class="catalog-chart-card">
+            <div class="catalog-chart-title">Trạng thái đối soát</div>
+            <div class="catalog-chart-wrap"><canvas id="catalogStatusChart" aria-label="Biểu đồ trạng thái đồ án"></canvas></div>
+          </div>
+          <div class="catalog-chart-card">
+            <div class="catalog-chart-title">Theo cấp quy hoạch</div>
+            <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
+          </div>
+          <div class="catalog-chart-summary" id="catalogChartSummary"></div>
         </div>
         <div class="catalog-table-scroll" id="catalogTableScroll">
           <table class="data-table catalog-data-table" id="catalogTable">
