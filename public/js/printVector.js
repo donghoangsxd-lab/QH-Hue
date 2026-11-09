@@ -17,6 +17,8 @@ const GLYPH_FALLBACK = [[/≈/g, '~'], [/≥/g, '>='], [/≤/g, '<='], [/→/g, 
 const PATTERN_FILL_ALPHA = 0.45;
 // Bỏ đỉnh cách đỉnh trước dưới ngưỡng này (mm trên giấy) cho file nhẹ
 const MIN_STEP_MM = 0.04;
+// Trần mm/px cho nét vector: khổ lớn (4A0) frame.w/rect.w rất cao → nét không nhân tuyến tính theo bề ngang tờ
+const STROKE_K_CAP = 0.55;
 
 let fontsPromise = null;
 
@@ -206,12 +208,12 @@ function ringsOf(latlngs) {
   return latlngs.flatMap(ringsOf);
 }
 
-function applyStroke(pdf, o, color, k, state) {
+function applyStroke(pdf, o, color, strokeK, state) {
   pdf.setDrawColor(color.r, color.g, color.b);
-  pdf.setLineWidth(Math.max(0.05, (o.weight || 1) * k));
+  pdf.setLineWidth(Math.max(0.05, (o.weight || 1) * strokeK));
   pdf.setLineCap(o.lineCap || 'round');
   pdf.setLineJoin(o.lineJoin || 'round');
-  const dash = dashOf(o.dashArray, k);
+  const dash = dashOf(o.dashArray, strokeK);
   const key = dash.join(',');
   if (key !== state.dash) {
     pdf.setLineDashPattern(dash, 0);
@@ -248,7 +250,7 @@ function drawPath(pdf, l, alpha, ctx) {
     const ry = (l._radiusY || l._radius || o.radius || 0) * ctx.k;
     if (rx <= 0) return false;
     const [x, y] = ctx.toMm(c);
-    if (doStroke) applyStroke(pdf, o, stroke, ctx.k, ctx.state);
+    if (doStroke) applyStroke(pdf, o, stroke, ctx.strokeK ?? ctx.k, ctx.state);
     if (doFill) pdf.setFillColor(fill.r, fill.g, fill.b);
     setAlpha(pdf, doFill ? fAlpha : 1, doStroke ? sAlpha : 1);
     pdf.ellipse(x, y, rx, ry, doFill && doStroke ? 'FD' : doFill ? 'F' : 'S');
@@ -273,7 +275,7 @@ function drawPath(pdf, l, alpha, ctx) {
   if (!paths.length) return false;
   const fillIt = closed && doFill;
   if (!fillIt && !doStroke) return false;
-  if (doStroke) applyStroke(pdf, o, stroke, ctx.k, ctx.state);
+  if (doStroke) applyStroke(pdf, o, stroke, ctx.strokeK ?? ctx.k, ctx.state);
   if (fillIt) pdf.setFillColor(fill.r, fill.g, fill.b);
   setAlpha(pdf, fillIt ? fAlpha : 1, doStroke ? sAlpha : 1);
   paths.forEach(pts => {
@@ -289,10 +291,12 @@ function drawPath(pdf, l, alpha, ctx) {
 
 /**
  * Vẽ mọi L.Path đang hiện của bản đồ m vào khung giấy.
- * rect: vùng in theo px khung bản đồ m; frame: vị trí trên giấy (mm). Nét theo px bản đồ × (mm / px) để đồng bộ với icon.
+ * rect: vùng in theo px khung bản đồ m; frame: vị trí trên giấy (mm).
+ * Tọa độ / bán kính dùng k = mm/px đầy đủ; nét và dash dùng strokeK (có trần) để khổ lớn không phóng nét.
  */
-export function drawMapPaths(pdf, m, rect, frame, groups, { patternFromRaster = false } = {}) {
+export function drawMapPaths(pdf, m, rect, frame, groups, { patternFromRaster = false, strokeKCap = STROKE_K_CAP } = {}) {
   const k = frame.w / rect.w;
+  const strokeK = Math.min(k, Number(strokeKCap) > 0 ? Number(strokeKCap) : STROKE_K_CAP);
   const zoom = m.getZoom();
   const origin = m.getPixelOrigin();
   const pane = m._getMapPanePos();
@@ -303,6 +307,7 @@ export function drawMapPaths(pdf, m, rect, frame, groups, { patternFromRaster = 
   );
   const ctx = {
     k,
+    strokeK,
     bounds,
     patternFromRaster,
     state: { dash: '' },

@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261110">
+  <link rel="stylesheet" href="css/style.css?v=20261111">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -443,6 +443,7 @@
         <div class="print-opts" role="group" aria-label="Tùy chọn in">
           <label class="print-opt"><input type="checkbox" id="printShowGrid" checked> Lưới kinh độ – vĩ độ</label>
           <label class="print-opt"><input type="checkbox" id="printMapBanner"> Tiêu đề lớn giữa bản đồ</label>
+          <label class="print-opt" title="Bật: xuất hoa văn TT16 (hatch). Tắt: tô màu đặc như trước. Khổ lớn cần phóng khung gần hơn để hatch đủ chi tiết."><input type="checkbox" id="printShowHatch"> Hoa văn TT16 (hatch)</label>
         </div>
         <label class="print-title-lbl">Tiêu đề
           <input id="printTitle" type="text" maxlength="140" autocomplete="off" spellcheck="false">
@@ -1799,6 +1800,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261110"></script>
+  <script type="module" src="./js/app.js?v=20261111"></script>
 </body>
 </html>

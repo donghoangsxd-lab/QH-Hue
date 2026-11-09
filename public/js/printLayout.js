@@ -5,7 +5,9 @@
 // Cột ghi chú giữ chromeScale theo khổ (không nới rộng trên A0+). Khung chọn trên bản đồ phải theo
 // tỷ lệ vùng map còn lại của khổ đang chọn — nếu giữ 1:1 / A3 sẽ hụt, để khoảng trắng khi in.
 // Chữ lưới VN-2000 cũng chromeScale, không nhân tuyến tính theo bề ngang tờ.
-// Khi xuất: ép hoa văn TT16 lên canvas Leaflet rồi chụp canvas đó vào PDF (vector không vẽ lại được CanvasPattern).
+// Hoa văn TT16 (tick #printShowHatch): ép lên canvas Leaflet rồi chụp vào PDF (jsPDF không vẽ CanvasPattern).
+// Mặc định tắt = tô màu đặc. Khi bật, staging phóng cao hơn (đến ~zoom 17) để ô hatch px không bị kéo phình trên 4A0.
+// Nét vector dùng trần mm/px trong printVector (STROKE_K_CAP), không nhân đủ theo bề ngang tờ.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
 import { map, popLayerMeta } from './mapEngine.js';
@@ -16,7 +18,7 @@ import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
 import { basemapLabel, isLightBasemap, whenBasemapSettled } from './basemap.js';
 import { getLevel, levelChk, LEVELS } from './mapLevel.js';
-import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss, setPrintTt16Detail, tt16Detailed } from './tt16Symbols.js';
+import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss, setPrintTt16Detail, tt16Detailed, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
 import {
   PX_MM, loadPrintFonts, createPdf, cleanText, setFont, setAlpha, withClip, parseColor,
   vectorContainers, captureVectorGroups, drawMapPaths, drawDom
@@ -67,6 +69,8 @@ const NICE_STEPS = [50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000
 const RASTER_DPI = 160;
 const STAGE_MAX_PX = 3600;
 const STAGE_MAX_GAIN = 2.5;
+/** Khi xuất hatch: trần phóng khung cao hơn để ô hoa văn (px màn hình) không bị kéo phình trên A0/4A0 */
+const STAGE_HATCH_MAX_GAIN = 12;
 const BASE_MAX_PIXELS = 40e6;
 const TOP_MAX_PIXELS = 20e6;
 const INK = [15, 23, 42];
@@ -91,9 +95,10 @@ let frameUser = null;
 let dockBound = false;
 let frameObserver = null;
 let classObserver = null;
-/** Tùy chọn dock: lưới VN-2000 và tiêu đề lớn giữa phía trên vùng map */
+/** Tùy chọn dock: lưới VN-2000, tiêu đề lớn giữa map, hoa văn TT16 (mặc định tắt = màu đặc) */
 let showGrid = true;
 let showMapBanner = false;
+let showHatch = false;
 
 const FRAME_LABEL = { plain: 'Khung trống', side: 'Ghi chú bên phải' };
 const DEFAULT_NOTE = 'Bản đồ phục vụ tham khảo, không thay thế hồ sơ quy hoạch được phê duyệt.';
@@ -409,17 +414,30 @@ function setViewExact(m, center, zoom) {
 }
 
 /**
+ * Hệ số phóng khung staging: đủ DPI ảnh nền; khi hatch thì cố gắng đạt mật độ ~ TT16_PATTERN_ZOOM
+ * (ô hoa văn tính bằng px màn hình — phóng ít → kéo lên 4A0 sẽ phình hatch và nét).
+ */
+function stageGain(rect, pixelW, { hatch = false, zoom0 = 0 } = {}) {
+  const want = pixelW / Math.max(1, rect.w);
+  const capPx = STAGE_MAX_PX / Math.max(rect.w, rect.h, 1);
+  let gain = Math.min(Math.max(1, want), capPx, STAGE_MAX_GAIN);
+  if (hatch) {
+    const need = Math.pow(2, Math.max(0, TT16_PATTERN_ZOOM - (Number(zoom0) || 0)));
+    gain = Math.min(Math.max(gain, need), capPx, STAGE_HATCH_MAX_GAIN);
+  }
+  return gain;
+}
+
+/**
  * Phóng khung bản đồ đúng vùng trong khung xem trước (giữ phạm vi, tăng độ nét); trả về hàm khôi phục.
  * Phải cập nhật kích thước CẢ HAI bản đồ trước khi đặt tâm: invalidateSize({ pan: false }) giữ góc trên trái
  * nên phát 'move', syncMaps (planMap.js) sẽ kéo bản đồ kia lệch tâm nếu gọi sau setView.
  */
-async function stageFrame(rect, pixelW) {
+async function stageFrame(rect, pixelW, { hatch = false } = {}) {
   const src = viewMap();
   const center = src.containerPointToLatLng([rect.x + rect.w / 2, rect.y + rect.h / 2]);
   const zoom0 = src.getZoom();
-  const want = pixelW / rect.w;
-  const cap = STAGE_MAX_PX / Math.max(rect.w, rect.h);
-  const k = Math.min(Math.max(1, want), cap, STAGE_MAX_GAIN);
+  const k = stageGain(rect, pixelW, { hatch, zoom0 });
   const zoom1 = Math.min(src.getMaxZoom(), Math.max(src.getMinZoom(), zoom0 + Math.log2(k)));
   const used = 2 ** (zoom1 - zoom0);
   const W = Math.max(2, Math.round(rect.w * used));
@@ -1000,10 +1018,13 @@ function updateLiveScale() {
   const sheet = activeSheet();
   const scale = scaleInfo(rect, sheet.frame.w);
   const z = viewMap()?.getZoom?.() ?? 0;
-  const needZoom = scale.ratio <= 5000 && !tt16Detailed(z);
-  el.textContent = needZoom
-    ? `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)} · phóng gần hơn để thấy hoa văn`
-    : `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)}`;
+  if (!showHatch) {
+    el.textContent = `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)} · màu đặc`;
+  } else if (z < TT16_PATTERN_ZOOM) {
+    el.textContent = `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)} · phóng gần hơn để hatch đủ chi tiết`;
+  } else {
+    el.textContent = `In ${sheet.paper.label} ≈ 1:${dotted(scale.ratio)} · có hoa văn TT16`;
+  }
 }
 
 function setPaper(id) {
@@ -1090,8 +1111,10 @@ function onMapView() {
 function syncPrintOptsFromDock() {
   const grid = $('printShowGrid');
   const banner = $('printMapBanner');
+  const hatch = $('printShowHatch');
   if (grid) showGrid = !!grid.checked;
   if (banner) showMapBanner = !!banner.checked;
+  if (hatch) showHatch = !!hatch.checked;
 }
 
 function bindDock() {
@@ -1107,6 +1130,10 @@ function bindDock() {
   });
   $('printShowGrid')?.addEventListener('change', syncPrintOptsFromDock);
   $('printMapBanner')?.addEventListener('change', syncPrintOptsFromDock);
+  $('printShowHatch')?.addEventListener('change', () => {
+    syncPrintOptsFromDock();
+    updateLiveScale();
+  });
   bindFrameResize();
   $('printCancel')?.addEventListener('click', closePreview);
   $('printGo')?.addEventListener('click', runExport);
@@ -1128,8 +1155,10 @@ function openPreview() {
   bindDock();
   const gridChk = $('printShowGrid');
   const bannerChk = $('printMapBanner');
+  const hatchChk = $('printShowHatch');
   if (gridChk) gridChk.checked = showGrid;
   if (bannerChk) bannerChk.checked = showMapBanner;
+  if (hatchChk) hatchChk.checked = showHatch;
   syncPrintOptsFromDock();
   frameUser = null;
   setPaper(paperId);
@@ -1209,12 +1238,12 @@ function placePathCanvases(pdf, m, frameMm, rect) {
   });
 }
 
-/** Vẽ một ô bản đồ (nền + hoa văn canvas + vector + icon) vào framePx */
+/** Vẽ một ô bản đồ (nền + hoa văn canvas tùy chọn + vector + icon) vào framePx */
 async function paintMapCell(pdf, m, full, framePx, targetW) {
   const F = toMm(framePx);
   const size = m.getSize();
   const groups = captureVectorGroups(m);
-  const hatch = tt16Detailed(m.getZoom());
+  const hatch = showHatch && tt16Detailed(m.getZoom());
   const base = await captureOneMap(m, rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
   placeRaster(pdf, base, 'JPEG', F);
   if (hatch) placePathCanvases(pdf, m, F, full);
@@ -1238,9 +1267,7 @@ async function drawMapFrameDual(pdf, sheet) {
   const rightCenter = planMap.containerPointToLatLng([rightRect.x + rightRect.w / 2, rightRect.y + rightRect.h / 2]);
   const zoom0 = map.getZoom();
   const targetW = toMm(sheet.leftFrame).w / 25.4 * RASTER_DPI;
-  const want = targetW / leftRect.w;
-  const cap = STAGE_MAX_PX / Math.max(leftRect.w, leftRect.h);
-  const k = Math.min(Math.max(1, want), cap, STAGE_MAX_GAIN);
+  const k = stageGain(leftRect, targetW, { hatch: showHatch, zoom0 });
   const zoom1 = Math.min(map.getMaxZoom(), Math.max(map.getMinZoom(), zoom0 + Math.log2(k)));
   const used = 2 ** (zoom1 - zoom0);
   const W = Math.max(2, Math.round(leftRect.w * used));
@@ -1285,16 +1312,16 @@ async function drawMapFrameDual(pdf, sheet) {
   }
 }
 
-/** Vùng bản đồ trong khung in → nền + hoa văn canvas + vector; trả về { grid, splitRel } */
+/** Vùng bản đồ trong khung in → nền + hoa văn canvas (nếu tick) + vector; trả về { grid, splitRel } */
 async function drawMapFrame(pdf, rect, sheet) {
   const F = toMm(sheet.frame);
   const targetW = F.w / 25.4 * RASTER_DPI;
-  const staged = await stageFrame(rect, targetW);
+  const staged = await stageFrame(rect, targetW, { hatch: showHatch });
   try {
     const size = staged.size;
     const full = { x: 0, y: 0, w: size.x, h: size.y };
     const groups = captureVectorGroups(staged.map);
-    const hatch = tt16Detailed(staged.map.getZoom());
+    const hatch = showHatch && tt16Detailed(staged.map.getZoom());
     const base = await captureMapCanvas(rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
     placeRaster(pdf, base.canvas, 'JPEG', F);
     if (hatch) placePathCanvases(pdf, staged.map, F, full);
@@ -1329,11 +1356,13 @@ async function runExport() {
   $('printPreview')?.classList.add('print-capturing');
   let holder = null;
   try {
-    showToast(`⏳ Đang dựng bản đồ ${sheet.paper.label}${dual ? ' (hai ô so sánh)' : ''}...`);
+    showToast(`⏳ Đang dựng bản đồ ${sheet.paper.label}${dual ? ' (hai ô so sánh)' : ''}${showHatch ? ' (có hatch)' : ''}...`);
     const [fonts] = await Promise.all([loadPrintFonts(), loadJsPdf(), loadHtml2Canvas()]);
-    // Ép hoa văn TT16 trước khi phóng khung: khổ lớn + khung màn hình thường dưới zoom 17
-    setPrintTt16Detail(true);
-    await sleep(80);
+    // Chỉ ép hoa văn khi tick «Hoa văn TT16»; mặc định tô màu đặc (tránh hatch phóng trên 4A0)
+    if (showHatch) {
+      setPrintTt16Detail(true);
+      await sleep(80);
+    }
     const seen = scaleInfo(rect, sheet.frame.w);
     const pdf = createPdf(sheet.paper, fonts);
     let grid;
