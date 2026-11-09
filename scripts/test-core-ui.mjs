@@ -953,8 +953,8 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
 assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
 assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261109/);
-assert.match(html, /js\/app\.js\?v=20261109/);
+assert.match(html, /css\/style\.css\?v=20261110/);
+assert.match(html, /js\/app\.js\?v=20261110/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -1011,7 +1011,7 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES/);
 assert.match(read('docs/ui-spec.md'), /Ba droplist cùng kiểu HTKT/);
 assert.match(read('docs/ui-spec.md'), /Bản đồ nhiệt mức độ đáp ứng hạ tầng/);
 assert.match(read('docs/ui-spec.md'), /Trạng thái điểm:.*Đã phê duyệt|Giả lập bán kính chung/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261109'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261110'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -1074,7 +1074,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261109"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261110"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

@@ -68,6 +68,100 @@ export const trafficGlowColor = (f) => {
 /** Thứ tự vẽ: đường cấp thấp dưới, đường sắt trên cùng */
 export const trafficRank = (f) => (isRail(f) ? 10 : roadClassOf(f.properties).rank);
 
+// Tem số hiệu kiểu Google Maps: CT nền vàng, QL nền xanh, ĐT nền trắng viền xanh. Zoom tối thiểu theo cấp.
+const SHIELD_RE = /^(CT|QL|ĐT|DT)\s*([0-9]+[A-Za-z]?)/i;
+const SHIELD_MIN_ZOOM = { ct: 8, ql: 9, dt: 12 };
+const SHIELD_RANK = { ct: 3, ql: 2, dt: 1 };
+
+function lineParts(geom) {
+  if (!geom) return [];
+  if (geom.type === 'LineString') return [geom.coordinates];
+  if (geom.type === 'MultiLineString') return geom.coordinates;
+  return [];
+}
+
+function midOfCoords(coords) {
+  if (!coords?.length) return null;
+  if (coords.length === 1) return coords[0];
+  let total = 0;
+  const segs = [];
+  for (let i = 1; i < coords.length; i++) {
+    const a = coords[i - 1];
+    const b = coords[i];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    segs.push({ a, b, d });
+    total += d;
+  }
+  if (!total) return coords[Math.floor(coords.length / 2)];
+  let half = total / 2;
+  for (const s of segs) {
+    if (half <= s.d) {
+      const t = s.d ? half / s.d : 0;
+      return [s.a[0] + (s.b[0] - s.a[0]) * t, s.a[1] + (s.b[1] - s.a[1]) * t];
+    }
+    half -= s.d;
+  }
+  return coords[coords.length - 1];
+}
+
+function midOfGeom(geom) {
+  let best = null;
+  let bestN = 0;
+  for (const part of lineParts(geom)) {
+    if (part.length > bestN) {
+      bestN = part.length;
+      best = part;
+    }
+  }
+  return midOfCoords(best);
+}
+
+/** Số hiệu tem (QL1A, CT01, ĐT14B…). Cao tốc không có tên → "CT". */
+export function routeShieldOf(f) {
+  if (!f || isRail(f) || f.properties?.L !== 'b') return null;
+  const n = String(f.properties.n || '').trim();
+  const m = n.match(SHIELD_RE);
+  if (m) {
+    let kind = m[1].toUpperCase();
+    if (kind === 'DT') kind = 'ĐT';
+    const num = m[2].toUpperCase();
+    return { kind, text: `${kind}${num}`, cls: kind === 'ĐT' ? 'dt' : kind.toLowerCase() };
+  }
+  if (f.properties.c === 'ct') return { kind: 'CT', text: 'CT', cls: 'ct' };
+  return null;
+}
+
+/**
+ * Một tem mỗi số hiệu (đặt giữa đoạn dài nhất). focusKey: chỉ tem loại đang làm nổi.
+ * Cách nhau tối thiểu theo zoom để tránh chồng khi nhìn toàn đô thị.
+ * @returns {{ shield: { kind, text, cls }, lnglat: [lng, lat] }[]}
+ */
+export function pickRouteShields(features, zoom, { focusKey } = {}) {
+  const best = new Map();
+  for (const f of features || []) {
+    const shield = routeShieldOf(f);
+    if (!shield) continue;
+    if (zoom < (SHIELD_MIN_ZOOM[shield.cls] ?? 12)) continue;
+    if (focusKey && trafficKey(f) !== focusKey) continue;
+    const len = f.properties.l || 0;
+    const prev = best.get(shield.text);
+    if (prev && prev.len >= len) continue;
+    const mid = midOfGeom(f.geometry);
+    if (!mid) continue;
+    best.set(shield.text, { shield, lnglat: mid, len });
+  }
+  const gap = zoom < 11 ? 0.14 : zoom < 13 ? 0.07 : zoom < 15 ? 0.035 : 0.018;
+  const ranked = [...best.values()].sort((a, b) =>
+    (SHIELD_RANK[b.shield.cls] - SHIELD_RANK[a.shield.cls]) || (b.len - a.len));
+  const out = [];
+  for (const item of ranked) {
+    const [lng, lat] = item.lnglat;
+    if (out.some(p => Math.hypot(p.lnglat[0] - lng, p.lnglat[1] - lat) < gap)) continue;
+    out.push(item);
+  }
+  return out;
+}
+
 /** [nét viền, nét chính] — mỗi đoạn vẽ 2 lớp để nổi trên ảnh vệ tinh và nền lô */
 export function trafficStyles(f) {
   const p = f.properties;
