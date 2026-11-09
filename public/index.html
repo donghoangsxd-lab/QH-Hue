@@ -26,7 +26,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="/manifest.webmanifest?v=20261091">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261109">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261091">
+  <link rel="stylesheet" href="css/style.css?v=20261109">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -163,7 +163,7 @@
         <p class="map-intro-kicker">Sở Xây dựng thành phố Huế</p>
         <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</h1>
         <p class="map-intro-line">Trang thông tin phục vụ quản lý quy hoạch và hạ tầng đô thị.</p>
-        <p class="map-title-notice" id="mapTitleNotice">Bản đồ tải lần đầu mất 30–60 giây. Vui lòng chờ!</p>
+        <p class="map-title-notice" id="mapTitleNotice">Lần tải đầu có thể mất 30–60 giây.</p>
       </div>
       <div class="map-title-actions">
         <button type="button" class="map-title-x" id="btnTitleDismiss" title="Ẩn tiêu đề" aria-label="Ẩn tiêu đề"><svg class="ico"><use href="#i-close"/></svg></button>
@@ -887,6 +887,7 @@
               <option value="positron">Bản đồ đường phố</option>
             </select>
           </div>
+          <p class="layer-pane-note" id="baseLoadNote">Một số lớp nạp lần đầu có thể mất 30–60 giây; số % bên phải là tiến độ tải.</p>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="layer-row layer-subrow" id="osmRailRow" hidden><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Chỉ hiện khi bật Mạng lưới đường. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM. Hiện từ mức phóng 11.">Đường sắt hiện trạng <small class="layer-hint" id="railHint"></small></label></div></div>
@@ -954,7 +955,7 @@
       </div>
       <div class="dock-fold" id="axisEnvFold" role="tabpanel" aria-labelledby="btnDockEnv" hidden>
         <div class="layer-map-pane" id="layerPaneEnv" data-map-pane="env">
-
+          <p class="layer-pane-note" id="envLoadNote">Một số lớp nạp lần đầu có thể mất 30–60 giây; số % bên phải là tiến độ tải.</p>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_terrain"><label for="chk_terrain" title="Cao độ nền FABDEM ~30 m (Hawker &amp; Neal 2021, CC BY 4.0): đã gỡ nhà và tán cây khỏi Copernicus GLO-30, hệ EGM2008, trong ranh Huế. Ngoài vùng dữ liệu vẫn là cao độ bề mặt GLO-30. FABDEM is produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved."><svg class="ico ico-layer"><use href="#i-terrain"/></svg>Địa hình (cao độ nền)</label></div>
             <span id="terrainBox" class="layer-slider" style="display:none;"><input type="range" id="terrainOpacity" class="opacity-slider" min="0" max="100" value="55" title="Độ trong suốt lớp địa hình" aria-label="Độ trong suốt lớp địa hình"></span>
@@ -1782,6 +1783,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261091"></script>
+  <script type="module" src="./js/app.js?v=20261109"></script>
 </body>
 </html>
