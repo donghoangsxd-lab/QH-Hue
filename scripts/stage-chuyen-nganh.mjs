@@ -33,11 +33,22 @@ for (const name of schemes) {
     continue;
   }
   const st = fs.lstatSync(link);
-  if (materialize && st.isSymbolicLink()) {
-    fs.rmSync(link);
+  // Windows/Git: symlink thường thành file text chứa đường dẫn tương đối — coi như stub.
+  const stub = !st.isSymbolicLink() && !st.isDirectory()
+    && st.isFile() && st.size < 512
+    && (() => {
+      try {
+        const text = fs.readFileSync(link, 'utf8').trim().replace(/\\/g, '/');
+        return text === rel.replace(/\\/g, '/') || text.endsWith(`/${name}`) || text === `../../../data/chuyen-nganh/${name}`;
+      } catch {
+        return false;
+      }
+    })();
+  if (materialize && (st.isSymbolicLink() || stub)) {
+    fs.rmSync(link, { force: true });
     fs.cpSync(target, link, { recursive: true });
     console.log('Đã bung', name);
-  } else if (!st.isSymbolicLink() && !st.isDirectory()) {
+  } else if (!st.isSymbolicLink() && !st.isDirectory() && !stub) {
     console.error('Không phải symlink hay thư mục:', link);
     process.exit(1);
   }
