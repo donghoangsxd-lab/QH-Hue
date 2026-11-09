@@ -77,7 +77,7 @@ Lớp nền độc lập với trục, dùng được trên mọi trục. Không
 - Google vệ tinh
 - Bản đồ đường phố
 
-Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị). Thửa đất địa chính 2016 và Công trình vi phạm nằm trong khung này, không lặp ở danh sách quy hoạch.
+Ngay dưới ô ảnh nền (và đầu khung Lớp môi trường) có dòng ghi chú `#baseLoadNote` / `#envLoadNote`: «Một số lớp nạp lần đầu có thể mất 30–60 giây; số % bên phải là tiến độ tải.» Khi lớp đang nạp, cuối dòng hiện `.layer-load-pct` (0% lúc chưa có ô xong thì chữ «Đang tải», không phải độ trong suốt). Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị). Thửa đất địa chính 2016 và Công trình vi phạm nằm trong khung này, không lặp ở danh sách quy hoạch.
 
 Lớp môi trường dùng được trên mọi trục: địa hình, thoát nước, lưu vực, mô phỏng ngập, ngập Sentinel-1, nhiệt độ bề mặt, NDVI, ưu tiên trồng cây, rừng, công trình chịu rủi ro.
 

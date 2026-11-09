@@ -31,7 +31,8 @@ import {
   visionColor, visionLineStyle, zoneAreaHa, WATER_KINDS, GREEN_COLOR
 } from './qhc2045.js';
 import {
-  loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
+  loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail,
+  pickRouteShields, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
 } from './qhcRoads.js';
 import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs, regulationsPaneHtml } from './lotPopup.js';
 import { layerDecisionOf, layerDocsOf } from './layerDecisions.js';
@@ -46,8 +47,9 @@ const LINE_PANE = ['qhcLinePane', 420];
 // các ranh đó, nếu không bị che và trông như chỉ còn nét trắng từng quận
 const WASH_PANE = ['qhcWashPane', 430];
 // Mạng lưới giao thông (qhcRoads.js) nổi trên lô và ranh 40 phường; không nhận click (canvas phủ kín sẽ chặn lớp khác),
-// click dò ở qhcClick theo khoảng cách tới tuyến
+// click dò ở qhcClick theo khoảng cách tới tuyến. Tem số hiệu (QL/CT/ĐT) ở pane HTML riêng, cùng mặt tem đường nền (450).
 const ROAD_PANE = ['qhcRoadPane', 415];
+const ROAD_LABEL_PANE = ['qhcRoadLabelPane', 450];
 const ROAD_HIT_PX = 6;
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
@@ -167,6 +169,25 @@ function ensureRoadRenderer(m) {
   pane.style.pointerEvents = 'none';
   b.roadRenderer = L.canvas({ pane: ROAD_PANE[0], padding: 0.3 });
   return b.roadRenderer;
+}
+
+function ensureRoadLabelPane(m) {
+  let pane = m.getPane(ROAD_LABEL_PANE[0]);
+  if (!pane) {
+    pane = m.createPane(ROAD_LABEL_PANE[0]);
+    pane.style.zIndex = ROAD_LABEL_PANE[1];
+    pane.style.pointerEvents = 'none';
+  }
+  return ROAD_LABEL_PANE[0];
+}
+
+function roadShieldIcon(shield) {
+  return L.divIcon({
+    className: 'qhc-road-shield-icon',
+    html: `<span class="qhc-road-shield qhc-road-shield-${shield.cls}">${escapeHtml(shield.text)}</span>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0]
+  });
 }
 
 function qhcHosts(id, on) {
@@ -295,6 +316,15 @@ function drawRoads(scale) {
   }
   const group = L.featureGroup(passes);
   group.feats = feats;
+  const labelPane = ensureRoadLabelPane(m);
+  pickRouteShields(feats, m.getZoom(), { focusKey: focus }).forEach(({ shield, lnglat }) => {
+    L.marker([lnglat[1], lnglat[0]], {
+      icon: roadShieldIcon(shield),
+      interactive: false,
+      keyboard: false,
+      pane: labelPane
+    }).addTo(group);
+  });
   layers[`road${scale}`] = group.addTo(m);
 }
 
@@ -1444,6 +1474,12 @@ export function initQhc2045Layer() {
       if (bare) setLand(true);
     }
     if (!host._animatingZoom && data.vision && qhcOn(host, 'qhc25', 'chk_qhc25') && !layers.vision) setVision(true);
+    // Tem CT/QL/ĐT theo zoom (ẩn ĐT khi xa, hiện khi phóng gần)
+    if (!host._animatingZoom) {
+      ['10', '25'].forEach(scale => {
+        if (active.layers[`road${scale}`] && $(ROAD_CHK[scale])?.checked) drawRoads(scale);
+      });
+    }
   };
   [map, planMap].filter(Boolean).forEach(host => {
     host.on('zoomend', () => onZoom(host));

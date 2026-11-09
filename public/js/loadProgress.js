@@ -324,10 +324,15 @@ function paint() {
     if (view.open || failed) el.classList.remove('is-fading');
     if (!el.classList.contains('is-fading')) {
       el.style.color = progressColor(pct);
-      el.textContent = failed ? `${pct}% · ${failed} lỗi` : `${pct}%`;
+      // 0% dễ lẫn với độ trong suốt — lúc chưa có ô xong ghi «Đang tải».
+      el.textContent = failed
+        ? `${pct}% · ${failed} lỗi`
+        : (view.open && pct === 0 ? 'Đang tải' : `${pct}%`);
       el.title = failed
         ? `${name}: ${view.done} ô thành công, ${failed} ô lỗi, ${view.open} ô đang tải`
-        : `${name}: ${pct}%`;
+        : view.open
+          ? `${name}: đang nạp lần đầu, có thể mất 30–60 giây (${pct}%)`
+          : `${name}: ${pct}%`;
     }
     if (!view.open && !failed) armHide(name, job);
     else if (job.hideTimer) {
