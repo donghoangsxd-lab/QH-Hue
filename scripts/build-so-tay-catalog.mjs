@@ -1,5 +1,5 @@
 /**
- * Xuất public/data/qh-so-tay.json từ kết quả merge sổ tay (chỉ dòng đồ án cha).
+ * Xuất public/data/qh-so-tay.json từ merge sổ tay: đồ án cha + cụm ĐCCB/đính chính.
  * Usage: node scripts/build-so-tay-catalog.mjs [--in DIR]
  */
 import fs from 'fs';
@@ -17,16 +17,31 @@ const inDir = (() => {
 const outFile = path.join(root, 'public', 'data', 'qh-so-tay.json');
 
 function parseHa(raw) {
-  const s = String(raw || '')
-    .replace(/\s/g, '')
-    .replace(/[^\d,.\-]/g, '');
-  if (!s || s === '-' || s === '–') return null;
-  // 1.850,00 → 1850.00 ; 170,00 → 170
+  const text = String(raw || '').trim();
+  if (!text || text === '-' || text === '–') return null;
+  // Chuỗi chú thích (vd. «Hết hiệu lực…») không phải diện tích số.
+  if (/[a-zA-ZÀ-ỹ]/.test(text)) return null;
+  const s = text.replace(/\s/g, '').replace(/[^\d,.\-]/g, '');
+  if (!s) return null;
   const normalized = s.includes(',')
     ? s.replace(/\./g, '').replace(',', '.')
     : s;
   const n = Number(normalized);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number.isFinite(n) && n >= 0 && n < 1e6 ? n : null;
+}
+
+function childOf(r) {
+  return {
+    id: r.Ma_thanh_phan || '',
+    loaiDong: r.Loai_dong || '',
+    ten: r['Tên quy hoạch'] || '',
+    quyetDinh: r['Số quyết định phê duyệt quy hoạch'] || '',
+    ngay: r['Ngày phê duyệt'] || '',
+    coQuan: r['Cơ quan phê duyệt quy hoạch'] || '',
+    dienTichText: r['Quy mô diện tích (ha)'] || '',
+    danSo: r['Quy mô dân số dự báo (người)'] || '',
+    ghiChu: r.Ghi_chu_nguon || ''
+  };
 }
 
 const dm = JSON.parse(fs.readFileSync(path.join(inDir, 'DANH_MUC.json'), 'utf8'));
@@ -41,11 +56,16 @@ for (const r of rows) {
 }
 
 const items = [];
+let childCount = 0;
 for (const [ma, g] of byMa) {
   const p = g.parent;
   if (!p) continue;
-  const dccb = g.children.filter((c) => c.Loai_dong === 'dccb').length;
-  const dinh = g.children.filter((c) => c.Loai_dong === 'dinh_chinh').length;
+  const children = g.children
+    .filter((c) => c.Loai_dong === 'dccb' || c.Loai_dong === 'dinh_chinh')
+    .map(childOf);
+  childCount += children.length;
+  const dccb = children.filter((c) => c.loaiDong === 'dccb').length;
+  const dinh = children.filter((c) => c.loaiDong === 'dinh_chinh').length;
   items.push({
     ma: ma,
     ten: p['Tên quy hoạch'] || '',
@@ -63,21 +83,28 @@ for (const [ma, g] of byMa) {
     linkGis: p.Link_GIS || p['Cơ sở dữ liệu số địa lý (GIS)'] || '',
     soDccb: dccb,
     soDinhChinh: dinh,
+    children,
     sttNguon: p.Stt_nguon || '',
     sheetNguon: p.Sheet_nguon || '',
     ghiChu: p.Ghi_chu_nguon || ''
   });
 }
 
-items.sort((a, b) => String(a.ten).localeCompare(String(b.ten), 'vi'));
+items.sort((a, b) => {
+  const ca = String(a.cap || '');
+  const cb = String(b.cap || '');
+  if (ca !== cb) return ca.localeCompare(cb, 'vi');
+  return String(a.ma || '').localeCompare(String(b.ma || ''), 'vi');
+});
 
 const payload = {
   generatedAt: new Date().toISOString(),
   source: 'Sổ tay QH Huế (TT24) — merge 9 ĐVHC',
   count: items.length,
+  childCount,
   items
 };
 
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, JSON.stringify(payload));
-console.log(`OK: ${items.length} đồ án → ${path.relative(root, outFile)}`);
+console.log(`OK: ${items.length} đồ án + ${childCount} ĐCCB/đính chính → ${path.relative(root, outFile)}`);

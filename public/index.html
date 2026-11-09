@@ -1516,15 +1516,22 @@
             <select id="catalogStatusFilter" class="catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>
             <select id="catalogWardFilter" class="catalog-filter" aria-label="Lọc theo phường xã" hidden></select>
             <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
+            <div class="catalog-chart-summary" id="catalogChartSummary" hidden></div>
           </div>
           <div class="catalog-toolbar-actions" data-html2canvas-ignore="true">
+            <div class="catalog-ward-legend" id="catalogChartLegend" aria-hidden="true" hidden>
+              <span class="catalog-ward-leg catalog-ward-leg-qhc">QHC</span>
+              <span class="catalog-ward-leg catalog-ward-leg-qhpk">QHPK</span>
+              <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
+            </div>
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogFlipChart" title="Xem biểu đồ theo phường / xã" aria-label="Xem biểu đồ theo phường / xã" hidden><svg class="ico"><use href="#i-flip"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportCsv" title="Xuất CSV" aria-label="Xuất CSV"><svg class="ico"><use href="#i-file"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportPdf" title="Xuất PDF danh mục" aria-label="Xuất PDF danh mục"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogClose" title="Đóng bảng danh mục" aria-label="Đóng bảng danh mục"><svg class="ico"><use href="#i-close"/></svg></button>
           </div>
         </header>
-        <!-- Mặc định dock: 2 khối chart (pie | cột năm) như bảng HT toàn TP; ward chart chỉ khi bottom-max -->
+        <!-- Dock: pie | cột (năm mặc định); nút lật trước CSV đổi sang cột theo 40 PX -->
         <div class="catalog-charts" id="catalogCharts" hidden>
           <div class="catalog-chart-top">
             <div class="catalog-chart-pies">
@@ -1537,34 +1544,16 @@
                 <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
               </div>
             </div>
-            <div class="catalog-chart-year">
-              <div class="catalog-chart-year-head">
-                <div class="catalog-chart-title">Số đồ án theo năm phê duyệt</div>
-                <div class="catalog-ward-legend" aria-hidden="true">
-                  <span class="catalog-ward-leg catalog-ward-leg-qhc">QHC</span>
-                  <span class="catalog-ward-leg catalog-ward-leg-qhpk">QHPK</span>
-                  <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
-                </div>
-              </div>
-              <div class="catalog-chart-summary" id="catalogChartSummary"></div>
-              <div class="catalog-chart-wrap catalog-chart-wrap-year">
+            <div class="catalog-chart-bars" id="catalogChartBars" data-page="year">
+              <div class="catalog-chart-title" id="catalogBarTitle">Số đồ án theo năm phê duyệt</div>
+              <div class="catalog-chart-wrap catalog-chart-wrap-bar" data-catalog-bar="year">
                 <canvas id="catalogYearChart" aria-label="Biểu đồ cột chồng số đồ án theo năm phê duyệt, tách QHC QHPK QHCT"></canvas>
               </div>
-            </div>
-          </div>
-          <div class="catalog-chart-ward">
-            <div class="catalog-chart-ward-head">
-              <div class="catalog-chart-title">Số đồ án theo 40 phường / xã</div>
-              <div class="catalog-ward-legend" aria-hidden="true">
-                <span class="catalog-ward-leg catalog-ward-leg-qhc">QHC</span>
-                <span class="catalog-ward-leg catalog-ward-leg-qhpk">QHPK</span>
-                <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
+              <div class="catalog-chart-wrap catalog-chart-wrap-bar" data-catalog-bar="ward" hidden>
+                <canvas id="catalogWardChart" aria-label="Biểu đồ số đồ án quy hoạch theo phường xã, cột chồng QHC QHPK QHCT"></canvas>
               </div>
+              <div class="catalog-ward-note" id="catalogWardNote" hidden></div>
             </div>
-            <div class="catalog-chart-wrap catalog-chart-wrap-ward">
-              <canvas id="catalogWardChart" aria-label="Biểu đồ số đồ án quy hoạch theo phường xã, cột chồng QHC QHPK QHCT"></canvas>
-            </div>
-            <div class="catalog-ward-note" id="catalogWardNote"></div>
           </div>
         </div>
         <!-- Cùng khung .table-container + table.data-table như bảng tổng hợp hạ tầng -->
@@ -1573,13 +1562,15 @@
             <thead>
               <tr>
                 <th>STT</th>
+                <th>Mã</th>
                 <th id="catalogColName">Tên quy hoạch</th>
-                <th>Đơn vị</th>
-                <th id="catalogColScale">Cấp</th>
+                <th>Quyết định</th>
+                <th>Ngày ban hành</th>
+                <th>Cấp phê duyệt</th>
                 <th>Diện tích</th>
+                <th>Dân số</th>
                 <th>Trạng thái</th>
                 <th>Ranh</th>
-                <th>Ghi chú</th>
               </tr>
             </thead>
             <tbody id="catalogTableBody"></tbody>

@@ -27,10 +27,24 @@ const sheet = [
     dvhc: 'Quận Thuận Hóa',
     dienTichHa: 170,
     dienTichText: '170,00',
+    danSo: '5.000',
     quyetDinh: '23/QĐ-UBND',
     ngay: '18/11/2013',
+    coQuan: 'UBND tỉnh',
     linkGis: 'http://example',
-    soDccb: 6
+    soDccb: 1,
+    children: [
+      {
+        id: 'TH.B.001.01',
+        loaiDong: 'dccb',
+        ten: 'ĐCCB khu đất dự án LK8,9',
+        quyetDinh: '3314/QĐ-UBND',
+        ngay: '23/12/2016',
+        coQuan: 'UBND tỉnh',
+        dienTichText: '',
+        danSo: ''
+      }
+    ]
   },
   {
     ma: 'TH.B.099',
@@ -132,6 +146,14 @@ assert.ok(catalogFilterOptions('plan').some(o => o.value === 'QHPK'));
 assert.ok(catalogFilterOptions('invest').some(o => o.value === 'dvtm'));
 assert.equal(planYearOf('18/11/2013'), 2013);
 assert.equal(nam.year, 2013);
+assert.equal(nam.quyetDinh, '23/QĐ-UBND');
+assert.equal(nam.ngay, '18/11/2013');
+assert.equal(nam.coQuan, 'UBND tỉnh');
+assert.equal(nam.danSo, '5.000');
+assert.equal(nam.children.length, 1);
+assert.equal(nam.children[0].quyetDinh, '3314/QĐ-UBND');
+assert.match(rowsToCsv([nam], 'plan'), /3314\/QĐ-UBND/);
+assert.ok(filterCatalogRows(merged, { query: 'LK8' }).some((r) => r.maDoAn === 'TH.B.001'));
 
 const yearStats = catalogYearLevelStats(merged);
 assert.ok(yearStats.labels.includes('2013'));

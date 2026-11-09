@@ -13,12 +13,12 @@ import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
-  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS
+  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS, PLAN_TABLE_COLS
 } from './catalogTableCore.js';
 
 const $ = (id) => document.getElementById(id);
 /* ?v= đổi khi rebuild catalog để trình duyệt/SW không giữ bản JSON cũ. */
-const SO_TAY_URL = './data/qh-so-tay.json?v=20261108a';
+const SO_TAY_URL = './data/qh-so-tay.json?v=20261109b';
 
 let source = 'plan';
 let filterLevel = '';
@@ -35,6 +35,8 @@ let statusChart = null;
 let levelChart = null;
 let yearChart = null;
 let wardChart = null;
+/** 'year' | 'ward' — mặt cột phải; lật bằng #btnCatalogFlipChart. */
+let chartPage = 'year';
 
 function host() { return $('catalogTableHost'); }
 
@@ -53,6 +55,33 @@ function syncMaxBtn() {
   btn.setAttribute('aria-label', btn.title);
 }
 
+function syncChartPageUi() {
+  const bars = $('catalogChartBars');
+  const title = $('catalogBarTitle');
+  const yearWrap = document.querySelector('#catalogCharts [data-catalog-bar="year"]');
+  const wardWrap = document.querySelector('#catalogCharts [data-catalog-bar="ward"]');
+  const note = $('catalogWardNote');
+  const flip = $('btnCatalogFlipChart');
+  const isWard = chartPage === 'ward';
+  if (bars) bars.dataset.page = chartPage;
+  if (yearWrap) yearWrap.hidden = isWard;
+  if (wardWrap) wardWrap.hidden = !isWard;
+  if (note) note.hidden = !isWard;
+  if (title) {
+    title.textContent = isWard
+      ? 'Số đồ án theo 40 phường / xã'
+      : 'Số đồ án theo năm phê duyệt';
+  }
+  if (flip) {
+    const tip = isWard
+      ? 'Xem biểu đồ theo năm phê duyệt'
+      : 'Xem biểu đồ theo phường / xã';
+    flip.title = tip;
+    flip.setAttribute('aria-label', tip);
+    flip.setAttribute('aria-pressed', isWard ? 'true' : 'false');
+  }
+}
+
 function paintChrome() {
   const title = $('catalogTableTitle');
   const colName = $('catalogColName');
@@ -60,10 +89,16 @@ function paintChrome() {
   const statusFilter = $('catalogStatusFilter');
   const wardFilter = $('catalogWardFilter');
   const charts = $('catalogCharts');
+  const summary = $('catalogChartSummary');
+  const legend = $('catalogChartLegend');
+  const flip = $('btnCatalogFlipChart');
   const planOnly = source === 'plan';
   if (statusFilter) statusFilter.hidden = !planOnly;
   if (wardFilter) wardFilter.hidden = !planOnly;
   if (charts) charts.hidden = !planOnly;
+  if (summary) summary.hidden = !planOnly;
+  if (legend) legend.hidden = !planOnly;
+  if (flip) flip.hidden = !planOnly;
   if (source === 'invest') {
     if (title) title.textContent = 'DANH MỤC DỰ ÁN ĐẦU TƯ';
     if (colName) colName.textContent = 'Tên dự án';
@@ -72,6 +107,7 @@ function paintChrome() {
     if (title) title.textContent = 'DANH MỤC ĐỒ ÁN QUY HOẠCH';
     if (colName) colName.textContent = 'Tên quy hoạch';
     if (colScale) colScale.textContent = 'Cấp';
+    syncChartPageUi();
   }
   syncPlanColumns(planOnly);
 }
@@ -84,13 +120,15 @@ function syncPlanColumns(planOnly) {
   if (!head) return;
   if (planOnly) {
     head.innerHTML = `<th>STT</th>
+      <th>Mã</th>
       <th id="catalogColName">Tên quy hoạch</th>
-      <th>Đơn vị</th>
-      <th id="catalogColScale">Cấp</th>
+      <th>Quyết định</th>
+      <th>Ngày ban hành</th>
+      <th>Cấp phê duyệt</th>
       <th>Diện tích</th>
+      <th>Dân số</th>
       <th>Trạng thái</th>
-      <th>Ranh</th>
-      <th>Ghi chú</th>`;
+      <th>Ranh</th>`;
   } else {
     head.innerHTML = `<th>STT</th>
       <th id="catalogColName">Tên dự án</th>
@@ -196,21 +234,48 @@ function displayName(r) {
   return ma || '—';
 }
 
+function cellOrDash(v) {
+  const s = String(v || '').trim();
+  return s ? escapeHtml(s) : '—';
+}
+
+function planChildRowHtml(parent, child) {
+  const tag = child.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB';
+  const name = String(child.ten || tag).trim() || tag;
+  return `<tr class="catalog-dccb-row" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
+    <td class="st-num"></td>
+    <td class="catalog-ma"></td>
+    <td class="st-name catalog-dccb-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+    <td class="catalog-qd" title="${escapeHtml(child.quyetDinh || '')}">${cellOrDash(child.quyetDinh)}</td>
+    <td class="catalog-date">${cellOrDash(child.ngay)}</td>
+    <td class="catalog-agency">${cellOrDash(child.coQuan)}</td>
+    <td class="catalog-area">${cellOrDash(child.dienTichText)}</td>
+    <td class="catalog-pop">${cellOrDash(child.danSo)}</td>
+    <td><span class="catalog-status catalog-status-dccb" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span></td>
+    <td class="catalog-bound-no">—</td>
+  </tr>`;
+}
+
 function planRowHtml(r, stt) {
   const name = displayName(r);
+  const ma = String(r.maDoAn || '').trim();
   const bound = r.hasBoundary
     ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
     : `<span class="catalog-bound-no">Chưa</span>`;
-  return `<tr data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
+  const kids = Array.isArray(r.children) ? r.children : [];
+  const parent = `<tr class="catalog-parent-row" data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
     <td class="st-num">${stt}</td>
+    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}</td>
     <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
-    <td class="st-name" title="${escapeHtml(r.ward || '')}">${escapeHtml(r.ward || '—')}</td>
-    <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
-    <td class="catalog-area">${escapeHtml(r.areaText || '—')}</td>
+    <td class="catalog-qd" title="${escapeHtml(r.quyetDinh || '')}">${cellOrDash(r.quyetDinh)}</td>
+    <td class="catalog-date">${cellOrDash(r.ngay)}</td>
+    <td class="catalog-agency">${cellOrDash(r.coQuan)}</td>
+    <td class="catalog-area" title="${escapeHtml(r.areaText || '')}">${cellOrDash(r.areaText)}</td>
+    <td class="catalog-pop">${cellOrDash(r.danSo)}</td>
     <td>${statusChip(r)}</td>
     <td>${bound}</td>
-    <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
   </tr>`;
+  return parent + kids.map((c) => planChildRowHtml(r, c)).join('');
 }
 
 function paintTable() {
@@ -226,7 +291,7 @@ function paintTable() {
   if (count) count.textContent = `${visibleRows.length} / ${rowsCache.length} ${unit}`;
   if (!body) return;
   if (!visibleRows.length) {
-    const cols = source === 'plan' ? 8 : 6;
+    const cols = source === 'plan' ? PLAN_TABLE_COLS : 6;
     body.innerHTML = `<tr><td colspan="${cols}" class="catalog-empty st-msg">Không có dòng khớp bộ lọc.</td></tr>`;
     paintCharts();
     return;
@@ -237,7 +302,7 @@ function paintTable() {
     for (const item of groupPlanRowsByLevel(visibleRows)) {
       if (item.type === 'group') {
         parts.push(
-          `<tr class="catalog-group-row"><td colspan="8">${escapeHtml(item.label)} (${item.count})</td></tr>`
+          `<tr class="catalog-group-row"><td colspan="${PLAN_TABLE_COLS}">${escapeHtml(item.label)} (${item.count})</td></tr>`
         );
         continue;
       }
@@ -390,6 +455,7 @@ function paintCharts() {
       ? `${wardStats.unmatched} đồ án chưa gán được vào 40 phường/xã (chỉ có cấp huyện/thị xã cũ hoặc thiếu địa bàn).`
       : '';
   }
+  syncChartPageUi();
 
   const sCanvas = $('catalogStatusChart');
   const lCanvas = $('catalogLevelChart');
@@ -444,22 +510,26 @@ function paintCharts() {
   const yearDatasets = levelStackDatasets(yearStats);
   const yearOpts = stackedBarOpts({ tickColor });
 
-  if (yearChart && yearChart.canvas === yCanvas) {
-    yearChart.data.labels = yearStats.labels;
-    yearChart.data.datasets.forEach((ds, i) => { ds.data = yearDatasets[i].data; });
-    yearChart.update();
-  } else {
-    if (yearChart) yearChart.destroy();
-    yearChart = new Chart(yCanvas.getContext('2d'), {
-      type: 'bar',
-      data: { labels: yearStats.labels, datasets: yearDatasets },
-      options: yearOpts
-    });
+  if (chartPage === 'year' || !wCanvas) {
+    if (yearChart && yearChart.canvas === yCanvas) {
+      yearChart.data.labels = yearStats.labels;
+      yearChart.data.datasets.forEach((ds, i) => { ds.data = yearDatasets[i].data; });
+      yearChart.update();
+    } else {
+      if (yearChart) yearChart.destroy();
+      yearChart = new Chart(yCanvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels: yearStats.labels, datasets: yearDatasets },
+        options: yearOpts
+      });
+    }
   }
 
-  const showWard = document.body.classList.contains('bottom-max') && wCanvas;
-  if (!showWard) {
-    if (wardChart) { wardChart.destroy(); wardChart = null; }
+  if (!wCanvas || chartPage !== 'ward') {
+    if (chartPage !== 'ward' && wardChart) {
+      wardChart.destroy();
+      wardChart = null;
+    }
     return;
   }
 
@@ -509,6 +579,7 @@ export async function openCatalogTable(opts = {}) {
   query = '';
   filterStatus = '';
   filterWard = '';
+  chartPage = 'year';
   const search = $('catalogSearch');
   if (search) search.value = '';
   if (source === 'plan') {
@@ -608,6 +679,15 @@ export function initCatalogTable() {
     filterWard = e.target.value || '';
     paintTable();
   });
+  $('btnCatalogFlipChart')?.addEventListener('click', () => {
+    chartPage = chartPage === 'ward' ? 'year' : 'ward';
+    syncChartPageUi();
+    requestAnimationFrame(() => {
+      paintCharts();
+      if (chartPage === 'year') yearChart?.resize();
+      else wardChart?.resize();
+    });
+  });
   $('btnCatalogExportCsv')?.addEventListener('click', exportCsv);
   $('btnCatalogExportPdf')?.addEventListener('click', () => { void exportPdf(); });
   $('btnCatalogMax')?.addEventListener('click', () => {
@@ -617,6 +697,7 @@ export function initCatalogTable() {
       statusChart?.resize();
       levelChart?.resize();
       yearChart?.resize();
+      wardChart?.resize();
       paintCharts();
     });
   });

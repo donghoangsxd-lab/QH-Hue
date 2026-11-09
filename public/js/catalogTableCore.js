@@ -9,10 +9,12 @@ import { WARD_NAMES } from './facetStore.js';
 import { bareName } from './urbanStatus.js';
 
 export const CATALOG_HEADERS_PLAN = [
-  'STT', 'Tên quy hoạch', 'Đơn vị', 'Cấp', 'Diện tích (ha)', 'Trạng thái', 'Ranh', 'Ghi chú'
+  'STT', 'Mã', 'Tên quy hoạch', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
+  'Diện tích (ha)', 'Dân số', 'Trạng thái', 'Ranh'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
+export const PLAN_TABLE_COLS = CATALOG_HEADERS_PLAN.length;
 
 export { STATUS };
 
@@ -162,6 +164,30 @@ function formatHa(n) {
   return Number(n).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 }
 
+/** Ô diện tích: ưu tiên số ha hợp lệ; chuỗi chú thích (hết hiệu lực…) giữ nguyên. */
+export function areaTextOf(item) {
+  const text = String(item?.dienTichText || item?.areaText || '').trim();
+  const ha = item?.dienTichHa ?? item?.areaHa;
+  if (Number.isFinite(ha) && ha >= 0 && ha < 1e6) return formatHa(ha);
+  if (text) return text;
+  return '';
+}
+
+function mapChildren(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((c, i) => ({
+    id: c.id || `child-${i}`,
+    loaiDong: c.loaiDong || 'dccb',
+    ten: c.ten || '',
+    quyetDinh: c.quyetDinh || '',
+    ngay: c.ngay || '',
+    coQuan: c.coQuan || '',
+    dienTichText: c.dienTichText || '',
+    danSo: c.danSo || '',
+    ghiChu: c.ghiChu || ''
+  }));
+}
+
 /** Ghép sổ tay + catalog webapp thành hàng bảng danh mục trục B. */
 export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
   const list = Array.isArray(catalog) ? catalog : [];
@@ -182,10 +208,10 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     const { status, missing } = classifyPlanStatus(item, hit, hasBoundary);
     const notes = [];
     if (missing.length) notes.push(missingLabel(missing));
-    if (item.soDccb) notes.push(`${item.soDccb} ĐCCB`);
-    if (item.quyetDinh) notes.push(item.quyetDinh);
     if (p?.legacy) notes.push('Đồ án cũ trên bản đồ');
+    if (item.ghiChu) notes.push(item.ghiChu);
     const wards = resolvePlanWards(item, p);
+    const children = mapChildren(item.children);
     rows.push({
       id: item.ma,
       source: 'plan',
@@ -197,7 +223,10 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       level,
       year: planYearOf(item.ngay),
       areaHa: item.dienTichHa,
-      areaText: item.dienTichText || formatHa(item.dienTichHa),
+      areaText: areaTextOf(item),
+      danSo: item.danSo || '',
+      ngay: item.ngay || '',
+      coQuan: item.coQuan || '',
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
@@ -206,6 +235,8 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       maDoAn: item.ma,
       quyetDinh: item.quyetDinh || '',
       linkGis: item.linkGis || '',
+      soDccb: children.filter((c) => c.loaiDong === 'dccb').length,
+      children,
       matched: !!hit
     });
   }
@@ -233,6 +264,9 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       year: null,
       areaHa: ha,
       areaText: formatHa(ha),
+      danSo: '',
+      ngay: '',
+      coQuan: '',
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
@@ -241,6 +275,8 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       maDoAn: '',
       quyetDinh: p.decision?.name || '',
       linkGis: '',
+      soDccb: 0,
+      children: [],
       matched: false
     });
   }
@@ -303,7 +339,10 @@ export function filterCatalogRows(rows, { query = '', level = '', status = '', w
       if (!list.includes(wd) && matchCatalogWard(r.ward) !== wd) return false;
     }
     if (!q) return true;
-    const blob = `${r.name} ${r.fullName} ${r.ward} ${r.scale} ${r.statusLabel} ${r.note} ${r.quyetDinh || ''}`.toLowerCase();
+    const kids = Array.isArray(r.children)
+      ? r.children.map((c) => `${c.ten} ${c.quyetDinh} ${c.ngay} ${c.coQuan}`).join(' ')
+      : '';
+    const blob = `${r.maDoAn} ${r.name} ${r.fullName} ${r.ward} ${r.scale} ${r.statusLabel} ${r.note} ${r.quyetDinh || ''} ${r.ngay || ''} ${r.coQuan || ''} ${r.danSo || ''} ${kids}`.toLowerCase();
     return blob.includes(q);
   });
   if (filtered.some((r) => r.source === 'plan' || LEVEL_KEYS.includes(r.level))) {
@@ -459,18 +498,36 @@ export function rowsToCsv(rows, source = 'plan') {
     return `\uFEFF${lines.join('\r\n')}`;
   }
   const lines = [CATALOG_HEADERS_PLAN.join(',')];
-  (rows || []).forEach((r, i) => {
+  let stt = 0;
+  for (const r of rows || []) {
+    stt += 1;
     lines.push([
-      i + 1,
+      stt,
+      r.maDoAn || '',
       r.name,
-      r.ward,
-      r.scale,
+      r.quyetDinh || '',
+      r.ngay || '',
+      r.coQuan || '',
       r.areaText || '',
+      r.danSo || '',
       r.statusLabel || '',
-      r.hasBoundary ? 'Có' : 'Chưa',
-      r.note
+      r.hasBoundary ? 'Có' : 'Chưa'
     ].map(escape).join(','));
-  });
+    for (const c of r.children || []) {
+      lines.push([
+        '',
+        '',
+        c.ten || '',
+        c.quyetDinh || '',
+        c.ngay || '',
+        c.coQuan || '',
+        c.dienTichText || '',
+        c.danSo || '',
+        c.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB',
+        ''
+      ].map(escape).join(','));
+    }
+  }
   return `\uFEFF${lines.join('\r\n')}`;
 }
 
