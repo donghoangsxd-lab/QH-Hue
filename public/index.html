@@ -1508,21 +1508,21 @@
       <div id="projectReviewHost"></div>
       <!-- Chế độ danh mục: B mở đồ án, F mở dự án — không chung tab nguồn; full màn hình qua bottom-max -->
       <div id="catalogTableHost" class="catalog-table-host" hidden>
-        <div class="bp-part-head catalog-table-head">
-          <div class="bp-title-wrap catalog-table-titles">
-            <b class="bp-part-title" id="catalogTableTitle">DANH MỤC</b>
+        <header class="catalog-toolbar">
+          <b class="catalog-toolbar-title" id="catalogTableTitle">DANH MỤC</b>
+          <div class="catalog-toolbar-filters">
             <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, đơn vị, quyết định…" aria-label="Tìm trong danh mục">
-            <select id="catalogFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc theo cấp"></select>
-            <select id="catalogStatusFilter" class="ward-selector-dropdown catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>
+            <select id="catalogFilter" class="catalog-filter" aria-label="Lọc theo cấp"></select>
+            <select id="catalogStatusFilter" class="catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>
             <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
           </div>
-          <div class="bp-actions catalog-table-actions" data-html2canvas-ignore="true">
+          <div class="catalog-toolbar-actions" data-html2canvas-ignore="true">
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportCsv" title="Xuất CSV" aria-label="Xuất CSV"><svg class="ico"><use href="#i-file"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportPdf" title="Xuất PDF danh mục" aria-label="Xuất PDF danh mục"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogClose" title="Đóng bảng danh mục" aria-label="Đóng bảng danh mục"><svg class="ico"><use href="#i-close"/></svg></button>
           </div>
-        </div>
+        </header>
         <div class="catalog-charts" id="catalogCharts" hidden>
           <div class="catalog-chart-top">
             <div class="catalog-chart-card">
@@ -1550,7 +1550,8 @@
             <div class="catalog-ward-note" id="catalogWardNote"></div>
           </div>
         </div>
-        <div class="catalog-table-scroll" id="catalogTableScroll">
+        <!-- Cùng khung .table-container + table.data-table như bảng tổng hợp hạ tầng -->
+        <div class="table-container catalog-table-box" id="catalogTableScroll">
           <table class="data-table catalog-data-table" id="catalogTable">
             <thead>
               <tr>

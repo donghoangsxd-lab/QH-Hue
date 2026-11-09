@@ -170,6 +170,15 @@ function statusChip(r) {
   return `<span class="catalog-status catalog-status-${escapeHtml(meta.id)}" title="${escapeHtml(meta.label)}">${escapeHtml(meta.short)}</span>`;
 }
 
+function displayName(r) {
+  const name = String(r.name || '').trim();
+  if (name) return name;
+  const full = String(r.fullName || '').trim();
+  if (full) return full;
+  const ma = String(r.maDoAn || '').trim();
+  return ma || '—';
+}
+
 function paintTable() {
   visibleRows = filterCatalogRows(rowsCache, {
     query, level: filterLevel, status: source === 'plan' ? filterStatus : ''
@@ -181,38 +190,40 @@ function paintTable() {
   if (!body) return;
   if (!visibleRows.length) {
     const cols = source === 'plan' ? 8 : 6;
-    body.innerHTML = `<tr><td colspan="${cols}" class="catalog-empty">Không có dòng khớp bộ lọc.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${cols}" class="catalog-empty st-msg">Không có dòng khớp bộ lọc.</td></tr>`;
     paintCharts();
     return;
   }
   if (source === 'plan') {
     body.innerHTML = visibleRows.map((r, i) => {
+      const name = displayName(r);
       const bound = r.hasBoundary
         ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
         : `<span class="catalog-bound-no">Chưa</span>`;
       return `<tr data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
-        <td class="catalog-stt">${i + 1}</td>
-        <td>${escapeHtml(r.name)}</td>
-        <td>${escapeHtml(r.ward || '—')}</td>
-        <td>${escapeHtml(r.scale || '—')}</td>
+        <td class="st-num">${i + 1}</td>
+        <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+        <td class="st-name" title="${escapeHtml(r.ward || '')}">${escapeHtml(r.ward || '—')}</td>
+        <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
         <td class="catalog-area">${escapeHtml(r.areaText || '—')}</td>
         <td>${statusChip(r)}</td>
         <td>${bound}</td>
-        <td>${escapeHtml(r.note || '')}</td>
+        <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
       </tr>`;
     }).join('');
   } else {
     body.innerHTML = visibleRows.map((r, i) => {
+      const name = displayName(r);
       const bound = r.hasBoundary
         ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
         : `<span class="catalog-bound-no">Chưa</span>`;
       return `<tr data-catalog-id="${escapeHtml(r.id)}">
-        <td class="catalog-stt">${i + 1}</td>
-        <td>${escapeHtml(r.name)}</td>
-        <td>${escapeHtml(r.ward || '—')}</td>
-        <td>${escapeHtml(r.scale || '—')}</td>
+        <td class="st-num">${i + 1}</td>
+        <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+        <td class="st-name">${escapeHtml(r.ward || '—')}</td>
+        <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
         <td>${bound}</td>
-        <td>${escapeHtml(r.note || '')}</td>
+        <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
       </tr>`;
     }).join('');
   }
