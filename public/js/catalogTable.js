@@ -11,7 +11,7 @@ import {
 } from './investLayer.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
-  catalogFilterOptions, catalogStatusOptions, catalogStatusStats,
+  catalogFilterOptions, catalogStatusOptions, catalogStatusStats, catalogWardLevelStats,
   rowsToCsv, downloadCsv, STATUS
 } from './catalogTableCore.js';
 
@@ -31,6 +31,7 @@ let pdfBusy = false;
 let ready = false;
 let statusChart = null;
 let levelChart = null;
+let wardChart = null;
 
 function host() { return $('catalogTableHost'); }
 
@@ -221,6 +222,17 @@ function paintTable() {
 function destroyCharts() {
   if (statusChart) { statusChart.destroy(); statusChart = null; }
   if (levelChart) { levelChart.destroy(); levelChart = null; }
+  if (wardChart) { wardChart.destroy(); wardChart = null; }
+}
+
+/** Giống shortWardTick ở biểu đồ độ phủ panel dưới: tên dài viết tắt vế sau dấu -. */
+function shortWardTick(name) {
+  if (name.length <= 13) return name;
+  const parts = name.split(/\s*-\s*/);
+  if (parts.length < 2) return name;
+  const tail = parts.pop().split(' ');
+  const last = tail.pop();
+  return `${parts.join('-')}-${tail.map((w) => w[0] + '.').join('')}${last}`;
 }
 
 function paintCharts() {
@@ -230,6 +242,7 @@ function paintCharts() {
     return;
   }
   const stats = catalogStatusStats(rowsCache);
+  const wardStats = catalogWardLevelStats(rowsCache);
   const statusOrder = ['du', 'thieu', 'chi_so_tay', 'chi_ban_do'];
   const statusLabels = statusOrder.map((id) => STATUS[id].short);
   const statusColors = statusOrder.map((id) => STATUS[id].color);
@@ -249,9 +262,17 @@ function paintCharts() {
       <span class="catalog-sum-info">${stats.byStatus.chi_ban_do} ngoài sổ tay</span>`;
   }
 
+  const noteEl = $('catalogWardNote');
+  if (noteEl) {
+    noteEl.textContent = wardStats.unmatched
+      ? `${wardStats.unmatched} đồ án chưa gán được vào 40 phường/xã (chỉ có cấp huyện/thị xã cũ hoặc thiếu địa bàn).`
+      : '';
+  }
+
   const sCanvas = $('catalogStatusChart');
   const lCanvas = $('catalogLevelChart');
-  if (!sCanvas || !lCanvas) return;
+  const wCanvas = $('catalogWardChart');
+  if (!sCanvas || !lCanvas || !wCanvas) return;
 
   const common = {
     responsive: true,
@@ -293,6 +314,106 @@ function paintCharts() {
         datasets: [{ data: levelData, backgroundColor: levelColors, borderWidth: 0, hoverOffset: 4 }]
       },
       options: { ...common, cutout: '58%' }
+    });
+  }
+
+  const wardDatasets = [
+    {
+      label: 'QHC',
+      data: wardStats.qhc,
+      backgroundColor: '#38bdf8',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      fullNames: wardStats.fullNames
+    },
+    {
+      label: 'QHPK',
+      data: wardStats.qhpk,
+      backgroundColor: '#f59e0b',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      fullNames: wardStats.fullNames
+    },
+    {
+      label: 'QHCT',
+      data: wardStats.qhct,
+      backgroundColor: '#a78bfa',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      fullNames: wardStats.fullNames
+    }
+  ];
+
+  const tickColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1';
+  const wardOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 8, right: 4, bottom: 2, left: 0 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          title: (items) => {
+            const i = items[0]?.dataIndex ?? 0;
+            return wardStats.fullNames[i] || wardStats.labels[i] || '';
+          },
+          label: (item) => {
+            const n = item.parsed.y || 0;
+            return ` ${item.dataset.label}: ${n}`;
+          },
+          footer: (items) => {
+            const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0);
+            return `Tổng: ${total}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        ticks: {
+          autoSkip: false,
+          minRotation: 45,
+          maxRotation: 45,
+          callback(value) {
+            return shortWardTick(this.getLabelForValue(value));
+          },
+          color: tickColor,
+          font: { size: 10 }
+        },
+        grid: { color: 'rgba(255,255,255,0.05)' }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        ticks: {
+          color: '#94a3b8',
+          precision: 0,
+          font: { size: 11 }
+        },
+        grid: { color: 'rgba(255,255,255,0.05)' }
+      }
+    }
+  };
+
+  if (wardChart && wardChart.canvas === wCanvas) {
+    wardChart.data.labels = wardStats.labels;
+    wardChart.data.datasets.forEach((ds, i) => {
+      ds.data = wardDatasets[i].data;
+      ds.fullNames = wardStats.fullNames;
+    });
+    wardChart.update();
+  } else {
+    if (wardChart) wardChart.destroy();
+    wardChart = new Chart(wCanvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: wardStats.labels, datasets: wardDatasets },
+      options: wardOpts
     });
   }
 }

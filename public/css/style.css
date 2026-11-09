@@ -3104,15 +3104,22 @@ body.catalog-table-on .bp-body {
   max-width: 12em;
 }
 .catalog-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.catalog-charts[hidden] { display: none !important; }
+.catalog-chart-top {
   display: grid;
   grid-template-columns: minmax(120px, 160px) minmax(120px, 160px) 1fr;
   gap: 10px 14px;
   align-items: center;
-  padding: 6px 10px 8px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-  flex: 0 0 auto;
+  min-width: 0;
 }
-.catalog-charts[hidden] { display: none !important; }
 .catalog-chart-card { min-width: 0; }
 .catalog-chart-title {
   font-size: var(--fs-xs);
@@ -3135,6 +3142,57 @@ body.catalog-table-on .bp-body {
 .catalog-sum-warn { color: #fbbf24; }
 .catalog-sum-muted { color: #94a3b8; }
 .catalog-sum-info { color: #38bdf8; }
+.catalog-chart-ward {
+  min-width: 0;
+  padding: 6px 8px 4px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: var(--r-md);
+  background: rgba(15, 23, 42, 0.35);
+}
+.catalog-chart-ward-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 2px;
+}
+.catalog-ward-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.catalog-ward-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.catalog-ward-leg::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--leg);
+}
+.catalog-ward-leg-qhc { --leg: #38bdf8; }
+.catalog-ward-leg-qhpk { --leg: #f59e0b; }
+.catalog-ward-leg-qhct { --leg: #a78bfa; }
+.catalog-chart-wrap-ward {
+  height: min(200px, 28vh);
+  min-height: 140px;
+}
+body.bottom-max .catalog-chart-wrap-ward {
+  height: min(240px, 32vh);
+}
+.catalog-ward-note {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  min-height: 1em;
+}
 .catalog-status {
   display: inline-block;
   padding: 1px 7px;
@@ -3150,10 +3208,11 @@ body.catalog-table-on .bp-body {
 .catalog-status-chi_ban_do { color: #7dd3fc; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.3); }
 .catalog-area { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 840px) {
-  .catalog-charts {
+  .catalog-chart-top {
     grid-template-columns: 1fr 1fr;
   }
   .catalog-chart-summary { grid-column: 1 / -1; }
+  .catalog-chart-wrap-ward { height: 180px; }
 }
 .catalog-table-scroll {
   flex: 1;

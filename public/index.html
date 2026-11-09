@@ -1523,15 +1523,31 @@
           </div>
         </div>
         <div class="catalog-charts" id="catalogCharts" hidden>
-          <div class="catalog-chart-card">
-            <div class="catalog-chart-title">Trạng thái đối soát</div>
-            <div class="catalog-chart-wrap"><canvas id="catalogStatusChart" aria-label="Biểu đồ trạng thái đồ án"></canvas></div>
+          <div class="catalog-chart-top">
+            <div class="catalog-chart-card">
+              <div class="catalog-chart-title">Trạng thái đối soát</div>
+              <div class="catalog-chart-wrap"><canvas id="catalogStatusChart" aria-label="Biểu đồ trạng thái đồ án"></canvas></div>
+            </div>
+            <div class="catalog-chart-card">
+              <div class="catalog-chart-title">Theo cấp quy hoạch</div>
+              <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
+            </div>
+            <div class="catalog-chart-summary" id="catalogChartSummary"></div>
           </div>
-          <div class="catalog-chart-card">
-            <div class="catalog-chart-title">Theo cấp quy hoạch</div>
-            <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
+          <div class="catalog-chart-ward">
+            <div class="catalog-chart-ward-head">
+              <div class="catalog-chart-title">Số đồ án theo 40 phường / xã</div>
+              <div class="catalog-ward-legend" aria-hidden="true">
+                <span class="catalog-ward-leg catalog-ward-leg-qhc">QHC</span>
+                <span class="catalog-ward-leg catalog-ward-leg-qhpk">QHPK</span>
+                <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
+              </div>
+            </div>
+            <div class="catalog-chart-wrap catalog-chart-wrap-ward">
+              <canvas id="catalogWardChart" aria-label="Biểu đồ số đồ án quy hoạch theo phường xã, cột chồng QHC QHPK QHCT"></canvas>
+            </div>
+            <div class="catalog-ward-note" id="catalogWardNote"></div>
           </div>
-          <div class="catalog-chart-summary" id="catalogChartSummary"></div>
         </div>
         <div class="catalog-table-scroll" id="catalogTableScroll">
           <table class="data-table catalog-data-table" id="catalogTable">

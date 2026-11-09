@@ -5,6 +5,8 @@ import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 import {
   matchSoTayToCatalog, classifyPlanStatus, missingLabel, STATUS
 } from './soTayMatch.js';
+import { WARD_NAMES } from './facetStore.js';
+import { bareName } from './urbanStatus.js';
 
 export const CATALOG_HEADERS_PLAN = [
   'STT', 'Tên quy hoạch', 'Đơn vị', 'Cấp', 'Diện tích (ha)', 'Trạng thái', 'Ranh', 'Ghi chú'
@@ -19,6 +21,97 @@ const LEVEL_SCALE = {
   QHPK: 'QHPK 1/2.000',
   QHCT: 'QHCT 1/500'
 };
+
+const LEVEL_KEYS = ['QHC', 'QHPK', 'QHCT'];
+
+function haystack(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .replace(/[-–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+/** Khớp một chuỗi địa bàn với đúng một trong 40 phường/xã. */
+export function matchCatalogWard(raw, wardNames = WARD_NAMES) {
+  const b = bareName(raw);
+  if (!b || b.length < 2) return '';
+  const names = Array.isArray(wardNames) ? wardNames : WARD_NAMES;
+  const exact = names.find((n) => bareName(n) === b);
+  if (exact) return exact;
+  // Ưu tiên tên dài nhất nằm trong chuỗi (tránh «Phú» khớp nhầm).
+  let best = '';
+  let bestLen = 0;
+  for (const n of names) {
+    const bn = bareName(n);
+    if (bn.length < 3) continue;
+    if (b === bn || b.includes(bn) || bn.includes(b)) {
+      if (bn.length > bestLen) {
+        best = n;
+        bestLen = bn.length;
+      }
+    }
+  }
+  return best;
+}
+
+/** Liệt kê mọi phường/xã xuất hiện trong văn bản (tên / địa điểm / dvhc). */
+export function findCatalogWardsInText(text, wardNames = WARD_NAMES) {
+  const hay = haystack(text);
+  if (!hay) return [];
+  const names = Array.isArray(wardNames) ? wardNames : WARD_NAMES;
+  const ranked = names
+    .map((n) => ({ n, b: bareName(n) }))
+    .filter(({ b }) => b.length >= 3 && hay.includes(b))
+    .sort((a, b) => b.b.length - a.b.length);
+  const out = [];
+  const used = new Set();
+  for (const { n, b } of ranked) {
+    // Bỏ tên ngắn hơn đã nằm trong tên dài hơn đã chọn (vd Hương trong Hương Thủy).
+    if ([...used].some((u) => u.includes(b) || b.includes(u))) continue;
+    used.add(b);
+    out.push(n);
+  }
+  return out;
+}
+
+function isOldDistrictLabel(raw) {
+  return /^(Quận|Huyện|Thị\s*xã)\b/i.test(String(raw || '').trim());
+}
+
+/**
+ * Gán đồ án vào các phường/xã 40 đơn vị: ưu tiên `project.wards`, rồi quét địa điểm/tên.
+ * Không map cả «Huyện/Quận/Thị xã …» cũ sang một phường trùng tên.
+ * Một đồ án có thể thuộc nhiều phường (đếm ở mỗi cột).
+ */
+export function resolvePlanWards(item, project, wardNames = WARD_NAMES) {
+  const names = Array.isArray(wardNames) ? wardNames : WARD_NAMES;
+  const out = [];
+  const seen = new Set();
+  const add = (name) => {
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    out.push(name);
+  };
+  if (Array.isArray(project?.wards)) {
+    for (const w of project.wards) add(matchCatalogWard(w, names));
+  }
+  if (out.length) return out;
+  for (const raw of [item?.diaDiem, item?.ten, project?.tenQH]) {
+    findCatalogWardsInText(raw, names).forEach(add);
+  }
+  if (out.length) return out;
+  if (item?.dvhc && !isOldDistrictLabel(item.dvhc)) {
+    add(matchCatalogWard(item.dvhc, names));
+  }
+  return out;
+}
+
+function shortWardLabel(name) {
+  return String(name || '').replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim();
+}
 
 /** mapLevel id → khóa lọc cấp đồ án (QHC/QHPK/QHCT) hoặc '' = tất cả. */
 export function filterKeyFromMapLevel(levelId) {
@@ -65,12 +158,14 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     if (item.soDccb) notes.push(`${item.soDccb} ĐCCB`);
     if (item.quyetDinh) notes.push(item.quyetDinh);
     if (p?.legacy) notes.push('Đồ án cũ trên bản đồ');
+    const wards = resolvePlanWards(item, p);
     rows.push({
       id: item.ma,
       source: 'plan',
       name: item.ten || names.tenRutGon || names.tenQH || '',
       fullName: names.tenQH || item.ten || '',
-      ward: item.dvhc || item.diaDiem || '',
+      ward: wards.length ? wards.join(', ') : (item.dvhc || item.diaDiem || ''),
+      wards,
       scale: LEVEL_SCALE[level] || level || '',
       level,
       areaHa: item.dienTichHa,
@@ -97,12 +192,14 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     if (missing.length) notes.push(missingLabel(missing));
     notes.push('Có trên bản đồ, chưa thấy trong sổ tay');
     if (p.legacy) notes.push('Đồ án cũ');
+    const wards = resolvePlanWards(null, p);
     rows.push({
       id: `web:${p.slug || names.tenQH}`,
       source: 'plan',
       name: names.tenRutGon || names.tenQH || '',
       fullName: names.tenQH || '',
-      ward: Array.isArray(p.wards) ? p.wards.filter(Boolean).join(', ') : '',
+      ward: wards.length ? wards.join(', ') : (Array.isArray(p.wards) ? p.wards.filter(Boolean).join(', ') : ''),
+      wards,
       scale: LEVEL_SCALE[level] || level || '',
       level,
       areaHa: ha,
@@ -208,6 +305,49 @@ export function catalogStatusStats(rows) {
     else byLevel.khac += 1;
   }
   return { byStatus: by, byLevel, total: (rows || []).length };
+}
+
+/**
+ * Số đồ án theo 40 phường/xã, tách QHC / QHPK / QHCT (cột chồng).
+ * Đồ án nhiều phường được đếm ở mỗi phường; đồ án không gán được → unmatched.
+ */
+export function catalogWardLevelStats(rows, wardNames = WARD_NAMES) {
+  const names = (Array.isArray(wardNames) && wardNames.length ? wardNames : WARD_NAMES).slice();
+  const idx = new Map(names.map((n, i) => [n, i]));
+  const qhc = names.map(() => 0);
+  const qhpk = names.map(() => 0);
+  const qhct = names.map(() => 0);
+  let unmatched = 0;
+  for (const r of rows || []) {
+    const level = String(r.level || '').toUpperCase();
+    if (!LEVEL_KEYS.includes(level)) continue;
+    const list = Array.isArray(r.wards) && r.wards.length
+      ? r.wards
+      : resolvePlanWards(
+        { dvhc: r.ward, diaDiem: r.ward, ten: r.name },
+        { wards: r.wards, tenQH: r.fullName },
+        names
+      );
+    if (!list.length) {
+      unmatched += 1;
+      continue;
+    }
+    const bucket = level === 'QHC' ? qhc : level === 'QHPK' ? qhpk : qhct;
+    for (const w of list) {
+      const i = idx.get(w);
+      if (i == null) continue;
+      bucket[i] += 1;
+    }
+  }
+  return {
+    labels: names.map(shortWardLabel),
+    fullNames: names,
+    qhc,
+    qhpk,
+    qhct,
+    unmatched,
+    total: (rows || []).length
+  };
 }
 
 export function rowsToCsv(rows, source = 'plan') {

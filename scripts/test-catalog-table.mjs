@@ -1,9 +1,11 @@
 import assert from 'assert';
 import {
   planRowsFromCatalog, planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
-  filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats
+  filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
+  catalogWardLevelStats, matchCatalogWard, resolvePlanWards
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName } from '../public/js/soTayMatch.js';
+import { WARD_NAMES } from '../public/js/facetStore.js';
 
 assert.equal(filterKeyFromMapLevel('qhpk'), 'QHPK');
 assert.equal(filterKeyFromMapLevel('qhct'), 'QHCT');
@@ -43,13 +45,13 @@ const sheet = [
 const catalog = [
   {
     tenQH: 'QHCT Đàn Nam Giao và vùng phụ cận',
-    wards: ['Thuận Hóa'],
+    wards: ['Phường Thuận Hóa'],
     boundary: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
     decision: { name: '23/QĐ-UBND' }
   },
   {
     tenQH: 'QHPK chỉ trên bản đồ ABC',
-    wards: ['An Cựu'],
+    wards: ['Phường An Cựu'],
     boundary: null,
     legacy: true
   }
@@ -95,6 +97,20 @@ assert.match(csv, /Đàn Nam Giao/);
 const stats = catalogStatusStats(merged);
 assert.ok(stats.total >= 3);
 assert.ok(stats.byStatus.du >= 1);
+
+assert.equal(matchCatalogWard('Phường An Cựu'), 'Phường An Cựu');
+assert.equal(matchCatalogWard('An Cựu'), 'Phường An Cựu');
+assert.ok(resolvePlanWards({ ten: 'QHPK phường Kim Long' }, null).includes('Phường Kim Long'));
+assert.ok(nam.wards.includes('Phường Thuận Hóa'));
+
+const wardStats = catalogWardLevelStats(merged);
+assert.equal(wardStats.labels.length, WARD_NAMES.length);
+assert.equal(wardStats.qhc.length, WARD_NAMES.length);
+const iThuan = WARD_NAMES.indexOf('Phường Thuận Hóa');
+const iAnCuu = WARD_NAMES.indexOf('Phường An Cựu');
+assert.ok(iThuan >= 0 && iAnCuu >= 0);
+assert.ok(wardStats.qhpk[iThuan] >= 1);
+assert.ok(wardStats.qhpk[iAnCuu] + wardStats.qhct[iAnCuu] + wardStats.qhc[iAnCuu] >= 1);
 
 assert.ok(catalogFilterOptions('plan').some(o => o.value === 'QHPK'));
 assert.ok(catalogFilterOptions('invest').some(o => o.value === 'dvtm'));
