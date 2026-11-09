@@ -2,7 +2,8 @@ import assert from 'assert';
 import {
   planRowsFromCatalog, planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
-  catalogWardLevelStats, matchCatalogWard, resolvePlanWards
+  catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
+  groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName } from '../public/js/soTayMatch.js';
 import { WARD_NAMES } from '../public/js/facetStore.js';
@@ -27,6 +28,7 @@ const sheet = [
     dienTichHa: 170,
     dienTichText: '170,00',
     quyetDinh: '23/QĐ-UBND',
+    ngay: '18/11/2013',
     linkGis: 'http://example',
     soDccb: 6
   },
@@ -38,6 +40,19 @@ const sheet = [
     dienTichHa: 12,
     dienTichText: '12,00',
     quyetDinh: '1/QĐ',
+    ngay: '04/06/2024',
+    linkGis: '',
+    soDccb: 0
+  },
+  {
+    ma: 'TH.A.001',
+    ten: 'QHC thử nhóm A',
+    cap: 'QHC',
+    dvhc: 'Phường An Cựu',
+    dienTichHa: 50,
+    dienTichText: '50,00',
+    quyetDinh: '2/QĐ',
+    ngay: '01/01/2020',
     linkGis: '',
     soDccb: 0
   }
@@ -80,7 +95,8 @@ const plans = planRowsFromCatalog([
 ]);
 assert.equal(plans.length, 2);
 assert.equal(filterCatalogRows(plans, { level: 'QHPK' }).length, 1);
-assert.equal(filterCatalogRows(merged, { status: 'chi_so_tay' }).length, 1);
+assert.ok(filterCatalogRows(merged, { status: 'chi_so_tay' }).length >= 1);
+assert.equal(missingMap.status, 'chi_so_tay');
 
 const invest = investRowsFromItems([
   { id: 'a', title: 'Dự án X', sheet: { 'Địa điểm': 'Phường Đúc', 'Lĩnh vực': 'Du lịch' }, hasBoundary: true, areaText: '12 ha', dtGroup: 'dvtm' },
@@ -114,5 +130,19 @@ assert.ok(wardStats.qhpk[iAnCuu] + wardStats.qhct[iAnCuu] + wardStats.qhc[iAnCuu
 
 assert.ok(catalogFilterOptions('plan').some(o => o.value === 'QHPK'));
 assert.ok(catalogFilterOptions('invest').some(o => o.value === 'dvtm'));
+assert.equal(planYearOf('18/11/2013'), 2013);
+assert.equal(nam.year, 2013);
+
+const yearStats = catalogYearLevelStats(merged);
+assert.ok(yearStats.labels.includes('2013'));
+assert.ok(yearStats.qhpk[yearStats.labels.indexOf('2013')] >= 1);
+
+assert.ok(catalogWardFilterOptions().some(o => o.value === 'Phường An Cựu'));
+assert.equal(filterCatalogRows(merged, { ward: 'Phường Thuận Hóa' }).length >= 1, true);
+
+const grouped = groupPlanRowsByLevel(merged);
+assert.equal(grouped[0].type, 'group');
+assert.equal(grouped[0].label, 'A. QHC');
+assert.ok(grouped.some(g => g.type === 'group' && g.label === 'B. QHPK'));
 
 console.log('test-catalog-table: ok');

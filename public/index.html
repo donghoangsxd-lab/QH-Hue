@@ -1508,12 +1508,13 @@
       <div id="projectReviewHost"></div>
       <!-- Chế độ danh mục: B mở đồ án, F mở dự án — không chung tab nguồn; full màn hình qua bottom-max -->
       <div id="catalogTableHost" class="catalog-table-host" hidden>
-        <header class="catalog-toolbar">
+        <header class="catalog-toolbar bp-part-head catalog-table-head">
           <b class="catalog-toolbar-title" id="catalogTableTitle">DANH MỤC</b>
           <div class="catalog-toolbar-filters">
             <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, đơn vị, quyết định…" aria-label="Tìm trong danh mục">
             <select id="catalogFilter" class="catalog-filter" aria-label="Lọc theo cấp"></select>
             <select id="catalogStatusFilter" class="catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>
+            <select id="catalogWardFilter" class="catalog-filter" aria-label="Lọc theo phường xã" hidden></select>
             <span class="catalog-count" id="catalogCount" aria-live="polite"></span>
           </div>
           <div class="catalog-toolbar-actions" data-html2canvas-ignore="true">
@@ -1523,17 +1524,33 @@
             <button type="button" class="bp-btn bp-icon" id="btnCatalogClose" title="Đóng bảng danh mục" aria-label="Đóng bảng danh mục"><svg class="ico"><use href="#i-close"/></svg></button>
           </div>
         </header>
+        <!-- Mặc định dock: 2 khối chart (pie | cột năm) như bảng HT toàn TP; ward chart chỉ khi bottom-max -->
         <div class="catalog-charts" id="catalogCharts" hidden>
           <div class="catalog-chart-top">
-            <div class="catalog-chart-card">
-              <div class="catalog-chart-title">Trạng thái đối soát</div>
-              <div class="catalog-chart-wrap"><canvas id="catalogStatusChart" aria-label="Biểu đồ trạng thái đồ án"></canvas></div>
+            <div class="catalog-chart-pies">
+              <div class="catalog-chart-card">
+                <div class="catalog-chart-title">Trạng thái đối soát</div>
+                <div class="catalog-chart-wrap"><canvas id="catalogStatusChart" aria-label="Biểu đồ trạng thái đồ án"></canvas></div>
+              </div>
+              <div class="catalog-chart-card">
+                <div class="catalog-chart-title">Theo cấp quy hoạch</div>
+                <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
+              </div>
             </div>
-            <div class="catalog-chart-card">
-              <div class="catalog-chart-title">Theo cấp quy hoạch</div>
-              <div class="catalog-chart-wrap"><canvas id="catalogLevelChart" aria-label="Biểu đồ cấp quy hoạch"></canvas></div>
+            <div class="catalog-chart-year">
+              <div class="catalog-chart-year-head">
+                <div class="catalog-chart-title">Số đồ án theo năm phê duyệt</div>
+                <div class="catalog-ward-legend" aria-hidden="true">
+                  <span class="catalog-ward-leg catalog-ward-leg-qhc">QHC</span>
+                  <span class="catalog-ward-leg catalog-ward-leg-qhpk">QHPK</span>
+                  <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
+                </div>
+              </div>
+              <div class="catalog-chart-summary" id="catalogChartSummary"></div>
+              <div class="catalog-chart-wrap catalog-chart-wrap-year">
+                <canvas id="catalogYearChart" aria-label="Biểu đồ cột chồng số đồ án theo năm phê duyệt, tách QHC QHPK QHCT"></canvas>
+              </div>
             </div>
-            <div class="catalog-chart-summary" id="catalogChartSummary"></div>
           </div>
           <div class="catalog-chart-ward">
             <div class="catalog-chart-ward-head">

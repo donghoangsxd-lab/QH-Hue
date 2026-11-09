@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, loadHtml2Pdf, inlineSpriteIcons } from './utils.js';
 import {
-  setBottomPanelCollapsed, toggleBottomPanelMaximized
+  setBottomPanelCollapsed, setBottomPanelMaximized, toggleBottomPanelMaximized
 } from './uiComponents.js';
 import { loadCatalog, projectAreaOf } from './projectFiles.js';
 import { openProjectByName } from './projectLayer.js';
@@ -11,8 +11,9 @@ import {
 } from './investLayer.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
-  catalogFilterOptions, catalogStatusOptions, catalogStatusStats, catalogWardLevelStats,
-  rowsToCsv, downloadCsv, STATUS
+  catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
+  catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
+  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS
 } from './catalogTableCore.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,6 +23,7 @@ const SO_TAY_URL = './data/qh-so-tay.json?v=20261108a';
 let source = 'plan';
 let filterLevel = '';
 let filterStatus = '';
+let filterWard = '';
 let query = '';
 let rowsCache = [];
 let visibleRows = [];
@@ -31,6 +33,7 @@ let pdfBusy = false;
 let ready = false;
 let statusChart = null;
 let levelChart = null;
+let yearChart = null;
 let wardChart = null;
 
 function host() { return $('catalogTableHost'); }
@@ -55,9 +58,11 @@ function paintChrome() {
   const colName = $('catalogColName');
   const colScale = $('catalogColScale');
   const statusFilter = $('catalogStatusFilter');
+  const wardFilter = $('catalogWardFilter');
   const charts = $('catalogCharts');
   const planOnly = source === 'plan';
   if (statusFilter) statusFilter.hidden = !planOnly;
+  if (wardFilter) wardFilter.hidden = !planOnly;
   if (charts) charts.hidden = !planOnly;
   if (source === 'invest') {
     if (title) title.textContent = 'DANH MỤC DỰ ÁN ĐẦU TƯ';
@@ -121,6 +126,18 @@ function paintFilterOptions() {
       st.value = '';
     }
   }
+  const wd = $('catalogWardFilter');
+  if (wd && source === 'plan') {
+    const opts = catalogWardFilterOptions();
+    const cur = filterWard;
+    wd.innerHTML = opts.map(o =>
+      `<option value="${escapeHtml(o.value)}"${o.value === cur ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
+    ).join('');
+    if (![...wd.options].some(o => o.value === cur)) {
+      filterWard = '';
+      wd.value = '';
+    }
+  }
 }
 
 async function loadSoTay() {
@@ -179,9 +196,29 @@ function displayName(r) {
   return ma || '—';
 }
 
+function planRowHtml(r, stt) {
+  const name = displayName(r);
+  const bound = r.hasBoundary
+    ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
+    : `<span class="catalog-bound-no">Chưa</span>`;
+  return `<tr data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
+    <td class="st-num">${stt}</td>
+    <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+    <td class="st-name" title="${escapeHtml(r.ward || '')}">${escapeHtml(r.ward || '—')}</td>
+    <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
+    <td class="catalog-area">${escapeHtml(r.areaText || '—')}</td>
+    <td>${statusChip(r)}</td>
+    <td>${bound}</td>
+    <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
+  </tr>`;
+}
+
 function paintTable() {
   visibleRows = filterCatalogRows(rowsCache, {
-    query, level: filterLevel, status: source === 'plan' ? filterStatus : ''
+    query,
+    level: filterLevel,
+    status: source === 'plan' ? filterStatus : '',
+    ward: source === 'plan' ? filterWard : ''
   });
   const body = $('catalogTableBody');
   const count = $('catalogCount');
@@ -195,22 +232,19 @@ function paintTable() {
     return;
   }
   if (source === 'plan') {
-    body.innerHTML = visibleRows.map((r, i) => {
-      const name = displayName(r);
-      const bound = r.hasBoundary
-        ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
-        : `<span class="catalog-bound-no">Chưa</span>`;
-      return `<tr data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
-        <td class="st-num">${i + 1}</td>
-        <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
-        <td class="st-name" title="${escapeHtml(r.ward || '')}">${escapeHtml(r.ward || '—')}</td>
-        <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
-        <td class="catalog-area">${escapeHtml(r.areaText || '—')}</td>
-        <td>${statusChip(r)}</td>
-        <td>${bound}</td>
-        <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
-      </tr>`;
-    }).join('');
+    const parts = [];
+    let stt = 0;
+    for (const item of groupPlanRowsByLevel(visibleRows)) {
+      if (item.type === 'group') {
+        parts.push(
+          `<tr class="catalog-group-row"><td colspan="8">${escapeHtml(item.label)} (${item.count})</td></tr>`
+        );
+        continue;
+      }
+      stt += 1;
+      parts.push(planRowHtml(item.row, stt));
+    }
+    body.innerHTML = parts.join('');
   } else {
     body.innerHTML = visibleRows.map((r, i) => {
       const name = displayName(r);
@@ -233,6 +267,7 @@ function paintTable() {
 function destroyCharts() {
   if (statusChart) { statusChart.destroy(); statusChart = null; }
   if (levelChart) { levelChart.destroy(); levelChart = null; }
+  if (yearChart) { yearChart.destroy(); yearChart = null; }
   if (wardChart) { wardChart.destroy(); wardChart = null; }
 }
 
@@ -246,14 +281,90 @@ function shortWardTick(name) {
   return `${parts.join('-')}-${tail.map((w) => w[0] + '.').join('')}${last}`;
 }
 
+function stackedBarOpts({ tickColor, xTick }) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 6, right: 4, bottom: 2, left: 0 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: (item) => ` ${item.dataset.label}: ${item.parsed.y || 0}`,
+          footer: (items) => {
+            const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0);
+            return `Tổng: ${total}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        ticks: {
+          autoSkip: true,
+          maxRotation: 45,
+          minRotation: 0,
+          color: tickColor,
+          font: { size: 10 },
+          ...(xTick || {})
+        },
+        grid: { color: 'rgba(255,255,255,0.05)' }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        ticks: { color: '#94a3b8', precision: 0, font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.05)' }
+      }
+    }
+  };
+}
+
+function levelStackDatasets(stats, extra = {}) {
+  return [
+    {
+      label: 'QHC',
+      data: stats.qhc,
+      backgroundColor: '#38bdf8',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      ...extra
+    },
+    {
+      label: 'QHPK',
+      data: stats.qhpk,
+      backgroundColor: '#f59e0b',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      ...extra
+    },
+    {
+      label: 'QHCT',
+      data: stats.qhct,
+      backgroundColor: '#a78bfa',
+      stack: 'plan',
+      barPercentage: 0.9,
+      categoryPercentage: 0.85,
+      ...extra
+    }
+  ];
+}
+
 function paintCharts() {
   const wrap = $('catalogCharts');
   if (!wrap || source !== 'plan' || typeof Chart === 'undefined') {
     destroyCharts();
     return;
   }
-  const stats = catalogStatusStats(rowsCache);
-  const wardStats = catalogWardLevelStats(rowsCache);
+  const chartRows = visibleRows.length ? visibleRows : rowsCache;
+  const stats = catalogStatusStats(chartRows);
+  const yearStats = catalogYearLevelStats(chartRows);
+  const wardStats = catalogWardLevelStats(chartRows);
   const statusOrder = ['du', 'thieu', 'chi_so_tay', 'chi_ban_do'];
   const statusLabels = statusOrder.map((id) => STATUS[id].short);
   const statusColors = statusOrder.map((id) => STATUS[id].color);
@@ -282,8 +393,9 @@ function paintCharts() {
 
   const sCanvas = $('catalogStatusChart');
   const lCanvas = $('catalogLevelChart');
+  const yCanvas = $('catalogYearChart');
   const wCanvas = $('catalogWardChart');
-  if (!sCanvas || !lCanvas || !wCanvas) return;
+  if (!sCanvas || !lCanvas || !yCanvas) return;
 
   const common = {
     responsive: true,
@@ -328,88 +440,44 @@ function paintCharts() {
     });
   }
 
-  const wardDatasets = [
-    {
-      label: 'QHC',
-      data: wardStats.qhc,
-      backgroundColor: '#38bdf8',
-      stack: 'plan',
-      barPercentage: 0.9,
-      categoryPercentage: 0.85,
-      fullNames: wardStats.fullNames
-    },
-    {
-      label: 'QHPK',
-      data: wardStats.qhpk,
-      backgroundColor: '#f59e0b',
-      stack: 'plan',
-      barPercentage: 0.9,
-      categoryPercentage: 0.85,
-      fullNames: wardStats.fullNames
-    },
-    {
-      label: 'QHCT',
-      data: wardStats.qhct,
-      backgroundColor: '#a78bfa',
-      stack: 'plan',
-      barPercentage: 0.9,
-      categoryPercentage: 0.85,
-      fullNames: wardStats.fullNames
-    }
-  ];
-
   const tickColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1';
-  const wardOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { top: 8, right: 4, bottom: 2, left: 0 } },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-        callbacks: {
-          title: (items) => {
-            const i = items[0]?.dataIndex ?? 0;
-            return wardStats.fullNames[i] || wardStats.labels[i] || '';
-          },
-          label: (item) => {
-            const n = item.parsed.y || 0;
-            return ` ${item.dataset.label}: ${n}`;
-          },
-          footer: (items) => {
-            const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0);
-            return `Tổng: ${total}`;
-          }
-        }
-      }
-    },
-    scales: {
-      x: {
-        stacked: true,
-        ticks: {
-          autoSkip: false,
-          minRotation: 45,
-          maxRotation: 45,
-          callback(value) {
-            return shortWardTick(this.getLabelForValue(value));
-          },
-          color: tickColor,
-          font: { size: 10 }
-        },
-        grid: { color: 'rgba(255,255,255,0.05)' }
-      },
-      y: {
-        stacked: true,
-        beginAtZero: true,
-        ticks: {
-          color: '#94a3b8',
-          precision: 0,
-          font: { size: 11 }
-        },
-        grid: { color: 'rgba(255,255,255,0.05)' }
+  const yearDatasets = levelStackDatasets(yearStats);
+  const yearOpts = stackedBarOpts({ tickColor });
+
+  if (yearChart && yearChart.canvas === yCanvas) {
+    yearChart.data.labels = yearStats.labels;
+    yearChart.data.datasets.forEach((ds, i) => { ds.data = yearDatasets[i].data; });
+    yearChart.update();
+  } else {
+    if (yearChart) yearChart.destroy();
+    yearChart = new Chart(yCanvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: yearStats.labels, datasets: yearDatasets },
+      options: yearOpts
+    });
+  }
+
+  const showWard = document.body.classList.contains('bottom-max') && wCanvas;
+  if (!showWard) {
+    if (wardChart) { wardChart.destroy(); wardChart = null; }
+    return;
+  }
+
+  const wardDatasets = levelStackDatasets(wardStats, { fullNames: wardStats.fullNames });
+  const wardOpts = stackedBarOpts({
+    tickColor,
+    xTick: {
+      autoSkip: false,
+      minRotation: 45,
+      maxRotation: 45,
+      callback(value) {
+        return shortWardTick(this.getLabelForValue(value));
       }
     }
+  });
+  wardOpts.plugins.tooltip.callbacks.title = (items) => {
+    const i = items[0]?.dataIndex ?? 0;
+    return wardStats.fullNames[i] || wardStats.labels[i] || '';
   };
 
   if (wardChart && wardChart.canvas === wCanvas) {
@@ -440,6 +508,7 @@ export async function openCatalogTable(opts = {}) {
   source = opts.source === 'invest' ? 'invest' : 'plan';
   query = '';
   filterStatus = '';
+  filterWard = '';
   const search = $('catalogSearch');
   if (search) search.value = '';
   if (source === 'plan') {
@@ -451,6 +520,8 @@ export async function openCatalogTable(opts = {}) {
       : '';
   }
   setCatalogMode(true);
+  // Mặc định dock ~1/5 như bảng HT toàn TP (2 chart); maximize chỉ khi bấm nút phóng.
+  setBottomPanelMaximized(false);
   setBottomPanelCollapsed(false);
   await refresh();
   syncMaxBtn();
@@ -533,11 +604,21 @@ export function initCatalogTable() {
     filterStatus = e.target.value || '';
     paintTable();
   });
+  $('catalogWardFilter')?.addEventListener('change', (e) => {
+    filterWard = e.target.value || '';
+    paintTable();
+  });
   $('btnCatalogExportCsv')?.addEventListener('click', exportCsv);
   $('btnCatalogExportPdf')?.addEventListener('click', () => { void exportPdf(); });
   $('btnCatalogMax')?.addEventListener('click', () => {
     toggleBottomPanelMaximized();
     syncMaxBtn();
+    requestAnimationFrame(() => {
+      statusChart?.resize();
+      levelChart?.resize();
+      yearChart?.resize();
+      paintCharts();
+    });
   });
   $('btnCatalogClose')?.addEventListener('click', () => {
     closeCatalogTable();

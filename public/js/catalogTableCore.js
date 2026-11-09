@@ -23,6 +23,33 @@ const LEVEL_SCALE = {
 };
 
 const LEVEL_KEYS = ['QHC', 'QHPK', 'QHCT'];
+const LEVEL_RANK = { QHC: 0, QHPK: 1, QHCT: 2 };
+const LEVEL_GROUP_LABEL = {
+  QHC: 'A. QHC',
+  QHPK: 'B. QHPK',
+  QHCT: 'C. QHCT'
+};
+
+/** Năm phê duyệt từ cột ngày sổ tay (dd/mm/yyyy). */
+export function planYearOf(ngay) {
+  const raw = String(ngay || '').trim();
+  const m = raw.match(/(\d{1,2})\/(\d{1,2})\/(19\d{2}|20\d{2})/);
+  if (!m) return null;
+  const y = Number(m[3]);
+  return (y >= 1990 && y <= 2035) ? y : null;
+}
+
+function levelRank(level) {
+  return Object.prototype.hasOwnProperty.call(LEVEL_RANK, level) ? LEVEL_RANK[level] : 9;
+}
+
+function sortPlanRows(rows) {
+  return rows.sort((a, b) => {
+    const d = levelRank(a.level) - levelRank(b.level);
+    if (d) return d;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+  });
+}
 
 function haystack(value) {
   return String(value || '')
@@ -168,6 +195,7 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       wards,
       scale: LEVEL_SCALE[level] || level || '',
       level,
+      year: planYearOf(item.ngay),
       areaHa: item.dienTichHa,
       areaText: item.dienTichText || formatHa(item.dienTichHa),
       status,
@@ -202,6 +230,7 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       wards,
       scale: LEVEL_SCALE[level] || level || '',
       level,
+      year: null,
       areaHa: ha,
       areaText: formatHa(ha),
       status,
@@ -216,7 +245,7 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     });
   }
 
-  return rows.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  return sortPlanRows(rows);
 }
 
 /** Giữ API cũ: chỉ catalog webapp (không sổ tay). */
@@ -261,17 +290,26 @@ export function investRowsFromItems(items) {
   }).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
 
-export function filterCatalogRows(rows, { query = '', level = '', status = '' } = {}) {
+export function filterCatalogRows(rows, { query = '', level = '', status = '', ward = '' } = {}) {
   const q = String(query || '').trim().toLowerCase();
   const lv = String(level || '').trim();
   const st = String(status || '').trim();
-  return (rows || []).filter(r => {
+  const wd = String(ward || '').trim();
+  const filtered = (rows || []).filter(r => {
     if (lv && r.level !== lv) return false;
     if (st && r.status !== st) return false;
+    if (wd) {
+      const list = Array.isArray(r.wards) ? r.wards : [];
+      if (!list.includes(wd) && matchCatalogWard(r.ward) !== wd) return false;
+    }
     if (!q) return true;
     const blob = `${r.name} ${r.fullName} ${r.ward} ${r.scale} ${r.statusLabel} ${r.note} ${r.quyetDinh || ''}`.toLowerCase();
     return blob.includes(q);
   });
+  if (filtered.some((r) => r.source === 'plan' || LEVEL_KEYS.includes(r.level))) {
+    return sortPlanRows(filtered.slice());
+  }
+  return filtered;
 }
 
 export function catalogFilterOptions(source) {
@@ -282,10 +320,38 @@ export function catalogFilterOptions(source) {
   }
   return [
     { value: '', label: 'Tất cả cấp' },
-    { value: 'QHC', label: 'QHC' },
-    { value: 'QHPK', label: 'QHPK 1/2.000' },
-    { value: 'QHCT', label: 'QHCT 1/500' }
+    { value: 'QHC', label: 'A. QHC' },
+    { value: 'QHPK', label: 'B. QHPK 1/2.000' },
+    { value: 'QHCT', label: 'C. QHCT 1/500' }
   ];
+}
+
+export function catalogWardFilterOptions(wardNames = WARD_NAMES) {
+  const names = Array.isArray(wardNames) ? wardNames : WARD_NAMES;
+  return [
+    { value: '', label: 'Tất cả phường / xã' },
+    ...names.map((n) => ({ value: n, label: shortWardLabel(n) }))
+  ];
+}
+
+/** Nhóm bảng mặc định A. QHC → B. QHPK → C. QHCT (và «Khác» nếu còn). */
+export function groupPlanRowsByLevel(rows) {
+  const buckets = { QHC: [], QHPK: [], QHCT: [], khac: [] };
+  for (const r of rows || []) {
+    if (LEVEL_KEYS.includes(r.level)) buckets[r.level].push(r);
+    else buckets.khac.push(r);
+  }
+  const out = [];
+  for (const id of LEVEL_KEYS) {
+    if (!buckets[id].length) continue;
+    out.push({ type: 'group', id, label: LEVEL_GROUP_LABEL[id], count: buckets[id].length });
+    for (const r of buckets[id]) out.push({ type: 'row', row: r });
+  }
+  if (buckets.khac.length) {
+    out.push({ type: 'group', id: 'khac', label: 'Khác', count: buckets.khac.length });
+    for (const r of buckets.khac) out.push({ type: 'row', row: r });
+  }
+  return out;
 }
 
 export function catalogStatusOptions() {
@@ -346,6 +412,33 @@ export function catalogWardLevelStats(rows, wardNames = WARD_NAMES) {
     qhpk,
     qhct,
     unmatched,
+    total: (rows || []).length
+  };
+}
+
+/** Cột chồng số đồ án theo năm phê duyệt × QHC/QHPK/QHCT. */
+export function catalogYearLevelStats(rows) {
+  const byYear = new Map();
+  let unknown = 0;
+  for (const r of rows || []) {
+    const level = String(r.level || '').toUpperCase();
+    if (!LEVEL_KEYS.includes(level)) continue;
+    const y = Number.isFinite(r.year) ? r.year : planYearOf(r.ngay);
+    if (!y) {
+      unknown += 1;
+      continue;
+    }
+    if (!byYear.has(y)) byYear.set(y, { QHC: 0, QHPK: 0, QHCT: 0 });
+    byYear.get(y)[level] += 1;
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  return {
+    labels: years.map(String),
+    years,
+    qhc: years.map((y) => byYear.get(y).QHC),
+    qhpk: years.map((y) => byYear.get(y).QHPK),
+    qhct: years.map((y) => byYear.get(y).QHCT),
+    unknown,
     total: (rows || []).length
   };
 }
