@@ -8,9 +8,22 @@ import {
 import { WARD_NAMES } from './facetStore.js';
 import { bareName } from './urbanStatus.js';
 
+/** Đếm lớp bản đồ đang có trên entry catalog (ranh + lô + nets) — không tải file, an toàn cho test Node. */
+export function layerCountOfCatalogProject(p) {
+  if (!p) return 0;
+  let n = 0;
+  if (p.boundary) n += 1;
+  if (Number(p.lands) > 0 || Number(p.infra) > 0) n += 1;
+  const nets = p.nets && typeof p.nets === 'object' ? p.nets : {};
+  for (const v of Object.values(nets)) {
+    if (Number(v) > 0) n += 1;
+  }
+  return n;
+}
+
 export const CATALOG_HEADERS_PLAN = [
   'STT', 'Mã', 'Tên quy hoạch', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
-  'Diện tích (ha)', 'Dân số', 'Trạng thái', 'Ranh'
+  'Diện tích (ha)', 'Dân số', 'Ranh'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
@@ -212,6 +225,7 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     if (item.ghiChu) notes.push(item.ghiChu);
     const wards = resolvePlanWards(item, p);
     const children = mapChildren(item.children);
+    const zoomKey = hasBoundary ? (names.tenQH || '') : '';
     rows.push({
       id: item.ma,
       source: 'plan',
@@ -230,8 +244,9 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
+      layerCount: hasBoundary ? layerCountOfCatalogProject(p) : 0,
       note: notes.join(' · '),
-      zoomKey: hasBoundary ? (names.tenQH || '') : '',
+      zoomKey,
       maDoAn: item.ma,
       quyetDinh: item.quyetDinh || '',
       linkGis: item.linkGis || '',
@@ -252,6 +267,7 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     notes.push('Có trên bản đồ, chưa thấy trong sổ tay');
     if (p.legacy) notes.push('Đồ án cũ');
     const wards = resolvePlanWards(null, p);
+    const zoomKey = hasBoundary ? (names.tenQH || '') : '';
     rows.push({
       id: `web:${p.slug || names.tenQH}`,
       source: 'plan',
@@ -270,8 +286,9 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
+      layerCount: hasBoundary ? layerCountOfCatalogProject(p) : 0,
       note: notes.join(' · '),
-      zoomKey: hasBoundary ? (names.tenQH || '') : '',
+      zoomKey,
       maDoAn: '',
       quyetDinh: p.decision?.name || '',
       linkGis: '',
@@ -497,6 +514,9 @@ export function rowsToCsv(rows, source = 'plan') {
     });
     return `\uFEFF${lines.join('\r\n')}`;
   }
+  const ranhLabel = (r) => (r.hasBoundary
+    ? `Có (${Number(r.layerCount) || 0})`
+    : 'Chưa có');
   const lines = [CATALOG_HEADERS_PLAN.join(',')];
   let stt = 0;
   for (const r of rows || []) {
@@ -511,8 +531,7 @@ export function rowsToCsv(rows, source = 'plan') {
       r.coQuan || '',
       r.areaText || '',
       r.danSo || '',
-      r.statusLabel || '',
-      r.hasBoundary ? 'Có' : 'Chưa'
+      ranhLabel(r)
     ].map(escape).join(','));
     for (const c of r.children || []) {
       lines.push([
@@ -525,8 +544,7 @@ export function rowsToCsv(rows, source = 'plan') {
         c.coQuan || '',
         c.dienTichText || '',
         c.danSo || '',
-        c.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB',
-        ''
+        c.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB'
       ].map(escape).join(','));
     }
   }
@@ -548,7 +566,7 @@ export function downloadCsv(filename, csvText) {
 }
 
 export function emptySoTayEdits() {
-  return { v: 1, saved: 0, projects: [], dccb: [] };
+  return { v: 1, saved: 0, projects: [], dccb: [], links: [], patches: [] };
 }
 
 /** Gộp bản ghi admin thêm vào danh sách sổ tay gốc (không đụng file tĩnh). */
@@ -614,6 +632,34 @@ export function mergeSoTayEdits(items, edits) {
     });
     parent.soDccb = parent.children.filter((c) => c.loaiDong === 'dccb').length;
     parent.soDinhChinh = parent.children.filter((c) => c.loaiDong === 'dinh_chinh').length;
+  }
+  // Admin gán ranh sổ tay ↔ tenQH trên bản đồ (nút «Chưa») — ghi mapTenQH sau khi gom projects.
+  for (const row of pack.links || []) {
+    const ma = String(row?.ma || '').trim();
+    const tenQH = String(row?.tenQH || '').trim();
+    const parent = byMa.get(ma);
+    if (parent && tenQH) parent.mapTenQH = tenQH;
+  }
+  // Admin sửa tên / PX / QĐ / DT / dân số trên dòng sổ tay hiện có (không đụng file tĩnh).
+  for (const row of pack.patches || []) {
+    const ma = String(row?.ma || '').trim();
+    const parent = byMa.get(ma);
+    if (!parent) continue;
+    if (row.ten != null) parent.ten = String(row.ten || '').trim();
+    if (row.dvhc != null) {
+      parent.dvhc = String(row.dvhc || '').trim();
+      parent.diaDiem = parent.dvhc;
+    }
+    if (row.quyetDinh != null) parent.quyetDinh = String(row.quyetDinh || '').trim();
+    if (row.dienTichText != null || row.dienTichHa != null) {
+      if (row.dienTichText != null) parent.dienTichText = String(row.dienTichText || '').trim();
+      parent.dienTichHa = Number.isFinite(row.dienTichHa) ? row.dienTichHa : null;
+    }
+    if (row.danSo != null) parent.danSo = String(row.danSo || '').trim();
+    const note = String(parent.ghiChu || '');
+    if (!/Sửa bởi admin/i.test(note)) {
+      parent.ghiChu = note ? `${note} · Sửa bởi admin` : 'Sửa bởi admin';
+    }
   }
   return list;
 }

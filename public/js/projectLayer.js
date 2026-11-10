@@ -414,6 +414,37 @@ export function openProjectByName(name) {
   return true;
 }
 
+/**
+ * Chỉ phóng + làm sáng ranh — không mở panel đồ án, không bật lô/HTKT (tránh lag từ bảng danh mục).
+ */
+export function zoomToProjectBoundary(name) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return false;
+  if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
+  const p = projects.find(x => x.name === wanted || x.slug === wanted || x.short === wanted);
+  if (!p) return false;
+  const b = boundsOf(p);
+  if (!b || !b.isValid() || !map) return false;
+
+  let needRedraw = false;
+  if (!kindOn(p.name)) {
+    turnKindOn(p, () => setMaster(true));
+    needRedraw = true;
+  }
+  if (state.hiddenProjects.delete(p.name)) {
+    saveHidden();
+    needRedraw = true;
+  }
+  if (needRedraw) redrawOutlines();
+
+  const view = planMap?.getContainer()?.offsetParent ? planMap : map;
+  view.fitBounds(b.pad(0.1), { maxZoom: 18 });
+  focusName = p.name;
+  drawFocus();
+  pinGlow(p);
+  return true;
+}
+
 export function listPlanCatalogProjects() {
   if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
   return projects.slice();

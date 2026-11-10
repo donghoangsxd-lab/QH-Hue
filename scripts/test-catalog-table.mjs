@@ -6,7 +6,7 @@ import {
   groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards,
   mergeSoTayEdits, nextDccbId
 } from '../public/js/catalogTableCore.js';
-import { nameScore, areaScore, classifyPlanStatus, foldPlanName } from '../public/js/soTayMatch.js';
+import { nameScore, areaScore, classifyPlanStatus, foldPlanName, matchSoTayToCatalog } from '../public/js/soTayMatch.js';
 import { WARD_NAMES } from '../public/js/facetStore.js';
 
 assert.equal(filterKeyFromMapLevel('qhpk'), 'QHPK');
@@ -84,6 +84,11 @@ const catalog = [
     wards: ['Phường An Cựu'],
     boundary: null,
     legacy: true
+  },
+  {
+    tenQH: 'QHPK Khu vực An Cựu',
+    wards: ['Phường An Cựu'],
+    boundary: { type: 'Polygon', coordinates: [[[2, 2], [3, 2], [3, 3], [2, 2]]] }
   }
 ];
 
@@ -123,9 +128,13 @@ assert.equal(filterCatalogRows(invest, { level: 'dvtm' }).length, 1);
 const csv = rowsToCsv(filterCatalogRows(merged, {}), 'plan');
 assert.match(csv, /Tên quy hoạch/);
 assert.match(csv, /Phường \/ xã/);
-assert.match(csv, /Trạng thái/);
+assert.match(csv, /Ranh/);
+assert.doesNotMatch(csv, /Trạng thái/);
 assert.match(csv, /Đàn Nam Giao/);
 assert.match(csv, /Phường Thuận Hóa/);
+assert.match(csv, /Có \(/);
+assert.ok(nam.hasBoundary === true);
+assert.ok(Number(nam.layerCount) >= 1);
 
 const stats = catalogStatusStats(merged);
 assert.ok(stats.total >= 3);
@@ -172,9 +181,33 @@ assert.ok(grouped.some(g => g.type === 'group' && g.label === 'B. QHPK'));
 
 const mergedEdits = mergeSoTayEdits(sheet, {
   projects: [{ ma: 'ZZ.B.001', ten: 'QHPK thử admin', cap: 'QHPK', quyetDinh: '1/QĐ', ngay: '01/01/2024', coQuan: 'UBND tỉnh', children: [] }],
-  dccb: [{ ma: 'TH.B.001', child: { id: nextDccbId('TH.B.001', nam.children), loaiDong: 'dccb', ten: 'ĐCCB thử', quyetDinh: '2/QĐ', ngay: '02/02/2024', coQuan: 'UBND tỉnh' } }]
+  dccb: [{ ma: 'TH.B.001', child: { id: nextDccbId('TH.B.001', nam.children), loaiDong: 'dccb', ten: 'ĐCCB thử', quyetDinh: '2/QĐ', ngay: '02/02/2024', coQuan: 'UBND tỉnh' } }],
+  links: [{ ma: 'TH.A.001', tenQH: 'QHPK Khu vực An Cựu' }],
+  patches: [{
+    ma: 'TH.A.001',
+    ten: 'QHC thử nhóm A (đã sửa)',
+    dvhc: 'Phường An Đông',
+    quyetDinh: '99/QĐ-UBND',
+    dienTichHa: 55,
+    dienTichText: '55,00',
+    danSo: '9.000'
+  }]
 });
 assert.ok(mergedEdits.some((r) => r.ma === 'ZZ.B.001'));
 assert.ok(mergedEdits.find((r) => r.ma === 'TH.B.001').children.some((c) => /ĐCCB thử/.test(c.ten)));
+assert.equal(mergedEdits.find((r) => r.ma === 'TH.A.001').mapTenQH, 'QHPK Khu vực An Cựu');
+const patched = mergedEdits.find((r) => r.ma === 'TH.A.001');
+assert.equal(patched.ten, 'QHC thử nhóm A (đã sửa)');
+assert.equal(patched.dvhc, 'Phường An Đông');
+assert.equal(patched.quyetDinh, '99/QĐ-UBND');
+assert.equal(patched.dienTichHa, 55);
+assert.equal(patched.danSo, '9.000');
+
+const forced = matchSoTayToCatalog(
+  [{ ma: 'TH.A.001', ten: 'Tên lệch hoàn toàn', cap: 'QHPK', mapTenQH: 'QHPK Khu vực An Cựu' }],
+  catalog
+);
+assert.equal(forced.matches.get('TH.A.001')?.project?.tenQH, 'QHPK Khu vực An Cựu');
+assert.equal(forced.matches.get('TH.A.001')?.forced, true);
 
 console.log('test-catalog-table: ok');

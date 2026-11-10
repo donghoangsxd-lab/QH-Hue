@@ -85,9 +85,27 @@ export function matchSoTayToCatalog(sheetItems, catalogProjects, opts = {}) {
   const used = new Set();
   const matches = new Map();
 
+  // Admin gán ranh thủ công (mapTenQH) — ưu tiên tuyệt đối trước ghép tên tự động.
+  for (const item of sheetItems || []) {
+    const forced = String(item?.mapTenQH || '').trim();
+    if (!forced) continue;
+    const idx = projects.findIndex((p) => p.tenQH === forced || p.slug === forced);
+    if (idx < 0) continue;
+    matches.set(item.ma, {
+      project: projects[idx],
+      score: 1,
+      nameScore: 1,
+      areaScore: null,
+      forced: true
+    });
+    used.add(idx);
+  }
+
   const scored = [];
   for (const item of sheetItems || []) {
+    if (matches.has(item.ma)) continue;
     for (let i = 0; i < projects.length; i++) {
+      if (used.has(i)) continue;
       const p = projects[i];
       const ns = nameScore(item.ten, p.tenQH);
       if (ns < minName) continue;

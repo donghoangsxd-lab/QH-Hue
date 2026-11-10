@@ -1571,7 +1571,6 @@
                 <th>Cấp phê duyệt</th>
                 <th>Diện tích</th>
                 <th>Dân số</th>
-                <th>Trạng thái</th>
                 <th>Ranh</th>
               </tr>
             </thead>
@@ -1590,32 +1589,37 @@
               <label class="catalog-edit-field" data-edit="project">Mã đồ án
                 <input type="text" id="catalogEditMa" maxlength="32" placeholder="VD: TH.B.099" required>
               </label>
-              <label class="catalog-edit-field" data-edit="project">Cấp quy hoạch
+              <label class="catalog-edit-field" data-edit="project-only">Cấp quy hoạch
                 <select id="catalogEditCap">
                   <option value="QHC">QHC</option>
                   <option value="QHPK" selected>QHPK</option>
                   <option value="QHCT">QHCT</option>
                 </select>
               </label>
-              <label class="catalog-edit-field catalog-edit-span">Tên quy hoạch / ĐCCB
+              <label class="catalog-edit-field catalog-edit-span" data-edit="facts">Tên quy hoạch / ĐCCB
                 <input type="text" id="catalogEditTen" maxlength="240" required>
               </label>
-              <label class="catalog-edit-field">Số quyết định
+              <label class="catalog-edit-field catalog-edit-span" data-edit="link" hidden>Ranh đồ án trên bản đồ
+                <select id="catalogEditBound" aria-label="Chọn ranh đồ án đã có">
+                  <option value="">— Chọn ranh đồ án —</option>
+                </select>
+              </label>
+              <label class="catalog-edit-field" data-edit="facts">Số quyết định
                 <input type="text" id="catalogEditQd" maxlength="80" placeholder="VD: 432/QĐ-UBND">
               </label>
-              <label class="catalog-edit-field">Ngày ban hành
+              <label class="catalog-edit-field" data-edit="meta">Ngày ban hành
                 <input type="text" id="catalogEditNgay" maxlength="20" placeholder="dd/mm/yyyy">
               </label>
-              <label class="catalog-edit-field">Cấp phê duyệt
+              <label class="catalog-edit-field" data-edit="meta">Cấp phê duyệt
                 <input type="text" id="catalogEditCoQuan" maxlength="80" placeholder="UBND tỉnh / UBND thành phố…">
               </label>
-              <label class="catalog-edit-field" data-edit="project">Diện tích (ha)
+              <label class="catalog-edit-field" data-edit="facts">Diện tích (ha)
                 <input type="text" id="catalogEditArea" maxlength="40" placeholder="380,00">
               </label>
-              <label class="catalog-edit-field" data-edit="project">Dân số
+              <label class="catalog-edit-field" data-edit="facts">Dân số
                 <input type="text" id="catalogEditDanSo" maxlength="40" placeholder="18.000">
               </label>
-              <label class="catalog-edit-field catalog-edit-span" data-edit="project">Đơn vị hành chính / địa điểm
+              <label class="catalog-edit-field catalog-edit-span" data-edit="facts">Phường / xã
                 <input type="text" id="catalogEditDvhc" maxlength="120" placeholder="Phường / xã hoặc khu vực">
               </label>
             </div>
