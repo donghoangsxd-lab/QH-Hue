@@ -8069,6 +8069,7 @@ body.project-review.la-page #projectReviewHost {
   color: var(--axis-color-muted, var(--text-muted));
 }
 #legendDauTu .invest-legend-row { cursor: default; }
+#legendDauTu .invest-legend-row input { cursor: pointer; }
 #legendDauTu .invest-legend-row.is-sub { padding-left: 14px; }
 #legendDauTu .invest-legend-drop {
   width: 14px;

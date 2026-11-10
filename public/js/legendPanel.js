@@ -10,7 +10,7 @@ import { LEVEL_EVENT } from './mapLevel.js';
 import { renderRoadSections } from './roadSections.js';
 import { renderTrafficLegend } from './qhcRoads.js';
 import { BUFFER_COLORS, BUFFER_KEYS } from './state.js';
-import { investLegendHtml } from './investLayer.js';
+import { investLegendHtml, syncInvestLegendBoxes } from './investLayer.js';
 import { paintAptLegendMarks } from './apartmentLayer.js';
 
 const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
@@ -39,7 +39,7 @@ const SOCIAL_LEGEND = [
 ];
 
 function dauTuLegendHtml() {
-  // Đủ ký hiệu nhóm; bật/tắt lớp invest ở panel F / nút mắt nhóm, không mirror trong Chú giải.
+  // Ký hiệu nhóm kèm checkbox cuối dòng (investLegendHtml). Không mirror ô «Dự án kêu gọi đầu tư».
   const invest = investLegendHtml();
   const aptOn = !!document.getElementById('chk_c14')?.checked;
   const aptRow = `<label class="htkt-legend-row"><img class="layer-type-icon" src="./icons/Noxh.svg" alt="" width="14" height="16"><span>Chung cư (điểm)</span><input type="checkbox" data-xh-mirror="chk_c14"${aptOn ? ' checked' : ''} aria-label="Chung cư"></label>`;
@@ -269,6 +269,7 @@ export function initLegendPanel() {
       dtLegend.hidden = !dautu;
       if (dautu) {
         dtLegend.innerHTML = dauTuLegendHtml();
+        syncInvestLegendBoxes();
         paintAptLegendMarks(dtLegend);
       }
     }

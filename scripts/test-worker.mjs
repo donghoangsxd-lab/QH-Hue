@@ -53,7 +53,10 @@ assert.match(wrangler, /\/api\/\*/);
 assert.match(wrangler, /buildings\.pmtiles/);
 assert.equal(fs.existsSync(new URL('../vercel.json', import.meta.url)), false);
 assert.doesNotMatch(src, /vercel\.app/);
-assert.match(fs.readFileSync(new URL('../public/js/api.js', import.meta.url), 'utf8'), /https:\/\/qh-hue\.donghoangsxd\.workers\.dev\/api\/gee/);
+// Origin và /api/gee tách từ 7cd8c4e để gcsUrl dùng chung PROD_ORIGIN; URL runtime vẫn là worker production.
+const apiJs = fs.readFileSync(new URL('../public/js/api.js', import.meta.url), 'utf8');
+assert.match(apiJs, /const PROD_ORIGIN = 'https:\/\/qh-hue\.donghoangsxd\.workers\.dev'/);
+assert.match(apiJs, /const PROD_GEE = `\$\{PROD_ORIGIN\}\/api\/gee`/);
 
 assert.equal(normalizeByteRange('bytes=0-16383'), 'bytes=0-16383');
 assert.equal(normalizeByteRange(' BYTES=8-15 '), 'bytes=8-15');
