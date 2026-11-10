@@ -9,7 +9,7 @@ import { WARD_NAMES } from './facetStore.js';
 import { bareName } from './urbanStatus.js';
 
 export const CATALOG_HEADERS_PLAN = [
-  'STT', 'Mã', 'Tên quy hoạch', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
+  'STT', 'Mã', 'Tên quy hoạch', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
   'Diện tích (ha)', 'Dân số', 'Trạng thái', 'Ranh'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
@@ -505,6 +505,7 @@ export function rowsToCsv(rows, source = 'plan') {
       stt,
       r.maDoAn || '',
       r.name,
+      r.ward || '',
       r.quyetDinh || '',
       r.ngay || '',
       r.coQuan || '',
@@ -518,6 +519,7 @@ export function rowsToCsv(rows, source = 'plan') {
         '',
         '',
         c.ten || '',
+        r.ward || '',
         c.quyetDinh || '',
         c.ngay || '',
         c.coQuan || '',
@@ -543,4 +545,81 @@ export function downloadCsv(filename, csvText) {
     URL.revokeObjectURL(a.href);
     a.remove();
   }, 0);
+}
+
+export function emptySoTayEdits() {
+  return { v: 1, saved: 0, projects: [], dccb: [] };
+}
+
+/** Gộp bản ghi admin thêm vào danh sách sổ tay gốc (không đụng file tĩnh). */
+export function mergeSoTayEdits(items, edits) {
+  const list = (Array.isArray(items) ? items : []).map((it) => ({
+    ...it,
+    children: Array.isArray(it.children) ? it.children.map((c) => ({ ...c })) : []
+  }));
+  const byMa = new Map(list.map((it) => [String(it.ma || ''), it]));
+  const pack = edits && typeof edits === 'object' ? edits : emptySoTayEdits();
+  for (const raw of pack.projects || []) {
+    const ma = String(raw?.ma || '').trim();
+    if (!ma) continue;
+    const next = {
+      ma,
+      ten: String(raw.ten || '').trim(),
+      cap: String(raw.cap || 'QHPK').trim(),
+      loai: String(raw.loai || '').trim(),
+      dvhc: String(raw.dvhc || '').trim(),
+      maDvhc: String(raw.maDvhc || '').trim(),
+      diaDiem: String(raw.diaDiem || raw.dvhc || '').trim(),
+      dienTichHa: Number.isFinite(raw.dienTichHa) ? raw.dienTichHa : null,
+      dienTichText: String(raw.dienTichText || '').trim(),
+      danSo: String(raw.danSo || '').trim(),
+      quyetDinh: String(raw.quyetDinh || '').trim(),
+      ngay: String(raw.ngay || '').trim(),
+      coQuan: String(raw.coQuan || '').trim(),
+      linkGis: String(raw.linkGis || '').trim(),
+      soDccb: Number(raw.soDccb) || 0,
+      soDinhChinh: Number(raw.soDinhChinh) || 0,
+      children: mapChildren(raw.children),
+      sttNguon: String(raw.sttNguon || '').trim(),
+      sheetNguon: String(raw.sheetNguon || 'admin').trim(),
+      ghiChu: String(raw.ghiChu || 'Thêm bởi admin').trim()
+    };
+    if (byMa.has(ma)) {
+      const cur = byMa.get(ma);
+      Object.assign(cur, next, { children: cur.children?.length ? cur.children : next.children });
+    } else {
+      list.push(next);
+      byMa.set(ma, next);
+    }
+  }
+  for (const row of pack.dccb || []) {
+    const ma = String(row?.ma || '').trim();
+    const child = row?.child;
+    if (!ma || !child) continue;
+    const parent = byMa.get(ma);
+    if (!parent) continue;
+    if (!Array.isArray(parent.children)) parent.children = [];
+    const id = String(child.id || '').trim();
+    if (id && parent.children.some((c) => c.id === id)) continue;
+    parent.children.push({
+      id: id || `${ma}.${String(parent.children.length + 1).padStart(2, '0')}`,
+      loaiDong: child.loaiDong === 'dinh_chinh' ? 'dinh_chinh' : 'dccb',
+      ten: String(child.ten || '').trim(),
+      quyetDinh: String(child.quyetDinh || '').trim(),
+      ngay: String(child.ngay || '').trim(),
+      coQuan: String(child.coQuan || '').trim(),
+      dienTichText: String(child.dienTichText || '').trim(),
+      danSo: String(child.danSo || '').trim(),
+      ghiChu: String(child.ghiChu || 'Thêm bởi admin').trim()
+    });
+    parent.soDccb = parent.children.filter((c) => c.loaiDong === 'dccb').length;
+    parent.soDinhChinh = parent.children.filter((c) => c.loaiDong === 'dinh_chinh').length;
+  }
+  return list;
+}
+
+export function nextDccbId(parentMa, children) {
+  const ma = String(parentMa || '').trim();
+  const n = (Array.isArray(children) ? children.length : 0) + 1;
+  return `${ma}.${String(n).padStart(2, '0')}`;
 }

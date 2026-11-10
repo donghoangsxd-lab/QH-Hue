@@ -1967,6 +1967,7 @@ function doPost(e) {
     if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
+    if (action === "saveSoTayEdits") return jsonOutput(saveSoTayEdits(body));
     if (action === "saveChungCu") return jsonOutput(saveChungCu(body));
     if (action === "saveNoxh") return jsonOutput(saveNoxh(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
@@ -2700,6 +2701,14 @@ function savePopEdits(body) {
   var content = String(body.content || '');
   if (!content || content.length > 2000000) return { "error": "Dữ liệu vùng hiệu chỉnh dân cư rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "pop/edits.json") };
+}
+
+// BẢN GHI ADMIN THÊM VÀO SỔ TAY QH (đồ án / ĐCCB) → catalog/so-tay-edits.json (overlay, không đụng file sổ tay gốc)
+function saveSoTayEdits(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 1500000) return { "error": "Dữ liệu sổ tay bổ sung rỗng hoặc quá lớn" };
+  try { JSON.parse(content); } catch (e) { return { "error": "Dữ liệu sổ tay bổ sung không phải JSON" }; }
+  return { "success": true, "saved": uploadToGCS(content, "catalog/so-tay-edits.json") };
 }
 
 function bucketProjectJson(name) {

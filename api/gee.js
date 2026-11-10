@@ -3624,6 +3624,47 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, saved: true, at: payload.saved, count: list.length });
     }
 
+    // Overlay sổ tay QH: admin thêm đồ án / ĐCCB → catalog/so-tay-edits.json (Class A hiếm, chỉ khi Admin ghi)
+    if (action === 'saveSoTayEdits') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const edits = body && body.edits && typeof body.edits === 'object' ? body.edits : null;
+      if (!edits) return res.status(400).json({ error: true, message: 'Thiếu dữ liệu sổ tay bổ sung' });
+      const projects = Array.isArray(edits.projects) ? edits.projects : [];
+      const dccb = Array.isArray(edits.dccb) ? edits.dccb : [];
+      if (projects.length > 500 || dccb.length > 2000) {
+        return res.status(413).json({ error: true, message: 'Quá nhiều bản ghi sổ tay bổ sung' });
+      }
+      const payload = {
+        v: 1,
+        saved: Date.now(),
+        projects,
+        dccb
+      };
+      const content = JSON.stringify(payload);
+      if (content.length > 1500000) {
+        return res.status(413).json({ error: true, message: 'Dữ liệu sổ tay bổ sung quá lớn' });
+      }
+      const result = await callAppsScript(
+        { action: 'saveSoTayEdits' },
+        { action: 'saveSoTayEdits', content }
+      );
+      if (result.saved !== true) {
+        return res.status(502).json({
+          error: true,
+          message: 'Apps Script chưa ghi được sổ tay bổ sung (đã triển khai phiên bản mới của Code.gs chưa?)'
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        saved: true,
+        at: payload.saved,
+        projects: projects.length,
+        dccb: dccb.length
+      });
+    }
+
     if (action === 'saveRoadNetwork') {
       requirePostFromApp(req);
       await requireAdmin(req);

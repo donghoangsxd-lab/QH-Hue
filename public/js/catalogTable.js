@@ -9,16 +9,21 @@ import { openProjectByName } from './projectLayer.js';
 import {
   listInvestCatalogItems, focusInvest, primeInvestLoad, ensureInvestCatalogLoaded
 } from './investLayer.js';
+import { postAdmin } from './wardRoads.js';
+import { gcsUrl } from './api.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
-  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS, PLAN_TABLE_COLS
+  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS, PLAN_TABLE_COLS,
+  mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf
 } from './catalogTableCore.js';
 
 const $ = (id) => document.getElementById(id);
 /* ?v= đổi khi rebuild catalog để trình duyệt/SW không giữ bản JSON cũ. */
 const SO_TAY_URL = './data/qh-so-tay.json?v=20261109b';
+const EDITS_KEY = 'qh-so-tay-edits-v1';
+const EDITS_GCS = 'catalog/so-tay-edits.json';
 
 let source = 'plan';
 let filterLevel = '';
@@ -27,9 +32,12 @@ let filterWard = '';
 let query = '';
 let rowsCache = [];
 let visibleRows = [];
+let soTayBase = null;
 let soTayItems = null;
 let soTayPromise = null;
+let soTayEdits = emptySoTayEdits();
 let pdfBusy = false;
+let editBusy = false;
 let ready = false;
 let statusChart = null;
 let levelChart = null;
@@ -37,6 +45,8 @@ let yearChart = null;
 let wardChart = null;
 /** 'year' | 'ward' — mặt cột phải; lật bằng #btnCatalogFlipChart. */
 let chartPage = 'year';
+
+const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
 function host() { return $('catalogTableHost'); }
 
@@ -92,6 +102,8 @@ function paintChrome() {
   const summary = $('catalogChartSummary');
   const legend = $('catalogChartLegend');
   const flip = $('btnCatalogFlipChart');
+  const addBtn = $('btnCatalogAdd');
+  const count = $('catalogCount');
   const planOnly = source === 'plan';
   if (statusFilter) statusFilter.hidden = !planOnly;
   if (wardFilter) wardFilter.hidden = !planOnly;
@@ -99,6 +111,10 @@ function paintChrome() {
   if (summary) summary.hidden = !planOnly;
   if (legend) legend.hidden = !planOnly;
   if (flip) flip.hidden = !planOnly;
+  if (addBtn) addBtn.hidden = !(planOnly && isAdmin());
+  // Plan: tóm tắt đã có tổng — ẩn chip «N / N đồ án» trùng trên toolbar.
+  if (count) count.hidden = planOnly;
+  if (!planOnly || !isAdmin()) closeEditPanel();
   if (source === 'invest') {
     if (title) title.textContent = 'DANH MỤC DỰ ÁN ĐẦU TƯ';
     if (colName) colName.textContent = 'Tên dự án';
@@ -112,6 +128,220 @@ function paintChrome() {
   syncPlanColumns(planOnly);
 }
 
+function readLocalEdits() {
+  try {
+    const raw = localStorage.getItem(EDITS_KEY);
+    if (!raw) return emptySoTayEdits();
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') return emptySoTayEdits();
+    return {
+      v: 1,
+      saved: Number(data.saved) || 0,
+      projects: Array.isArray(data.projects) ? data.projects : [],
+      dccb: Array.isArray(data.dccb) ? data.dccb : []
+    };
+  } catch {
+    return emptySoTayEdits();
+  }
+}
+
+function writeLocalEdits(edits) {
+  try { localStorage.setItem(EDITS_KEY, JSON.stringify(edits)); } catch { /* private mode */ }
+}
+
+function applyEditsToBase() {
+  soTayItems = mergeSoTayEdits(soTayBase || [], soTayEdits);
+}
+
+async function loadRemoteEdits() {
+  try {
+    const res = await fetch(gcsUrl(EDITS_GCS), { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || typeof data !== 'object') return null;
+    return {
+      v: 1,
+      saved: Number(data.saved) || 0,
+      projects: Array.isArray(data.projects) ? data.projects : [],
+      dccb: Array.isArray(data.dccb) ? data.dccb : []
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function persistEdits(edits) {
+  writeLocalEdits(edits);
+  if (!isAdmin()) return { remote: false };
+  try {
+    await postAdmin('saveSoTayEdits', { edits, base: soTayEdits.saved || 0 });
+    return { remote: true };
+  } catch (err) {
+    // GAS chưa deploy hoặc API chưa có — giữ localStorage.
+    return { remote: false, error: err?.message || String(err) };
+  }
+}
+
+function closeEditPanel() {
+  const panel = $('catalogEditPanel');
+  if (panel) panel.hidden = true;
+}
+
+function setEditMode(mode, parentMa = '') {
+  const panel = $('catalogEditPanel');
+  const form = $('catalogEditForm');
+  if (!panel || !form) return;
+  form.reset();
+  $('catalogEditMode').value = mode;
+  $('catalogEditParentMa').value = parentMa || '';
+  const isDccb = mode === 'dccb';
+  $('catalogEditTitle').textContent = isDccb
+    ? `Thêm ĐCCB · ${parentMa}`
+    : 'Thêm đồ án quy hoạch';
+  $('catalogEditHint').textContent = isDccb
+    ? 'Dòng điều chỉnh cục bộ sẽ nằm dưới mã đồ án cha.'
+    : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).';
+  panel.querySelectorAll('[data-edit="project"]').forEach((el) => {
+    el.hidden = isDccb;
+    el.querySelectorAll('input,select').forEach((inp) => {
+      if (isDccb) inp.removeAttribute('required');
+      else if (inp.id === 'catalogEditMa' || inp.id === 'catalogEditTen') inp.required = true;
+    });
+  });
+  if (isDccb) {
+    $('catalogEditTen').placeholder = 'ĐCCB …';
+    $('catalogEditTen').value = 'ĐCCB ';
+  } else {
+    $('catalogEditTen').placeholder = 'Tên đồ án quy hoạch';
+  }
+  panel.hidden = false;
+  $('catalogEditTen')?.focus();
+}
+
+function openAddProject() {
+  if (!isAdmin()) {
+    showToast('Cần đăng nhập Admin để thêm đồ án', 'info');
+    return;
+  }
+  setEditMode('project');
+}
+
+function openAddDccb(ma) {
+  if (!isAdmin()) {
+    showToast('Cần đăng nhập Admin để thêm ĐCCB', 'info');
+    return;
+  }
+  if (!ma) return;
+  setEditMode('dccb', ma);
+}
+
+function parseAreaHa(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return { ha: null, text: '' };
+  if (/[a-zA-ZÀ-ỹ]/.test(text)) return { ha: null, text };
+  const s = text.replace(/\s/g, '').replace(/[^\d,.\-]/g, '');
+  if (!s) return { ha: null, text };
+  const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
+  const n = Number(normalized);
+  return {
+    ha: Number.isFinite(n) && n >= 0 && n < 1e6 ? n : null,
+    text
+  };
+}
+
+async function submitEdit(e) {
+  e.preventDefault();
+  if (editBusy || !isAdmin()) return;
+  const mode = $('catalogEditMode')?.value || 'project';
+  const ten = String($('catalogEditTen')?.value || '').trim();
+  const qd = String($('catalogEditQd')?.value || '').trim();
+  const ngay = String($('catalogEditNgay')?.value || '').trim();
+  const coQuan = String($('catalogEditCoQuan')?.value || '').trim();
+  if (!ten) {
+    showToast('Nhập tên quy hoạch / ĐCCB', 'info');
+    return;
+  }
+  if (ngay && !planYearOf(ngay)) {
+    showToast('Ngày ban hành cần dạng dd/mm/yyyy', 'info');
+    return;
+  }
+  editBusy = true;
+  try {
+    const next = {
+      v: 1,
+      saved: soTayEdits.saved || 0,
+      projects: [...(soTayEdits.projects || [])],
+      dccb: [...(soTayEdits.dccb || [])]
+    };
+    if (mode === 'dccb') {
+      const ma = String($('catalogEditParentMa')?.value || '').trim();
+      const parent = (soTayItems || []).find((it) => it.ma === ma);
+      if (!parent) {
+        showToast('Không tìm thấy đồ án cha', 'error');
+        return;
+      }
+      next.dccb.push({
+        ma,
+        child: {
+          id: nextDccbId(ma, parent.children),
+          loaiDong: 'dccb',
+          ten,
+          quyetDinh: qd,
+          ngay,
+          coQuan,
+          dienTichText: '',
+          danSo: '',
+          ghiChu: 'Thêm bởi admin'
+        }
+      });
+    } else {
+      const ma = String($('catalogEditMa')?.value || '').trim().toUpperCase();
+      const cap = String($('catalogEditCap')?.value || 'QHPK').trim();
+      if (!ma) {
+        showToast('Nhập mã đồ án', 'info');
+        return;
+      }
+      if ((soTayItems || []).some((it) => it.ma === ma) || next.projects.some((p) => p.ma === ma)) {
+        showToast(`Mã ${ma} đã có trong sổ tay`, 'info');
+        return;
+      }
+      const area = parseAreaHa($('catalogEditArea')?.value);
+      next.projects.push({
+        ma,
+        ten,
+        cap,
+        dvhc: String($('catalogEditDvhc')?.value || '').trim(),
+        diaDiem: String($('catalogEditDvhc')?.value || '').trim(),
+        dienTichHa: area.ha,
+        dienTichText: area.text,
+        danSo: String($('catalogEditDanSo')?.value || '').trim(),
+        quyetDinh: qd,
+        ngay,
+        coQuan,
+        children: [],
+        soDccb: 0,
+        soDinhChinh: 0,
+        sheetNguon: 'admin',
+        ghiChu: 'Thêm bởi admin'
+      });
+    }
+    const saved = await persistEdits(next);
+    soTayEdits = { ...next, saved: Date.now() };
+    writeLocalEdits(soTayEdits);
+    applyEditsToBase();
+    closeEditPanel();
+    await refresh();
+    showToast(
+      saved.remote
+        ? (mode === 'dccb' ? 'Đã ghi ĐCCB lên máy chủ' : 'Đã ghi đồ án lên máy chủ')
+        : (mode === 'dccb' ? 'Đã ghi ĐCCB trên máy này (chưa đồng bộ bucket)' : 'Đã ghi đồ án trên máy này (chưa đồng bộ bucket)'),
+      saved.remote ? 'success' : 'info'
+    );
+  } finally {
+    editBusy = false;
+  }
+}
+
 function syncPlanColumns(planOnly) {
   const table = $('catalogTable');
   if (!table) return;
@@ -119,9 +349,19 @@ function syncPlanColumns(planOnly) {
   const head = table.querySelector('thead tr');
   if (!head) return;
   if (planOnly) {
+    // colgroup % khớp CSS — mọi hàng cùng lưới 11 cột (kể cả ĐCCB); PX ngay trước Quyết định.
+    let colgroup = table.querySelector('colgroup');
+    if (!colgroup) {
+      colgroup = document.createElement('colgroup');
+      table.insertBefore(colgroup, table.firstChild);
+    }
+    colgroup.innerHTML = `<col style="width:3%"><col style="width:6%"><col style="width:37%">
+      <col style="width:11%"><col style="width:8%"><col style="width:6%"><col style="width:6%">
+      <col style="width:6%"><col style="width:5%"><col style="width:7%"><col style="width:5%">`;
     head.innerHTML = `<th>STT</th>
       <th>Mã</th>
       <th id="catalogColName">Tên quy hoạch</th>
+      <th>Phường / xã</th>
       <th>Quyết định</th>
       <th>Ngày ban hành</th>
       <th>Cấp phê duyệt</th>
@@ -130,6 +370,8 @@ function syncPlanColumns(planOnly) {
       <th>Trạng thái</th>
       <th>Ranh</th>`;
   } else {
+    const colgroup = table.querySelector('colgroup');
+    if (colgroup) colgroup.remove();
     head.innerHTML = `<th>STT</th>
       <th id="catalogColName">Tên dự án</th>
       <th>Phường / xã</th>
@@ -181,19 +423,26 @@ function paintFilterOptions() {
 async function loadSoTay() {
   if (soTayItems) return soTayItems;
   if (soTayPromise) return soTayPromise;
-  soTayPromise = fetch(SO_TAY_URL, { cache: 'no-store' })
-    .then(async (res) => {
+  soTayPromise = (async () => {
+    try {
+      const res = await fetch(SO_TAY_URL, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      soTayItems = Array.isArray(data.items) ? data.items : [];
-      return soTayItems;
-    })
-    .catch((err) => {
+      soTayBase = Array.isArray(data.items) ? data.items : [];
+    } catch (err) {
       console.warn('Không tải được sổ tay QH:', err);
       showToast('Chưa tải được sổ tay đồ án từ sheet — đang hiện danh mục bản đồ', 'info');
-      soTayItems = [];
-      return soTayItems;
-    });
+      soTayBase = [];
+    }
+    const remote = await loadRemoteEdits();
+    const local = readLocalEdits();
+    soTayEdits = (remote && remote.saved >= (local.saved || 0)) ? remote : local;
+    if ((soTayEdits.projects?.length || soTayEdits.dccb?.length) && soTayEdits !== remote) {
+      writeLocalEdits(soTayEdits);
+    }
+    applyEditsToBase();
+    return soTayItems;
+  })().finally(() => { soTayPromise = null; });
   return soTayPromise;
 }
 
@@ -239,17 +488,40 @@ function cellOrDash(v) {
   return s ? escapeHtml(s) : '—';
 }
 
-function planChildRowHtml(parent, child) {
+function areaCellHtml(text) {
+  const s = String(text || '').trim();
+  if (!s) return '<td class="catalog-area">—</td>';
+  const note = /[a-zA-ZÀ-ỹ]/.test(s);
+  const cls = note ? 'catalog-area catalog-area-note' : 'catalog-area';
+  return `<td class="${cls}" title="${escapeHtml(s)}">${escapeHtml(s)}</td>`;
+}
+
+function nameCellHtml(name, extraClass = '') {
+  const s = String(name || '').trim() || '—';
+  const cls = extraClass ? `st-name ${extraClass}` : 'st-name';
+  return `<td class="${cls}" title="${escapeHtml(s)}"><span class="catalog-name-text">${escapeHtml(s)}</span></td>`;
+}
+
+function wardCellHtml(r) {
+  const list = Array.isArray(r?.wards) ? r.wards.filter(Boolean) : [];
+  const full = list.length ? list.join(', ') : String(r?.ward || '').trim();
+  if (!full) return '<td class="catalog-ward">—</td>';
+  return `<td class="catalog-ward" title="${escapeHtml(full)}">${escapeHtml(full)}</td>`;
+}
+
+function planChildRowHtml(parent, child, isLast) {
   const tag = child.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB';
   const name = String(child.ten || tag).trim() || tag;
-  return `<tr class="catalog-dccb-row" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
-    <td class="st-num"></td>
-    <td class="catalog-ma"></td>
-    <td class="st-name catalog-dccb-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+  // Đủ 11 <td> giống hàng cha; PX kế thừa đồ án cha (cùng bộ lọc địa phương).
+  return `<tr class="catalog-dccb-row${isLast ? ' is-last' : ''}" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
+    <td class="st-num catalog-dccb-empty"></td>
+    <td class="catalog-ma catalog-dccb-empty"></td>
+    ${nameCellHtml(name, 'catalog-dccb-name')}
+    ${wardCellHtml(parent)}
     <td class="catalog-qd" title="${escapeHtml(child.quyetDinh || '')}">${cellOrDash(child.quyetDinh)}</td>
     <td class="catalog-date">${cellOrDash(child.ngay)}</td>
     <td class="catalog-agency">${cellOrDash(child.coQuan)}</td>
-    <td class="catalog-area">${cellOrDash(child.dienTichText)}</td>
+    ${areaCellHtml(child.dienTichText)}
     <td class="catalog-pop">${cellOrDash(child.danSo)}</td>
     <td><span class="catalog-status catalog-status-dccb" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span></td>
     <td class="catalog-bound-no">—</td>
@@ -262,20 +534,25 @@ function planRowHtml(r, stt) {
   const bound = r.hasBoundary
     ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
     : `<span class="catalog-bound-no">Chưa</span>`;
+  const addDccb = (isAdmin() && ma)
+    ? `<button type="button" class="catalog-add-dccb" data-catalog-add-dccb="${escapeHtml(ma)}" title="Thêm điều chỉnh cục bộ" aria-label="Thêm điều chỉnh cục bộ">${ico('plus')}</button>`
+    : '';
   const kids = Array.isArray(r.children) ? r.children : [];
-  const parent = `<tr class="catalog-parent-row" data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
+  const hasKids = kids.length > 0;
+  const parent = `<tr class="catalog-parent-row${hasKids ? ' has-kids' : ''}" data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
     <td class="st-num">${stt}</td>
-    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}</td>
-    <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
+    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${addDccb}</td>
+    ${nameCellHtml(name)}
+    ${wardCellHtml(r)}
     <td class="catalog-qd" title="${escapeHtml(r.quyetDinh || '')}">${cellOrDash(r.quyetDinh)}</td>
     <td class="catalog-date">${cellOrDash(r.ngay)}</td>
     <td class="catalog-agency">${cellOrDash(r.coQuan)}</td>
-    <td class="catalog-area" title="${escapeHtml(r.areaText || '')}">${cellOrDash(r.areaText)}</td>
+    ${areaCellHtml(r.areaText)}
     <td class="catalog-pop">${cellOrDash(r.danSo)}</td>
     <td>${statusChip(r)}</td>
     <td>${bound}</td>
   </tr>`;
-  return parent + kids.map((c) => planChildRowHtml(r, c)).join('');
+  return parent + kids.map((c, i) => planChildRowHtml(r, c, i === kids.length - 1)).join('');
 }
 
 function paintTable() {
@@ -350,7 +627,7 @@ function stackedBarOpts({ tickColor, xTick }) {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    layout: { padding: { top: 6, right: 4, bottom: 2, left: 0 } },
+    layout: { padding: { top: 2, right: 2, bottom: 0, left: 0 } },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -442,7 +719,12 @@ function paintCharts() {
 
   const sumEl = $('catalogChartSummary');
   if (sumEl) {
-    sumEl.innerHTML = `<b>${stats.total}</b> đồ án ·
+    const shown = visibleRows.length;
+    const all = rowsCache.length;
+    const head = shown === all
+      ? `<b>${all}</b> đồ án`
+      : `<b>${shown}</b>/${all} đồ án`;
+    sumEl.innerHTML = `${head} ·
       <span class="catalog-sum-ok">${stats.byStatus.du} đủ</span> ·
       <span class="catalog-sum-warn">${stats.byStatus.thieu} thiếu</span> ·
       <span class="catalog-sum-muted">${stats.byStatus.chi_so_tay} chưa lên bản đồ</span> ·
@@ -688,6 +970,9 @@ export function initCatalogTable() {
       else wardChart?.resize();
     });
   });
+  $('btnCatalogAdd')?.addEventListener('click', openAddProject);
+  $('btnCatalogEditClose')?.addEventListener('click', closeEditPanel);
+  $('catalogEditForm')?.addEventListener('submit', (e) => { void submitEdit(e); });
   $('btnCatalogExportCsv')?.addEventListener('click', exportCsv);
   $('btnCatalogExportPdf')?.addEventListener('click', () => { void exportPdf(); });
   $('btnCatalogMax')?.addEventListener('click', () => {
@@ -702,13 +987,24 @@ export function initCatalogTable() {
     });
   });
   $('btnCatalogClose')?.addEventListener('click', () => {
+    closeEditPanel();
     closeCatalogTable();
     setBottomPanelCollapsed(true);
   });
   $('catalogTableBody')?.addEventListener('click', (e) => {
+    const add = e.target.closest('[data-catalog-add-dccb]');
+    if (add) {
+      openAddDccb(add.dataset.catalogAddDccb);
+      return;
+    }
     const btn = e.target.closest('[data-catalog-zoom]');
     if (!btn) return;
     void onZoom(btn.dataset.catalogZoom);
+  });
+  document.addEventListener('auth:change', () => {
+    if (!document.body.classList.contains('catalog-table-on')) return;
+    paintChrome();
+    if (source === 'plan') paintTable();
   });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => {
     if (document.body.classList.contains('catalog-table-on')) closeCatalogTable();

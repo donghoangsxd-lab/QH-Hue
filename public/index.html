@@ -1525,6 +1525,7 @@
               <span class="catalog-ward-leg catalog-ward-leg-qhct">QHCT</span>
             </div>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogFlipChart" title="Xem biểu đồ theo phường / xã" aria-label="Xem biểu đồ theo phường / xã" hidden><svg class="ico"><use href="#i-flip"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnCatalogAdd" title="Thêm đồ án / điều chỉnh cục bộ" aria-label="Thêm đồ án / điều chỉnh cục bộ" hidden><svg class="ico"><use href="#i-plus"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportCsv" title="Xuất CSV" aria-label="Xuất CSV"><svg class="ico"><use href="#i-file"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogExportPdf" title="Xuất PDF danh mục" aria-label="Xuất PDF danh mục"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnCatalogMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
@@ -1564,6 +1565,7 @@
                 <th>STT</th>
                 <th>Mã</th>
                 <th id="catalogColName">Tên quy hoạch</th>
+                <th>Phường / xã</th>
                 <th>Quyết định</th>
                 <th>Ngày ban hành</th>
                 <th>Cấp phê duyệt</th>
@@ -1575,6 +1577,53 @@
             </thead>
             <tbody id="catalogTableBody"></tbody>
           </table>
+        </div>
+        <div class="catalog-edit-panel" id="catalogEditPanel" hidden>
+          <form class="catalog-edit-form" id="catalogEditForm">
+            <header class="catalog-edit-head">
+              <b id="catalogEditTitle">Thêm đồ án</b>
+              <button type="button" class="bp-btn bp-icon" id="btnCatalogEditClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
+            </header>
+            <input type="hidden" id="catalogEditMode" value="project">
+            <input type="hidden" id="catalogEditParentMa" value="">
+            <div class="catalog-edit-grid">
+              <label class="catalog-edit-field" data-edit="project">Mã đồ án
+                <input type="text" id="catalogEditMa" maxlength="32" placeholder="VD: TH.B.099" required>
+              </label>
+              <label class="catalog-edit-field" data-edit="project">Cấp quy hoạch
+                <select id="catalogEditCap">
+                  <option value="QHC">QHC</option>
+                  <option value="QHPK" selected>QHPK</option>
+                  <option value="QHCT">QHCT</option>
+                </select>
+              </label>
+              <label class="catalog-edit-field catalog-edit-span">Tên quy hoạch / ĐCCB
+                <input type="text" id="catalogEditTen" maxlength="240" required>
+              </label>
+              <label class="catalog-edit-field">Số quyết định
+                <input type="text" id="catalogEditQd" maxlength="80" placeholder="VD: 432/QĐ-UBND">
+              </label>
+              <label class="catalog-edit-field">Ngày ban hành
+                <input type="text" id="catalogEditNgay" maxlength="20" placeholder="dd/mm/yyyy">
+              </label>
+              <label class="catalog-edit-field">Cấp phê duyệt
+                <input type="text" id="catalogEditCoQuan" maxlength="80" placeholder="UBND tỉnh / UBND thành phố…">
+              </label>
+              <label class="catalog-edit-field" data-edit="project">Diện tích (ha)
+                <input type="text" id="catalogEditArea" maxlength="40" placeholder="380,00">
+              </label>
+              <label class="catalog-edit-field" data-edit="project">Dân số
+                <input type="text" id="catalogEditDanSo" maxlength="40" placeholder="18.000">
+              </label>
+              <label class="catalog-edit-field catalog-edit-span" data-edit="project">Đơn vị hành chính / địa điểm
+                <input type="text" id="catalogEditDvhc" maxlength="120" placeholder="Phường / xã hoặc khu vực">
+              </label>
+            </div>
+            <footer class="catalog-edit-foot">
+              <span class="catalog-edit-hint" id="catalogEditHint"></span>
+              <button type="submit" class="bp-btn" id="btnCatalogEditSave">Ghi</button>
+            </footer>
+          </form>
         </div>
       </div>
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
