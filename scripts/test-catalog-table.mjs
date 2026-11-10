@@ -3,7 +3,8 @@ import {
   planRowsFromCatalog, planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
   catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
-  groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards
+  groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards,
+  mergeSoTayEdits, nextDccbId
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName } from '../public/js/soTayMatch.js';
 import { WARD_NAMES } from '../public/js/facetStore.js';
@@ -121,8 +122,10 @@ assert.equal(filterCatalogRows(invest, { level: 'dvtm' }).length, 1);
 
 const csv = rowsToCsv(filterCatalogRows(merged, {}), 'plan');
 assert.match(csv, /Tên quy hoạch/);
+assert.match(csv, /Phường \/ xã/);
 assert.match(csv, /Trạng thái/);
 assert.match(csv, /Đàn Nam Giao/);
+assert.match(csv, /Phường Thuận Hóa/);
 
 const stats = catalogStatusStats(merged);
 assert.ok(stats.total >= 3);
@@ -166,5 +169,12 @@ const grouped = groupPlanRowsByLevel(merged);
 assert.equal(grouped[0].type, 'group');
 assert.equal(grouped[0].label, 'A. QHC');
 assert.ok(grouped.some(g => g.type === 'group' && g.label === 'B. QHPK'));
+
+const mergedEdits = mergeSoTayEdits(sheet, {
+  projects: [{ ma: 'ZZ.B.001', ten: 'QHPK thử admin', cap: 'QHPK', quyetDinh: '1/QĐ', ngay: '01/01/2024', coQuan: 'UBND tỉnh', children: [] }],
+  dccb: [{ ma: 'TH.B.001', child: { id: nextDccbId('TH.B.001', nam.children), loaiDong: 'dccb', ten: 'ĐCCB thử', quyetDinh: '2/QĐ', ngay: '02/02/2024', coQuan: 'UBND tỉnh' } }]
+});
+assert.ok(mergedEdits.some((r) => r.ma === 'ZZ.B.001'));
+assert.ok(mergedEdits.find((r) => r.ma === 'TH.B.001').children.some((c) => /ĐCCB thử/.test(c.ten)));
 
 console.log('test-catalog-table: ok');
