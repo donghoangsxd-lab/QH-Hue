@@ -3146,16 +3146,17 @@ body.catalog-table-on .bp-body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 2px 2px 4px;
+  /* Chừa mép dưới panel — donut/bar không dính đáy màn hình. */
+  padding: 2px 2px 10px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
   flex: 0 0 auto;
   min-width: 0;
 }
 .catalog-charts[hidden] { display: none !important; }
-/* Pie trái | cột phải: cùng hàng, cùng chiều cao — bar không cao hơn pie. */
+/* Pie trái | cột phải: cùng hàng; pie nhỏ hơn để còn chỗ nhãn năm của bar. */
 .catalog-chart-top {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
   gap: 4px 8px;
   align-items: stretch;
   min-width: 0;
@@ -3166,7 +3167,7 @@ body.catalog-table-on .bp-body {
   gap: 2px 4px;
   min-width: 0;
   min-height: 0;
-  padding: 4px 6px;
+  padding: 4px 6px 6px;
   border: 1px solid var(--border-color);
   border-radius: var(--r-md);
   background: rgba(15, 23, 42, 0.35);
@@ -3177,10 +3178,11 @@ body.catalog-table-on .bp-body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 4px 8px 4px;
+  padding: 4px 8px 6px;
   border: 1px solid var(--border-color);
   border-radius: var(--r-md);
   background: rgba(15, 23, 42, 0.35);
+  overflow: visible;
 }
 .catalog-chart-card {
   min-width: 0;
@@ -3196,19 +3198,22 @@ body.catalog-table-on .bp-body {
   flex: 0 0 auto;
 }
 .catalog-chart-wrap {
-  height: 112px;
-  flex: 1 1 auto;
-  min-height: 96px;
+  height: 84px;
+  flex: 0 0 auto;
+  min-height: 72px;
+  max-height: 84px;
   position: relative;
 }
-/* Bar cùng tầm pie: không min-height lớn hơn wrap pie. */
+/* Bar: đủ cao cho cột + nhãn năm (không bị cắt dòng dưới). */
 .catalog-chart-wrap-bar {
-  height: auto;
+  height: 108px;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 100px;
   position: relative;
+  overflow: visible;
 }
-body.bottom-max .catalog-chart-wrap { height: 128px; min-height: 112px; }
+body.bottom-max .catalog-chart-wrap { height: 96px; max-height: 96px; min-height: 84px; }
+body.bottom-max .catalog-chart-wrap-bar { height: 120px; min-height: 112px; }
 .catalog-chart-summary {
   flex: 1 1 180px;
   min-width: 140px;
@@ -3312,29 +3317,27 @@ body.bottom-max .catalog-chart-wrap { height: 128px; min-height: 112px; }
   font-weight: 700;
   background: var(--bg-panel);
 }
-/* % cố định tổng 100%: Tên ~37%; Phường/xã (cột 4, trước Quyết định) ~11%. */
+/* % cố định tổng 100%: 10 cột (Ranh gộp trạng thái); Tên ~38%; PX ~11%. */
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(1),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(1) { width: 3%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(2),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(2) { width: 6%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(3),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(3) { width: 37%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(3) { width: 38%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(4),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(4) { width: 11%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(5),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(5) { width: 8%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(5) { width: 9%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(6),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(6) { width: 6%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(6) { width: 7%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(7),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(7) { width: 6%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(7) { width: 7%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(8),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(8) { width: 6%; text-align: right; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(9),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(9) { width: 5%; text-align: right; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(10),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(10) { width: 7%; text-align: center; }
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(11),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(11) { width: 5%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(10) { width: 8%; text-align: center; }
 /* Clamp trong span — không đổi display của td (tránh lệch cột giữa các hàng). */
 #catalogTableHost table.data-table.catalog-data-table td.st-name {
   text-align: left;
@@ -3438,6 +3441,29 @@ body.bottom-max .catalog-chart-wrap { height: 128px; min-height: 112px; }
 }
 .catalog-add-dccb:hover { background: rgba(56, 189, 248, 0.22); }
 .catalog-add-dccb .ico { width: 12px; height: 12px; }
+.catalog-edit-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(18px * var(--k));
+  height: calc(18px * var(--k));
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: var(--r-sm);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+}
+.catalog-edit-row:hover { background: rgba(251, 191, 36, 0.22); }
+.catalog-edit-row .ico { width: 12px; height: 12px; }
+#catalogEditMa[readonly] {
+  opacity: 0.85;
+  cursor: default;
+  color: var(--accent-cyan);
+}
 .catalog-edit-panel {
   position: absolute;
   right: 12px;
@@ -3532,12 +3558,27 @@ body.bottom-max .catalog-chart-wrap { height: 128px; min-height: 112px; }
   font-weight: 700;
 }
 .catalog-bound-yes:hover { background: rgba(34, 197, 94, 0.22); }
+.catalog-bound-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.catalog-bound-link:hover { background: rgba(251, 191, 36, 0.22); }
 .catalog-bound-no { color: var(--text-muted); font-size: var(--fs-xs); }
 .catalog-empty { color: var(--text-muted); text-align: center; padding: 16px 8px; }
 @media (max-width: 840px) {
   .catalog-chart-top { grid-template-columns: 1fr; }
-  .catalog-chart-wrap { height: 112px; }
-  .catalog-chart-wrap-bar { min-height: 112px; }
+  .catalog-chart-wrap { height: 84px; max-height: 84px; }
+  .catalog-chart-wrap-bar { height: 108px; min-height: 100px; }
   .catalog-chart-summary { max-width: 100%; flex-basis: 100%; white-space: normal; }
   .catalog-toolbar-title { max-width: 100%; }
 }
