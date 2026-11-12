@@ -740,7 +740,7 @@ function stampBoxHtml() {
   const cur = match.pending.find(s => s.id === current.stampPick) || match.pending[0];
   const chips = match.pending.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
   return `<div class="cad-stamp">
-    <b>Có polygon chứa từ 2 tem, hoặc tem chưa nằm trong lô.</b>
+    <b>Tem chưa tự khớp (cần ≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).</b>
     <span>Chọn lần lượt từng tem (đang gán màu hồng trên bản đồ) rồi bấm polygon tương ứng. Mỗi lô chỉ nhận một tem.</span>
     <div class="cad-stamp-list">${chips}</div>
     <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
@@ -854,7 +854,11 @@ function renderReport() {
     alerts.push(['warn', `Tên file khác tên đồ án «${escapeHtml(pairName)}»: ${mismatched.map(f => `<b>${escapeHtml(f)}</b>`).join(', ')} — kiểm tra lại có chọn nhầm đồ án hoặc nhầm file không.`]);
   }
   if (current.boundaryGeom) {
-    alerts.push(['info', `Ranh giới từ file${current.boundaryFile ? ` <b>${escapeHtml(current.boundaryFile)}</b>` : ''} — nét liền trên bản đồ.`]);
+    const inline = current.inlineRanh ? ' (layer ranh trong file sử dụng đất)' : '';
+    alerts.push(['info', `Ranh giới từ file${current.boundaryFile ? ` <b>${escapeHtml(current.boundaryFile)}</b>` : ''}${inline} — nét liền trên bản đồ.`]);
+    if (current.droppedOutside) {
+      alerts.push(['info', `Đã bỏ ${fmtNum(current.droppedOutside)} lô nằm ngoài ranh (≥ 95% diện tích ngoài).`]);
+    }
     const out = current.outsideBoundary;
     if (out && out.checked && out.n) alerts.push(['bad', `${fmtNum(out.n)}/${fmtNum(out.checked)} lô có hơn 5% diện tích nằm ngoài ranh — kiểm tra hệ tọa độ hoặc nhầm file.`]);
   } else if (current.boundaryFailed) {
@@ -1342,7 +1346,10 @@ function applyStamps(parcels) {
   const lots = parcels.filter(p => p.polygons && p.polygons.length).map(p => ({
     key: String(p.src),
     area: p.area,
-    rings: [...p.polygons, ...((p.partner && p.partner.polygons) || [])]
+    rings: [...p.polygons, ...((p.partner && p.partner.polygons) || [])],
+    layer: p.layer || '',
+    name: p.name || '',
+    lotCode: p.lotCode || ''
   }));
   const hatchAxes = detectAxes(current.entities || []);
   let projected = [];
@@ -1393,6 +1400,7 @@ function analyse({ fit = true } = {}) {
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
   const entities = demoteCsd(applyManualMapping(current.entities, current.manual));
   const base = current.wgs84 ? buildParcelsLonLat(entities) : buildParcels(entities, { crs });
+  base.parcels = dropOutsideBoundary(base.parcels);
   assignWards(base.parcels, state.wardLabelsList || []);
   enrichParcels(base.parcels);
   current.base = base;
@@ -1491,15 +1499,32 @@ function fileRole(r) {
 // Vòng kín AutoCAD là LWPOLYLINE / HATCH; đoạn hở (LINE) để khép ranh gServer. POLYLINE cũ cũng là vòng.
 const BOUNDARY_RING_KINDS = new Set(['POLYLINE', 'LWPOLYLINE', 'POLYGON', 'HATCH']);
 
-function lineRingsWgs84(r) {
-  const crs = CRS_PRESETS[r.parsed.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
+const foldName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+/** Layer ranh quy hoạch trong cùng file sử dụng đất (vd. -RANH GIOI) — không tính thành lô. */
+function isRanhLayer(name) {
+  const n = foldName(name).replace(/[^a-z0-9]+/g, '');
+  return n === 'ranh' || n.startsWith('ranhgioi') || n.startsWith('ranhqh') || n.startsWith('ranhdoan');
+}
+
+function peelInlineRanh(entities) {
+  const land = [];
+  const ranh = [];
+  (entities || []).forEach(e => {
+    if (e.kind !== 'HATCH' && isRanhLayer(e.layer)) ranh.push(e);
+    else land.push(e);
+  });
+  return { land, ranh };
+}
+
+function ringsToWgs84(entities, wgs84, crs) {
   const toLL = (x, y) => {
-    if (r.wgs84) return [x, y];
+    if (wgs84) return [x, y];
     const [lat, lng] = vn2000ToWgs84(x, y, crs);
     return [lng, lat];
   };
   const lines = [];
-  r.parsed.entities.forEach(e => {
+  (entities || []).forEach(e => {
     if (e.kind !== 'LINE' && !BOUNDARY_RING_KINDS.has(e.kind)) return;
     (e.rings || []).forEach(ring => {
       const pts = ring.map(([x, y]) => toLL(x, y)).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
@@ -1514,6 +1539,19 @@ function lineRingsWgs84(r) {
   return lines;
 }
 
+function lineRingsWgs84(r) {
+  const crs = CRS_PRESETS[r.parsed.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
+  return ringsToWgs84(r.parsed.entities, r.wgs84, crs);
+}
+
+function applyBoundaryGeom(geometry, fileName) {
+  if (!current) return;
+  const fitted = geometry ? fitBoundary(geometry) : null;
+  current.boundaryGeom = fitted;
+  current.boundaryFailed = !fitted;
+  current.boundaryFile = fitted ? (fileName || '') : '';
+}
+
 function setBoundaryFrom(lineRead) {
   if (!current) return;
   if (!lineRead) {
@@ -1523,13 +1561,39 @@ function setBoundaryFrom(lineRead) {
     return;
   }
   const built = boundaryFromLines(lineRingsWgs84(lineRead));
-  const fitted = built.geometry ? fitBoundary(built.geometry) : null;
-  current.boundaryGeom = fitted;
-  current.boundaryFailed = !fitted;
-  current.boundaryFile = lineRead.file.name;
+  applyBoundaryGeom(built.geometry, lineRead.file.name);
 }
 
-const foldName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+function setBoundaryFromInline(entities, fileName, wgs84) {
+  if (!current || !entities || !entities.length) return false;
+  const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
+  const built = boundaryFromLines(ringsToWgs84(entities, wgs84, crs));
+  applyBoundaryGeom(built.geometry, fileName || '');
+  return !!current.boundaryGeom;
+}
+
+/** Lô nằm gần như hoàn toàn ngoài ranh (≥ 95% diện tích) thì bỏ, không đưa vào webapp. */
+function dropOutsideBoundary(parcels) {
+  if (!current?.boundaryGeom || typeof turf === 'undefined') return parcels;
+  const bound = turf.feature(current.boundaryGeom);
+  const kept = [];
+  let dropped = 0;
+  parcels.forEach(p => {
+    if (!p.polygons || !p.polygons.length) { kept.push(p); return; }
+    try {
+      const poly = p.polygons.length === 1 ? turf.polygon(p.polygons[0]) : turf.multiPolygon(p.polygons);
+      const total = turf.area(poly);
+      if (!(total > 0)) { kept.push(p); return; }
+      if (turf.booleanWithin(poly, bound)) { kept.push(p); return; }
+      const inter = turf.intersect(poly, bound);
+      const inside = inter ? turf.area(inter) : 0;
+      if (inside / total < 0.05) { dropped++; return; }
+      kept.push(p);
+    } catch (e) { kept.push(p); }
+  });
+  current.droppedOutside = dropped;
+  return kept;
+}
 
 function nameHits(names, query) {
   const words = foldName(query).split(/[^a-z0-9]+/).filter(Boolean);
@@ -1828,21 +1892,26 @@ function openParsed({ file, format, parsed, text, wgs84 }, pendingId, extras) {
   if (format === 'shp' && parsed.crs && CRS_PRESETS[parsed.crs] && $('cadCrs')) $('cadCrs').value = parsed.crs;
   const both = !!(extras && extras.both);
   const filePhase = both ? null : (format === 'dxf' || format === 'shp' ? filePhaseFromName(file.name) : null);
+  const peeled = peelInlineRanh(parsed.entities || []);
   // Layer TT16 nhận thẳng; layer khác (kể cả file lẫn tên trước TT16) vào khớp thủ công
-  const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
+  const tt16 = peeled.land.some(e => tt16Layer(e.layer));
   current = {
     fileName: both ? `${projectName(file.name)}.dxf` : file.name,
     format, wgs84, tt16, filePhase, bothPhases: both, slotFiles: extras && extras.slotFiles || null,
-    entities: parsed.entities, stats: parsed.stats, base: null, result: null,
-    manual: createManualMapping(parsed.entities, { allowCsd: CSD_FORMATS.has(format) }), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
+    entities: peeled.land, stats: parsed.stats, base: null, result: null,
+    manual: createManualMapping(peeled.land, { allowCsd: CSD_FORMATS.has(format) }), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
     reviewSrc: null, reviewStarted: false,
     raw: { ext: format === 'shp' ? 'geojson' : format, text }, pendingId,
     crs: parsed.crs || null, crsUnknown: !!parsed.crsUnknown, layers: parsed.layers || [],
     points: points ? pointSource(points) : null,
     inlineStamps: parsed.stamps || [],
-    boundaryOnly: false, boundaryGeom: null, boundaryFailed: false, boundaryFile: ''
+    boundaryOnly: false, boundaryGeom: null, boundaryFailed: false, boundaryFile: '',
+    droppedOutside: 0, inlineRanh: peeled.ranh.length
   };
   setBoundaryFrom(lines);
+  if (!current.boundaryGeom && peeled.ranh.length) {
+    setBoundaryFromInline(peeled.ranh, file.name, wgs84);
+  }
   lockCrs(wgs84);
   syncPhaseSelect();
   analyse();
