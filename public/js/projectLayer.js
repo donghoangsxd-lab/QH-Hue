@@ -12,7 +12,8 @@
 // Mỗi đồ án một màu viền + nền mờ nhẹ (cùng kiểu wash vùng trung tâm QHC), nhãn tên ở giữa ranh.
 // Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
 // QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
-// bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn.
+// bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn. Zoom ≥ PLACE_DETAIL_ZOOM: bỏ chế độ chỉ-ranh —
+// mở lô đồ án tại tâm khung (openLotsAtView), bấm ranh giữ khung (không fitBounds toàn đồ án).
 // Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
 // trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
 // Lô QHC 1/10.000 (trung tâm và đồ án nhập) chỉ khi đang chọn: phủ tối ngoài ranh. Bỏ chọn thì ẩn lô và phủ tối, còn đường ranh.
@@ -24,7 +25,7 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
+  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -635,6 +636,35 @@ function openMany(hits, kind, geom) {
   revealInList(primary);
   document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: primary.name }));
   return primary.name;
+}
+
+function viewHost() {
+  return planMap?.getContainer()?.offsetParent ? planMap : map;
+}
+
+/** Đang phóng gần (≥ PLACE_DETAIL_ZOOM): bỏ bước chỉ xem ranh / fitBounds toàn đồ án. */
+function atPlaceDetail(m = viewHost()) {
+  return !!m && m.getZoom() >= PLACE_DETAIL_ZOOM;
+}
+
+/**
+ * Zoom lớn: mở lô đồ án nhỏ nhất cấp kind tại tâm khung nhìn, không phóng ra toàn đồ án.
+ * Không có đồ án tại tâm → null (giữ ranh).
+ */
+export function openLotsAtView(kind) {
+  const m = viewHost();
+  if (!m || !kind || !atPlaceDetail(m)) return null;
+  return openProjectAt(m.getCenter(), kind);
+}
+
+/** Bấm ranh trên bản đồ: zoom lớn → giữ khung + mở lô; nhìn rộng → phóng tới toàn đồ án. */
+function openOutlineProject(p, m) {
+  if (atPlaceDetail(m)) {
+    if (p.level === 'QHC') selectQhcScheme(p);
+    else openSchemeDetail(p);
+    return;
+  }
+  openProject(p);
 }
 
 /**
@@ -2334,7 +2364,7 @@ function drawOutlinesOn(m, list, below) {
     shape.on('mouseout', () => setHover(m, null));
     shape.on('click', (e) => {
       if (passToolClick(m, e)) return;
-      openProject(p);
+      openOutlineProject(p, m);
       revealInList(p);
     });
     group.addLayer(shape);
@@ -2986,16 +3016,36 @@ export function initProjectLayer(opts = {}) {
   document.addEventListener('auth:change', renderList);
   document.addEventListener(ADJUST_CHANGE_EVENT, renderList);
   document.addEventListener(LEVEL_EVENT, focusLevelGroup);
-  map?.on('zoomend', () => {
-    const below = map.getZoom() < PARCEL_MIN_ZOOM;
-    if (below === belowZoom) return;
+  let placeZoom = (() => {
+    const host = viewHost();
+    return host ? host.getZoom() >= PLACE_DETAIL_ZOOM : null;
+  })();
+  const onHostZoom = () => {
+    const host = viewHost();
+    if (!host) return;
+    const below = host.getZoom() < PARCEL_MIN_ZOOM;
+    const place = host.getZoom() >= PLACE_DETAIL_ZOOM;
+    const crossedParcel = below !== belowZoom;
+    const crossedPlace = place !== placeZoom;
+    if (!crossedParcel && !crossedPlace) return;
     belowZoom = below;
+    placeZoom = place;
+    // Zoom lớn trên QHC / QHPK / QHCT: mở lô tại tâm khung, không chờ bấm ranh rồi fitBounds toàn đồ án.
+    if (place && crossedPlace) {
+      const kind = levelKeyOf(getLevel());
+      if (kind) openLotsAtView(kind);
+    }
     // QHC / QHCT tắt lớp QHPK (showProjects = false) nhưng ranh cấp đang chọn vẫn phải vẽ lại khi qua ngưỡng lô
     redrawOutlines();
     if (state.showProjects) refreshProjectLots();
-  });
+  };
+  map?.on('zoomend', onHostZoom);
+  planMap?.on('zoomend', onHostZoom);
   onCompareChange(redrawOutlines);
   onFacet((kind) => { if (kind === 'area') renderList(); });
-  belowZoom = map ? map.getZoom() < PARCEL_MIN_ZOOM : null;
+  belowZoom = (() => {
+    const host = viewHost();
+    return host ? host.getZoom() < PARCEL_MIN_ZOOM : null;
+  })();
   rebuild();
 }
