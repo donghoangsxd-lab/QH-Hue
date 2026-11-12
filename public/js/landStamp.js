@@ -1,6 +1,8 @@
 // Tem đất trên lớp ký hiệu (file KH, hoặc block ngay trong file sử dụng đất): vòng tròn + chữ, hoặc block.
 // Mỗi tem: ký hiệu lô, diện tích, mật độ xây dựng, tầng cao; hệ số sử dụng đất có thể không có.
-// Gán theo điểm chèn, rồi tâm khung block, rồi điểm gần lô trong vài mét. Nhiều block trên một lô thì gộp chỉ tiêu nếu không mâu thuẫn.
+// Ba tiêu chí: (1) vị trí trong/lỗ/gần hatch, (2) ký hiệu tem ↔ layer, (3) diện tích sai số < 1%.
+// Chỉ tự gán khi ≥ 2 tiêu chí cùng chỉ một lô; khớp đúng 1 tiêu chí thì hỏi người dùng.
+import { lotCodePatternKey, landPatternKey } from './tt16Symbols.js';
 
 function readTags(text) {
   const lines = String(text || '').split(/\r?\n/);
@@ -44,7 +46,8 @@ function readEntity(tags, i) {
   return [ent, i];
 }
 
-const CODE_RE = /^[A-Za-z]{1,8}(?:[.\-]?\d{0,4}[A-Za-z]?)?$/;
+// CX1, TMDV, OD.1, CX-QT (sau khi bỏ khoảng quanh gạch).
+const CODE_RE = /^[A-Za-z]{1,8}(?:[.\-][A-Za-z0-9]{1,8}|\d{0,4}[A-Za-z]?)?$/;
 const RANGE_RE = /^(\d{1,2})\s*[-–]\s*(\d{1,2})$/;
 // Tên tag sau khi bỏ dấu, khoảng trắng, gạch. Bỏ cột cận min/max (gServer ghi 0).
 const ATTR_TAG = {
@@ -67,13 +70,27 @@ function tagKey(tag) {
   return Object.keys(ATTR_TAG).find(k => ATTR_TAG[k].test(n)) || '';
 }
 
+/** "CX - QT" → "CX-QT" để nhận ký hiệu và gom cụm chữ. */
+export function normalizeStampText(s) {
+  return String(s || '').trim().replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ');
+}
+
 export function isLotCode(s) {
-  const t = String(s || '').trim();
-  return !!t && t.length <= 16 && !/\s/.test(t) && /[A-Za-z]/.test(t) && CODE_RE.test(t);
+  const t = normalizeStampText(s).replace(/\s+/g, '');
+  return !!t && t.length <= 16 && /[A-Za-z]/.test(t) && CODE_RE.test(t);
 }
 
 function numToken(s) {
-  const t = String(s || '').trim().replace(',', '.');
+  const raw = String(s || '').trim();
+  if (!raw) return null;
+  // Kiểu Việt: 4.994,4 / 2.509,6 (chấm nghìn, phẩy thập phân).
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw) || /^\d+,\d+$/.test(raw)) {
+    const t = raw.replace(/\./g, '').replace(',', '.');
+    const value = Number(t);
+    if (!Number.isFinite(value)) return null;
+    return { raw: t, value, decimals: (t.split('.')[1] || '').length };
+  }
+  const t = raw.replace(',', '.');
   if (!/^\d+(?:\.\d+)?$/.test(t)) return null;
   const value = Number(t);
   if (!Number.isFinite(value)) return null;
@@ -362,14 +379,14 @@ function linesOf(items) {
 }
 
 // Hai số cùng hàng: số ≥ 50 (hoặc số tròn 30–100 khi số kia ≤ 30) là mật độ %; số còn lại là tầng cao.
-// Khi không tách được bằng giá trị thì trái = mật độ, phải = tầng cao.
+// Tem quy hoạch thường trái = tầng cao, phải = mật độ (kể cả mật độ thấp như 5%).
 function classifyPair(left, right) {
   const roundish = (n) => n >= 30 && n <= 100 && n % 5 === 0;
   if (right >= 50 && right <= 100 && left <= 40) return { floors: left, coverage: right };
   if (left >= 50 && left <= 100 && right <= 40) return { floors: right, coverage: left };
   if (roundish(right) && left <= 30) return { floors: left, coverage: right };
   if (roundish(left) && right <= 30) return { floors: right, coverage: left };
-  return { coverage: left, floors: right };
+  return { floors: left, coverage: right };
 }
 
 function numText(n) {
@@ -405,10 +422,14 @@ function parseItems(items, x, y) {
   const nums = [];
   lines.forEach((line, li) => {
     line.items.forEach(t => {
-      if (!code && isLotCode(t.text)) { code = t.text.toUpperCase(); return; }
-      const range = rangeToken(t.text);
+      const text = normalizeStampText(t.text);
+      if (!code && isLotCode(text)) {
+        code = text.replace(/\s+/g, '').toUpperCase();
+        return;
+      }
+      const range = rangeToken(text);
       if (range && !floors) { floors = range; return; }
-      const n = numToken(t.text);
+      const n = numToken(text);
       if (n) nums.push({ ...n, li, x: t.x });
     });
   });
@@ -440,15 +461,16 @@ function stampFromBlock(block) {
   const got = {};
   block.attrs.forEach(a => {
     const key = tagKey(a.tag);
-    if (key && a.text) got[key] = a.text.trim();
+    if (key && a.text) got[key] = normalizeStampText(a.text);
   });
   if (!got.code && !got.area && !got.coverage && !got.floors && !got.far) return null;
   const area = numToken(got.area);
   const floors = rangeToken(got.floors) || (numToken(got.floors) ? numToken(got.floors).raw : String(got.floors || '').trim());
   const coverage = numToken(got.coverage);
   const far = numToken(got.far);
+  const codeNorm = normalizeStampText(got.code).replace(/\s+/g, '');
   return {
-    code: isLotCode(got.code) ? got.code.toUpperCase() : String(got.code || '').trim().slice(0, 16),
+    code: isLotCode(codeNorm) ? codeNorm.toUpperCase() : codeNorm.slice(0, 16),
     areaRaw: area ? area.raw : '',
     floors: floors && floors !== '0' ? floors : '',
     coverage: coverage && coverage.value !== 0 ? numText(coverage.value) : '',
@@ -467,6 +489,15 @@ function fillStamp(base, extra) {
   return out.code || out.areaRaw || out.floors || out.coverage || out.far ? out : null;
 }
 
+/** ATTRIB không đặt tên tag (cùng tag "1") → đọc theo vị trí chữ trong tem như TEXT. */
+function attrTextItems(block) {
+  return (block.attrs || []).map(a => {
+    const text = normalizeStampText(a.text);
+    if (!text || !Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
+    return { text, x: a.x, y: a.y, h: 2 };
+  }).filter(Boolean);
+}
+
 /** DXF lớp ký hiệu → tem { code, areaRaw, floors, coverage, far, x, y } trong hệ tọa độ bản vẽ */
 export function parseLandStampDxf(text) {
   const { texts, circles, blocks } = readStampEntities(text);
@@ -475,7 +506,8 @@ export function parseLandStampDxf(text) {
   const used = new Set();
   blocks.forEach(b => {
     const fromAttr = stampFromBlock(b);
-    const fromText = (b.texts && b.texts.length) ? parseItems(b.texts.flatMap(explode), NaN, NaN) : null;
+    const textSrc = [...(b.texts || []), ...attrTextItems(b)];
+    const fromText = textSrc.length ? parseItems(textSrc.flatMap(explode), NaN, NaN) : null;
     const s = fillStamp(fromAttr, fromText);
     if (!s) return;
     s.points = b.points;
@@ -590,14 +622,10 @@ function distToLot(lng, lat, polys) {
   return best;
 }
 
-function nearestLot(stamp, lots, tol) {
-  let best = null;
-  let bestD = tol;
+function minDistToLot(stamp, lot) {
+  let best = Infinity;
   candPoints(stamp).forEach(p => {
-    lots.forEach(lot => {
-      const d = distToLot(p.lng, p.lat, lot.rings);
-      if (d <= bestD) { bestD = d; best = lot; }
-    });
+    best = Math.min(best, distToLot(p.lng, p.lat, lot.rings));
   });
   return best;
 }
@@ -625,19 +653,124 @@ function mergeGroup(group) {
   return out;
 }
 
+/** Sai số diện tích tem ↔ hatch để tự gán (1%). */
+export const STAMP_AREA_TOL = 0.01;
+
+const TYPE_FAMILY = {
+  '1-CV': 'green', 'CX-HC': 'green', 'CX-CD': 'green',
+  '2-BDX': 'parking',
+  '9-TM': 'commerce', 'CC-DV': 'commerce',
+  'O-NO': 'housing', 'O-LX': 'housing', 'O-HH': 'housing',
+  '3-MN': 'school', '4-TH': 'school', '5-THCS': 'school', '6-THPT': 'school', SCHOOL: 'school',
+  '7-YT': 'health', '8-VH': 'culture', TDTT: 'culture',
+  'CQ': 'office', 'DT-TG': 'worship', 'NTR': 'cemetery', 'DCS': 'vacant'
+};
+
+function foldCompact(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '');
+}
+
+// Tiền tố ký hiệu tem → gợi ý chữ trong tên layer khi landPatternKey chưa đủ (vd. layer "CAY 1").
+const PREFIX_LAYER_RE = [
+  [/^CX|^CV/, /CAY|CX|CONGVIEN|VUONHOA|GREEN|PARK|DIEMXANH/],
+  [/^P\d|^P$|^BDX|^BX/, /BAI|DOXE|PARKING|BDX|\bBX\b/],
+  [/^TM|^TMDV|^DVTM|^DV|^TTTM/, /THUONGMAI|DICHVU|TMDV|DVTM|CONGCONG|TTTM|SIEUTHI|\bCHO\b/],
+  [/^MN/, /MAMNON|MAUGIAO|NHATRE|\bMN\b/],
+  [/^THCS/, /THCS|TRUNGHOCCOSO/],
+  [/^THPT/, /THPT|TRUNGHOCPHOTHONG/],
+  [/^TH/, /TIEUHOC|\bTH\b/],
+  [/^YT/, /YTE|BENHVIEN|TRAMY/],
+  [/^VH|^TDTT/, /VANHOA|THETHAO|TDTT/],
+  [/^O|^NO|^OB|^OL|^OH/, /NHAO|DATO|ODT|ONT|LANGXOM|CHUNGCU/]
+];
+
+function stampTypeKey(code) {
+  const c = String(code || '').trim();
+  if (!c) return '';
+  return lotCodePatternKey(c) || landPatternKey(c) || '';
+}
+
+function lotTypeKey(lot) {
+  if (lot && lot.typeKey) return lot.typeKey;
+  return landPatternKey(lot && lot.layer, (lot && (lot.name || lot.lotCode)) || '') || '';
+}
+
+/** Ký hiệu tem có cùng nhóm loại đất với layer / typeKey của hatch. */
+export function stampNameMatch(stamp, lot) {
+  const code = String(stamp && stamp.code || '').trim();
+  if (!code || !lot) return false;
+  const a = stampTypeKey(code);
+  const b = lotTypeKey(lot);
+  if (a && b) {
+    if (a === b) return true;
+    if (TYPE_FAMILY[a] && TYPE_FAMILY[a] === TYPE_FAMILY[b]) return true;
+  }
+  const layer = foldCompact(lot.layer || '') + foldCompact(lot.name || '');
+  if (!layer) return false;
+  const head = foldCompact(code);
+  for (const [pre, re] of PREFIX_LAYER_RE) {
+    if (pre.test(head) && re.test(layer)) return true;
+  }
+  const pref = (head.match(/^[A-Z]+/) || [''])[0];
+  return !!(pref && pref.length >= 2 && layer.includes(pref));
+}
+
+export function stampAreaMatch(stamp, lot, tol = STAMP_AREA_TOL) {
+  if (!stamp || !lot || !(lot.area > 0)) return false;
+  const m2 = stampAreaM2(stamp.areaRaw, lot.area);
+  if (!(m2 > 0)) return false;
+  return Math.abs(m2 - lot.area) / lot.area <= tol;
+}
+
+function scoreLot(stamp, lot, tol, areaTol) {
+  const hit = bestHit(stamp, lot);
+  const near = hit ? false : minDistToLot(stamp, lot) <= tol;
+  const pos = hit === 'in' || hit === 'hole' || near;
+  const name = stampNameMatch(stamp, lot);
+  const area = stampAreaMatch(stamp, lot, areaTol);
+  const n = (pos ? 1 : 0) + (name ? 1 : 0) + (area ? 1 : 0);
+  const parts = [];
+  if (hit === 'in') parts.push('pos');
+  else if (hit === 'hole') parts.push('hole');
+  else if (near) parts.push('near');
+  if (name) parts.push('name');
+  if (area) parts.push('area');
+  return { lot, pos, name, area, n, hit, near, how: parts.join('+') };
+}
+
 /**
- * lots: { key, area, rings } — rings là mảng polygon GeoJSON [lng, lat].
- * assign: { stampId: lotKey } do người dùng chọn. skip: tem bỏ qua.
- * Một lô một bộ chỉ tiêu. Nhiều tem không mâu thuẫn thì gộp; mâu thuẫn thì để người dùng gán.
- * tolM: mét, tem nằm sát mép lô (mặc định 12).
+ * Chỉ tự gán khi ≥ 2 tiêu chí (vị trí / tên / diện tích) cùng một lô.
+ * Khớp đúng 1 tiêu chí → không gán (hỏi người dùng).
+ */
+function preferLot(stamp, openLots, tol, areaTol) {
+  if (!openLots.length) return { lot: null, how: '' };
+  const scored = openLots.map(l => scoreLot(stamp, l, tol, areaTol))
+    .filter(s => s.n >= 2)
+    .sort((a, b) => b.n - a.n
+      || (a.hit === 'in' || a.hit === 'hole' ? 0 : 1) - (b.hit === 'in' || b.hit === 'hole' ? 0 : 1)
+      || (a.lot.area || 0) - (b.lot.area || 0));
+  if (!scored.length) return { lot: null, how: '' };
+  const best = scored[0];
+  // Hai lô cùng số tiêu chí → không đoán; để người dùng chọn.
+  if (scored.length > 1 && scored[1].n === best.n) return { lot: null, how: '' };
+  return { lot: best.lot, how: best.how };
+}
+
+/**
+ * lots: { key, area, rings, layer?, name?, lotCode?, typeKey? }.
+ * assign / skip: gán tay. areaTol: sai số diện tích (mặc định 1%).
+ * Một lô một bộ chỉ tiêu; nhiều tem cùng lô không mâu thuẫn thì gộp.
  */
 export function matchStamps(stamps, lots, opt = {}) {
   const assign = opt.assign || {};
   const skip = new Set(opt.skip || []);
   const tol = Number.isFinite(opt.tolM) ? opt.tolM : STAMP_TOL_M;
+  const areaTol = Number.isFinite(opt.areaTol) ? opt.areaTol : STAMP_AREA_TOL;
   const used = new Set();
   const taken = new Set();
   const assigned = [];
+  const pending = [];
   const claim = (stamp, key, how) => {
     if (!stamp || !key || used.has(key) || skip.has(stamp.id)) return false;
     const ids = stamp.members || [stamp.id];
@@ -649,46 +782,93 @@ export function matchStamps(stamps, lots, opt = {}) {
     return true;
   };
   (stamps || []).forEach(s => { if (assign[s.id]) claim(s, assign[s.id], 'user'); });
+
   const free = () => (lots || []).filter(l => !used.has(l.key));
-  const hits = (stamps || []).filter(s => !taken.has(s.id) && !skip.has(s.id)).map(s => {
+  const openStamps = () => (stamps || []).filter(s => !taken.has(s.id) && !skip.has(s.id));
+
+  // Ưu tiên tem khớp nhiều tiêu chí hơn (pos+name+area trước pos+name...).
+  const rankHow = (how) => 3 - String(how || '').split('+').filter(Boolean).length;
+
+  let guard = 0;
+  while (guard++ < 1000) {
     const open = free();
-    const inside = open.filter(l => bestHit(s, l) === 'in').sort((a, b) => (a.area || 0) - (b.area || 0));
-    const hole = open.filter(l => bestHit(s, l) === 'hole').sort((a, b) => (a.area || 0) - (b.area || 0));
-    return { stamp: s, lot: inside[0] || hole[0] || null, how: inside[0] ? 'auto' : hole[0] ? 'hole' : '' };
+    const left = openStamps();
+    if (!left.length) break;
+    const props = left.map(s => {
+      const pref = preferLot(s, open, tol, areaTol);
+      return { stamp: s, lot: pref.lot, how: pref.how };
+    }).filter(p => p.lot);
+    if (!props.length) {
+      left.forEach(s => pending.push(s));
+      break;
+    }
+    const byLot = new Map();
+    props.forEach(p => {
+      const g = byLot.get(p.lot.key) || [];
+      g.push(p);
+      byLot.set(p.lot.key, g);
+    });
+    let progressed = false;
+    const singles = [];
+    const conflicts = [];
+    byLot.forEach((group, key) => {
+      if (group.length === 1) singles.push(group[0]);
+      else conflicts.push({ key, group });
+    });
+    singles.sort((a, b) => rankHow(a.how) - rankHow(b.how));
+    singles.forEach(p => {
+      if (used.has(p.lot.key) || taken.has(p.stamp.id)) return;
+      if (claim(p.stamp, p.lot.key, p.how || 'auto')) progressed = true;
+    });
+    conflicts.forEach(({ key, group }) => {
+      if (used.has(key)) return;
+      const merged = mergeGroup(group);
+      if (merged && claim(merged, key, 'merge')) {
+        progressed = true;
+        return;
+      }
+      // Tranh lô: giữ tem khớp diện tích / tên rõ hơn; còn lại để vòng sau hoặc pending.
+      // Tranh một lô: chỉ chốt nếu một tem vượt các tem kia về số tiêu chí; không thì hỏi tay.
+      const scored = group.slice().sort((a, b) => {
+        const na = String(a.how || '').split('+').filter(Boolean).length;
+        const nb = String(b.how || '').split('+').filter(Boolean).length;
+        if (nb !== na) return nb - na;
+        return rankHow(a.how) - rankHow(b.how);
+      });
+      const best = scored[0];
+      const bestN = String(best.how || '').split('+').filter(Boolean).length;
+      const secondN = scored[1] ? String(scored[1].how || '').split('+').filter(Boolean).length : 0;
+      if (bestN >= 2 && bestN > secondN && claim(best.stamp, key, best.how)) {
+        progressed = true;
+        return;
+      }
+      group.forEach(p => {
+        if (!taken.has(p.stamp.id)) pending.push(p.stamp);
+        taken.add(p.stamp.id);
+      });
+      progressed = true;
+    });
+    if (!progressed) {
+      left.forEach(s => { if (!taken.has(s.id)) pending.push(s); });
+      break;
+    }
+  }
+  openStamps().forEach(s => pending.push(s));
+  const seenPend = new Set();
+  const pendingUnique = pending.filter(s => {
+    if (!s || seenPend.has(s.id)) return false;
+    seenPend.add(s.id);
+    return true;
   });
-  const by = new Map();
-  hits.forEach(h => {
-    if (!h.lot) return;
-    const g = by.get(h.lot.key) || [];
-    g.push(h);
-    by.set(h.lot.key, g);
-  });
-  const pending = [];
-  const give = (group, key, how) => {
-    if (group.length === 1) { claim(group[0].stamp, key, how); return; }
-    const merged = mergeGroup(group);
-    if (merged && claim(merged, key, 'merge')) return;
-    group.forEach(h => pending.push(h.stamp));
-  };
-  by.forEach((group, key) => give(group, key, group[0].how || 'auto'));
-  const near = [];
-  hits.forEach(h => {
-    if (h.lot || taken.has(h.stamp.id) || skip.has(h.stamp.id)) return;
-    const lot = nearestLot(h.stamp, free(), tol);
-    if (!lot) { pending.push(h.stamp); return; }
-    const g = near.find(n => n.key === lot.key);
-    if (g) g.group.push(h);
-    else near.push({ key: lot.key, group: [h] });
-  });
-  near.forEach(n => give(n.group, n.key, 'near'));
   const unmatchedLots = (lots || []).filter(l => !used.has(l.key)).map(l => l.key);
-  return { assigned, pending, unmatchedLots };
+  return { assigned, pending: pendingUnique, unmatchedLots };
 }
 
 /** Diện tích ghi trên tem → m². So với diện tích polygon để phân biệt ha (5.230) và m² (5.230 = 5230). */
 export function stampAreaM2(raw, lotM2) {
-  const s = String(raw || '').trim().replace(/\s/g, '').replace(',', '.');
-  const n = Number(s);
+  const tok = numToken(String(raw || '').trim().replace(/\s/g, ''));
+  const s = tok ? tok.raw : String(raw || '').trim().replace(/\s/g, '').replace(',', '.');
+  const n = tok ? tok.value : Number(s);
   if (!Number.isFinite(n) || n <= 0) return null;
   const dec = (s.split('.')[1] || '').length;
   const cands = [n];
