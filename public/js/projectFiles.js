@@ -47,9 +47,18 @@ export function bindMap(fn, zoom, lotZoomFn) {
   if (lotZoomFn) lotZoom = lotZoomFn;
 }
 
-/** QHPK 1/2.000, chưa chọn phường: ranh bấm được ở mọi zoom. Lô không theo ngưỡng zoom. */
+/** Từ mức này trở lên (khớp viewFlow PLACE_ZOOM): đang xem địa điểm — bỏ chế độ chỉ ranh. */
+export const PLACE_DETAIL_ZOOM = 14;
+
+/**
+ * QHPK 1/2.000, chưa chọn phường, nhìn rộng: chỉ ranh (bấm / tick mới mở lô).
+ * Zoom lớn (≥ PLACE_DETAIL_ZOOM): không còn chỉ-ranh — mở lô tại khung đang xem.
+ */
 export function qhpkBoundaryOnly() {
-  return getLevel() === 'qhpk' && state.showProjects && !wardScopeName();
+  if (getLevel() !== 'qhpk' || !state.showProjects || wardScopeName()) return false;
+  const map = getMap();
+  if (map && map.getZoom() >= PLACE_DETAIL_ZOOM) return false;
+  return true;
 }
 
 export function schemeInteriorOn(name) {

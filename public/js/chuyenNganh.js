@@ -2105,7 +2105,12 @@ export function initChuyenNganh() {
     const layerId = e.target.closest('[data-cn-layer]')?.dataset.cnLayer;
     if (layerId) {
       const layer = getLayers().find(l => l.id === layerId);
-      if (layer) setLayerOn(layer, e.target.checked, { frame: e.target.checked && !layer.bind });
+      // Lớp GIS giao thông QHC 1/25.000 phủ cả TP: tick con không fitBounds (giữ khung đang xem).
+      const gtQhc25Child = layer?.sector === QHC25_GT_SECTOR
+        && !!e.target.closest('#gt25Children, #qhc25HtktHt, #qhc25HtktQh');
+      if (layer) setLayerOn(layer, e.target.checked, {
+        frame: e.target.checked && !layer.bind && !gtQhc25Child
+      });
       if (e.target.checked && layer) publishSectorLegend(true, layer.sector);
       return;
     }

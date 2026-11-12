@@ -9,11 +9,11 @@
 //    - QHC 1/10.000: ranh + tên mọi đồ án QHC đang bật (kể cả ngoài vùng trung tâm). Droplist phóng khung nếu còn đồ án ngoài màn hình, không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung, mở thẳng lô.
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
-//    - QHPK 1/2.000: ranh mọi đồ án; bấm ranh hoặc tick một đồ án trong panel mới tải lô đồ án đó.
+//    - QHPK 1/2.000: nhìn rộng chỉ ranh; bấm ranh / tick mới tải lô. Zoom ≥ PLACE_DETAIL_ZOOM (hoặc đang
+//      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn, không fitBounds toàn đồ án.
 //      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
-//      Chọn phường: vẫn chỉ ranh, lô khi tick đồ án (chỉ tiêu panel dưới giữ nguyên).
 //      Esc khi đang chọn đồ án QHPK: bỏ chọn, giữ lớp và khung nhìn, không phóng ra toàn thành phố.
-//    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), tick hoặc bấm đồ án → chi tiết.
+//    - QHCT 1/500: nhìn rộng ranh + tên; tick / bấm → chi tiết. Zoom lớn: mở lô tại khung như QHPK.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
@@ -23,8 +23,8 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering } from './projectLayer.js';
-import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView } from './projectLayer.js';
+import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
   URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt, urbanStatusFeature, urbanStatusAt
@@ -46,7 +46,7 @@ const WARD_PICK_MAX_ZOOM = 14;
 // Hệ thống đô thị: dưới mức này tem công trình, biểu đồ và ranh đồ án không nhận chuột để còn bấm được ranh đô thị
 export const URBAN_DETAIL_ZOOM = 13;
 // Từ mức này trở lên (hoặc đang chọn phường / đồ án) là đang xem một địa điểm, không phải toàn thành phố
-const PLACE_ZOOM = 14;
+const PLACE_ZOOM = PLACE_DETAIL_ZOOM;
 // Tải lô nhanh hơn ngưỡng này thì không hiện thanh tiến độ (tránh nháy)
 const PROGRESS_DELAY_MS = 250;
 // Ký hiệu đô thị (QĐ 756) mở QHC 1/10.000 khi bật lớp đô thị để so sánh ở lớp khác
@@ -111,13 +111,19 @@ function onLevelChange({ level, prev, keepView }) {
   if (level === 'qhpk') {
     setQhcPlaceMode(false);
     if (!state.focusedProject) revealWardProjects(ward);
+    // Zoom lớn / đang xem địa điểm: mở lô tại tâm khung, bỏ bước chỉ-ranh.
+    if (viewingPlace()) openLotsAtView('QHPK');
     syncEscHint();
     return;
   }
   revealWardProjects(ward, { show: false });
   const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
   setQhcPlaceMode(place);
-  if (level === 'qhc10') setCoreOpen(place);
+  if (level === 'qhc10') {
+    setCoreOpen(place);
+    if (place) openLotsAtView('QHC');
+  }
+  if (level === 'qhct' && viewingPlace()) openLotsAtView('QHCT');
   // keepView (bấm QHC 1/25.000 hoặc 1/10.000): giữ nguyên khung nhìn, không phóng ra toàn thành phố.
   // Địa điểm cụ thể: giữ khung. Bấm đô thị trung tâm (không keepView) vẫn phóng tới vùng trung tâm.
   if (place || level !== 'qhc10' || state.focusedProject || keepView) {
