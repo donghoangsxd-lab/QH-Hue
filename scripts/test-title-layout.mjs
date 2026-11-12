@@ -174,7 +174,8 @@ try {
     }, withClass);
     boxes.panels.forEach(panel => {
       assert.ok(panel.width > 80, `${withClass} ${panel.cls} rộng ${panel.width}`);
-      assert.ok(panel.left >= boxes.tool.right + 6, `${withClass} ${panel.cls} left ${panel.left} đè cột nút ${boxes.tool.right}`);
+      // Cột nút điện thoại ở mép phải (ui-spec). Thẻ đứng bên trái cột, không đè.
+      assert.ok(panel.right <= boxes.tool.left - 6, `${withClass} ${panel.cls} mép phải ${panel.right} đè cột nút ${boxes.tool.left}`);
     });
     console.log(JSON.stringify({ phone: withClass ? 'class' : 'media', toolRight: Math.round(boxes.tool.right), panels: boxes.panels.map(p => ({ cls: p.cls, left: Math.round(p.left) })) }));
   }

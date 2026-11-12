@@ -93,7 +93,7 @@ const pack = sketchShapesFromKml(kml);
 assert.equal(pack.shapes.length, 3);
 assert.equal(pack.shapes[0].tool, 'polygon');
 assert.equal(pack.shapes[0].color, '#f43f5e');
-assert.equal(pack.shapes[1].tool, 'line');
+assert.equal(pack.shapes[1].tool, 'polyline');
 assert.equal(pack.shapes[1].color, '#fac015');
 assert.equal(pack.shapes[2].tool, 'text');
 assert.equal(pack.shapes[2].text, 'Chu xanh');

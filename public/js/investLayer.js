@@ -321,6 +321,81 @@ function setDvtmSubMap(subId, on) {
   });
 }
 
+function projectsOfGroup(groupId) {
+  return projectList().filter(p => p.dtGroup === groupId);
+}
+
+function projectsOfSub(subId) {
+  return projectList().filter(p => p.dtGroup === 'dvtm' && p.dvtmSub === subId);
+}
+
+/** on = mọi dự án hiện; off = không dự án nào; mixed = một phần (khớp tick từng dòng). */
+function mapFlag(items) {
+  if (!items.length) return 'off';
+  let shown = 0;
+  items.forEach(p => { if (!investHidden.has(projectKey(p))) shown += 1; });
+  if (shown === 0) return 'off';
+  if (shown === items.length) return 'on';
+  return 'mixed';
+}
+
+function setGroupMap(groupId, on) {
+  projectsOfGroup(groupId).forEach(p => {
+    const id = projectKey(p);
+    if (!id) return;
+    if (on) investHidden.delete(id);
+    else investHidden.add(id);
+  });
+}
+
+function paintLegendBox(box, flag) {
+  box.checked = flag === 'on';
+  box.indeterminate = flag === 'mixed';
+}
+
+export function syncInvestLegendBoxes() {
+  document.querySelectorAll('[data-invest-legend-group]').forEach(box => {
+    paintLegendBox(box, mapFlag(projectsOfGroup(box.dataset.investLegendGroup)));
+  });
+  document.querySelectorAll('[data-invest-legend-sub]').forEach(box => {
+    paintLegendBox(box, mapFlag(projectsOfSub(box.dataset.investLegendSub)));
+  });
+}
+
+function openInvestGroup(groupId) {
+  const sel = $('dtGroupPick');
+  if (!sel || !groupId || sel.value === groupId) return;
+  sel.value = groupId;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Checkbox chú giải: bật/tắt cả nhóm hoặc nhóm con, rồi nhảy sang tab nhóm. */
+function applyInvestLegendToggle(kind, id, on) {
+  if (!id) return;
+  if (kind === 'sub') {
+    setDvtmSubMap(id, on);
+    if (on) {
+      dvtmFoldOpen.add(id);
+      openInvestGroup('dvtm');
+    }
+  } else {
+    setGroupMap(id, on);
+    if (on) {
+      if (id === 'dvtm') DVTM_SUBGROUPS.forEach(s => dvtmFoldOpen.add(s.id));
+      openInvestGroup(id);
+    }
+  }
+  if (on) {
+    const box = $('chk_invest');
+    if (box && !box.checked) {
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    } else queueInvestDraw();
+  } else queueInvestDraw();
+  paintInvestList({ counts: false });
+  syncInvestLegendBoxes();
+}
+
 function dvtmSubMapOn(subId, items) {
   return items.some(p => !investHidden.has(projectKey(p)));
 }
@@ -418,20 +493,26 @@ function sectorDropSvg(sector, className = 'invest-drop') {
   </svg>`;
 }
 
-/** Chú giải trục F: đủ giọt nước từng nhóm (+ nhóm con DVTM) và swatch ranh; không checkbox lớp. */
+/** Chú giải trục F: giọt nước từng nhóm, swatch ranh, checkbox cuối dòng nhóm / nhóm con. Không checkbox «Dự án kêu gọi đầu tư». */
 export function investLegendHtml() {
-  const row = (look, label, nested = false) =>
-    `<div class="htkt-legend-row invest-legend-row${nested ? ' is-sub' : ''}">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${escapeHtml(label)}</span></div>`;
+  const row = (look, label, nested, kind, id) => {
+    const flag = kind === 'sub' ? mapFlag(projectsOfSub(id)) : mapFlag(projectsOfGroup(id));
+    const attr = kind === 'sub'
+      ? `data-invest-legend-sub="${escapeHtml(id)}"`
+      : `data-invest-legend-group="${escapeHtml(id)}"`;
+    const name = escapeHtml(label);
+    return `<label class="htkt-legend-row invest-legend-row${nested ? ' is-sub' : ''}">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${name}</span><input type="checkbox" ${attr}${flag === 'on' ? ' checked' : ''} aria-label="Hiện ${name} trên bản đồ"></label>`;
+  };
   const bound = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch" aria-hidden="true"></i><span>Ranh dự án</span></div>`;
   let html = `<div class="invest-legend-block"><b class="invest-legend-h">Ký hiệu chung</b>${bound}</div>`;
   html += '<div class="invest-legend-block"><b class="invest-legend-h">Nhóm dự án</b>';
   for (const g of INVEST_GROUPS) {
     const look = GROUP_LOOK[g.id] || lookOf('layers', '#64748b', '#334155', g.label);
-    html += row(look, g.label || g.title || g.id);
+    html += row(look, g.label || g.title || g.id, false, 'group', g.id);
     if (g.id === 'dvtm') {
       for (const s of DVTM_SUBGROUPS) {
         const sub = DVTM_LOOK[s.id] || lookOf('shop', '#ec4899', '#9d174d', s.label);
-        html += row(sub, s.label || s.title || s.id, true);
+        html += row(sub, s.label || s.title || s.id, true, 'sub', s.id);
       }
     }
   }
@@ -2022,6 +2103,7 @@ function paintInvestList(opts = {}) {
   });
   if (scroller) scroller.scrollTop = y;
   if (opts.counts !== false) refreshHint();
+  syncInvestLegendBoxes();
 }
 
 /** Gộp nhiều lần đổi tab / tick ẩn hiện thành một lần vẽ lớp trong khung hình kế tiếp. */
@@ -2179,6 +2261,12 @@ export function initInvestLayer() {
     }
   });
   $('chk_invest')?.addEventListener('change', (e) => setVisible(e.target.checked));
+  document.addEventListener('change', (e) => {
+    const group = e.target?.closest?.('[data-invest-legend-group]');
+    const sub = !group && e.target?.closest?.('[data-invest-legend-sub]');
+    if (group) applyInvestLegendToggle('group', group.dataset.investLegendGroup, group.checked);
+    else if (sub) applyInvestLegendToggle('sub', sub.dataset.investLegendSub, sub.checked);
+  });
   const listHost = $('dtList');
   listHost?.addEventListener('click', (e) => {
     if (!e.target.closest('.invest-tab-list')) return;
@@ -2223,6 +2311,7 @@ export function initInvestLayer() {
     if (box.checked) investHidden.delete(id);
     else investHidden.add(id);
     box.closest('.project-row')?.classList.toggle('is-off', !box.checked);
+    syncInvestLegendBoxes();
     if (box.checked && !$('chk_invest')?.checked) {
       $('chk_invest').checked = true;
       $('chk_invest').dispatchEvent(new Event('change', { bubbles: true }));
