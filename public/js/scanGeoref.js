@@ -1,25 +1,26 @@
-// Ghép ảnh tờ bản vẽ scan (A3 có dấu) lên bản đồ, hai cách:
-//  - Kéo, xoay (mặc định): ảnh nằm dưới ranh điều chỉnh đọc từ DXF, người dùng dời / co giãn đều / xoay cho khung
-//    bản vẽ đã phê duyệt trùng ranh (phép đồng dạng, giữ tỷ lệ tờ).
-//  - Chấm điểm: cặp điểm ảnh ↔ bản đồ, giải affine 6 tham số (dời, co giãn, xoay, xiên) bằng bình phương tối thiểu.
-// Cả hai tính trong hệ mét Web Mercator. Định vị lưu dạng 3 góc ảnh (trên trái, trên phải, dưới trái);
-// ScanOverlay vẽ bằng ma trận CSS nên không cần plugin.
+// Ghép ảnh tờ bản vẽ scan lên bản đồ:
+//  - Kéo / xoay / stretch (mặc định): dời, xoay, co giãn độc lập theo cạnh; đồ án SDD căn khít ranh (tightFit).
+//  - Chấm điểm: cặp điểm ảnh ↔ bản đồ, affine 6 tham số.
+// Trước khi ghép đồ án: autoCropWhiteMargins cắt lề trắng rồi nén.
+// Định vị lưu 3 góc ảnh (tl, tr, bl); ScanOverlay dùng CSS matrix.
 import { attachBasemap, detachBasemap, MAP_MAX_ZOOM } from './basemap.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 export const SCAN_MAX_BYTES = 2 * 1024 * 1024 - 8192;
+export const SDD_SCAN_MAX_BYTES = 5 * 1024 * 1024 - 8192;
 const SCAN_INPUT_MAX_BYTES = 40 * 1024 * 1024;
 const SCAN_MAX_SIDE = 6000;
 const SCAN_TYPES = /^image\/(webp|png|jpeg)$/;
 const SNAP_PX = 14;
 const WARN_M = 3;
 const RANH = '#2f80ff';
-// Đặt sẵn khi chưa có định vị: tờ A3 rộng khoảng 5 lần ranh, tâm ranh rơi vào khung bản vẽ bên trái
 const FIT_SHEET_PER_RANH = 5;
 const FIT_ANCHOR = [0.22, 0.36];
 const NUDGE_PX = 1;
 const NUDGE_FAST_PX = 10;
 const MERCATOR_WORLD_M = 40075016.686;
+const WHITE_MIN = 245;
+const WHITE_ROW_RATIO = 0.96;
 
 // ============================ LỚP ẢNH XOAY ============================
 
@@ -117,7 +118,6 @@ export function solveAffine(gcps) {
     sxX += x * X; syX += y * X; sxY += x * Y; syY += y * Y;
   });
   const det = sxx * syy - sxy * sxy;
-  // Các điểm ảnh gần thẳng hàng thì không xác định được góc xoay / co giãn theo phương còn lại
   if (!(det > 1e-6 * sxx * syy) || !(sxx > 0) || !(syy > 0)) return null;
   const a = (sxX * syy - syX * sxy) / det, b = (syX * sxx - sxX * sxy) / det;
   const d = (sxY * syy - syY * sxy) / det, e = (syY * sxx - sxY * sxy) / det;
@@ -134,39 +134,68 @@ export function solveAffine(gcps) {
     residuals,
     rms: n > 3 ? Math.sqrt(residuals.reduce((s, r) => s + r * r, 0) / n) : 0,
     mpp: Math.sqrt(Math.abs(a * e - b * d)) * k,
-    // Trục y ảnh hướng xuống, trục Y Mercator hướng lên: định thức dương nghĩa là ảnh bị lật (chấm sai cặp)
     mirrored: a * e - b * d > 0
   };
 }
 
-// Phép đồng dạng t = { cx, cy: tâm ảnh (mét Mercator), s: mét Mercator / pixel, a: góc xoay ngược chiều kim đồng hồ (rad) }
+/** t = { cx, cy, sx, sy, a } — sx/sy mét Mercator / pixel; a rad ngược chiều kim đồng hồ */
+function normT(t) {
+  if (!t) return null;
+  const sx = Number(t.sx != null ? t.sx : t.s);
+  const sy = Number(t.sy != null ? t.sy : t.s);
+  if (!(sx > 0) || !(sy > 0)) return null;
+  return { cx: t.cx, cy: t.cy, sx, sy, s: (sx + sy) / 2, a: t.a || 0 };
+}
+
 function similarityAt(t, w, h, x, y) {
-  const dx = x - w / 2, dy = y - h / 2;
+  const dx = (x - w / 2) * t.sx, dy = (y - h / 2) * t.sy;
   const c = Math.cos(t.a), s = Math.sin(t.a);
-  return unproject(t.cx + t.s * (dx * c + dy * s), t.cy + t.s * (dx * s - dy * c));
+  return unproject(t.cx + dx * c + dy * s, t.cy + dx * s - dy * c);
 }
 
 function similarityCorners(t, w, h) {
   const at = (x, y) => similarityAt(t, w, h, x, y);
-  return { tl: at(0, 0), tr: at(w, 0), br: at(w, h), bl: at(0, h), rot: at(w / 2, -h * 0.08) };
+  return {
+    tl: at(0, 0), tr: at(w, 0), br: at(w, h), bl: at(0, h),
+    rot: at(w / 2, -h * 0.08),
+    eL: at(0, h / 2), eR: at(w, h / 2), eT: at(w / 2, 0), eB: at(w / 2, h)
+  };
 }
 
-/** 3 góc đã lưu (kể cả affine có xiên) → phép đồng dạng gần nhất theo cạnh trên của ảnh */
-function similarityFrom(g, w) {
+/** 3 góc đã lưu → phép gần nhất (có stretch nếu cạnh đứng ≠ cạnh ngang) */
+function similarityFrom(g, w, h) {
   const tl = project(g.tl), tr = project(g.tr), bl = project(g.bl);
   const ux = tr.x - tl.x, uy = tr.y - tl.y;
-  return { cx: (tr.x + bl.x) / 2, cy: (tr.y + bl.y) / 2, s: Math.hypot(ux, uy) / w, a: Math.atan2(uy, ux) };
+  const vx = bl.x - tl.x, vy = bl.y - tl.y;
+  const sx = Math.hypot(ux, uy) / w;
+  const sy = Math.hypot(vx, vy) / (h || w);
+  const brx = tr.x + bl.x - tl.x, bry = tr.y + bl.y - tl.y;
+  return normT({ cx: (tl.x + brx) / 2, cy: (tl.y + bry) / 2, sx, sy, a: Math.atan2(uy, ux) });
 }
 
+/** Tờ rộng hơn ranh (điều chỉnh cục bộ): giữ tỷ lệ ảnh */
 function similarityGuess(bounds, w, h) {
   if (!bounds || !bounds.isValid()) return null;
   const sw = project([bounds.getSouth(), bounds.getWest()]), ne = project([bounds.getNorth(), bounds.getEast()]);
   const s = Math.max(ne.x - sw.x, (ne.y - sw.y) * w / h) * FIT_SHEET_PER_RANH / w;
   const mx = (sw.x + ne.x) / 2, my = (sw.y + ne.y) / 2;
-  return { cx: mx - s * (FIT_ANCHOR[0] * w - w / 2), cy: my + s * (FIT_ANCHOR[1] * h - h / 2), s, a: 0 };
+  return normT({
+    cx: mx - s * (FIT_ANCHOR[0] * w - w / 2),
+    cy: my + s * (FIT_ANCHOR[1] * h - h / 2),
+    sx: s, sy: s, a: 0
+  });
 }
 
-// ============================ CHUẨN BỊ ẢNH ============================
+/** Đồ án SDD: stretch khít bbox ranh (loại trừ phần lớn lệch tỷ lệ sau crop) */
+function tightFitGuess(bounds, w, h) {
+  if (!bounds || !bounds.isValid() || !(w > 0) || !(h > 0)) return null;
+  const sw = project([bounds.getSouth(), bounds.getWest()]), ne = project([bounds.getNorth(), bounds.getEast()]);
+  const sx = Math.max(1e-6, (ne.x - sw.x) / w);
+  const sy = Math.max(1e-6, (ne.y - sw.y) / h);
+  return normT({ cx: (sw.x + ne.x) / 2, cy: (sw.y + ne.y) / 2, sx, sy, a: 0 });
+}
+
+// ============================ CẮT LỀ TRẮNG + CHUẨN BỊ ẢNH ============================
 
 export function scanProblem(file) {
   if (!file) return '';
@@ -186,34 +215,147 @@ function loadImage(src) {
 
 const toBlob = (canvas, type, q) => new Promise(r => canvas.toBlob(r, type, q));
 
-/** Ảnh ≤ 2 MB giữ nguyên; lớn hơn thì nén WebP (trình duyệt không hỗ trợ thì JPEG), thu nhỏ dần nếu vẫn quá cỡ */
-export async function prepareScan(file) {
+function isNearWhite(r, g, b, a) {
+  if (a < 12) return true;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  return max >= WHITE_MIN && (max - min) <= 20;
+}
+
+/** Tìm bbox nội dung (bỏ lề trắng). Trả null nếu không cắt được / cắt quá ít. */
+export function detectWhiteMarginBox(data, w, h) {
+  if (!data || !(w > 8) || !(h > 8) || data.length < w * h * 4) return null;
+  const rowWhite = (y) => {
+    let n = 0;
+    const row = y * w * 4;
+    for (let x = 0; x < w; x++) {
+      const i = row + x * 4;
+      if (isNearWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) n++;
+    }
+    return n / w >= WHITE_ROW_RATIO;
+  };
+  const colWhite = (x) => {
+    let n = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      if (isNearWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) n++;
+    }
+    return n / h >= WHITE_ROW_RATIO;
+  };
+  let top = 0, bottom = h - 1, left = 0, right = w - 1;
+  while (top < bottom && rowWhite(top)) top++;
+  while (bottom > top && rowWhite(bottom)) bottom--;
+  while (left < right && colWhite(left)) left++;
+  while (right > left && colWhite(right)) right--;
+  const pad = Math.max(2, Math.round(Math.min(w, h) * 0.01));
+  left = Math.max(0, left - pad);
+  top = Math.max(0, top - pad);
+  right = Math.min(w - 1, right + pad);
+  bottom = Math.min(h - 1, bottom + pad);
+  const cw = right - left + 1, ch = bottom - top + 1;
+  if (cw < 32 || ch < 32) return null;
+  if (cw * ch > w * h * 0.97) return null;
+  if (cw * ch < w * h * 0.08) return null;
+  return { left, top, width: cw, height: ch };
+}
+
+async function encodeUnder(canvas, maxBytes) {
+  let scale = 1;
+  const W0 = canvas.width, H0 = canvas.height;
+  for (let i = 0; i < 8; i++) {
+    const w = Math.max(1, Math.round(W0 * scale)), h = Math.max(1, Math.round(H0 * scale));
+    let src = canvas;
+    if (w !== W0 || h !== H0) {
+      src = document.createElement('canvas');
+      src.width = w;
+      src.height = h;
+      src.getContext('2d').drawImage(canvas, 0, 0, w, h);
+    }
+    for (const q of [0.86, 0.74, 0.62]) {
+      let blob = await toBlob(src, 'image/webp', q);
+      if (!blob || blob.type !== 'image/webp') blob = await toBlob(src, 'image/jpeg', q);
+      if (blob && blob.size <= maxBytes) return { blob, w, h };
+    }
+    scale *= 0.8;
+  }
+  throw new Error(`Không nén được ảnh xuống dưới ${Math.round(maxBytes / (1024 * 1024))} MB`);
+}
+
+/**
+ * Ảnh ≤ maxBytes giữ nguyên nếu đúng loại và cạnh ≤ 6000; không thì nén WebP/JPEG.
+ * opts.maxBytes mặc định SCAN_MAX_BYTES (2 MB).
+ */
+export async function prepareScan(file, opts = {}) {
+  const maxBytes = Number(opts.maxBytes) > 0 ? Number(opts.maxBytes) : SCAN_MAX_BYTES;
   const src = URL.createObjectURL(file);
   try {
     const img = await loadImage(src);
     const W = img.naturalWidth, H = img.naturalHeight;
     if (!W || !H) throw new Error('Ảnh rỗng');
-    if (file.size <= SCAN_MAX_BYTES && SCAN_TYPES.test(file.type) && Math.max(W, H) <= SCAN_MAX_SIDE) {
-      return { blob: file, w: W, h: H };
+    if (file.size <= maxBytes && SCAN_TYPES.test(file.type) && Math.max(W, H) <= SCAN_MAX_SIDE) {
+      return { blob: file, w: W, h: H, cropped: false };
     }
     let scale = Math.min(1, SCAN_MAX_SIDE / Math.max(W, H));
-    for (let i = 0; i < 8; i++) {
-      const w = Math.round(W * scale), h = Math.round(H * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      for (const q of [0.86, 0.74]) {
-        let blob = await toBlob(canvas, 'image/webp', q);
-        if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, 'image/jpeg', q);
-        if (blob && blob.size <= SCAN_MAX_BYTES) return { blob, w, h };
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(W * scale);
+    canvas.height = Math.round(H * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const out = await encodeUnder(canvas, maxBytes);
+    return { ...out, cropped: false };
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
+/**
+ * Cắt lề trắng tự động (nếu có) rồi nén ≤ SDD_SCAN_MAX_BYTES (5 MB).
+ * Trả { blob, w, h, cropped }.
+ */
+export async function prepareSchemeScan(file) {
+  const bad = scanProblem(file);
+  if (bad) throw new Error(bad);
+  const src = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(src);
+    const W = img.naturalWidth, H = img.naturalHeight;
+    if (!W || !H) throw new Error('Ảnh rỗng');
+    const full = document.createElement('canvas');
+    const drawW = Math.min(W, SCAN_MAX_SIDE);
+    const drawH = Math.min(H, Math.round(H * (drawW / W)));
+    full.width = drawW;
+    full.height = drawH;
+    const fctx = full.getContext('2d', { willReadFrequently: true });
+    fctx.fillStyle = '#ffffff';
+    fctx.fillRect(0, 0, drawW, drawH);
+    fctx.drawImage(img, 0, 0, drawW, drawH);
+    let canvas = full;
+    let cropped = false;
+    try {
+      const box = detectWhiteMarginBox(fctx.getImageData(0, 0, drawW, drawH).data, drawW, drawH);
+      if (box) {
+        const cut = document.createElement('canvas');
+        cut.width = box.width;
+        cut.height = box.height;
+        cut.getContext('2d').drawImage(full, box.left, box.top, box.width, box.height, 0, 0, box.width, box.height);
+        canvas = cut;
+        cropped = true;
       }
-      scale *= 0.8;
+    } catch (e) { /* getImageData lỗi → giữ nguyên */ }
+    if (Math.max(canvas.width, canvas.height) > SCAN_MAX_SIDE) {
+      const s = SCAN_MAX_SIDE / Math.max(canvas.width, canvas.height);
+      const shrink = document.createElement('canvas');
+      shrink.width = Math.round(canvas.width * s);
+      shrink.height = Math.round(canvas.height * s);
+      shrink.getContext('2d').drawImage(canvas, 0, 0, shrink.width, shrink.height);
+      canvas = shrink;
     }
-    throw new Error('Không nén được ảnh xuống dưới 2 MB');
+    if (!cropped && file.size <= SDD_SCAN_MAX_BYTES && SCAN_TYPES.test(file.type) && Math.max(W, H) <= SCAN_MAX_SIDE) {
+      return { blob: file, w: W, h: H, cropped: false };
+    }
+    const out = await encodeUnder(canvas, SDD_SCAN_MAX_BYTES);
+    return { ...out, cropped };
   } finally {
     URL.revokeObjectURL(src);
   }
@@ -250,15 +392,15 @@ const degText = (rad) => {
 };
 
 const HINTS = {
-  fit: `Kéo ảnh để dời cho khung <b>bản vẽ đã phê duyệt</b> trùng ranh điều chỉnh (nét xanh, nằm trên ảnh).
-    Kéo chấm vuông ở góc để phóng to / thu nhỏ, kéo chấm tròn phía trên để xoay; nút ±0,1° / ±1° xoay tinh, phím mũi tên dời từng điểm màn hình (giữ Shift dời nhanh).`,
-  gcp: `Bấm một điểm trên khung <b>bản vẽ đã phê duyệt</b> (trái), rồi bấm điểm tương ứng trên bản đồ (phải). Điểm bản đồ tự hít vào đỉnh ranh điều chỉnh (chấm trắng viền xanh).
-    Cần ít nhất 3 cặp, nên 4–6 cặp trải đều các góc ranh và giao tim đường. Kéo chấm để chỉnh.`
+  fit: `Kéo ảnh để dời. Kéo góc để phóng đều; kéo chấm giữa cạnh để <b>stretch</b> ngang/dọc; chấm tròn để xoay.
+    Nút ±0,1° / ±1° xoay tinh; phím mũi tên dời (Shift nhanh).`,
+  gcp: `Bấm một điểm trên khung <b>bản vẽ đã phê duyệt</b> (trái), rồi bấm điểm tương ứng trên bản đồ (phải). Điểm bản đồ tự hít vào đỉnh ranh.
+    Cần ít nhất 3 cặp, nên 4–6 cặp trải đều. Kéo chấm để chỉnh.`
 };
 
 /**
- * Mở khung ghép ảnh. opts: { url, w, h, boundary (GeoJSON ranh điều chỉnh), title, initial (định vị đã lưu: tl, tr, bl, gcps, mode) }.
- * Trả Promise { w, h, tl, tr, bl, gcps, rms, mode: 'fit' | 'gcp' } khi bấm Lưu, null khi hủy.
+ * opts: { url, w, h, boundary, title, initial, tightFit }.
+ * tightFit: căn stretch khít bbox ranh (đồ án SDD). Trả { w, h, tl, tr, bl, gcps, rms, mode } hoặc null.
  */
 export function openGeoref(opts) {
   return new Promise((resolve) => {
@@ -267,7 +409,7 @@ export function openGeoref(opts) {
     const pairs = ((initial && initial.gcps) || []).map(g => ({ px: g.px.slice(), ll: g.ll.slice() }));
     const vertices = boundaryVertices(boundary);
     let mode = initial && initial.mode === 'gcp' && pairs.length >= 3 ? 'gcp' : 'fit';
-    let t = initial ? similarityFrom(initial, w) : null;
+    let t = initial ? similarityFrom(initial, w, h) : null;
     let fit = null;
     let preview = null;
     let imgMap = null;
@@ -284,8 +426,8 @@ export function openGeoref(opts) {
         <b>Ghép bản vẽ scan</b>
         <span>${escapeHtml(opts.title || '')}</span>
         <div class="sg-modes" role="radiogroup" aria-label="Cách ghép">
-          <label class="bulk-kind-btn"><input type="radio" name="sgMode" value="fit">Kéo, xoay ảnh</label>
-          <label class="bulk-kind-btn" title="Chấm cặp điểm ảnh ↔ bản đồ, chính xác hơn khi bản scan bị méo"><input type="radio" name="sgMode" value="gcp">Chấm điểm</label>
+          <label class="bulk-kind-btn"><input type="radio" name="sgMode" value="fit">Kéo, xoay, stretch</label>
+          <label class="bulk-kind-btn" title="Chấm cặp điểm ảnh ↔ bản đồ"><input type="radio" name="sgMode" value="gcp">Chấm điểm</label>
         </div>
         <button type="button" class="bp-btn" data-sg="close">${ico('close')}Hủy</button>
       </div>
@@ -313,9 +455,13 @@ export function openGeoref(opts) {
     const geoMap = L.map(box.querySelector('#sgMap'), { maxZoom: MAP_MAX_ZOOM, touchZoom: true, attributionControl: false, zoomControl: true, keyboard: false });
     attachBasemap(geoMap, 'google');
     geoMap.createPane('sgScan').style.zIndex = 390;
-    // Leaflet cần tâm nhìn trước khi nhận nét vẽ; ranh nằm trên ảnh (overlayPane 400) và không bắt chuột để kéo ảnh xuyên qua
     const ring = boundary ? L.geoJSON(boundary, { interactive: false, style: { color: RANH, weight: 3, dashArray: '10 6', fill: false } }) : null;
     const ringBounds = ring && ring.getBounds();
+
+    function guessT() {
+      if (opts.tightFit) return tightFitGuess(ringBounds, w, h) || similarityGuess(ringBounds, w, h);
+      return similarityGuess(ringBounds, w, h);
+    }
 
     function fitView() {
       if (mode === 'fit' && t) {
@@ -325,16 +471,25 @@ export function openGeoref(opts) {
       else geoMap.setView([16.4637, 107.5909], 14);
     }
 
-    if (!t) t = similarityGuess(ringBounds, w, h);
+    if (!t) t = guessT();
     fitView();
-    if (!t) t = similarityGuess(geoMap.getBounds().pad(-0.4), w, h);
+    if (!t) t = tightFitGuess(geoMap.getBounds().pad(-0.2), w, h) || similarityGuess(geoMap.getBounds().pad(-0.4), w, h);
+    t = normT(t);
     ring?.addTo(geoMap);
     vertices.forEach(v => L.circleMarker(v, { radius: 3, color: RANH, weight: 1, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(geoMap));
 
     const geoPins = L.layerGroup();
     const handles = L.layerGroup();
     const hm = {};
-    ['tl', 'tr', 'br', 'bl'].forEach(k => { hm[k] = L.marker([0, 0], { icon: handleIcon('scale', 'Kéo để phóng to / thu nhỏ'), draggable: true, keyboard: false }).addTo(handles); });
+    ['tl', 'tr', 'br', 'bl'].forEach(k => {
+      hm[k] = L.marker([0, 0], { icon: handleIcon('scale', 'Kéo để phóng đều'), draggable: true, keyboard: false }).addTo(handles);
+    });
+    ['eL', 'eR'].forEach(k => {
+      hm[k] = L.marker([0, 0], { icon: handleIcon('stretch-x', 'Kéo để stretch ngang'), draggable: true, keyboard: false }).addTo(handles);
+    });
+    ['eT', 'eB'].forEach(k => {
+      hm[k] = L.marker([0, 0], { icon: handleIcon('stretch-y', 'Kéo để stretch dọc'), draggable: true, keyboard: false }).addTo(handles);
+    });
     hm.rot = L.marker([0, 0], { icon: handleIcon('rot', 'Kéo để xoay'), draggable: true, keyboard: false }).addTo(handles);
 
     function showPreview(corners) {
@@ -346,13 +501,12 @@ export function openGeoref(opts) {
       else preview = new ScanOverlay(url, corners, { pane: 'sgScan', opacity: 1 - transparency / 100 }).addTo(geoMap);
     }
 
-    // ---------- Kéo, xoay ----------
-
     const centerOf = () => L.point(t.cx, t.cy);
     const angleTo = (p) => Math.atan2(p.y - t.cy, p.x - t.cx);
     let start = null;
 
     function renderFit(skip) {
+      t = normT(t);
       const c = similarityCorners(t, w, h);
       showPreview([c.tl, c.tr, c.bl]);
       Object.keys(hm).forEach(k => { if (hm[k] !== skip) hm[k].setLatLng(c[k]); });
@@ -361,11 +515,41 @@ export function openGeoref(opts) {
 
     ['tl', 'tr', 'br', 'bl'].forEach(k => {
       const m = hm[k];
-      m.on('dragstart', () => { start = { s: t.s, d: project([m.getLatLng().lat, m.getLatLng().lng]).distanceTo(centerOf()) }; });
+      m.on('dragstart', () => {
+        start = { sx: t.sx, sy: t.sy, d: project([m.getLatLng().lat, m.getLatLng().lng]).distanceTo(centerOf()) };
+      });
       m.on('drag', () => {
         if (!start || !(start.d > 0)) return;
         const d = project([m.getLatLng().lat, m.getLatLng().lng]).distanceTo(centerOf());
-        t.s = start.s * Math.max(0.05, d / start.d);
+        const f = Math.max(0.05, d / start.d);
+        t.sx = start.sx * f;
+        t.sy = start.sy * f;
+        renderFit(m);
+      });
+      m.on('dragend', () => { start = null; renderFit(); });
+    });
+    ['eL', 'eR'].forEach(k => {
+      const m = hm[k];
+      m.on('dragstart', () => {
+        start = { sx: t.sx, d: Math.abs(project([m.getLatLng().lat, m.getLatLng().lng]).x - t.cx) };
+      });
+      m.on('drag', () => {
+        if (!start || !(start.d > 0)) return;
+        const d = Math.abs(project([m.getLatLng().lat, m.getLatLng().lng]).x - t.cx);
+        t.sx = start.sx * Math.max(0.05, d / start.d);
+        renderFit(m);
+      });
+      m.on('dragend', () => { start = null; renderFit(); });
+    });
+    ['eT', 'eB'].forEach(k => {
+      const m = hm[k];
+      m.on('dragstart', () => {
+        start = { sy: t.sy, d: Math.abs(project([m.getLatLng().lat, m.getLatLng().lng]).y - t.cy) };
+      });
+      m.on('drag', () => {
+        if (!start || !(start.d > 0)) return;
+        const d = Math.abs(project([m.getLatLng().lat, m.getLatLng().lng]).y - t.cy);
+        t.sy = start.sy * Math.max(0.05, d / start.d);
         renderFit(m);
       });
       m.on('dragend', () => { start = null; renderFit(); });
@@ -396,7 +580,6 @@ export function openGeoref(opts) {
       return true;
     }
 
-    // Bắt ở pha capture để tắt kéo bản đồ trước khi Leaflet nhận mousedown; ngoài ảnh vẫn kéo bản đồ như thường
     cont.addEventListener('pointerdown', (e) => {
       if (mode !== 'fit' || !t || e.button !== 0 || e.target.closest('.sg-handle, .leaflet-control')) return;
       if (!insideImage(e)) return;
@@ -423,8 +606,6 @@ export function openGeoref(opts) {
     cont.addEventListener('pointermove', (e) => {
       if (mode === 'fit' && t && !cont.classList.contains('sg-moving')) cont.classList.toggle('sg-over', insideImage(e));
     });
-
-    // ---------- Chấm điểm ----------
 
     function ensureImgMap() {
       if (imgMap) return;
@@ -488,14 +669,12 @@ export function openGeoref(opts) {
 
     geoMap.on('click', (e) => addPoint('ll', snap(e.latlng)));
 
-    // ---------- Chung ----------
-
     function drawList() {
       const list = box.querySelector('#sgList');
       const save = box.querySelector('[data-sg="save"]');
       if (mode === 'fit') {
         const k = Math.cos(unproject(t.cx, t.cy)[0] * Math.PI / 180);
-        list.innerHTML = `<div class="sg-sum">Tỷ lệ ${mppText(t.s * k)} · tờ rộng ${fmtNum(Math.round(t.s * k * w))} m · xoay ${degText(t.a)}</div>`;
+        list.innerHTML = `<div class="sg-sum">Ngang ${mppText(t.sx * k)} · dọc ${mppText(t.sy * k)} · tờ ${fmtNum(Math.round(t.sx * k * w))}×${fmtNum(Math.round(t.sy * k * h))} m · xoay ${degText(t.a)}</div>`;
         save.disabled = false;
         return;
       }
@@ -524,7 +703,7 @@ export function openGeoref(opts) {
     }
 
     function setMode(next) {
-      if (next === 'fit' && mode === 'gcp' && fit && !fit.mirrored) t = similarityFrom(fit.corners(w, h), w);
+      if (next === 'fit' && mode === 'gcp' && fit && !fit.mirrored) t = similarityFrom(fit.corners(w, h), w, h);
       mode = next;
       box.querySelector(`input[name="sgMode"][value="${mode}"]`).checked = true;
       panes.classList.toggle('sg-single', mode === 'fit');
@@ -580,9 +759,13 @@ export function openGeoref(opts) {
       const act = el.dataset.sg;
       if (act === 'close') close(null);
       else if (act === 'rot') { t.a -= Number(el.dataset.v) * Math.PI / 180; renderFit(); }
-      else if (act === 'zoom') { t.s *= Number(el.dataset.v); renderFit(); }
-      else if (act === 'reset') {
-        t = similarityGuess(ringBounds, w, h) || t;
+      else if (act === 'zoom') {
+        const f = Number(el.dataset.v);
+        t.sx *= f;
+        t.sy *= f;
+        renderFit();
+      } else if (act === 'reset') {
+        t = guessT() || t;
         renderFit();
         fitView();
       } else if (act === 'undo') {
@@ -608,6 +791,7 @@ export function openGeoref(opts) {
     });
 
     setMode(mode);
-    if (!vertices.length) showToast('Hồ sơ chưa có ranh điều chỉnh, căn ảnh theo đường giao thông trên nền vệ tinh', 'info');
+    if (!vertices.length) showToast('Chưa có ranh — căn ảnh theo đường giao thông trên nền vệ tinh', 'info');
+    else if (opts.tightFit) showToast('Đã căn stretch theo ranh — chỉnh xoay / cạnh nếu cần', 'info');
   });
 }

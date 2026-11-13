@@ -11,6 +11,7 @@
 //   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định người dùng gửi (tối đa 2 MB). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
 //   projects/<slug>/quyet-dinh-cho.pdf — đường cũ, chỉ đọc khi duyệt nốt rồi xóa.
 //   projects/<slug>/adjust/<id>.json|.pdf|.scan — điều chỉnh cục bộ. Chỉ quyết định: chưa có json cho đến khi gắn bản vẽ. Chỉ mục projects/adjustments.json (title = tóm tắt).
+//   projects/<slug>/sdd-scans.json + sdd-scan/<id>.webp|jpg|png — ảnh scan bản vẽ SDD (Admin, ≤ 5 MB/tờ, tối đa 8 tờ).
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
 // Đồ án chưa chuyển (legacy) vẫn nằm trong cad_parcels.json cho tới khi migrate xong.
@@ -3111,6 +3112,218 @@ async function publishSchemeDraw({ tenQH, kind, features }) {
   rejectReview('Lớp bản vẽ không hợp lệ');
 }
 
+// ============================ ẢNH SCAN SDD ĐỒ ÁN (Admin) ============================
+// projects/<slug>/sdd-scans.json — danh sách tờ; projects/<slug>/sdd-scan/<id>.webp|jpg|png — ảnh đã crop/nén ≤ 5 MB
+const SDD_SCAN_MAX_BYTES = 5 * 1024 * 1024;
+const SDD_SCAN_MAX_ITEMS = 8;
+const SDD_SCAN_ID_RE = /^[a-f0-9]{16}$/;
+
+function schemeSddError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function schemeSddScanObject(slug, id, type) {
+  const ext = type === 'image/png' ? 'png' : type === 'image/jpeg' ? 'jpg' : 'webp';
+  return `projects/${slug}/sdd-scan/${id}.${ext}`;
+}
+
+function sddScansMetaName(slug) {
+  return `projects/${slug}/sdd-scans.json`;
+}
+
+function sddScanType(buffer, maxBytes) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12 || buffer.length > maxBytes) return '';
+  if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (buffer[0] === 0x89 && buffer.toString('ascii', 1, 4) === 'PNG') return 'image/png';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  return '';
+}
+
+function emptySddScans() {
+  return { v: 1, layer: 'sdd', items: [] };
+}
+
+async function resolveSchemeSlug(slugOrName) {
+  const raw = String(slugOrName || '').trim();
+  if (!raw) return null;
+  const cat = await catalog();
+  const hit = cat.projects.find(p => {
+    if (!p || p.deleted || !p.tenQH) return false;
+    const slug = p.slug || projectSlug(p.tenQH);
+    return p.tenQH === raw || slug === raw;
+  });
+  if (!hit) return null;
+  return { slug: hit.slug || projectSlug(hit.tenQH), tenQH: hit.tenQH };
+}
+
+async function readSddScansDoc(slug) {
+  const got = await readJson(sddScansMetaName(slug));
+  if (got.missing || !got.data || got.data.v !== 1 || !Array.isArray(got.data.items)) {
+    return { missing: true, generation: '0', data: emptySddScans() };
+  }
+  return { missing: false, generation: got.generation || '0', data: { v: 1, layer: 'sdd', items: got.data.items } };
+}
+
+async function writeSddScansDoc(slug, mutator) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = await readSddScansDoc(slug);
+    const next = mutator({ ...cur.data, items: [...(cur.data.items || [])] });
+    next.v = 1;
+    next.layer = 'sdd';
+    next.saved = Date.now();
+    try {
+      const written = await writeText(sddScansMetaName(slug), JSON.stringify(next), cur.missing ? '0' : (cur.generation || undefined));
+      return { data: next, via: written.via };
+    } catch (err) {
+      if (err.code !== 'GEN' || attempt === 2) throw err;
+    }
+  }
+  throw schemeSddError('Xung đột khi cập nhật danh sách ảnh SDD', 409);
+}
+
+function publicSddItem(it, slug) {
+  if (!it || !it.id) return null;
+  const type = it.type || 'image/webp';
+  return {
+    id: it.id,
+    label: it.label || '',
+    name: it.name || '',
+    bytes: it.bytes || 0,
+    type,
+    at: it.at || 0,
+    w: it.w, h: it.h,
+    tl: it.tl, tr: it.tr, bl: it.bl,
+    mode: it.mode || 'fit',
+    gcps: Array.isArray(it.gcps) ? it.gcps : [],
+    rms: it.rms || 0,
+    opacity: it.opacity == null ? 0.75 : it.opacity,
+    on: it.on !== false,
+    object: schemeSddScanObject(slug, it.id, type),
+    url: `${publicUrl(schemeSddScanObject(slug, it.id, type))}?v=${it.at || 0}`
+  };
+}
+
+async function listSchemeSddScans(slugOrName) {
+  const resolved = await resolveSchemeSlug(slugOrName);
+  if (!resolved || !SLUG_RE.test(resolved.slug)) throw schemeSddError('Không tìm thấy đồ án', 404);
+  const doc = await readSddScansDoc(resolved.slug);
+  return {
+    slug: resolved.slug,
+    tenQH: resolved.tenQH,
+    items: (doc.data.items || []).map(it => publicSddItem(it, resolved.slug)).filter(Boolean)
+  };
+}
+
+/**
+ * Admin: thêm tờ mới (cần buffer + georef) hoặc cập nhật georef / label / opacity / on.
+ * body: { slug|tenQH, id?, fileName, buffer?, georef?, label?, opacity?, on? }
+ */
+async function putSchemeSddScan({ slug: slugIn, tenQH, id, fileName, buffer, georef, label, opacity, on }) {
+  const resolved = await resolveSchemeSlug(slugIn || tenQH);
+  if (!resolved || !SLUG_RE.test(resolved.slug)) throw schemeSddError('Không tìm thấy đồ án', 404);
+  const slug = resolved.slug;
+  let geo = null;
+  if (georef) {
+    geo = cleanGeoref(georef);
+    if (!geo) throw schemeSddError('Thông số định vị ảnh không hợp lệ', 400);
+  }
+  const existingId = id && SDD_SCAN_ID_RE.test(String(id)) ? String(id) : '';
+  let fileMeta = null;
+  let objectName = '';
+
+  if (buffer) {
+    const type = sddScanType(buffer, SDD_SCAN_MAX_BYTES);
+    if (!type) {
+      throw schemeSddError(
+        buffer.length > SDD_SCAN_MAX_BYTES ? 'Ảnh scan lớn hơn 5 MB' : 'Chỉ nhận ảnh WebP, PNG hoặc JPEG',
+        buffer.length > SDD_SCAN_MAX_BYTES ? 413 : 400
+      );
+    }
+    if (!geo) throw schemeSddError('Thiếu thông số định vị khi tải ảnh mới', 400);
+    const curDoc = await readSddScansDoc(slug);
+    if (!existingId && (curDoc.data.items || []).length >= SDD_SCAN_MAX_ITEMS) {
+      throw schemeSddError(`Mỗi đồ án tối đa ${SDD_SCAN_MAX_ITEMS} tờ scan SDD`, 400);
+    }
+    if (existingId && !(curDoc.data.items || []).some(x => x.id === existingId)) {
+      throw schemeSddError('Không có tờ scan này', 404);
+    }
+    const newId = existingId || crypto.randomBytes(8).toString('hex');
+    objectName = schemeSddScanObject(slug, newId, type);
+    try {
+      await gcsWrite.putObject(objectName, buffer, type);
+    } catch (err) {
+      if (err.code === 'NO_SA' || err.status === 401 || err.status === 403) throw schemeSddError('Máy chủ chưa có quyền ghi ảnh lên bucket', 502);
+      throw err;
+    }
+    fileMeta = {
+      id: newId,
+      name: cleanText(fileName, 120) || 'ban-ve-sdd',
+      bytes: buffer.length,
+      type,
+      at: Date.now(),
+      ...geo,
+      georefAt: Date.now(),
+      label: cleanText(label, 40) || '',
+      opacity: opacity == null ? 0.75 : Math.min(1, Math.max(0.05, Number(opacity) || 0.75)),
+      on: on !== false
+    };
+  }
+
+  const saved = await writeSddScansDoc(slug, (cur) => {
+    const items = cur.items || [];
+    if (fileMeta) {
+      const i = items.findIndex(x => x.id === fileMeta.id);
+      if (i >= 0) {
+        const prev = items[i];
+        if (prev.type && prev.type !== fileMeta.type) {
+          gcsWrite.removeObject(schemeSddScanObject(slug, prev.id, prev.type)).catch(() => {});
+        }
+        items[i] = { ...prev, ...fileMeta, label: fileMeta.label || prev.label || '' };
+      } else {
+        if (items.length >= SDD_SCAN_MAX_ITEMS) throw schemeSddError(`Mỗi đồ án tối đa ${SDD_SCAN_MAX_ITEMS} tờ scan SDD`, 400);
+        items.push(fileMeta);
+      }
+      return { ...cur, items };
+    }
+    if (!existingId) throw schemeSddError('Thiếu ảnh hoặc mã tờ', 400);
+    const i = items.findIndex(x => x.id === existingId);
+    if (i < 0) throw schemeSddError('Không có tờ scan này', 404);
+    const next = { ...items[i] };
+    if (geo) Object.assign(next, geo, { georefAt: Date.now() });
+    if (label != null) next.label = cleanText(label, 40);
+    if (opacity != null) next.opacity = Math.min(1, Math.max(0.05, Number(opacity) || next.opacity || 0.75));
+    if (on != null) next.on = !!on;
+    items[i] = next;
+    return { ...cur, items };
+  });
+
+  const it = saved.data.items.find(x => x.id === (fileMeta ? fileMeta.id : existingId));
+  return publicSddItem(it, slug);
+}
+
+async function deleteSchemeSddScan({ slug: slugIn, tenQH, id }) {
+  const resolved = await resolveSchemeSlug(slugIn || tenQH);
+  if (!resolved || !SLUG_RE.test(resolved.slug)) throw schemeSddError('Không tìm thấy đồ án', 404);
+  if (!SDD_SCAN_ID_RE.test(String(id || ''))) throw schemeSddError('Mã tờ không hợp lệ', 400);
+  const slug = resolved.slug;
+  let removed = null;
+  await writeSddScansDoc(slug, (cur) => {
+    const items = cur.items || [];
+    const i = items.findIndex(x => x.id === id);
+    if (i < 0) throw schemeSddError('Không có tờ scan này', 404);
+    removed = items[i];
+    items.splice(i, 1);
+    return { ...cur, items };
+  });
+  if (removed) {
+    try { await gcsWrite.removeObject(schemeSddScanObject(slug, removed.id, removed.type || 'image/webp')); }
+    catch (err) { console.warn('Xóa object scan SDD:', err.message); }
+  }
+  return { ok: true, id };
+}
+
 module.exports = {
   setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject, publishSchemeDraw,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
@@ -3118,5 +3331,6 @@ module.exports = {
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustDraw, attachAdjustPdf, attachAdjustScan, listAdjustments, listOwnAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
-  patchAdjustLot, approveAdjustment, removeAdjustment
+  patchAdjustLot, approveAdjustment, removeAdjustment,
+  listSchemeSddScans, putSchemeSddScan, deleteSchemeSddScan, schemeSddScanObject
 };

@@ -549,6 +549,7 @@ function checkAdjustRate(req) {
   checkRate(adjustHits, req, 4, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 4 hồ sơ điều chỉnh mỗi giờ, vui lòng thử lại sau');
 }
 const ADJUST_SCAN_B64_MAX = 2800000;
+const SDD_SCAN_B64_MAX = 7000000;
 
 // File quyết định người dùng gửi chờ admin duyệt: mỗi IP tối đa 4 file / giờ, mỗi file tối đa 2 MB
 const decisionProposalHits = new Map();
@@ -4410,6 +4411,35 @@ module.exports = async (req, res) => {
         id: String(body.id || ''), fileName: body.name, buffer: img ? Buffer.from(img, 'base64') : null, georef: body.georef, admin: !!admin
       });
       return res.status(200).json({ success: true, scan: saved });
+    }
+
+    // Ảnh scan sử dụng đất đồ án (Admin): nhiều tờ ≤ 5 MB, meta projects/<slug>/sdd-scans.json
+    if (action === 'getSchemeSddScans') {
+      const slug = String(req.query.slug || req.query.tenQH || '');
+      setCdn(res, ...CDN_READ);
+      return res.status(200).json(await projects.listSchemeSddScans(slug));
+    }
+
+    if (action === 'putSchemeSddScan') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const img = typeof body.image === 'string' ? body.image.replace(/\s+/g, '') : '';
+      if (img.length > SDD_SCAN_B64_MAX) return res.status(413).json({ error: true, message: 'Ảnh scan lớn hơn 5 MB' });
+      const saved = await projects.putSchemeSddScan({
+        slug: body.slug, tenQH: body.tenQH, id: body.id, fileName: body.name,
+        buffer: img ? Buffer.from(img, 'base64') : null, georef: body.georef,
+        label: body.label, opacity: body.opacity, on: body.on
+      });
+      return res.status(200).json({ success: true, scan: saved });
+    }
+
+    if (action === 'deleteSchemeSddScan') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const out = await projects.deleteSchemeSddScan({ slug: body.slug, tenQH: body.tenQH, id: body.id });
+      return res.status(200).json({ success: true, ...out });
     }
 
     if (action === 'getAdjustScan') {
