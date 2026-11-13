@@ -12,6 +12,7 @@ import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
 import { QHC2045, QHC10_CENTER_BRIEF, QHC_CENTER_INFO_EVENT, isQhcStaticName } from './qhc2045.js';
 import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
+import { sddScanBriefHtml, syncSddScanBrief } from './schemeSddScan.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const WAIT = '<span class="project-brief-wait">…</span>';
@@ -229,6 +230,7 @@ function detailBodyHtml(card) {
     ${popRows(card.pop || { ht: 0, qh: 0 })}
     <div class="project-brief-meters">${metersOf(card).join('')}</div>
     ${dossier}
+    ${sddScanBriefHtml()}
   </div>`;
 }
 
@@ -295,6 +297,7 @@ function render(card) {
       ${briefTools(card)}
     </div>
     ${detailOpen ? detailBodyHtml(card) : ''}`;
+  if (detailOpen) syncSddScanBrief(card.name);
   syncBriefStack();
 }
 

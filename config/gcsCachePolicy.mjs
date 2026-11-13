@@ -16,6 +16,9 @@ export function cacheControlFor(name) {
   if (n.startsWith('chuyen-nganh/v1/')) return IMMUTABLE;
   if (n === 'cho-duyet' || n.startsWith('cho-duyet/')) return 'private, no-store';
   if (n === 'projects/_pdf-in' || n.startsWith('projects/_pdf-in/')) return 'private, no-store';
+  // Ảnh scan SDD ghi đè cùng id + ?v=at trên URL client
+  if (/^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/sdd-scans\.json$/.test(n)) return INFRA_JSON;
+  if (/^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/sdd-scan\/[a-f0-9]{16}\.(webp|jpg|jpeg|png)$/.test(n)) return INFRA_JSON;
   if (n === 'quyet-dinh-cho.pdf' || n.endsWith('/quyet-dinh-cho.pdf')) return 'private, no-store';
   if (/^kien-truc\/[a-z0-9]+(?:-[a-z0-9]+)*\/quy-che\.pdf$/.test(n)) return INFRA_JSON;
   // Danh mục QĐ 1152: ghi đè cùng khóa, ?v= trên URL để khỏi giữ bản cũ.
