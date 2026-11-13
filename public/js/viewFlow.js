@@ -12,10 +12,10 @@
 //    - QHPK 1/2.000: nhìn rộng chỉ ranh; bấm ranh / tick mới tải lô. Zoom ≥ PLACE_DETAIL_ZOOM (hoặc đang
 //      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn, không fitBounds toàn đồ án.
 //      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
-//      Esc khi đang chọn đồ án QHPK: bỏ chọn, giữ lớp và khung nhìn, không phóng ra toàn thành phố.
+//      Bỏ chọn đồ án (bỏ tick, đóng hồ sơ, Esc, tắt cả cấp): giữ tâm và mức phóng, không centerOnCity.
 //    - QHCT 1/500: nhìn rộng ranh + tên; tick / bấm → chi tiết. Zoom lớn: mở lô tại khung như QHPK.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
-//    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
+//    QHCT 1/500), thông tin đồ án thay panel dưới. Thoát về lớp gốc nếu có, giữ nguyên khung nhìn.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
 // Bản đồ hiện trạng (lật sang hoặc nửa trái khi so sánh): bấm nền khi nhìn rộng → chọn phường.
 import { state } from './state.js';
@@ -313,15 +313,17 @@ function leaveScopeFocus(latlng) {
   syncEscHint();
 }
 
-// Thoát thông tin đồ án: về lớp gốc (Hệ thống đô thị, QHC 1/10.000) hoặc phường đang chọn / toàn TP. Ranh giữ, lô không tự mở lại.
-// detail.hidden: thoát do bỏ chọn đồ án trong danh sách → đóng thông tin, không hiện lại đồ án của phường
+// Thoát thông tin đồ án: về lớp gốc nếu đồ án mở từ lớp khác, hoặc giữ lớp đang xem.
+// Mọi lối bỏ chọn (bỏ tick, đóng hồ sơ, Esc, tắt cả cấp) giữ tâm và mức phóng.
+// Chọn đồ án vẫn phóng tới ranh (zoomTo). Mở trang vẫn centerOnCity.
+// detail.hidden: thoát do bỏ chọn trong danh sách → đóng thông tin, không hiện lại đồ án của phường
 function onProjectExit(e) {
   const unchecked = !!e?.detail?.hidden;
   if (unchecked) closeProjectView();
   clearProjectFocus();
   const from = levelOrigin();
   if (from && from !== getLevel()) {
-    setLevel(from);
+    setLevel(from, { keepView: true });
     return;
   }
   if (levelScope()) {
@@ -329,7 +331,7 @@ function onProjectExit(e) {
     syncEscHint();
     return;
   }
-  highlightWardBoundary(state.selectedWard, { fitView: true });
+  highlightWardBoundary(state.selectedWard, { fitView: false });
   if (!unchecked) revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard);
   syncEscHint();
 }
@@ -437,7 +439,7 @@ function onEscape(e) {
   }
   if (state.focusedProject) {
     e.preventDefault();
-    // QHPK: chỉ bỏ chọn. Thoát đủ (về lớp gốc, phóng về địa bàn) dành cho đồ án cấp khác và nút đóng panel.
+    // QHPK: chỉ bỏ chọn. Cấp khác về lớp gốc nếu có. Cả hai giữ khung nhìn.
     if (planLevelOf(state.focusedProject) === 'QHPK') leaveProject();
     else document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT));
     return;
