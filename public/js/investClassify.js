@@ -9,7 +9,9 @@ export const INVEST_GROUPS = [
   { id: 'khudothi', label: 'Đô thị, nhà ở', title: 'Đô thị, nhà ở' },
   { id: 'nongnghiep', label: 'Nông nghiệp', title: 'Nông nghiệp' },
   { id: 'vanhoaxahoi', label: 'Văn hóa - Y tế - Giáo dục', title: 'Văn hóa - Y tế - Giáo dục' },
-  { id: 'khac', label: 'Dự án khác', title: 'Dự án khác' }
+  { id: 'khac', label: 'Dự án khác', title: 'Dự án khác' },
+  // Bucket vòng đời (phác thảo → dự án); không suy ra từ lĩnh vực / tên.
+  { id: 'dangnghien', label: 'Đang nghiên cứu', title: 'Đang nghiên cứu' }
 ];
 
 /** Id nhóm đã bỏ khỏi tab (vẫn chấp nhận từ chỉnh sửa cũ). */

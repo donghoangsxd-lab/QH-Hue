@@ -1,5 +1,5 @@
 // Chuỗi và khung HTML của bảng thông tin lô. Không đụng bản đồ, không gọi mạng.
-import { escapeHtml, ico, planItems } from './utils.js';
+import { escapeHtml, fmtNum, ico, planItems } from './utils.js';
 import { namesOfProject } from './projectNames.js';
 
 function fold(s) {
@@ -207,6 +207,94 @@ export function regulationsPaneHtml(entry) {
   }).join('');
   if (rows) return `<div class="lp-regs">${rows}</div>`;
   return `<div class="lp-regs"><p class="lp-reg-empty">Chưa gắn quy định quản lý / quy chế kiến trúc.</p></div>`;
+}
+
+/**
+ * Gom diện tích theo loại đất khi chọn nhiều lô.
+ * rows: [{ id, label, areaM2, color? }]
+ * → { count, totalM2, types: [{ id, label, areaM2, color, count, pct }] } (pct 0–100, xếp diện tích giảm).
+ */
+export function summarizeLotAreas(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const by = new Map();
+  let totalM2 = 0;
+  list.forEach(r => {
+    const area = Math.max(0, Number(r?.areaM2) || 0);
+    totalM2 += area;
+    const id = String(r?.id || r?.label || 'other');
+    const label = String(r?.label || id).trim() || 'Đất khác';
+    let g = by.get(id);
+    if (!g) {
+      g = { id, label, areaM2: 0, color: r?.color || '#94a3b8', count: 0 };
+      by.set(id, g);
+    }
+    g.areaM2 += area;
+    g.count += 1;
+    if (r?.color) g.color = r.color;
+    if (label && label !== id) g.label = label;
+  });
+  const types = [...by.values()]
+    .sort((a, b) => b.areaM2 - a.areaM2 || a.label.localeCompare(b.label, 'vi'))
+    .map(g => ({
+      ...g,
+      pct: totalM2 > 0 ? (g.areaM2 / totalM2) * 100 : 0
+    }));
+  return { count: list.length, totalM2, types };
+}
+
+function fmtAreaM2(m2) {
+  const n = Math.max(0, Number(m2) || 0);
+  if (n >= 10000) return `${fmtNum(n / 10000)} ha`;
+  if (n >= 1) return `${fmtNum(Math.round(n))} m²`;
+  return '—';
+}
+
+function fmtPct(pct) {
+  const n = Number(pct) || 0;
+  if (n >= 10) return `${fmtNum(Math.round(n))}%`;
+  if (n >= 1) return `${fmtNum(Math.round(n * 10) / 10)}%`;
+  if (n > 0) return '< 1%';
+  return '0%';
+}
+
+/** Thẻ panel khi chọn nhiều lô (Shift): tổng diện tích + tỷ lệ từng loại đất. */
+export function multiLandCardHtml(summary, { hint } = {}) {
+  const s = summary || { count: 0, totalM2: 0, types: [] };
+  const n = s.count || 0;
+  const types = Array.isArray(s.types) ? s.types : [];
+  const top = types[0]?.label || '—';
+  const topShort = top.length > 28 ? `${top.slice(0, 26)}…` : top;
+  const mix = types.map(t => {
+    const w = Math.max(0, Math.min(100, t.pct || 0));
+    return `<div class="lp-mix-row" title="${escapeHtml(t.label)}: ${escapeHtml(fmtAreaM2(t.areaM2))} (${escapeHtml(fmtPct(t.pct))}) · ${t.count} lô">
+      <i class="lp-swatch lp-mix-swatch" style="background:${escapeHtml(t.color || '#94a3b8')}"></i>
+      <span class="lp-mix-name">${escapeHtml(t.label)}</span>
+      <span class="lp-mix-bar" aria-hidden="true"><i style="width:${w.toFixed(1)}%;background:${escapeHtml(t.color || '#94a3b8')}"></i></span>
+      <b class="lp-mix-pct">${escapeHtml(fmtPct(t.pct))}</b>
+      <span class="lp-mix-area">${escapeHtml(fmtAreaM2(t.areaM2))}</span>
+    </div>`;
+  }).join('');
+  const tip = hint || 'Giữ Shift và bấm lô để thêm hoặc bỏ chọn.';
+  return `<div class="pp land-popup land-popup-card land-popup-multi">
+    <div class="pp-title lp-head">
+      <div class="lp-head-main">
+        <div class="lp-eyebrow">
+          <span class="lp-eyebrow-label">Đã chọn ${n} lô</span>
+        </div>
+        <div class="lp-title-row"><span class="lp-title">Tổng hợp sử dụng đất</span></div>
+      </div>
+    </div>
+    <div class="lp-pane is-on" data-lp-pane="chi-tieu" role="tabpanel">
+      ${metricCellsHtml([
+        { tone: 'area', icon: 'ruler', label: 'Tổng diện tích', value: fmtAreaM2(s.totalM2) },
+        { tone: 'cover', icon: 'layers', label: 'Số lô', value: String(n) },
+        { tone: 'floors', icon: 'home', label: 'Loại đất', value: String(types.length) },
+        { tone: 'far', icon: 'coverage', label: 'Loại lớn nhất', value: topShort }
+      ])}
+      <div class="lp-mix" role="list">${mix || '<p class="lp-reg-empty">Chưa có loại đất.</p>'}</div>
+      <p class="lp-mix-hint">${escapeHtml(tip)}</p>
+    </div>
+  </div>`;
 }
 
 /** Gắn chuyển tab Chỉ tiêu / Quy định trên thẻ lô. */

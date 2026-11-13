@@ -37,6 +37,7 @@ import { lotBuildupSlotHtml } from './lotScreen.js';
 import {
   expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitsHtml, projectValueHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml, bindLandCardTabs,
+  summarizeLotAreas, multiLandCardHtml,
   pointToken, landToken, parseLotToken
 } from './lotPopup.js';
 
@@ -2398,9 +2399,104 @@ function landLotShape(p, m, detailed) {
   bindLotHover(shape);
   shape.on('click', (e) => {
     if (passToolClick(m, e)) return;
+    const shift = !!e.originalEvent?.shiftKey;
+    if (shift) {
+      e.originalEvent?.preventDefault?.();
+      toggleLandLotSelection(p, m);
+      openLandSelectionPopup(m);
+      return;
+    }
     openLandPopup(p, m);
   });
   return shape;
+}
+
+// ——— Chọn nhiều lô đất quy hoạch (giữ Shift) ———
+let selectedLandLots = []; // [{ key, p }]
+let selectedLandMap = null;
+let landSelSeq = 0;
+
+function landLotKey(p) {
+  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || ''].join('|');
+}
+
+function landLotAreaM2(p) {
+  const n = Number(p.area);
+  if (Number.isFinite(n) && n > 0) return n;
+  try { return p.geometry ? turf.area(p.geometry) : 0; } catch (e) { return 0; }
+}
+
+function landLotTypeMeta(p) {
+  const key = landPatternKey(p.layer, p.name);
+  const nhom = p.nhom || landLabel(p.layer);
+  const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
+  const label = shortLandUse(expandPlanWords(rawType)) || 'Đất khác';
+  const color = (key && TT16_STYLES[key]?.color) || landColor(p.layer) || '#94a3b8';
+  return { id: key || label, label, color };
+}
+
+function clearLandLotSelection() {
+  selectedLandLots = [];
+  selectedLandMap = null;
+}
+
+function toggleLandLotSelection(p, m) {
+  const key = landLotKey(p);
+  if (selectedLandMap && selectedLandMap !== m) selectedLandLots = [];
+  selectedLandMap = m;
+  const i = selectedLandLots.findIndex(x => x.key === key);
+  if (i >= 0) selectedLandLots.splice(i, 1);
+  else selectedLandLots.push({ key, p });
+}
+
+function attachMultiSelectionOutlines(m, lots, popup) {
+  (m === map ? planMap : map)?.closePopup();
+  clearSingleIsochrone();
+  const group = m === planMap ? planLayers.singleIso : layers.singleIso;
+  if (group && lots.length) {
+    const marks = L.featureGroup();
+    const renderer = selRendererFor(m);
+    lots.forEach(p => {
+      if (p?.geometry) addParcelOutline(marks, p.geometry, renderer);
+    });
+    group.addLayer(marks);
+  }
+  const seq = singleIsoSeq;
+  popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
+}
+
+function openMultiLandPopup(m) {
+  const sel = ++landSelSeq;
+  ensureQuyHoachPane();
+  if (map) map.closePopup();
+  if (planMap) planMap.closePopup();
+  const rows = selectedLandLots.map(({ p }) => {
+    const meta = landLotTypeMeta(p);
+    return { id: meta.id, label: meta.label, areaM2: landLotAreaM2(p), color: meta.color };
+  });
+  const summary = summarizeLotAreas(rows);
+  const popup = openDockPopup(m, 'land-lot-popup', multiLandCardHtml(summary));
+  attachMultiSelectionOutlines(m, selectedLandLots.map(x => x.p), popup);
+  addPopupCollapseToggle(popup, 'viền các lô đã chọn', 'Giữ Shift và bấm lô để thêm hoặc bỏ chọn');
+  popup.on('remove', () => {
+    if (landSelSeq === sel) clearLandLotSelection();
+    if (openLandInfo?.popup === popup) openLandInfo = null;
+  });
+  openLandInfo = { popup, key: `multi:${selectedLandLots.map(x => x.key).sort().join('+')}`, map: m };
+}
+
+function openLandSelectionPopup(m) {
+  if (!selectedLandLots.length) {
+    clearLandLotSelection();
+    m?.closePopup();
+    clearSingleIsochrone();
+    return;
+  }
+  if (selectedLandLots.length === 1) {
+    openLandPopup(selectedLandLots[0].p, m, { fromMulti: true });
+    return;
+  }
+  openMultiLandPopup(m);
 }
 
 // Viền sáng lô / vùng đang chọn. Cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ.
@@ -2688,17 +2784,27 @@ function facilityAnalyzeOpts(facility, m, popup) {
 
 function openLandPopup(p, m, opts) {
   // Thẻ lô trong panel B (#planInfoSlot dưới brief), giữ bốn tab cấp — mọi cỡ màn hình.
+  const sel = ++landSelSeq;
   ensureQuyHoachPane();
   const facility = opts?.facility || null;
   const projectName = p.file || facility?.tenQH || '';
   // hideProject (menu «Xem thông tin lô»): chỉ thẻ lô, không đổi bảng đồ án (ui-spec).
   if (!opts?.hideProject) syncFocusedProjectToLot(projectName);
   if (reuseLandInfo(p, m, opts)) return;
+  // Bấm thường: một lô. fromMulti: còn đúng 1 lô sau khi bỏ chọn bằng Shift.
+  if (!opts?.fromMulti) {
+    selectedLandLots = facility ? [] : [{ key: landLotKey(p), p }];
+    selectedLandMap = facility ? null : m;
+  }
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
   const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
   attachSelectionOutline(m, p.geometry, popup);
-  addPopupCollapseToggle(popup, facility ? 'ranh khu đất và vùng phục vụ' : 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  addPopupCollapseToggle(
+    popup,
+    facility ? 'ranh khu đất và vùng phục vụ' : 'viền lô',
+    facility ? 'Bấm lại vào lô đất để hiện bảng thông tin' : 'Bấm lại vào lô · giữ Shift để chọn thêm lô'
+  );
   const center = lotCenterOf(p.geometry, facility?.lat, facility?.lng);
   const analyze = facility ? facilityAnalyzeOpts(facility, m, popup) : null;
   addLotLocateTools(popup, {
@@ -2725,6 +2831,11 @@ function openLandPopup(p, m, opts) {
     addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   }
   trackLandInfo(popup, p, m, opts);
+  popup.on('remove', () => {
+    if (landSelSeq === sel && selectedLandLots.length === 1 && selectedLandLots[0].key === landLotKey(p)) {
+      clearLandLotSelection();
+    }
+  });
   fillLotBuildup(popup, p);
 }
 

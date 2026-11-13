@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {
   expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitItems, limitsHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml,
-  dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken
+  dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken,
+  summarizeLotAreas, multiLandCardHtml
 } from '../public/js/lotPopup.js';
 
 const kind = 'Công viên khu vực cấp đô thị';
@@ -92,5 +93,25 @@ const land = landToken('QH', 'QHPK Khu A', 'lô 1');
 assert.equal(parseLotToken(land).file, 'QHPK Khu A');
 assert.equal(parseLotToken(land).id, 'lô 1');
 assert.equal(parseLotToken(''), null);
+
+const mix = summarizeLotAreas([
+  { id: 'O', label: 'Đất ở', areaM2: 600, color: '#f59e0b' },
+  { id: 'CX', label: 'Cây xanh', areaM2: 300, color: '#22c55e' },
+  { id: 'O', label: 'Đất ở', areaM2: 100, color: '#f59e0b' }
+]);
+assert.equal(mix.count, 3);
+assert.equal(mix.totalM2, 1000);
+assert.equal(mix.types.length, 2);
+assert.equal(mix.types[0].id, 'O');
+assert.equal(mix.types[0].count, 2);
+assert.equal(mix.types[0].pct, 70);
+assert.equal(mix.types[1].pct, 30);
+const multi = multiLandCardHtml(mix);
+assert.match(multi, /Đã chọn 3 lô/);
+assert.match(multi, /Tổng hợp sử dụng đất/);
+assert.match(multi, /lp-mix-row/);
+assert.match(multi, /Giữ Shift/);
+assert.match(multi, /Đất ở/);
+assert.match(multi, /Cây xanh/);
 
 console.log('lot popup ok');

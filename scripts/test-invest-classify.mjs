@@ -4,13 +4,16 @@ import {
   INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT
 } from '../public/js/investClassify.js';
 
-assert.equal(INVEST_GROUPS.length, 6);
+assert.equal(INVEST_GROUPS.length, 7);
 assert.equal(INVEST_GROUPS[0].id, 'dvtm');
 assert.equal(INVEST_GROUPS[5].id, 'khac');
+assert.equal(INVEST_GROUPS[6].id, 'dangnghien');
+assert.equal(INVEST_GROUPS[6].label, 'Đang nghiên cứu');
 assert.equal(INVEST_GROUPS[1].label, 'Công nghiệp, năng lượng');
 assert.equal(INVEST_GROUPS[2].label, 'Đô thị, nhà ở');
 assert.equal(INVEST_GROUPS[4].label, 'Văn hóa - Y tế - Giáo dục');
 assert.ok(isInvestGroupId('nangluong'));
+assert.ok(isInvestGroupId('dangnghien'));
 assert.equal(normalizeInvestGroupId('nangluong'), 'congnghiep');
 assert.equal(normalizeInvestGroupId('chungcu'), 'khudothi');
 assert.equal(isInvestGroupId('dien'), false);
@@ -19,6 +22,10 @@ assert.equal(DVTM_SUB_DEFAULT, 'sangon');
 assert.deepEqual(DVTM_SUBGROUPS.map(g => g.id), ['sangon', 'khachsan', 'dulich', 'xang', 'dvtm-khac']);
 
 const row = (lv, ten) => ({ 'LĨNH VỰC': lv, 'TÊN DỰ ÁN': ten });
+
+// Phân loại lĩnh vực không bao giờ trả về bucket vòng đời.
+assert.equal(classifyInvestGroup(row('Thương mại, Dịch vụ', 'X')), 'dvtm');
+assert.notEqual(classifyInvestGroup(row('', 'Chưa rõ')), 'dangnghien');
 
 assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Sân gôn Ngũ Hồ')), 'sangon');
 assert.equal(classifyDvtmSub(row('Thương mại, Dịch vụ và Du lịch', 'Dự án sân Golf Thác Phướn')), 'sangon');

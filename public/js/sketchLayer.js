@@ -1,6 +1,7 @@
 // Phác thảo trên bản đồ đang xem (quy hoạch hoặc hiện trạng): đường thẳng, đường gấp khúc, đa giác, mũi tên, vòng tròn, chữ (nhiều dòng, gõ Telex).
 // Hình chỉ nằm trong bộ nhớ trang: không gửi máy chủ, không ghi Sheet / bucket / localStorage → người khác không thấy,
 // đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML / KMZ / DXF (sketchExport.js).
+// Admin: «Dự án» ghi vùng (đa giác / vòng tròn) thành dự án F → Đang nghiên cứu rồi xóa toàn bộ hình phiên.
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
 import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE } from './mapEngine.js';
@@ -12,6 +13,7 @@ import { attachTelex } from './telex.js';
 import { exportKml, exportKmz, exportDxf, sketchShapesFromDxf, densifySpline } from './sketchExport.js';
 import { createSketchEditSession, isVertexShape } from './sketchEdit.js';
 import { createVertexHandles, vertexMenuButton as menuButton } from './vertexHandles.js';
+import { createInvestFromSketch } from './investLayer.js';
 
 const TOOLS = {
   spline: { label: 'Đường cong', hint: 'Click các điểm điều khiển · nháy đúp hoặc Enter để kết thúc', min: 2 },
@@ -728,6 +730,89 @@ function removeShape(fg) {
   syncButtons();
 }
 
+function clearAllShapes() {
+  dropAdjust();
+  closeEditor(true);
+  hosts.forEach(h => h.group.clearLayers());
+  shapes = [];
+  pts = [];
+  hoverFg = null;
+  pickFg = null;
+  const investRow = $('sketchInvestRow');
+  if (investRow) investRow.hidden = true;
+  syncButtons();
+}
+
+const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
+
+/** Chỉ đa giác / vòng tròn → Polygon hoặc MultiPolygon; bỏ đường, mũi tên, chữ. */
+function areaGeometryFromShapes() {
+  const polys = [];
+  shapes.forEach(fg => {
+    const s = fg.sketch;
+    if (!s?.pts?.length) return;
+    if (s.tool === 'polygon' && s.pts.length >= 3) {
+      const ring = s.pts.map(p => [p.lng, p.lat]);
+      const a = ring[0];
+      const b = ring[ring.length - 1];
+      if (a[0] !== b[0] || a[1] !== b[1]) ring.push([a[0], a[1]]);
+      if (ring.length >= 4) polys.push([ring]);
+      return;
+    }
+    if (s.tool === 'circle' && s.pts.length >= 2) {
+      const r = distM(s.pts[0], s.pts[1]);
+      if (r < 1) return;
+      try {
+        const circle = turf.circle([s.pts[0].lng, s.pts[0].lat], r / 1000, { steps: 64, units: 'kilometers' });
+        if (circle?.geometry?.coordinates) polys.push(circle.geometry.coordinates);
+      } catch { /* bỏ vòng tròn hỏng */ }
+    }
+  });
+  if (!polys.length) return null;
+  if (polys.length === 1) return { type: 'Polygon', coordinates: polys[0] };
+  return { type: 'MultiPolygon', coordinates: polys };
+}
+
+function syncInvestUi() {
+  const admin = isAdmin();
+  const btn = $('btnSketchToInvest');
+  if (btn) btn.hidden = !admin;
+  const row = $('sketchInvestRow');
+  if (row && (!admin || !shapes.length)) row.hidden = true;
+}
+
+async function saveSketchAsInvest() {
+  if (!isAdmin()) {
+    showToast('Cần đăng nhập quản trị để ghi dự án', 'error');
+    return;
+  }
+  const name = String($('sketchInvestName')?.value || '').replace(/\s+/g, ' ').trim();
+  if (!name) {
+    showToast('Bắt buộc nhập tên dự án', 'error');
+    $('sketchInvestName')?.focus();
+    return;
+  }
+  const geometry = areaGeometryFromShapes();
+  if (!geometry) {
+    showToast('Cần ít nhất một đa giác hoặc vòng tròn để làm ranh dự án', 'error');
+    return;
+  }
+  const btn = $('btnSketchInvestSave');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await createInvestFromSketch({ name, geometry });
+    clearAllShapes();
+    const nameEl = $('sketchInvestName');
+    if (nameEl) nameEl.value = '';
+    showToast('Đã ghi dự án vào Đang nghiên cứu');
+  } catch (err) {
+    showToast(err.message || 'Không ghi được dự án', 'error');
+  } finally {
+    if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'Ghi'; }
+    syncInvestUi();
+  }
+}
+
 // ================== CHỮ (MTEXT) ==================
 const textHtml = (text, c, sizePx) =>
   `<div class="sketch-text-body" style="color:${c};font-size:${sizePx}px;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
@@ -890,6 +975,7 @@ function syncButtons() {
     telexBtn.classList.toggle('active', telexOn);
     telexBtn.setAttribute('aria-pressed', String(telexOn));
   }
+  syncInvestUi();
   syncSizeBtn();
   const btn = $('btnSketch');
   if (btn) {
@@ -1077,6 +1163,7 @@ export function initSketchLayer() {
   });
 
   document.addEventListener(FLOAT_OPEN_EVENT, (e) => { if (e.detail !== 'sketch') tuckSketchBar(); });
+  document.addEventListener('auth:change', () => syncInvestUi());
   const pal = $('sketchPalette');
   const sketchBtn = $('btnSketch');
   sketchBtnTitle = sketchBtn?.title || '';
@@ -1085,6 +1172,12 @@ export function initSketchLayer() {
   $('btnSketchPin')?.addEventListener('click', () => {
     collapsed = false;
     syncButtons();
+  });
+  $('sketchInvestName')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void saveSketchAsInvest();
+    }
   });
   // Bật đo đạc, tra cứu, ghim, vẽ tuyến…: bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'sketch') stopSketchTool(); });
@@ -1120,7 +1213,32 @@ export function initSketchLayer() {
       closeEditor(true);
       const row = $('sketchSaveRow');
       if (row && shapes.length) row.hidden = !row.hidden;
+      if (row?.hidden) {
+        const investRow = $('sketchInvestRow');
+        if (investRow) investRow.hidden = true;
+      }
       syncButtons();
+      return;
+    }
+    if (e.target.closest('#btnSketchToInvest')) {
+      closeEditor(true);
+      if (!isAdmin()) {
+        showToast('Cần đăng nhập quản trị để ghi dự án', 'error');
+        return;
+      }
+      if (!shapes.length) return;
+      const saveRow = $('sketchSaveRow');
+      if (saveRow) saveRow.hidden = false;
+      const row = $('sketchInvestRow');
+      if (row) {
+        row.hidden = !row.hidden;
+        if (!row.hidden) $('sketchInvestName')?.focus();
+      }
+      syncButtons();
+      return;
+    }
+    if (e.target.closest('#btnSketchInvestSave')) {
+      void saveSketchAsInvest();
       return;
     }
     if (e.target.closest('#btnSketchUndo')) {
@@ -1133,14 +1251,7 @@ export function initSketchLayer() {
       return;
     }
     if (e.target.closest('#btnSketchClear')) {
-      if (shapes.length && confirm(`Xóa toàn bộ ${shapes.length} hình phác thảo?`)) {
-        dropAdjust();
-        hosts.forEach(h => h.group.clearLayers());
-        shapes = [];
-        hoverFg = null;
-        pickFg = null;
-        syncButtons();
-      }
+      if (shapes.length && confirm(`Xóa toàn bộ ${shapes.length} hình phác thảo?`)) clearAllShapes();
       return;
     }
     if (e.target.closest('#btnSketchSize')) { cycleSketchSize(); return; }

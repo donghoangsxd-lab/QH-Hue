@@ -279,7 +279,8 @@ for (const [id, label] of [
   ['khudothi', 'Đô thị, nhà ở'],
   ['nongnghiep', 'Nông nghiệp'],
   ['vanhoaxahoi', 'Văn hóa - Y tế - Giáo dục'],
-  ['khac', 'Dự án khác']
+  ['khac', 'Dự án khác'],
+  ['dangnghien', 'Đang nghiên cứu']
 ]) {
   const at = dtPick.indexOf(`value="${id}"`);
   assert.ok(at > dtAt, `sai thứ tự nhóm ${label}`);
@@ -302,8 +303,13 @@ assert.match(dauTu, /id="aptBox"/);
 assert.match(dauTu, /id="aptList"/);
 assert.match(dauTu, /id="investList-dvtm"/);
 assert.match(dauTu, /id="investList-khac"/);
+assert.match(dauTu, /id="investList-dangnghien"/);
 assert.match(dauTu, /id="investList-khudothi"/);
 assert.doesNotMatch(dauTu, /id="investList-chungcu"|id="investList-nangluong"|data-dt-pane="chungcu"|data-dt-pane="nangluong"/);
+assert.match(html, /id="btnSketchToInvest"/);
+assert.match(html, /id="sketchInvestRow"/);
+assert.match(read('public/js/sketchLayer.js'), /createInvestFromSketch|saveSketchAsInvest/);
+assert.match(read('public/js/investLayer.js'), /createInvestFromSketch|dangnghien/);
 assert.match(read('docs/ui-spec.md'), /hai droplist|#dtPicks|#dtGroupPick|#dtScopePick/);
 assert.match(read('public/css/style.css'), /#dtPicks\.dt-picks[\s\S]*repeat\(2/);
 assert.match(dauTu, /id="dtListPane"/);
@@ -422,13 +428,13 @@ assert.match(read('public/js/legendPanel.js'), /dauTuLegendHtml|investLegendHtml
 assert.doesNotMatch(read('public/js/legendPanel.js'), /data-xh-mirror="chk_invest"/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /\['chk_invest'/);
 assert.match(read('public/js/investLayer.js'), /export function investLegendHtml/);
-assert.match(read('public/js/investLayer.js'), /data-invest-legend-group|data-invest-legend-sub/);
-assert.match(read('public/js/investLayer.js'), /applyInvestLegendToggle|setGroupMap/);
-assert.match(read('public/js/investLayer.js'), /DVTM_SUBGROUPS|GROUP_LOOK/);
+assert.match(read('public/js/investLayer.js'), /invest-legend-row|invest-legend-drop/);
+assert.match(read('public/js/investLayer.js'), /DVTM_SUBGROUPS|GROUP_LOOK|dangnghien/);
+assert.doesNotMatch(read('public/js/investLayer.js'), /data-invest-legend-group|applyInvestLegendToggle/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /LEGEND_OFF = new Set\(\[[^\]]*dautu/);
 assert.match(read('docs/ui-spec.md'), /F\. Dự án đầu tư/);
 assert.match(read('docs/ui-spec.md'), /Không checkbox «Dự án kêu gọi đầu tư»/);
-assert.match(read('docs/ui-spec.md'), /đồng bộ với tick\/mắt trên danh sách/);
+assert.match(read('docs/ui-spec.md'), /bảy nhóm dự án|Đang nghiên cứu/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
 assert.doesNotMatch(plan, /id="inputIsoRadius"/);
@@ -847,9 +853,11 @@ assert.equal((handles.match(/dragging\.disable\(\)/g) || []).length, 1);
 const sketch = read('public/js/sketchLayer.js');
 assert.match(sketch, /selectShape\(fg\)/);
 assert.match(sketch, /Điều chỉnh/);
-assert.match(sketch, /Xóa đỉnh/);
 assert.match(sketch, /Xong/);
 assert.match(sketch, /createVertexHandles/);
+// Menu «Xóa đỉnh» nằm ở vertexHandles / sketchEdit; sketchLayer chỉ mở phiên chỉnh.
+assert.match(handles, /Xóa đỉnh/);
+assert.match(sketch, /createInvestFromSketch|saveSketchAsInvest|dangnghien|Đang nghiên cứu/);
 assert.doesNotMatch(sketch, /dragging\.disable\(\)/);
 assert.match(sketch, /cancelAdjust\(\)/);
 assert.match(sketch, /consumeSketchMapClick/);
@@ -1002,8 +1010,8 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
 assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
 assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261110/);
-assert.match(html, /js\/app\.js\?v=20261110/);
+assert.match(html, /css\/style\.css\?v=20261113/);
+assert.match(html, /js\/app\.js\?v=20261113/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -1060,7 +1068,7 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES/);
 assert.match(read('docs/ui-spec.md'), /Ba droplist cùng kiểu HTKT/);
 assert.match(read('docs/ui-spec.md'), /Bản đồ nhiệt mức độ đáp ứng hạ tầng/);
 assert.match(read('docs/ui-spec.md'), /Trạng thái điểm:.*Đã phê duyệt|Giả lập bán kính chung/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261110'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261113'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -1123,7 +1131,7 @@ for (const [size, purpose] of [['192x192', 'any'], ['512x512', 'any'], ['192x192
 const any192 = fs.readFileSync(new URL('../public/icons/icon-192.png', import.meta.url));
 const mask192 = fs.readFileSync(new URL('../public/icons/icon-maskable-192.png', import.meta.url));
 assert.equal(any192.equals(mask192), false);
-assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261110"/);
+assert.match(html, /rel="manifest" href="\/manifest\.webmanifest\?v=20261113"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon" href="\/icons\/apple-touch-icon\.png"/);
 assert.match(html, /id="btnInstallApp"/);

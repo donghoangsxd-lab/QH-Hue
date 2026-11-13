@@ -1242,6 +1242,17 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
 .sketch-sub select { height: 24px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); }
+#sketchInvestRow input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-main);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--r-sm);
+}
 .sketch-btn.sketch-telex, .sketch-btn.sketch-export { width: auto; height: 28px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
 #map.sketch-moving, #mapPlan.sketch-moving { cursor: move !important; }
 /* Chữ phác thảo: cỡ cố định trên màn hình, viền tối để đọc được trên ảnh vệ tinh */
@@ -6632,6 +6643,36 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .land-popup .lp-reg-label { flex: 1 1 auto; min-width: 0; }
 .land-popup .lp-reg-go { flex: none; color: var(--text-muted); font-weight: 700; font-size: 11px; }
 .land-popup .lp-reg-empty { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.3; }
+/* Chọn nhiều lô (Shift): tổng diện tích + tỷ lệ loại đất */
+.land-popup-multi .lp-mix {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 6px;
+  max-height: 180px; overflow-y: auto;
+}
+.land-popup-multi .lp-mix-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) minmax(36px, 0.7fr) 34px 52px;
+  align-items: center; gap: 4px;
+  font-size: 11px; line-height: 1.2;
+}
+.land-popup-multi .lp-mix-swatch {
+  width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.land-popup-multi .lp-mix-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-weight: 600;
+}
+.land-popup-multi .lp-mix-bar {
+  display: block; height: 5px; border-radius: 3px; background: rgba(148, 163, 184, 0.25); overflow: hidden;
+}
+.land-popup-multi .lp-mix-bar > i { display: block; height: 100%; border-radius: 3px; }
+.land-popup-multi .lp-mix-pct {
+  justify-self: end; color: var(--accent-cyan); font-variant-numeric: tabular-nums; font-weight: 700;
+}
+.land-popup-multi .lp-mix-area {
+  justify-self: end; color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 10px;
+}
+.land-popup-multi .lp-mix-hint {
+  margin: 6px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.35;
+}
 .lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
 .lp-stat { padding: 6px 8px; border-radius: var(--r-md); background: rgba(var(--cyan-rgb), 0.07); border: 1px solid rgba(var(--cyan-rgb), 0.22); text-align: center; }
 .lp-stat .ico { display: inline-block; width: 17px; height: 17px; margin-right: 4px; vertical-align: -2px; color: var(--accent-cyan); opacity: 0.9; filter: drop-shadow(0 0 3px rgba(var(--cyan-rgb), 0.45)); }

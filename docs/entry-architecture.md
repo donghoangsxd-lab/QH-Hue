@@ -23,6 +23,7 @@ Sáu nút trong `#tabAdd` là lớp quản trị. Ba mẫu kỹ thuật H / P / 
 | **E** Kiến trúc | Công trình điểm | P | CanBo stage `kien-truc` | `addKienTruc` |
 | **F** Dự án | **Đề xuất** meta hoặc ranh | `submitInvestProposal` | User Google → kind `du-an` | — |
 | **F** Dự án | **Admin khởi tạo** | `saveInvestProject` | — | Có |
+| **F** Dự án | **Admin từ phác thảo** | `createInvestFromSketch` → nhóm `dangnghien` | — | Có |
 
 **F và C-điểm đã ship.** Schema điểm: `pointEntrySchema.js`. Bước hồ sơ: `entrySteps.js`. Facade chờ: `reviewQueue.js` (ChoDuyet + điểm FALSE).
 

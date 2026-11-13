@@ -192,7 +192,7 @@ function parseInvestCalls(text) {
 }
 
 const INVEST_GROUP_IDS = new Set([
-  'dvtm', 'congnghiep', 'khudothi', 'nongnghiep', 'vanhoaxahoi', 'khac'
+  'dvtm', 'congnghiep', 'khudothi', 'nongnghiep', 'vanhoaxahoi', 'khac', 'dangnghien'
 ]);
 const INVEST_GROUP_LEGACY = { nangluong: 'congnghiep', chungcu: 'khudothi' };
 

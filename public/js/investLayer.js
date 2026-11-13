@@ -66,7 +66,8 @@ const GROUP_LOOK = {
   khudothi: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Đô thị, nhà ở' },
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
   vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
-  khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' }
+  khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' },
+  dangnghien: { icon: 'pin', color: '#f59e0b', edge: '#b45309', label: 'Đang nghiên cứu' }
 };
 const DVTM_LOOK = {
   sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
@@ -1660,6 +1661,10 @@ async function postInvestSave({ key, match, fields, groupId, geometry }) {
   return data;
 }
 
+function linhVucOf(row) {
+  return entry(row, /lĩnh vực/i);
+}
+
 async function saveEdit() {
   const st = card;
   const feature = st?.feature;
@@ -1681,6 +1686,20 @@ async function saveEdit() {
     showToast('Dự án chưa có tên để lưu', 'error');
     return;
   }
+  const prevLv = linhVucOf(st.sheet);
+  const nextLv = linhVucOf(fields);
+  // Đổi lĩnh vực → phân lại nhóm theo droplist (không giữ override cũ / Đang nghiên cứu).
+  let groupId = st.dtGroup || undefined;
+  let moved = false;
+  if (nextLv !== prevLv) {
+    const next = classifyInvestGroup(fields, sheetProjectName(fields));
+    if (isInvestGroupId(next) && next !== groupId) {
+      groupId = next;
+      moved = true;
+    } else if (isInvestGroupId(next)) {
+      groupId = next;
+    }
+  }
   st.saving = true;
   const btn = el.querySelector('.invest-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu…'; }
@@ -1689,13 +1708,14 @@ async function saveEdit() {
       key,
       match: sheetProjectName(st.sheet) || '',
       fields,
-      groupId: st.dtGroup || undefined
+      groupId
     });
-    applySaved(feature, fields, { groupId: st.dtGroup });
+    applySaved(feature, fields, { groupId });
+    st.dtGroup = groupId;
     st.recorded = recordedM2(st.sheet || feature.properties.sheet);
     st.cache.clear();
     paintCard();
-    showToast('Đã lưu thông tin dự án');
+    showToast(moved ? `Đã lưu và chuyển sang nhóm ${investGroupLabel(groupId)}` : 'Đã lưu thông tin dự án');
   } catch (err) {
     st.saving = false;
     if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'Lưu'; }
@@ -2073,6 +2093,47 @@ export function listInvestCatalogItems() {
 export async function ensureInvestCatalogLoaded() {
   try { await loadPack(); } catch { /* loadPack đã toast */ }
   return listInvestCatalogItems();
+}
+
+/**
+ * Admin ghi dự án mới (thường từ phác thảo) vào nhóm Đang nghiên cứu.
+ * Ghi GCS rồi gắn ranh vào pack cục bộ (không chờ soft-refresh CDN).
+ */
+export async function createInvestFromSketch({ name, geometry, fields = {} } = {}) {
+  if (!isAdmin()) throw new Error('Chỉ quản trị mới ghi được dự án từ phác thảo');
+  const key = String(name || '').replace(/\s+/g, ' ').trim();
+  if (!key) throw new Error('Cần nhập tên dự án');
+  if (!geometry || (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon')) {
+    throw new Error('Cần ít nhất một vùng (đa giác hoặc vòng tròn) để làm ranh');
+  }
+  const packet = { ...fields, 'Tên dự án': key };
+  if (!packet['Nguồn']) packet['Nguồn'] = 'Phác thảo';
+  const groupId = 'dangnghien';
+  await postInvestSave({ key, match: '', fields: packet, groupId, geometry });
+  try { await loadPack(); } catch { /* loadPack đã toast; vẫn gắn cục bộ nếu pack có */ }
+  // Cho soft-refresh chạy lại sau khi vừa ghi GCS (tránh bản pack cũ che ranh mới).
+  softRefreshStarted = false;
+  try { await softRefreshInvest(); } catch { /* giữ inject cục bộ */ }
+  if (!Array.isArray(sheetRows)) sheetRows = [];
+  if (!Array.isArray(pack)) pack = [];
+  let row = sheetRows.find(r => r && (r._alias === key || sheetProjectName(r) === key));
+  if (!row) {
+    row = { ...packet, _alias: key, _groupId: groupId };
+    sheetRows.push(row);
+  } else {
+    Object.keys(row).forEach(k => { if (!String(k).startsWith('_')) delete row[k]; });
+    Object.assign(row, packet);
+    row._alias = key;
+    row._groupId = groupId;
+  }
+  attachAdminBoundaries(pack, sheetRows, [{ key, match: '', geometry }]);
+  rebuildSheetOnly(pack, sheetRows);
+  paintInvestList();
+  if (visible) redrawMaps();
+  const feature = pack.find(f => f.properties?._adminKey === key || f.properties?._key === `admin:${key}`);
+  const id = feature?.properties?._key || `admin:${key}`;
+  await focusInvest(id);
+  return { key, groupId, id };
 }
 
 export async function focusInvest(id) {
