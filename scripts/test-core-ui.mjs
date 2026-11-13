@@ -902,6 +902,9 @@ assert.doesNotMatch(phoneMenus.slice(phoneMenus.indexOf('initPhoneToolMenus'), p
 assert.match(measureJs, /measure-mode/);
 assert.match(read('public/js/sketchLayer.js'), /measureBlocksSketch/);
 assert.match(read('public/css/style.css'), /measure-mode path\.sketch-hit/);
+assert.match(read('public/css/style.css'), /detail-locked[\s\S]*drawToolPane-pane[\s\S]*sketch-hit/);
+assert.match(read('public/css/style.css'), /detail-locked[\s\S]*marker-pane > \.sketch-text/);
+assert.match(read('docs/ui-spec.md'), /detail-locked/);
 
 const linePts = [
   { lat: 16.46, lng: 107.58 },
@@ -1010,7 +1013,7 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
 assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
 assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261113/);
+assert.match(html, /css\/style\.css\?v=20261113a/);
 assert.match(html, /js\/app\.js\?v=20261113/);
 
 assert.equal(HTKT_GROUPS.length, 8);

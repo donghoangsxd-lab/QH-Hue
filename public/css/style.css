@@ -5168,8 +5168,19 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container.detail-locked .leaflet-popup-pane *,
 .leaflet-container.detail-locked .leaflet-tooltip-pane,
 .leaflet-container.detail-locked .leaflet-tooltip-pane *,
-.leaflet-container.detail-locked .leaflet-marker-pane > .ua-badge-icon {
+.leaflet-container.detail-locked .leaflet-marker-pane > .ua-badge-icon,
+/* Phác thảo / đo: vẫn chọn, xóa, menu chuột phải khi detail-locked (trục A đô thị zoom nhỏ) */
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane .leaflet-interactive,
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.sketch-hit,
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit,
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit-area,
+.leaflet-container.detail-locked .leaflet-marker-pane > .sketch-text,
+.leaflet-container.detail-locked .leaflet-marker-pane > .sketch-handle {
   pointer-events: auto !important;
+}
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.sketch-hit,
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit {
+  pointer-events: stroke !important;
 }
 
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
