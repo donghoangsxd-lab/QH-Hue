@@ -741,18 +741,20 @@ assert.match(css, /12px \+ var\(--tb-btn\) \+ 16px/);
 assert.match(css, /\.map-title-text\s*\{[^}]*white-space:\s*nowrap/);
 const titleCss = css.slice(css.indexOf('/* Hộp tiêu đề vừa chữ'), css.indexOf('.map-title::before'));
 assert.match(titleCss, /\.map-title\s*\{[^}]*width:\s*fit-content/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*left:\s*50%/);
 assert.match(titleCss, /\.map-title\s*\{[^}]*right:\s*auto/);
 assert.match(titleCss, /\.map-title\s*\{[^}]*margin:\s*0/);
-assert.match(titleCss, /\.map-title\s*\{[^}]*transform:\s*none/);
+assert.match(titleCss, /\.map-title\s*\{[^}]*transform:\s*translateX\(-50%\)/);
 assert.doesNotMatch(titleCss, /margin-left:\s*auto/);
 const titlePin = css.slice(css.indexOf('body.right-collapsed .map-title,'), css.indexOf('/* Ngay dưới thanh tiêu đề'));
 for (const flag of ['right-collapsed', 'bottom-collapsed', 'compare-on']) {
   assert.match(titlePin, new RegExp(`body\\.${flag} \\.map-title`));
 }
-assert.match(titlePin, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
+assert.match(titlePin, /left:\s*50%/);
+assert.match(titlePin, /transform:\s*translateX\(-50%\)/);
 assert.match(titlePin, /right:\s*auto/);
 assert.match(titlePin, /width:\s*fit-content/);
-assert.doesNotMatch(css, /bottom-collapsed[^{}]*\{[^}]*\.map-title[^}]*left:\s*(?!calc\(12px \+ var\(--right-w\))/);
+assert.doesNotMatch(css, /bottom-collapsed[^{}]*\{[^}]*\.map-title[^}]*left:\s*(?!50%)/);
 const titleJs = read('public/js/app.js');
 const titleFn = titleJs.slice(titleJs.indexOf('const VIEW_TITLES'), titleJs.indexOf('async function loadTouchGroups'));
 assert.match(titleFn, /BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ/);

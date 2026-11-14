@@ -17,4 +17,12 @@ const layer = fs.readFileSync(new URL('../public/js/qhc2045Layer.js', import.met
 // Thẻ vùng 1/25.000: hecta qua zoneAreaHa (a hoặc turf.area); 1/10.000: fmtNum(p.a) trong metricCellsHtml
 assert.match(layer, /zoneAreaHa\(f\.properties, areaM2\)/);
 assert.match(layer, /label:\s*'Diện tích',\s*value:\s*`\$\{fmtNum\(p\.a\)\} ha`/);
+const vision = layer.slice(layer.indexOf('function qhcVisionCardHtml'), layer.indexOf('function qhcLayerDossier'));
+const visionMetrics = vision.slice(vision.indexOf('metricCellsHtml(['), vision.indexOf('])}') + 3);
+assert.match(visionMetrics, /label:\s*'Diện tích'/);
+assert.match(visionMetrics, /label:\s*'Phường, xã'/);
+assert.equal([...visionMetrics.matchAll(/label:\s*'/g)].length, 2);
+assert.doesNotMatch(visionMetrics, /Vùng chức năng|Loại không gian|Tên vùng/);
+assert.doesNotMatch(vision, /qhc-pop-src/);
+assert.match(vision, /landUseBannerHtml\(zone/);
 console.log('ok');

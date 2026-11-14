@@ -1042,7 +1042,6 @@ function qhcVisionCardHtml(f, latlng) {
   const isGreen = f.properties.L === 'x';
   const zone = isGreen ? 'Không gian cây xanh' : (cats.zones[f.properties.k] || 'Khác');
   const desc = isGreen ? '' : (cats.funcs[f.properties.f] || '');
-  const name = f.properties.n ? String(f.properties.n).trim() : '';
   let areaM2 = null;
   if (typeof turf !== 'undefined' && f.geometry) {
     try { areaM2 = turf.area(f); } catch (e) { areaM2 = null; }
@@ -1051,6 +1050,7 @@ function qhcVisionCardHtml(f, latlng) {
   const areaText = ha > 0 ? `${fmtNum(ha)} ha` : '—';
   const ward = wardNameAt(latlng.lat, latlng.lng);
   const zoneSwatch = `<i class="qhc-sw" style="background:${isGreen ? GREEN_COLOR : visionColor(zone)}"></i>`;
+  // QHC 1/25.000: chỉ Diện tích | Phường, xã + dải Chức năng SDĐ; không dòng nguồn cuối.
   return `<div class="pp land-popup land-popup-card qhc-pop">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
@@ -1064,17 +1064,13 @@ function qhcVisionCardHtml(f, latlng) {
     <div class="lp-pane is-on" data-lp-pane="chi-tieu">
       ${metricCellsHtml([
         { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaText },
-        { tone: 'cover', icon: 'layers', label: isGreen ? 'Loại không gian' : 'Vùng chức năng', value: zone },
-        { tone: 'floors', icon: 'map', label: 'Phường, xã', value: ward || '—' },
-        { tone: 'far', icon: 'file', label: 'Tên vùng', value: name || '—' }
+        { tone: 'floors', icon: 'map', label: 'Phường, xã', value: ward || '—' }
       ])}
       ${landUseBannerHtml(zone, zoneSwatch)}
       ${desc ? `<p class="qhc-pop-desc lp-meta">${escapeHtml(desc)}</p>` : ''}
-      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
     <div class="lp-pane" data-lp-pane="quy-dinh" hidden>
       ${regulationsPaneHtml(qhcLayerDossier())}
-      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
   </div>`;
 }
