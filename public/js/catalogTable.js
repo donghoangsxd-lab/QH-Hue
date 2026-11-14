@@ -1,11 +1,11 @@
 // Bảng danh mục độc lập: trục B mở đồ án quy hoạch (sổ tay + đối soát bản đồ); trục F mở dự án đầu tư.
 import { state } from './state.js';
-import { escapeHtml, ico, showToast, loadHtml2Pdf, inlineSpriteIcons } from './utils.js';
+import { escapeHtml, ico, showToast, loadHtml2Pdf, inlineSpriteIcons, RIGHT_TAB_EVENT } from './utils.js';
 import {
   setBottomPanelCollapsed, setBottomPanelMaximized, toggleBottomPanelMaximized
 } from './uiComponents.js';
 import { loadCatalog, projectAreaOf } from './projectFiles.js';
-import { zoomToProjectBoundary } from './projectLayer.js';
+import { zoomToProjectBoundary, openProjectDocByName } from './projectLayer.js';
 import {
   listInvestCatalogItems, focusInvest, primeInvestLoad, ensureInvestCatalogLoaded
 } from './investLayer.js';
@@ -16,7 +16,7 @@ import {
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
   groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, rowsToCsv, downloadCsv,
-  STATUS, PLAN_TABLE_COLS, PLAN_SORT_COLUMNS,
+  STATUS, PLAN_TABLE_COLS, PLAN_SORT_COLUMNS, formatPhaseLayerLabel,
   mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf
 } from './catalogTableCore.js';
 
@@ -623,6 +623,20 @@ async function submitEdit(e) {
         ghiChu: 'Thêm bởi admin'
       });
     }
+    let offerTenQH = '';
+    let offerMode = '';
+    if (mode === 'link') {
+      offerTenQH = String($('catalogEditBound')?.value || '').trim();
+      offerMode = 'add';
+    } else if (mode === 'adopt') {
+      offerTenQH = String($('catalogEditTenQH')?.value || $('catalogEditParentMa')?.value || '').trim();
+      offerMode = ($('catalogAdoptKind')?.value === 'new') ? 'new' : 'add';
+    } else if (mode === 'dccb') {
+      const parentMa = String($('catalogEditParentMa')?.value || '').trim();
+      const parent = (soTayItems || []).find((it) => it.ma === parentMa);
+      offerTenQH = parent?.tenQH || parent?.ten || parentMa;
+      offerMode = 'adjust';
+    }
     const saved = await persistEdits(next);
     soTayEdits = { ...next, saved: Date.now() };
     writeLocalEdits(soTayEdits);
@@ -636,9 +650,41 @@ async function submitEdit(e) {
         ? 'Đã ghi sổ tay'
         : (mode === 'edit' ? 'Đã sửa đồ án' : (mode === 'dccb' ? 'Đã ghi ĐCCB' : 'Đã ghi đồ án')));
     showToast(`${label} ${okRemote}`, saved.remote ? 'success' : 'info');
+    if (offerTenQH && offerMode) offerCatalogSchemeEntry(offerTenQH, offerMode);
   } finally {
     editBusy = false;
   }
+}
+
+/** Toast + nút tùy chọn mở Bổ sung / Điều chỉnh — không auto-ingest DXF. */
+function offerCatalogSchemeEntry(tenQH, qmode) {
+  const name = String(tenQH || '').trim();
+  if (!name) return;
+  const el = document.getElementById('appToast');
+  if (!el) return;
+  const row = document.createElement('div');
+  row.className = 'app-toast-actions';
+  const isAdj = qmode === 'adjust';
+  row.innerHTML = `<span class="app-toast-hint">Chỉ meta sổ tay — chưa có bản vẽ.</span>
+    <button type="button" class="bp-btn" data-catalog-open-scheme>${escapeHtml(isAdj ? 'Mở Điều chỉnh' : 'Mở Bổ sung')}</button>`;
+  el.appendChild(row);
+  clearTimeout(el._catalogOfferTimer);
+  el._catalogOfferTimer = setTimeout(() => row.remove(), 8000);
+  row.querySelector('[data-catalog-open-scheme]')?.addEventListener('click', async () => {
+    document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+    if (isAdj) {
+      const { openEntryFlow } = await import('./entryFlows.js');
+      const { focusAdjustSupplement } = await import('./adjustImport.js');
+      openEntryFlow('flowQuyHoach', { qmode: 'adjust' });
+      focusAdjustSupplement(name);
+    } else {
+      const { focusHoSoSupplement } = await import('./entryFlows.js');
+      focusHoSoSupplement(name, { qmode: qmode === 'new' ? 'new' : 'add' });
+    }
+    showToast(isAdj
+      ? `Đã mở Đề xuất › Điều chỉnh cho «${name}».`
+      : `Đã mở Đề xuất › ${qmode === 'new' ? 'Đồ án mới' : 'Bổ sung'} cho «${name}».`, 'info');
+  });
 }
 
 function sortHeaderHtml(label, key, opts = {}) {
@@ -681,9 +727,10 @@ function syncPlanColumns(planOnly) {
       colgroup = document.createElement('colgroup');
       table.insertBefore(colgroup, table.firstChild);
     }
-    colgroup.innerHTML = `<col style="width:3%"><col style="width:5%"><col style="width:30%">
-      <col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:6%">
-      <col style="width:6%"><col style="width:5%"><col style="width:5%"><col style="width:8%">`;
+    colgroup.innerHTML = `<col style="width:3%"><col style="width:5%"><col style="width:26%">
+      <col style="width:8%"><col style="width:9%"><col style="width:7%"><col style="width:6%">
+      <col style="width:6%"><col style="width:5%"><col style="width:5%"><col style="width:9%">
+      <col style="width:7%"><col style="width:4%">`;
     head.innerHTML = `<th>STT</th>
       ${sortHeaderHtml('Mã', 'ma')}
       ${sortHeaderHtml('Tên quy hoạch', 'name', { id: 'catalogColName' })}
@@ -694,7 +741,9 @@ function syncPlanColumns(planOnly) {
       ${sortHeaderHtml('Cấp phê duyệt', 'coQuan')}
       ${sortHeaderHtml('Diện tích', 'area')}
       ${sortHeaderHtml('Dân số', 'danSo')}
-      ${sortHeaderHtml('Ranh', 'ranh')}`;
+      ${sortHeaderHtml('Văn bản', 'vanBan')}
+      ${sortHeaderHtml('Dữ liệu', 'duLieu')}
+      <th class="catalog-add-th" title="Thêm thông tin / lớp dữ liệu">+</th>`;
   } else {
     const colgroup = table.querySelector('colgroup');
     if (colgroup) colgroup.remove();
@@ -834,30 +883,39 @@ function wardCellHtml(r) {
   return `<td class="catalog-ward" title="${escapeHtml(full)}">${escapeHtml(full)}</td>`;
 }
 
-/** Cột Ranh gộp: Có (N lớp) | Chưa có — N = số lớp bản đồ đang có trên map.
- *  chi_ban_do (ngoài sổ tay): Admin thêm nút «Sổ tay» để ghép mã có sẵn hoặc ghi tên mới. */
-function boundCellHtml(r) {
-  const tenQH = String(r.fullName || r.zoomKey || r.name || '').trim();
-  if (r.status === 'chi_ban_do') {
-    const n = Number(r.layerCount) || 0;
-    const zoom = (r.hasBoundary && r.zoomKey)
-      ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh · ${n} lớp bản đồ (không mở đồ án)">Có (${n})</button>`
-      : '<span class="catalog-bound-no">Chưa có</span>';
-    if (isAdmin() && tenQH) {
-      return `<span class="catalog-bound-actions">${zoom}<button type="button" class="catalog-bound-link" data-catalog-adopt-tenqh="${escapeHtml(tenQH)}" title="Ghép vào mã sổ tay có sẵn hoặc thêm tên mới">Sổ tay</button></span>`;
-    }
-    return zoom;
-  }
+/** Cột Văn bản: QĐ/TM/QL — thiếu hiện --; chữ cái bấm được thì zoom + mở PDF. */
+function docsCellHtml(r) {
+  const tenQH = String(r.zoomKey || r.fullName || '').trim();
+  const part = (on, code, role, title) => {
+    if (!on) return '<span class="catalog-doc-miss" title="Chưa có">--</span>';
+    if (!tenQH) return `<span class="catalog-doc-on" title="${escapeHtml(title)}">${code}</span>`;
+    return `<button type="button" class="catalog-doc-link" data-catalog-doc-tenqh="${escapeHtml(tenQH)}" data-catalog-doc-role="${escapeHtml(role)}" title="${escapeHtml(title)} — phóng ranh và mở file">${code}</button>`;
+  };
+  return `<td class="catalog-docs" title="${escapeHtml(r.docsLabel || '--/--/--')}">${part(r.docsQd, 'QĐ', 'phe-duyet', 'Quyết định phê duyệt')}<span class="catalog-doc-sep">/</span>${part(r.docsTm, 'TM', 'thuyet-minh', 'Thuyết minh')}<span class="catalog-doc-sep">/</span>${part(r.docsQl, 'QL', 'quy-dinh', 'Quy định quản lý')}</td>`;
+}
+
+/** Cột Dữ liệu: số lớp HT/QH, ví dụ --/03. */
+function dataCellHtml(r) {
+  const label = r.dataLabel || formatPhaseLayerLabel(r.htLayers, r.qhLayers);
+  const tip = `Lớp hiện trạng / quy hoạch: ${label}`;
   if (r.hasBoundary && r.zoomKey) {
-    const n = Number(r.layerCount) || 0;
-    const label = `Có (${n})`;
-    return `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh · ${n} lớp bản đồ (không mở đồ án)">${escapeHtml(label)}</button>`;
+    return `<td class="catalog-data"><button type="button" class="catalog-data-btn" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="${escapeHtml(tip)} — phóng tới ranh">${escapeHtml(label)}</button></td>`;
   }
+  return `<td class="catalog-data" title="${escapeHtml(tip)}">${escapeHtml(label)}</td>`;
+}
+
+/** Nút + cuối hàng: thêm thông tin / lớp (user gửi duyệt; Admin thêm trực tiếp hoặc gán ranh / sổ tay). */
+function addDataCellHtml(r) {
+  const tenQH = String(r.zoomKey || r.fullName || r.name || '').trim();
   const ma = String(r.maDoAn || '').trim();
-  if (isAdmin() && ma) {
-    return `<button type="button" class="catalog-bound-link" data-catalog-link-ma="${escapeHtml(ma)}" title="Gán ranh đồ án trên bản đồ">Chưa có</button>`;
-  }
-  return `<span class="catalog-bound-no">Chưa có</span>`;
+  if (!tenQH && !ma) return '<td class="catalog-add-cell">—</td>';
+  const attrs = [
+    tenQH ? `data-catalog-add-tenqh="${escapeHtml(tenQH)}"` : '',
+    ma ? `data-catalog-add-ma="${escapeHtml(ma)}"` : '',
+    r.status ? `data-catalog-add-status="${escapeHtml(r.status)}"` : '',
+    r.hasBoundary ? 'data-catalog-add-bound="1"' : ''
+  ].filter(Boolean).join(' ');
+  return `<td class="catalog-add-cell"><button type="button" class="catalog-add-data" ${attrs} title="Thêm thông tin hoặc lớp dữ liệu" aria-label="Thêm thông tin hoặc lớp dữ liệu">${ico('plus')}</button></td>`;
 }
 
 function levelCellHtml(r) {
@@ -869,7 +927,7 @@ function levelCellHtml(r) {
 function planChildRowHtml(parent, child, isLast) {
   const tag = child.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB';
   const name = String(child.ten || tag).trim() || tag;
-  // Đủ 11 <td> giống hàng cha; cấp độ + PX kế thừa đồ án cha (không tách khi sắp xếp).
+  // Đủ 13 <td> giống hàng cha; cấp độ + PX kế thừa đồ án cha (không tách khi sắp xếp).
   return `<tr class="catalog-dccb-row${isLast ? ' is-last' : ''}" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
     <td class="st-num catalog-dccb-empty"></td>
     <td class="catalog-ma catalog-dccb-empty"></td>
@@ -881,7 +939,9 @@ function planChildRowHtml(parent, child, isLast) {
     <td class="catalog-agency">${cellOrDash(child.coQuan)}</td>
     ${areaCellHtml(child.dienTichText)}
     <td class="catalog-pop">${cellOrDash(child.danSo)}</td>
-    <td class="catalog-bound-no" title="${escapeHtml(tag)}">—</td>
+    <td class="catalog-docs catalog-dccb-empty" title="${escapeHtml(tag)}">—</td>
+    <td class="catalog-data catalog-dccb-empty">—</td>
+    <td class="catalog-add-cell catalog-dccb-empty"></td>
   </tr>`;
 }
 
@@ -907,7 +967,9 @@ function planRowHtml(r, stt) {
     <td class="catalog-agency">${cellOrDash(r.coQuan)}</td>
     ${areaCellHtml(r.areaText)}
     <td class="catalog-pop">${cellOrDash(r.danSo)}</td>
-    <td>${boundCellHtml(r)}</td>
+    ${docsCellHtml(r)}
+    ${dataCellHtml(r)}
+    ${addDataCellHtml(r)}
   </tr>`;
   return parent + kids.map((c, i) => planChildRowHtml(r, c, i === kids.length - 1)).join('');
 }
@@ -1313,6 +1375,35 @@ async function onZoom(key) {
   }
 }
 
+/** Nút + cuối hàng: Admin thiếu ranh/sổ tay → gán; còn lại mở Bổ sung (user gửi duyệt / Admin thêm trực tiếp). */
+async function onAddDataClick(btn) {
+  const tenQH = String(btn.dataset.catalogAddTenqh || '').trim();
+  const ma = String(btn.dataset.catalogAddMa || '').trim();
+  const status = String(btn.dataset.catalogAddStatus || '').trim();
+  const hasBound = btn.dataset.catalogAddBound === '1';
+  if (isAdmin() && status === 'chi_ban_do' && tenQH) {
+    openAdoptSoTay(tenQH);
+    return;
+  }
+  if (isAdmin() && !hasBound && ma) {
+    openLinkBound(ma);
+    return;
+  }
+  if (!tenQH) {
+    showToast('Chưa có tên đồ án để bổ sung dữ liệu', 'info');
+    return;
+  }
+  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+  const { focusHoSoSupplement } = await import('./entryFlows.js');
+  focusHoSoSupplement(tenQH, { qmode: 'add' });
+  showToast(
+    isAdmin()
+      ? `Đã mở Đề xuất › Bổ sung cho «${tenQH}» (Admin thêm trực tiếp).`
+      : `Đã mở Đề xuất › Bổ sung cho «${tenQH}» — gửi chờ Admin duyệt.`,
+    'info'
+  );
+}
+
 export function initCatalogTable() {
   if (ready) return;
   ready = true;
@@ -1394,6 +1485,17 @@ export function initCatalogTable() {
     const adopt = e.target.closest('[data-catalog-adopt-tenqh]');
     if (adopt) {
       openAdoptSoTay(adopt.dataset.catalogAdoptTenqh);
+      return;
+    }
+    const doc = e.target.closest('[data-catalog-doc-tenqh]');
+    if (doc) {
+      const ok = openProjectDocByName(doc.dataset.catalogDocTenqh, doc.dataset.catalogDocRole);
+      if (!ok) showToast('Chưa mở được hồ sơ (thiếu đồ án trên bản đồ)', 'info');
+      return;
+    }
+    const addData = e.target.closest('.catalog-add-data');
+    if (addData) {
+      void onAddDataClick(addData);
       return;
     }
     const btn = e.target.closest('[data-catalog-zoom]');

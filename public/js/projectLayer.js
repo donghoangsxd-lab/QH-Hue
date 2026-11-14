@@ -2905,6 +2905,22 @@ function openDossierPick(p, pick) {
   else openAssign(docTarget(p, null, pick));
 }
 
+/**
+ * Bảng danh mục: phóng ranh rồi mở hồ sơ PDF (QĐ / TM / QL).
+ * role: phe-duyet | thuyet-minh | quy-dinh
+ */
+export function openProjectDocByName(name, role) {
+  const wanted = String(name || '').trim();
+  const pick = String(role || '').trim();
+  if (!wanted || !pick) return false;
+  if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
+  const p = projects.find(x => x.name === wanted || x.slug === wanted || x.short === wanted);
+  if (!p) return false;
+  zoomToProjectBoundary(wanted);
+  openDossierPick(p, pick);
+  return true;
+}
+
 // ============================ KHỞI TẠO ============================
 
 /** opts.onDeleted: gọi sau khi xóa đồ án để tải lại dữ liệu bản đồ */

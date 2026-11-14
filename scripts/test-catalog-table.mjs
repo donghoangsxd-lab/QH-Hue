@@ -4,6 +4,7 @@ import {
   filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
   catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
   groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, planYearOf, matchCatalogWard, resolvePlanWards,
+  docsStatusOfCatalogProject, phaseLayerCountsOfCatalogProject, formatPhaseLayerLabel,
   mergeSoTayEdits, nextDccbId
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName, matchSoTayToCatalog } from '../public/js/soTayMatch.js';
@@ -142,17 +143,23 @@ const csv = rowsToCsv(filterCatalogRows(merged, {}), 'plan');
 assert.match(csv, /Tên quy hoạch/);
 assert.match(csv, /Cấp độ/);
 assert.match(csv, /Phường \/ xã/);
-assert.match(csv, /Ranh/);
+assert.match(csv, /Văn bản/);
+assert.match(csv, /Dữ liệu/);
 assert.doesNotMatch(csv, /Trạng thái/);
+assert.doesNotMatch(csv.split('\n')[0], /Ranh/);
 assert.match(csv, /Đàn Nam Giao/);
 assert.match(csv, /Phường Thuận Hóa/);
 assert.match(csv, /QHPK 1\/2\.000|QHC 1\/10\.000|QHCT 1\/500/);
-assert.match(csv, /Có \(/);
 assert.ok(nam.hasBoundary === true);
 assert.ok(Number(nam.layerCount) >= 1);
 assert.equal(levelLabelOf('QHC'), 'QHC 1/10.000');
 assert.equal(levelLabelOf('QHPK'), 'QHPK 1/2.000');
 assert.equal(levelLabelOf('QHCT'), 'QHCT 1/500');
+assert.equal(formatPhaseLayerLabel(0, 3), '--/03');
+assert.equal(docsStatusOfCatalogProject({ decision: { slug: 'a' }, docs: [{ id: '1', role: 'quy-dinh' }] }).label, 'QĐ/--/QL');
+assert.equal(phaseLayerCountsOfCatalogProject({
+  boundary: {}, lands: 2, nets: { 'ht-giao-thong': 1, 'qh-cap-nuoc': 2 }
+}).ht, 1);
 
 const sortedByName = sortPlanRowsByKeys(merged, [{ key: 'name' }, { key: 'level' }]);
 assert.ok(sortedByName.length >= 2);
@@ -161,6 +168,14 @@ assert.ok(namSorted);
 assert.equal(namSorted.children?.[0]?.id, 'TH.B.001.01');
 const byWardThenLevel = sortPlanRowsByKeys(merged, [{ key: 'ward' }, { key: 'level' }]);
 assert.ok(byWardThenLevel.every((r) => !Array.isArray(r.children) || r.children.every((c) => typeof c === 'object')));
+const byArea = sortPlanRowsByKeys([
+  { name: 'a', areaHa: 10, maDoAn: 'A' },
+  { name: 'b', areaHa: 50, maDoAn: 'B' },
+  { name: 'c', areaHa: null, maDoAn: 'C' }
+], [{ key: 'area' }]);
+assert.equal(byArea[0].maDoAn, 'B');
+assert.equal(byArea[1].maDoAn, 'A');
+assert.equal(byArea[2].maDoAn, 'C');
 
 const stats = catalogStatusStats(merged);
 assert.ok(stats.total >= 3);

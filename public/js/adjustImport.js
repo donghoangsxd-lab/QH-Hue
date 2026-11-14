@@ -7,6 +7,7 @@ import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { stampPendingBoxHtml } from './stampUi.js';
 import { adjustRecordFromDxf } from './localAdjust.js';
 import { sendAdjustment, sendAdjustDraw, attachAdjustPdfFile, schemeAdjustments, putScan, pdfProblem, adjustLotStyle, setSatelliteClip } from './adjustLayer.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
@@ -386,15 +387,16 @@ function khExtra() {
   if (!record) return `<div class="adj-stamp">Đã đọc ${fmtNum(n)} tem. Thêm DXF ranh + hatch để gán vào lô.</div>`;
   const left = (khMatch && khMatch.unmatchedLots && khMatch.unmatchedLots.length) || 0;
   if (!pend.length) return `<div class="adj-stamp adj-ok">Đã gán ${fmtNum(done)}/${fmtNum(n)} tem vào lô.${left ? ` ${fmtNum(left)} lô chưa có tem.` : ''}</div>`;
-  const cur = pend.find(s => s.id === stampPick) || pend[0];
-  const chips = pend.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-adj-imp="stamp" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
-  return `<div class="cad-stamp adj-stamp">
-    <b>Có lô chứa từ 2 tem, hoặc tem chưa nằm trong lô.</b>
-    <span>Chọn lần lượt từng tem rồi bấm polygon tương ứng trên bản đồ.</span>
-    <div class="cad-stamp-list">${chips}</div>
-    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
-      <button type="button" class="cad-clear" data-adj-imp="stamp-skip" data-stamp="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
-  </div>`;
+  return stampPendingBoxHtml({
+    pending: pend,
+    pickId: stampPick,
+    tip: 'Có lô chứa từ 2 tem, hoặc tem chưa nằm trong lô.',
+    hint: 'Chọn lần lượt từng tem rồi bấm polygon tương ứng trên bản đồ.',
+    extraClass: 'adj-stamp',
+    pickAttr: 'data-adj-imp="stamp" data-stamp',
+    skipAttr: 'data-stamp',
+    skipExtra: 'data-adj-imp="stamp-skip"'
+  });
 }
 
 function render() {
@@ -661,6 +663,27 @@ export function focusAdjustSupplement(tenQH, id) {
   drawPreview();
   render();
   $('adjDrop')?.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * Prefill từ Thẩm định › Điều chỉnh (đã chấm QCVN): không bắt upload lại.
+ * Caller mở tab Đề xuất › Điều chỉnh trước (openEntryFlow).
+ */
+export function prefillAdjustHandoff(opts = {}) {
+  const tenQH = String(opts.tenQH || '').trim();
+  const id = String(opts.id || '').trim();
+  setAdjustPanelVisible(true);
+  focusAdjustSupplement(tenQH, id);
+  if (opts.title && $('adjTitle')) $('adjTitle').value = String(opts.title).slice(0, 300);
+  if (opts.note != null && $('adjNote')) $('adjNote').value = String(opts.note).slice(0, 300);
+  const list = [];
+  if (opts.dxfFile) list.push(opts.dxfFile);
+  if (opts.pdfFile) list.push(opts.pdfFile);
+  if (opts.khFile) list.push(opts.khFile);
+  if (opts.imageFile) list.push(opts.imageFile);
+  if (list.length) addFiles(list);
+  else { render(); drawPreview(); }
+  showToast('Đã chuyển sang Đề xuất › Điều chỉnh — kiểm tra file rồi Gửi / Ghi hồ sơ.', 'info');
 }
 
 export function setAdjustPanelVisible(on) {

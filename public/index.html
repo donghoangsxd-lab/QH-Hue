@@ -1162,9 +1162,10 @@
             <div id="adjStatus" class="rp-status" role="status" aria-live="polite"></div>
           </div>
           <details class="entry-legacy" id="entryLegacy" hidden>
-            <summary>Công cụ Admin</summary>
+            <summary>Batch TT16 (Admin)</summary>
+            <p class="entry-note">Không thay Đồ án mới / Bổ sung (#hoSoBox). Dùng khi cần khớp TT16 hàng loạt, SHP/GeoJSON, điểm chức năng, dân số hoặc hàng chờ <code>pending/cad</code>.</p>
         <div class="add-mode-switch" role="tablist" aria-label="Công cụ quản trị">
-          <button type="button" class="add-mode-btn active" data-mode="addBulk" role="tab" aria-selected="true" title="Nhập KML, KMZ, GeoJSON, shapefile; DXF đồ án (ô RG/HT/QH/KH)"><svg class="ico"><use href="#i-folder"/></svg>Nhập file</button>
+          <button type="button" class="add-mode-btn active" data-mode="addBulk" role="tab" aria-selected="true" title="Batch TT16: DXF RG/HT/QH/KH, KML, KMZ, GeoJSON, shapefile; hàng chờ CAD"><svg class="ico"><use href="#i-folder"/></svg>Batch TT16</button>
           <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa hoặc thêm ô dân cư"><svg class="ico"><use href="#i-tool"/></svg>Quản trị</button>
         </div>
 
@@ -1196,6 +1197,8 @@
             <label for="cadPopQH">Dân số QH</label>
             <input type="number" id="cadPopQH" min="0" step="100" inputmode="numeric" placeholder="Dân số quy hoạch (người)" />
           </div>
+          <details class="cad-batch-advanced" id="cadBatchAdvanced" open>
+            <summary>Batch nâng cao — RG / HT / QH / KH</summary>
           <div class="cad-dxf-slots">
             <div class="cad-slot-row" data-slot="RG">
               <label class="cad-drop cad-slot" for="cadFileRG">
@@ -1230,10 +1233,11 @@
               <button type="button" class="cad-slot-clear" data-clear="KH" hidden title="Bỏ file ký hiệu" aria-label="Bỏ file ký hiệu">×</button>
             </div>
           </div>
+          </details>
           <label class="cad-drop" id="cadDrop" for="cadFile">
             <span class="cad-drop-main"><b>Định dạng khác</b> hoặc kéo thả vào đây</span>
-            <span class="cad-drop-types"><i>KML</i><i>KMZ</i><i>GeoJSON</i><i>SHP (.zip)</i></span>
-            <span class="cad-drop-sub">DXF đồ án chọn ở các ô phía trên (kèm KH nếu có tem đất). KML, KMZ, GeoJSON, shapefile (.zip) và lớp điểm chức năng thả tại đây.</span>
+            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i><i>SHP (.zip)</i></span>
+            <span class="cad-drop-sub">DXF multi-file ưu tiên ô Batch nâng cao. KML, KMZ, GeoJSON, shapefile (.zip), DXF đơn và lớp điểm chức năng thả tại đây → <code>importCadBatch</code>.</span>
             <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json,.zip" multiple hidden />
           </label>
           <input type="file" id="cadPointFile" accept=".kml,.kmz,.geojson,.json,.zip,.dxf" hidden />
@@ -1577,7 +1581,9 @@
                 <th>Cấp phê duyệt</th>
                 <th>Diện tích</th>
                 <th>Dân số</th>
-                <th>Ranh</th>
+                <th>Văn bản</th>
+                <th>Dữ liệu</th>
+                <th>+</th>
               </tr>
             </thead>
             <tbody id="catalogTableBody"></tbody>

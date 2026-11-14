@@ -5,15 +5,17 @@ import { state } from './state.js';
 import { escapeHtml, announceTool, fmtNum } from './utils.js';
 import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
 import {
-  isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit
+  isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit, stageOrPublish
 } from './entryKernel.js';
 import { FLOW_IDS as REGISTRY_FLOW_IDS } from './entryRegistry.js';
 import { allEntrySteps, visibleEntrySteps, PUBLISH_KIND } from './entrySteps.js';
 import { typeOptionsHtml } from './pointEntrySchema.js';
 import { EVAL_URBANS, fieldsForScope, gapRows } from './urbanEntrySchema.js';
 import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
-import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
-import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from './schemeLotClip.js';
+import {
+  ingestSchemeFile, ingestKhFile, tagFeatures, asCollection, DRAW_MAX_BYTES,
+  SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence
+} from './schemeIngest.js';
 import { PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
 import { loadCongSuat } from './congSuat.js';
 import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
@@ -21,7 +23,8 @@ import { setAdjustPanelVisible } from './adjustImport.js';
 import { planLevelOf } from './generalPlan.js';
 import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
-import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { stampPendingBoxHtml, stampStatusNoteHtml } from './stampUi.js';
 import { ensureSoTayItems } from './catalogTable.js';
 import { schemePickOptions } from './catalogTableCore.js';
 import { projectAreaOf } from './projectFiles.js';
@@ -474,26 +477,23 @@ function stampBoxHtml(bag) {
   const n = (bag && bag.khStamps && bag.khStamps.length) || 0;
   if (!bag?.khFile) return '';
   if (!n) {
-    return `<p class="entry-note lot-flag">File ký hiệu <b>${escapeHtml(bag.khFile.name)}</b> không đọc được tem đất.</p>`;
+    return stampStatusNoteHtml({ fileName: bag.khFile.name, n: 0, noStamps: true });
   }
   if (!bag.features?.length) {
-    return `<p class="entry-note">Đã đọc ${fmtNum(n)} tem từ <b>${escapeHtml(bag.khFile.name)}</b>. Chọn file sử dụng đất để gán vào lô.</p>`;
+    return stampStatusNoteHtml({ fileName: bag.khFile.name, n, noFeatures: true });
   }
   const pend = (match && match.pending) || [];
   const done = (match && match.assigned.length) || 0;
   const left = (match && match.unmatchedLots && match.unmatchedLots.length) || 0;
   if (!pend.length) {
-    return `<p class="entry-note">Tem đất: đã gán ${fmtNum(done)}/${fmtNum(n)} từ <b>${escapeHtml(bag.khFile.name)}</b>.${left ? ` ${fmtNum(left)} lô chưa có tem.` : ''}</p>`;
+    return stampStatusNoteHtml({ fileName: bag.khFile.name, n, done, left });
   }
-  const cur = pend.find(s => s.id === bag.stampPick) || pend[0];
-  const chips = pend.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-ho-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
-  return `<div class="cad-stamp">
-    <b>Tem chưa tự khớp (≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).</b>
-    <span>Chọn tem rồi bấm lô trên bản đồ. Mỗi lô một tem.</span>
-    <div class="cad-stamp-list">${chips}</div>
-    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
-      <button type="button" class="cad-clear" data-ho-stamp-skip="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
-  </div>`;
+  return stampPendingBoxHtml({
+    pending: pend,
+    pickId: bag.stampPick,
+    pickAttr: 'data-ho-stamp',
+    skipAttr: 'data-ho-stamp-skip'
+  });
 }
 
 function showStepPreview() {
@@ -1086,7 +1086,7 @@ async function takeDraw(step, file) {
     lon0: $('hoLon0')?.value
   };
   try {
-    const parsed = await readDrawingFile(file, step.draw, choice);
+    const parsed = await ingestSchemeFile(file, step.draw, choice);
     const features = parsed.error ? [] : tagFeatures(parsed.features, hoMeta(step));
     held[step.id] = {
       ...prev,
@@ -1106,36 +1106,17 @@ async function takeDraw(step, file) {
 
 async function takeKh(step, file) {
   const prev = held[step.id] || {};
-  if (!/\.dxf$/i.test(file.name)) {
-    held[step.id] = { ...prev, khFile: file, khStamps: [], khError: 'File ký hiệu chỉ nhận DXF.' };
-    renderActive();
-    return;
-  }
-  if (file.size > DRAW_MAX_BYTES) {
-    held[step.id] = { ...prev, khFile: file, khStamps: [], khError: 'File tối đa 20 MB.' };
-    renderActive();
-    return;
-  }
-  try {
-    const stamps = parseLandStampDxf(await file.text());
-    held[step.id] = {
-      ...prev,
-      khFile: file,
-      khStamps: stamps,
-      khError: stamps.length ? '' : 'Không đọc được tem trong file.',
-      stampAssign: {},
-      stampSkip: [],
-      stampPick: null
-    };
-    applyKhToHeld(step);
-  } catch (err) {
-    held[step.id] = {
-      ...prev,
-      khFile: file,
-      khStamps: [],
-      khError: err.message || 'Không đọc được file ký hiệu.'
-    };
-  }
+  const { stamps, error } = await ingestKhFile(file);
+  held[step.id] = {
+    ...prev,
+    khFile: file,
+    khStamps: stamps,
+    khError: error,
+    stampAssign: {},
+    stampSkip: [],
+    stampPick: null
+  };
+  if (!error && stamps.length) applyKhToHeld(step);
   renderActive();
 }
 
@@ -1258,44 +1239,43 @@ async function saveHoSo() {
     }
     if (!officerCanEdit(unitKey)) {
       notes.push('bản vẽ giữ trên máy — cần đăng nhập đúng đơn vị');
-      } else if (isAdmin()) {
-      for (const step of visibleSteps()) {
-        const bag = held[step.id];
-        if (!bag?.features?.length) {
-          if (bag?.counts) notes.push(`${step.label} (${clipSentence(bag.counts)}; không ghi)`);
-          continue;
-        }
-        const rows = netPayload(tagFeatures(bag.features, hoMeta(step)));
-        const kind = PUBLISH_KIND[step.id];
-        if (kind) {
-          const done = await postJson('publishSchemeDraw', { tenQH, kind, features: rows });
-          const clipNote = bag.counts ? ` ${clipSentence(bag.counts)}` : '';
-          notes.push(done.skipped ? `${step.label} (${done.note || 'đã có lớp'})` : `${step.label}.${clipNote}`.trim());
-        } else if (step.role) {
-          await postJson('putProjectNet', { tenQH, role: step.role, features: rows });
-          notes.push(step.label);
-        }
-      }
     } else {
       for (const step of visibleSteps()) {
         const bag = held[step.id];
         const hasDraw = bag?.features?.length || bag?.review?.length;
-        if (!hasDraw) continue;
+        if (!hasDraw) {
+          if (bag?.counts) notes.push(`${step.label} (${clipSentence(bag.counts)}; không ghi)`);
+          continue;
+        }
         const tagged = tagFeatures(bag.features || [], hoMeta(step));
         const rows = netPayload(tagged);
-        const kind = PUBLISH_KIND[step.id] || 'ban-ve';
+        const kind = PUBLISH_KIND[step.id];
         const review = step.draw === 'land' ? reviewBody(step, bag, tagged) : [];
-        await postJson('submitChoDuyet', {
-          kind,
+        const clipNote = bag.counts ? ` ${clipSentence(bag.counts)}` : '';
+        const stageBody = {
+          kind: kind || 'ban-ve',
           unitKey,
           tenQH,
-          role: kind === 'ban-ve' ? step.role : '',
+          role: kind ? '' : (step.role || ''),
           summary: `${step.label} · ${rows.length} đối tượng${bag.counts ? ` · đỏ ${bag.counts.bo + bag.counts.cat}` : ''}`.slice(0, 180),
           features: rows,
           lotReview: review,
           clip: bag.counts ? { edgeM: SCHEME_EDGE_M, ...bag.counts } : undefined
-        });
-        notes.push(`${step.label} (chờ duyệt)${bag.counts ? ` — ${clipSentence(bag.counts)}` : ''}`);
+        };
+        if (kind) {
+          const { staged, data } = await stageOrPublish({
+            adminFn: () => postJson('publishSchemeDraw', { tenQH, kind, features: rows }),
+            stageFn: () => postJson('submitChoDuyet', stageBody)
+          });
+          if (staged) notes.push(`${step.label} (chờ duyệt)${bag.counts ? ` — ${clipSentence(bag.counts)}` : ''}`);
+          else notes.push(data?.skipped ? `${step.label} (${data.note || 'đã có lớp'})` : `${step.label}.${clipNote}`.trim());
+        } else if (step.role) {
+          const { staged } = await stageOrPublish({
+            adminFn: () => postJson('putProjectNet', { tenQH, role: step.role, features: rows }),
+            stageFn: () => postJson('submitChoDuyet', stageBody)
+          });
+          notes.push(staged ? `${step.label} (chờ duyệt)` : step.label);
+        }
       }
     }
     if (features.length) downloadHoSo();
@@ -1527,7 +1507,7 @@ function renderDuAn() {
       return;
     }
     try {
-      const parsed = await readDrawingFile(file, 'boundary', { id: $('daCrs')?.value || 'HUE_3' });
+      const parsed = await ingestSchemeFile(file, 'boundary', { id: $('daCrs')?.value || 'HUE_3' });
       if (parsed.error) {
         daGeom = null;
         clearPreview();
@@ -1631,9 +1611,27 @@ export function openEntryFlow(id, opts = {}) {
     const legacy = $('entryLegacy');
     if (legacy && !legacy.hidden) legacy.setAttribute('open', '');
   }
+  if (opts.scheme && (hoMode === 'add' || hoMode === 'adjust' || hoMode === 'net')) {
+    fillHoSchemes(opts.scheme);
+    const sel = $('hoScheme');
+    if (sel && opts.scheme) {
+      if (![...sel.options].some(o => o.value === opts.scheme)) {
+        sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(opts.scheme)}">${escapeHtml(opts.scheme)}</option>`);
+      }
+      sel.value = opts.scheme;
+      onSchemePicked();
+    }
+  }
   if (flow === 'flowPhatTrien') renderHanhChinh();
   if (flow === 'flowKienTruc') renderKienTruc();
   if (flow === 'flowDuAn') renderDuAn();
+}
+
+/** Deep-link Bổ sung checklist (#hoSoBox) — Cân đối / Catalog; không nuốt DXF. */
+export function focusHoSoSupplement(tenQH, opts = {}) {
+  const qmode = opts.qmode === 'new' ? 'new' : 'add';
+  openEntryFlow('flowQuyHoach', { qmode, scheme: String(tenQH || '').trim() });
+  $('hoSoBox')?.scrollIntoView({ block: 'nearest' });
 }
 
 export function initEntryFlows(hooks = {}) {

@@ -1,5 +1,5 @@
-// Tab Đề xuất → "Nhập hàng loạt": đọc file DXF/KML/KMZ/GeoJSON/shapefile (.zip), xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi.
-// Đồ án gServer: tối đa 3 file — lớp vùng (sử dụng đất), lớp điểm, lớp đường (ranh). Ranh hoặc hiện trạng có thể ghép vào đồ án đã chọn.
+// Đề xuất › Batch TT16 (Admin, #entryLegacy): DXF/KML/KMZ/GeoJSON/shapefile → importCadBatch / pending/cad.
+// Không thay Đồ án mới / Bổ sung (#hoSoBox). Slot RG/HT/QH/KH nằm trong «Batch nâng cao».
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
 import { landColor, landLabel, landRule, RESIDENTIAL_COLOR } from './tt16Symbols.js';
 import { map } from './mapEngine.js';
@@ -22,6 +22,7 @@ import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
 import { lotKeysOf, projectAreaOf } from './projectFiles.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { stampPendingBoxHtml } from './stampUi.js';
 import { openEntryFlow } from './entryFlows.js';
 import { groupInfraParcels } from './touchGroups.js';
 import { ensureSoTayItems } from './catalogTable.js';
@@ -739,15 +740,14 @@ function focusRow(idx) {
 function stampBoxHtml() {
   const match = current && current.stampMatch;
   if (!match || !match.pending.length) return '';
-  const cur = match.pending.find(s => s.id === current.stampPick) || match.pending[0];
-  const chips = match.pending.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
-  return `<div class="cad-stamp">
-    <b>Tem chưa tự khớp (cần ≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).</b>
-    <span>Chọn lần lượt từng tem (đang gán màu hồng trên bản đồ) rồi bấm polygon tương ứng. Mỗi lô chỉ nhận một tem.</span>
-    <div class="cad-stamp-list">${chips}</div>
-    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
-      <button type="button" class="cad-clear" data-stamp-skip="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
-  </div>`;
+  return stampPendingBoxHtml({
+    pending: match.pending,
+    pickId: current.stampPick,
+    tip: 'Tem chưa tự khớp (cần ≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).',
+    hint: 'Chọn lần lượt từng tem (đang gán màu hồng trên bản đồ) rồi bấm polygon tương ứng. Mỗi lô chỉ nhận một tem.',
+    pickAttr: 'data-stamp',
+    skipAttr: 'data-stamp-skip'
+  });
 }
 
 function renderReport() {

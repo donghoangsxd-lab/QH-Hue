@@ -10,26 +10,58 @@ import { bareName } from './urbanStatus.js';
 
 /** Đếm lớp bản đồ đang có trên entry catalog (ranh + lô + nets) — không tải file, an toàn cho test Node. */
 export function layerCountOfCatalogProject(p) {
-  if (!p) return 0;
-  let n = 0;
-  if (p.boundary) n += 1;
-  if (Number(p.lands) > 0 || Number(p.infra) > 0) n += 1;
+  const { ht, qh } = phaseLayerCountsOfCatalogProject(p);
+  return ht + qh;
+}
+
+/** Số lớp HT / QH đang có trên entry (nets theo tiền tố + ranh/lô QH). */
+export function phaseLayerCountsOfCatalogProject(p) {
+  let ht = 0;
+  let qh = 0;
+  if (!p) return { ht, qh };
+  if (p.boundary) qh += 1;
+  // Catalog không tách phase lô → lands/infra tính vào QH (lớp sử dụng đất quy hoạch).
+  if (Number(p.lands) > 0 || Number(p.infra) > 0) qh += 1;
   const nets = p.nets && typeof p.nets === 'object' ? p.nets : {};
-  for (const v of Object.values(nets)) {
-    if (Number(v) > 0) n += 1;
+  for (const [key, v] of Object.entries(nets)) {
+    if (!(Number(v) > 0)) continue;
+    if (String(key).startsWith('ht-')) ht += 1;
+    else if (String(key).startsWith('qh-')) qh += 1;
   }
-  return n;
+  return { ht, qh };
+}
+
+export function formatPhaseLayerLabel(ht, qh) {
+  const part = (n) => (Number(n) > 0 ? String(Number(n)).padStart(2, '0') : '--');
+  return `${part(ht)}/${part(qh)}`;
+}
+
+/** Trạng thái hồ sơ PDF: QĐ / TM / QL (thiếu → --). */
+export function docsStatusOfCatalogProject(p) {
+  const docs = Array.isArray(p?.docs) ? p.docs : [];
+  const hasQd = !!(p?.decision && (p.decision.slug || p.decision.url || p.decision.name));
+  const hasTm = docs.some((d) => d && d.role === 'thuyet-minh' && d.id);
+  const hasQl = docs.some((d) => d && d.role === 'quy-dinh' && d.id);
+  const parts = [hasQd ? 'QĐ' : '--', hasTm ? 'TM' : '--', hasQl ? 'QL' : '--'];
+  return {
+    qd: hasQd,
+    tm: hasTm,
+    ql: hasQl,
+    label: parts.join('/'),
+    score: (hasQd ? 1 : 0) + (hasTm ? 1 : 0) + (hasQl ? 1 : 0)
+  };
 }
 
 export const CATALOG_HEADERS_PLAN = [
   'STT', 'Mã', 'Tên quy hoạch', 'Cấp độ', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
-  'Diện tích (ha)', 'Dân số', 'Ranh'
+  'Diện tích (ha)', 'Dân số', 'Văn bản', 'Dữ liệu'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
-export const PLAN_TABLE_COLS = CATALOG_HEADERS_PLAN.length;
+/** Cột bảng plan gồm thêm cột hành động «+» cuối hàng (không xuất CSV). */
+export const PLAN_TABLE_COLS = CATALOG_HEADERS_PLAN.length + 1;
 
-/** Khóa sắp xếp cột bảng plan (không gồm STT — số thứ tự sau khi xếp). */
+/** Khóa sắp xếp cột bảng plan (không gồm STT / cột +). area·danSo·vanBan·duLieu: lớn → nhỏ. */
 export const PLAN_SORT_COLUMNS = [
   { key: 'ma', label: 'Mã' },
   { key: 'name', label: 'Tên quy hoạch' },
@@ -38,10 +70,12 @@ export const PLAN_SORT_COLUMNS = [
   { key: 'quyetDinh', label: 'Quyết định' },
   { key: 'ngay', label: 'Ngày ban hành' },
   { key: 'coQuan', label: 'Cấp phê duyệt' },
-  { key: 'area', label: 'Diện tích' },
-  { key: 'danSo', label: 'Dân số' },
-  { key: 'ranh', label: 'Ranh' }
+  { key: 'area', label: 'Diện tích', desc: true },
+  { key: 'danSo', label: 'Dân số', desc: true },
+  { key: 'vanBan', label: 'Văn bản', desc: true },
+  { key: 'duLieu', label: 'Dữ liệu', desc: true }
 ];
+const PLAN_SORT_DESC = new Set(PLAN_SORT_COLUMNS.filter((c) => c.desc).map((c) => c.key));
 
 export { STATUS };
 
@@ -94,13 +128,13 @@ function cmpText(a, b) {
   return String(a || '').localeCompare(String(b || ''), 'vi', { sensitivity: 'base', numeric: true });
 }
 
-function cmpNumNullLast(a, b) {
+function cmpNumNullLast(a, b, desc = false) {
   const aOk = a != null && Number.isFinite(a);
   const bOk = b != null && Number.isFinite(b);
   if (!aOk && !bOk) return 0;
   if (!aOk) return 1;
   if (!bOk) return -1;
-  return a - b;
+  return desc ? (b - a) : (a - b);
 }
 
 /** Giá trị so sánh một cột — chỉ dùng trên đồ án cha. */
@@ -115,16 +149,19 @@ export function planSortValue(row, key) {
     case 'coQuan': return String(row.coQuan || '');
     case 'area': return Number.isFinite(row.areaHa) ? row.areaHa : parseVnNumber(row.areaText);
     case 'danSo': return parseVnNumber(row.danSo);
-    case 'ranh': return row.hasBoundary ? (1000 + (Number(row.layerCount) || 0)) : 0;
+    case 'vanBan': return Number(row.docsScore) || 0;
+    case 'duLieu': return (Number(row.htLayers) || 0) * 1000 + (Number(row.qhLayers) || 0);
     default: return '';
   }
 }
 
 function comparePlanField(a, b, key) {
-  if (key === 'level' || key === 'ngay' || key === 'area' || key === 'danSo' || key === 'ranh') {
-    return cmpNumNullLast(planSortValue(a, key), planSortValue(b, key));
+  const desc = PLAN_SORT_DESC.has(key);
+  if (key === 'level' || key === 'ngay' || key === 'area' || key === 'danSo' || key === 'vanBan' || key === 'duLieu') {
+    return cmpNumNullLast(planSortValue(a, key), planSortValue(b, key), desc);
   }
-  return cmpText(planSortValue(a, key), planSortValue(b, key));
+  const d = cmpText(planSortValue(a, key), planSortValue(b, key));
+  return desc ? -d : d;
 }
 
 /**
@@ -314,6 +351,8 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     const wards = resolvePlanWards(item, p);
     const children = mapChildren(item.children);
     const zoomKey = hasBoundary ? (names.tenQH || '') : '';
+    const phases = phaseLayerCountsOfCatalogProject(p);
+    const docs = docsStatusOfCatalogProject(p);
     rows.push({
       id: item.ma,
       source: 'plan',
@@ -332,7 +371,15 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
-      layerCount: hasBoundary ? layerCountOfCatalogProject(p) : 0,
+      layerCount: layerCountOfCatalogProject(p),
+      htLayers: phases.ht,
+      qhLayers: phases.qh,
+      dataLabel: formatPhaseLayerLabel(phases.ht, phases.qh),
+      docsQd: docs.qd,
+      docsTm: docs.tm,
+      docsQl: docs.ql,
+      docsLabel: docs.label,
+      docsScore: docs.score,
       note: notes.join(' · '),
       zoomKey,
       maDoAn: item.ma,
@@ -356,6 +403,8 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     if (p.legacy) notes.push('Đồ án cũ');
     const wards = resolvePlanWards(null, p);
     const zoomKey = hasBoundary ? (names.tenQH || '') : '';
+    const phases = phaseLayerCountsOfCatalogProject(p);
+    const docs = docsStatusOfCatalogProject(p);
     rows.push({
       id: `web:${p.slug || names.tenQH}`,
       source: 'plan',
@@ -374,7 +423,15 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       status,
       statusLabel: STATUS[status]?.label || status,
       hasBoundary,
-      layerCount: hasBoundary ? layerCountOfCatalogProject(p) : 0,
+      layerCount: layerCountOfCatalogProject(p),
+      htLayers: phases.ht,
+      qhLayers: phases.qh,
+      dataLabel: formatPhaseLayerLabel(phases.ht, phases.qh),
+      docsQd: docs.qd,
+      docsTm: docs.tm,
+      docsQl: docs.ql,
+      docsLabel: docs.label,
+      docsScore: docs.score,
       note: notes.join(' · '),
       zoomKey,
       maDoAn: '',
@@ -665,9 +722,6 @@ export function rowsToCsv(rows, source = 'plan') {
     });
     return `\uFEFF${lines.join('\r\n')}`;
   }
-  const ranhLabel = (r) => (r.hasBoundary
-    ? `Có (${Number(r.layerCount) || 0})`
-    : 'Chưa có');
   const lines = [CATALOG_HEADERS_PLAN.join(',')];
   let stt = 0;
   for (const r of rows || []) {
@@ -683,7 +737,8 @@ export function rowsToCsv(rows, source = 'plan') {
       r.coQuan || '',
       r.areaText || '',
       r.danSo || '',
-      ranhLabel(r)
+      r.docsLabel || '--/--/--',
+      r.dataLabel || formatPhaseLayerLabel(r.htLayers, r.qhLayers)
     ].map(escape).join(','));
     for (const c of r.children || []) {
       lines.push([
@@ -697,7 +752,8 @@ export function rowsToCsv(rows, source = 'plan') {
         c.coQuan || '',
         c.dienTichText || '',
         c.danSo || '',
-        c.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB'
+        c.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB',
+        ''
       ].map(escape).join(','));
     }
   }

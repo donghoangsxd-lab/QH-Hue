@@ -4,7 +4,7 @@
 // Bước 3: cộng số tăng/giảm vào tổng cả đồ án rồi chấm lại % QCVN. Dưới 100% → Không đảm bảo.
 // Bước 4: độ phủ = đất ở nằm trong bán kính phục vụ của hạ tầng đồ án. Chạy ngầm, chỉ báo khi giảm xuống dưới 100%.
 // Kết quả dựng thành tờ bản vẽ (hai bản vẽ trước / sau, bảng đất, bảng chỉ tiêu, cột ký hiệu, khung tên), xuất PDF A3. Không ghi Sheet.
-// Đồng ý thì Nhập hồ sơ: ranh + lô mới (+ PDF scan) lưu bucket qua adjustLayer.js, người dùng thường vào hàng chờ Admin duyệt.
+// Sau QCVN: «Nhập hồ sơ» deep-link + prefill sang Đề xuất › Điều chỉnh (#adjImportBox) — một cửa ghi.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
@@ -15,7 +15,7 @@ import { setBottomPanelCollapsed } from './uiComponents.js';
 import { dismissReviewHost, reviewHostDirty } from './projectReview.js';
 import { projectLayersOf, cachedLots } from './projectFiles.js';
 import { landPatternKey, layerForPattern, TT16_STYLES } from './tt16Symbols.js';
-import { sendAdjustment, pdfProblem } from './adjustLayer.js';
+import { pdfProblem } from './adjustLayer.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landRowByKey, landSubKey,
   decisionKind, presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, landSymbol, UNDETERMINED_KEY,
@@ -33,6 +33,7 @@ const A3_W = 1587, A3_H = 1122;
 const $ = (id) => document.getElementById(id);
 let minis = [];
 let sheet = null;
+let lastDxfFile = null;
 let pdfBusy = false;
 
 function tokensOf(name) {
@@ -609,36 +610,17 @@ function pdfPicked() {
   return $('localPdf')?.files?.[0] || null;
 }
 
-function importBoxHtml(s) {
-  const admin = isAdmin();
-  const pdf = pdfPicked();
-  return `<div class="la-import" id="laImport" hidden>
-    <p>${admin
-      ? `Ranh điều chỉnh và ${fmtNum(s.incoming.length)} lô đất mới sẽ ghi lên bản đồ quy hoạch đồ án «${escapeHtml(s.name)}».`
-      : 'Hồ sơ vào hàng chờ, ranh điều chỉnh hiện trên bản đồ quy hoạch sau khi Admin duyệt.'}${s.bad ? ' <b class="la-import-warn">Kết quả thẩm định: Không đảm bảo.</b>' : ''}</p>
-    <div class="la-import-fields">
-      ${admin ? '' : '<input type="text" id="laSender" maxlength="80" placeholder="Người gửi / đơn vị (bắt buộc)">'}
-      <input type="text" id="laNote" maxlength="300" placeholder="Ghi chú: số Quyết định, ngày ban hành…">
-      <span class="la-import-pdf">PDF scan: ${pdf ? `${escapeHtml(pdf.name)} · ${sizeText(pdf.size)}` : 'không kèm (chọn ở khung nhập trước khi thẩm định)'}</span>
-    </div>
-    <div class="la-import-btns">
-      <button type="button" class="bp-btn la-import-go" id="btnLaSend">${ico('check')}${admin ? 'Đồng ý nhập' : 'Gửi Admin duyệt'}</button>
-      <button type="button" class="bp-btn" id="btnLaCancel">${ico('close')}Hủy</button>
-    </div>
-  </div>`;
-}
-
 function pageHtml(s) {
   return `<div class="la-wrap">
     <div class="bp-part-head review-head">
       <b class="bp-part-title">ĐIỀU CHỈNH CỤC BỘ · ${escapeHtml(s.name)} <span class="la-verdict ${s.bad ? 'bad' : 'ok'}">${s.bad ? 'Không đảm bảo' : 'Đảm bảo'}</span></b>
       <div class="review-head-btns">
-        <button type="button" class="bp-btn" id="btnLocalImport">${ico('send')}Nhập hồ sơ</button>
+        <button type="button" class="bp-btn" id="btnLocalImport" title="Chuyển DXF/PDF đã thẩm định sang Đề xuất › Điều chỉnh để ghi (một cửa)">${ico('send')}Nhập hồ sơ</button>
         <button type="button" class="bp-btn" id="btnLocalPdf">${ico('printer')}Xuất PDF A3</button>
         <button type="button" class="bp-btn" id="btnLocalClose">${ico('close')}Đóng</button>
       </div>
     </div>
-    ${importBoxHtml(s)}
+    <p class="entry-note">Chấm QCVN xong. Bấm «Nhập hồ sơ» để mở Đề xuất › Điều chỉnh với file đã chọn (không upload lại).${s.bad ? ' <b class="la-import-warn">Kết quả: Không đảm bảo.</b>' : ''}</p>
     ${paperHtml(s, false)}
   </div>`;
 }
@@ -676,31 +658,27 @@ function adjustPayload(s) {
 
 const sizeText = (bytes) => (bytes < 1024 ? `${fmtNum(bytes)} B` : `${fmtNum(Math.round(bytes / 1024))} KB`);
 
-async function submitImport() {
-  if (!sheet || sheet.sent) return;
-  const admin = isAdmin();
-  const sender = $('laSender')?.value.trim() || '';
-  if (!admin && !sender) { showToast('Nhập tên người gửi / đơn vị', 'error'); $('laSender')?.focus(); return; }
-  const pdf = pdfPicked();
-  const bad = pdfProblem(pdf, isAdmin());
-  if (bad) { showToast(bad, 'error'); return; }
-  const btn = $('btnLaSend');
-  if (btn) btn.disabled = true;
-  showToast(admin ? '⏳ Đang ghi hồ sơ điều chỉnh...' : '⏳ Đang gửi hồ sơ điều chỉnh...');
-  try {
-    const out = await sendAdjustment({ ...adjustPayload(sheet), sender, note: $('laNote')?.value.trim() || '' }, pdf);
-    sheet.sent = true;
-    $('laImport')?.setAttribute('hidden', '');
-    const go = $('btnLocalImport');
-    if (go) { go.disabled = true; go.innerHTML = `${ico('check')}${out.approved ? 'Đã nhập' : 'Đã gửi'}`; }
-    showToast(out.approved
-      ? '✓ Đã ghi ranh điều chỉnh lên bản đồ quy hoạch'
-      : '✓ Đã gửi hồ sơ, chờ Admin duyệt', 'success');
-    if (out.pdfError) showToast(`Hồ sơ đã lưu nhưng chưa gắn được PDF: ${out.pdfError}`, 'error');
-  } catch (err) {
-    showToast(`Không nhập được hồ sơ: ${err.message}`, 'error');
-    if (btn) btn.disabled = false;
+async function handoffToAdjustImport() {
+  if (!sheet) return;
+  const dxf = lastDxfFile || $('localFile')?.files?.[0] || null;
+  if (!dxf) {
+    showToast('Không còn file DXF trong phiên — chọn lại DXF ở khung Điều chỉnh rồi thẩm định lại.', 'error');
+    return;
   }
+  const pdf = pdfPicked();
+  const title = adjustPayload(sheet).title || `ĐIỀU CHỈNH CỤC BỘ ${sheet.name}`;
+  const note = sheet.bad ? 'Thẩm định: Không đảm bảo QCVN' : 'Thẩm định: Đảm bảo QCVN';
+  const tenQH = sheet.name;
+  dismissReviewHost();
+  // Dynamic import: tránh vòng localAdjust ↔ adjustImport ↔ entryFlows
+  const [{ RIGHT_TAB_EVENT }, { openEntryFlow }, { prefillAdjustHandoff }] = await Promise.all([
+    import('./utils.js'),
+    import('./entryFlows.js'),
+    import('./adjustImport.js')
+  ]);
+  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+  openEntryFlow('flowQuyHoach', { qmode: 'adjust' });
+  prefillAdjustHandoff({ tenQH, title, note, dxfFile: dxf, pdfFile: pdf || undefined });
 }
 
 function showPage(s) {
@@ -866,6 +844,7 @@ async function runAdjust() {
       ...extra
     ].join(' ');
     rememberPop(name, pop);
+    lastDxfFile = file;
     showPage({
       name, kind, bad, lead, lines,
       areas: areaRows(kind, beforeMap, afterMap),
@@ -956,8 +935,6 @@ export function initLocalAdjust() {
   $('projectReviewHost')?.addEventListener('click', (e) => {
     if (e.target.closest('#btnLocalClose')) dismissReviewHost();
     else if (e.target.closest('#btnLocalPdf')) exportA3();
-    else if (e.target.closest('#btnLocalImport')) $('laImport')?.toggleAttribute('hidden');
-    else if (e.target.closest('#btnLaCancel')) $('laImport')?.setAttribute('hidden', '');
-    else if (e.target.closest('#btnLaSend')) submitImport();
+    else if (e.target.closest('#btnLocalImport')) handoffToAdjustImport();
   });
 }

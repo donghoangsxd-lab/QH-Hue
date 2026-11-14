@@ -1052,11 +1052,13 @@ function actionsHtml(open) {
   if (session.saved) {
     return `<div class="review-foot review-noprint">
       <span>Tính từ các lô đã lưu của đồ án (lớp sử dụng đất hiện trạng / quy hoạch). Chỉ xem — không ghi Sheet; dân số nhập ở đây lưu trên máy này.</span>
+      <button type="button" class="bp-btn" id="btnReviewHosoAdd" title="Mở Đề xuất › Bổ sung checklist PDF/capacity (không thay dossier CAD)">${ico('plus')}Checklist Bổ sung</button>
     </div>`;
   }
   if (session.pendingId) {
     return `<div class="review-foot review-noprint">
-      <span>Hồ sơ chờ duyệt${session.sender ? ` · người gửi: <b>${escapeHtml(session.sender)}</b>` : ''}. Phê duyệt: dữ liệu chuyển sang khung Nhập hàng loạt để khớp công trình đã có rồi ghi Sheet (Ten_QH = <b>${escapeHtml(session.project)}</b>).</span>
+      <span>Hồ sơ chờ duyệt${session.sender ? ` · người gửi: <b>${escapeHtml(session.sender)}</b>` : ''}. Phê duyệt: mở Batch TT16 để khớp công trình rồi ghi Sheet (Ten_QH = <b>${escapeHtml(session.project)}</b>). Checklist Bổ sung dùng khi chỉ cần PDF/capacity.</span>
+      <button type="button" class="bp-btn" id="btnReviewHosoAdd" title="Mở Đề xuất › Bổ sung (checklist)">${ico('plus')}Checklist Bổ sung</button>
       <button type="button" class="bp-btn rej" id="btnReviewReject">${ico('close')}Từ chối</button>
       <button type="button" class="bp-btn review-approve" id="btnReviewApprove">${ico('check')}Phê duyệt & ghi Sheet</button>
     </div>`;
@@ -1065,6 +1067,7 @@ function actionsHtml(open) {
   return `<div class="review-foot review-noprint">
     ${blocked ? `<span class="c-orange">Còn ${open.layers ? `${open.layers} layer chưa rõ đầu mục` : ''}${open.layers && open.lots ? ' và ' : ''}${open.lots ? `${open.lots} lô chưa xác nhận` : ''} — xử lý trước khi chuyển phê duyệt.</span>` : '<span>Kết quả chưa cộng vào bảng phường xã. Chuyển phê duyệt: hồ sơ vào hàng chờ, Admin duyệt rồi mới ghi Sheet.</span>'}
     <input type="text" id="reviewSender" maxlength="80" placeholder="Người gửi / đơn vị (tùy chọn)" value="${escapeHtml(session.sender || '')}">
+    <button type="button" class="bp-btn" id="btnReviewHosoAdd" title="Mở Đề xuất › Bổ sung checklist (không thay dossier CAD)">${ico('plus')}Checklist Bổ sung</button>
     <button type="button" class="bp-btn rej" id="btnReviewCancel">${ico('close')}Hủy bỏ</button>
     <button type="button" class="bp-btn review-approve" id="btnReviewSend"${blocked || sending ? ' disabled' : ''}>${ico('send')}Chuyển phê duyệt</button>
     ${isAdmin() ? `<button type="button" class="bp-btn" id="btnReviewApprove"${blocked ? ' disabled' : ''} title="Admin: ghi thẳng vào Sheet, không qua hàng chờ">${ico('check')}Phê duyệt ngay</button>` : ''}
@@ -1522,6 +1525,15 @@ async function sendDossier() {
 
 // ============================ BƯỚC 5: ADMIN PHÊ DUYỆT ============================
 
+async function openHosoSupplement() {
+  if (!session?.project) return;
+  const name = session.project;
+  const { focusHoSoSupplement } = await import('./entryFlows.js');
+  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+  focusHoSoSupplement(name, { qmode: 'add' });
+  showToast(`Đã mở Đề xuất › Bổ sung cho «${name}». Dossier CAD vẫn dùng Batch TT16 khi cần báo cáo TT16.`, 'info');
+}
+
 async function approve() {
   if (!session || !isAdmin()) return;
   const text = session.dossierText || JSON.stringify(dossierGeoJson());
@@ -1529,7 +1541,7 @@ async function approve() {
   const pendingId = session.pendingId;
   closeReview();
   await importReviewDossier(text, fileName, pendingId);
-  showToast('Kiểm tra khớp công trình đã có trong mục Nhập hàng loạt, rồi bấm Ghi vào hệ thống.', 'info');
+  showToast('Kiểm tra khớp công trình trong Batch TT16, rồi bấm Ghi vào hệ thống.', 'info');
 }
 
 async function reject() {
@@ -2040,6 +2052,7 @@ export function initProjectReview() {
     if (t.closest('#btnReviewSend')) { sendDossier(); return; }
     if (t.closest('#btnReviewApprove')) { approve(); return; }
     if (t.closest('#btnReviewReject')) { reject(); return; }
+    if (t.closest('#btnReviewHosoAdd')) { openHosoSupplement(); return; }
     const dec = t.closest('[data-decide]');
     if (dec) { decide(dec.dataset.decide); return; }
     const all = t.closest('[data-decide-all]');
