@@ -3,7 +3,7 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch
+  filterMassing, namesMatch, treeCap
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -156,6 +156,27 @@ if (js.includes('new deck.LightingEffect') || js.includes('new deck.DirectionalL
 }
 if (!js.includes('composeGoogleGround') || !js.includes('google-sat') || !js.includes('google-labels') || !js.includes('filterMassing')) {
   throw new Error('thiếu nền Google hoặc lọc nhà cao theo bán kính');
+}
+if (js.includes('groundPack.sat && !showStack')) {
+  throw new Error('sat vẫn ẩn khi tách lớp');
+}
+{
+  const startIdx = js.indexOf('async function start()');
+  const startBlock = js.slice(startIdx, js.indexOf('if (typeof document', startIdx));
+  const firstShow = startBlock.indexOf('showBuilt()');
+  if (firstShow < 0) throw new Error('start thiếu showBuilt');
+  if (startBlock.slice(0, firstShow).includes('composeGoogleGround')) {
+    throw new Error('sat vẫn trên đường nóng trước first paint');
+  }
+  if (startBlock.indexOf('composeGoogleGround', firstShow) < 0) {
+    throw new Error('sat chưa gắn sau first paint');
+  }
+}
+if (!js.includes('LOD_RADIUS_M') || !js.includes('TREE_CAP_MAX') || !js.includes('treeCap') || !js.includes("blooms('trees'")) {
+  throw new Error('thiếu LOD / tán cây có trần');
+}
+if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCap('x') !== 0) {
+  throw new Error(`treeCap ${treeCap(200)} ${treeCap(800)}`);
 }
 if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
   throw new Error('buildModel chưa chịu osm=null khi tải dần');

@@ -48,6 +48,11 @@ export const LIGHT_PRESETS = {
 const GOOGLE_SAT = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
 const GOOGLE_LBL = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=h&hl=vi&x=${x}&y=${y}&z=${z}`;
 const EDGE_VOLUME_CAP = 900;
+/** Từ bán kính này (hoặc pointer coarse): bỏ mái/cạnh khối, giản PathLayer lô. */
+const LOD_RADIUS_M = 500;
+/** Trần tán cây procedural (ScatterplotLayer), không mesh. */
+const TREE_CAP_MAX = 120;
+const INFRA_LOT_DRAW_CAP = 40;
 const GLOW_STEPS = 4;
 const USE_FILL = {
   'Đất ở': [214, 150, 230, 240],
@@ -785,13 +790,20 @@ function collectNodes(lines, r) {
   return nodes.slice(0, 48);
 }
 
+/** Trần số tán cây theo bán kính: min(120, floor(r/4)). */
+export function treeCap(r) {
+  const n = Math.floor(Number(r) / 4);
+  return Math.min(TREE_CAP_MAX, Number.isFinite(n) && n > 0 ? n : 0);
+}
+
 function scatterTrees(rings, r, cap) {
   const out = [];
-  if (!rings.length) return out;
+  const limit = Math.max(0, Math.min(TREE_CAP_MAX, Number(cap) || 0));
+  if (!rings.length || limit < 1) return out;
   const step = 22;
   let salt = 1;
-  for (let y = -r + 14; y <= r - 14 && out.length < cap; y += step) {
-    for (let x = -r + 14; x <= r - 14 && out.length < cap; x += step) {
+  for (let y = -r + 14; y <= r - 14 && out.length < limit; y += step) {
+    for (let x = -r + 14; x <= r - 14 && out.length < limit; x += step) {
       salt += 1;
       const jx = x + Math.sin(salt * 12.989) * 9;
       const jy = y + Math.cos(salt * 78.233) * 9;
@@ -1375,6 +1387,11 @@ function buildModel(raw, origin, r, heights, floorPack) {
 
   const nodes = collectNodes(majorLines, r);
   const corners = discPosts(r);
+  const trees = scatterTrees(greenRings, r, treeCap(r)).map((t) => ({
+    position: [t.x, t.y],
+    radius: t.r,
+    color: t.shade
+  }));
   const area = Math.PI * r * r;
   const mix = shannon(groupArea);
   const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
@@ -1382,7 +1399,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const meanH = matchedFp > 0 ? hSum / matchedFp : null;
   for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
   return {
-    volumes, blocks, greens, waters, squares, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
+    volumes, blocks, greens, waters, squares, trees, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
     infraLots,
     roadM, driveM, squareArea: area, area, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
     groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
@@ -1717,6 +1734,7 @@ function bootMap(place, model, ground) {
     const zVoids = planeZ('voids');
     const zVolumes = planeZ('volumes');
     const showStack = k > 0.08;
+    const heavy = coarse || place.r >= LOD_RADIUS_M;
     const disc = plateRing(place.r);
     const groundTone = LIGHT_PRESETS[moodName].ground;
     const layers = [
@@ -1729,7 +1747,8 @@ function bootMap(place, model, ground) {
         getFillColor: [255, 255, 255, 255]
       })
     ];
-    if (groundPack && groundPack.sat && !showStack && typeof deck.BitmapLayer === 'function') {
+    // Sat luôn dưới cùng khi có ảnh (kể cả tách lớp) — xanh thật, không thêm geometry.
+    if (groundPack && groundPack.sat && typeof deck.BitmapLayer === 'function') {
       try {
         if (boundSat !== groundPack.sat || !satLayer) {
           boundSat = groundPack.sat;
@@ -1750,13 +1769,14 @@ function bootMap(place, model, ground) {
           }) : null;
         }
         layers.push(satLayer);
-        if (labelLayer) layers.push(labelLayer);
-      } catch (err) { groundPack = null; satLayer = null; }
+        // Tem chữ chỉ khi gộp — giảm overdraw khi tách lớp.
+        if (labelLayer && !showStack) layers.push(labelLayer);
+      } catch (err) { groundPack = null; satLayer = null; labelLayer = null; boundSat = null; }
     }
-    if (!groundPack || showStack) {
-      layers.push(polys('plate-links', [{ rings: [disc], h: PLATE, fill: groundTone.links }], zLinks));
-    } else {
+    if (groundPack && groundPack.sat) {
       layers.push(polys('plate-links', [{ rings: [disc], h: 0.4, fill: [0, 0, 0, 0] }], zLinks));
+    } else {
+      layers.push(polys('plate-links', [{ rings: [disc], h: PLATE, fill: groundTone.links }], zLinks));
     }
     layers.push(new deck.PathLayer({
       id: 'rim',
@@ -1781,8 +1801,9 @@ function bootMap(place, model, ground) {
     const lotList = model.infraLots || [];
     if (lotList.length) {
       const lotZ = (showStack ? zUses : zLinks) + PLATE;
+      const drawLots = heavy ? lotList.slice(0, INFRA_LOT_DRAW_CAP) : lotList;
       const byBase = new Map();
-      lotList.forEach((lot) => {
+      drawLots.forEach((lot) => {
         const key = lot.z0 || 0;
         if (!byBase.has(key)) byBase.set(key, []);
         byBase.get(key).push(lot);
@@ -1792,30 +1813,33 @@ function bootMap(place, model, ground) {
         layers.push(polys(li ? `infra-lot-fill-${li}` : 'infra-lot-fill', data, lotZ + z0, (d) => d.fill));
         li += 1;
       });
-      layers.push(new deck.PathLayer(withMask({
-        id: 'infra-lot-glow',
-        data: lotList,
-        coordinateSystem: CART,
-        modelMatrix: lift(lotZ + 0.85),
-        getPath: (d) => d.path.map((p) => [p[0], p[1], d.z0 || 0]),
-        getColor: (d) => d.glow,
-        getWidth: 7,
-        widthUnits: 'pixels',
-        widthMinPixels: 4,
-        jointRounded: true,
-        capRounded: true,
-        pickable: false
-      })));
+      // Vòng lớn / touch: bỏ glow, chỉ viền mỏng.
+      if (!heavy) {
+        layers.push(new deck.PathLayer(withMask({
+          id: 'infra-lot-glow',
+          data: drawLots,
+          coordinateSystem: CART,
+          modelMatrix: lift(lotZ + 0.85),
+          getPath: (d) => d.path.map((p) => [p[0], p[1], d.z0 || 0]),
+          getColor: (d) => d.glow,
+          getWidth: 7,
+          widthUnits: 'pixels',
+          widthMinPixels: 4,
+          jointRounded: true,
+          capRounded: true,
+          pickable: false
+        })));
+      }
       layers.push(new deck.PathLayer(withMask({
         id: 'infra-lot-edge',
-        data: lotList,
+        data: drawLots,
         coordinateSystem: CART,
         modelMatrix: lift(lotZ + 1.1),
         getPath: (d) => d.path.map((p) => [p[0], p[1], (d.z0 || 0) + 0.15]),
         getColor: (d) => d.edge,
-        getWidth: 2.4,
+        getWidth: heavy ? 1.6 : 2.4,
         widthUnits: 'pixels',
-        widthMinPixels: 1.5,
+        widthMinPixels: 1.2,
         jointRounded: true,
         capRounded: true,
         pickable: false
@@ -1823,6 +1847,11 @@ function bootMap(place, model, ground) {
     }
     const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
     if (openBloom) layers.push(openBloom);
+    // Tán cây procedural: chỉ khi tách lớp, không coarse, khối dưới trần cạnh.
+    if (showStack && !coarse && model.volumes.length <= EDGE_VOLUME_CAP && (model.trees || []).length) {
+      const canopy = blooms('trees', model.trees, zVoids + PLATE + 2.2);
+      if (canopy) layers.push(canopy);
+    }
     if (k > 0.12) {
       const access = blooms('access', model.access, zUses + PLATE + 0.3);
       if (access) layers.push(access);
@@ -1861,7 +1890,7 @@ function bootMap(place, model, ground) {
       layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0, wallOf));
       volI += 1;
     });
-    const lightGeom = model.volumes.length <= EDGE_VOLUME_CAP && !coarse;
+    const lightGeom = model.volumes.length <= EDGE_VOLUME_CAP && !heavy;
     if (lightGeom) {
       const caps = roofCaps('roof-caps', model.volumes, zVolumes + PLATE);
       if (caps) layers.push(caps);
@@ -2376,8 +2405,8 @@ async function start() {
     gba: [], cadastre: [], osm: null, sites: [], massing: [], localInfra: [], localLots: [],
     gbaError: '', cadError: '', osmError: '', heightMeta: null
   };
-  // Đường nóng: dấu chân + chiều cao + nền Google. OSM/thửa đất chạy sau để khỏi treo khung 3D.
-  const [gba, heights, overrides, ground, ward] = await Promise.all([
+  // Đường nóng: dấu chân + chiều cao. Nền Google / OSM / thửa đất sau first paint.
+  const [gba, heights, overrides, ward] = await Promise.all([
     readLayer('gba', 'gba', tiles).catch((err) => { raw.gbaError = err.message; return []; }),
     fetch(withAssetVersion('data/gba/bldg-hf.bin')).then(async (res) => {
       if (!res.ok) throw new Error('bin');
@@ -2388,7 +2417,6 @@ async function start() {
       return index;
     }).catch(() => null),
     loadOverrideFootprints(),
-    composeGoogleGround(place.lat, place.lng, place.r, origin).catch(() => null),
     loadWard(place.lat, place.lng).catch(() => ({ name: '', pop: 0 }))
   ]);
   const additions = await loadAdditionPack().catch(() => ({ v: 1, saved: 0, features: [] }));
@@ -2405,13 +2433,19 @@ async function start() {
     $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   }
   try {
-    built = { raw, origin, place: { ...place, mLng, mLat }, heights, ward, ground, dem: null };
+    built = { raw, origin, place: { ...place, mLng, mLat }, heights, ward, ground: null, dem: null };
     await loadFloorPack().catch(() => {});
     showBuilt();
   } catch (err) {
     console.warn('Mô hình 3D:', err);
     $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
   }
+  // Sat sau first volumes — không tranh băng thông với GBA trên đường nóng.
+  composeGoogleGround(place.lat, place.lng, place.r, origin).then((ground) => {
+    if (!built || !ground) return;
+    built.ground = ground;
+    try { showBuilt(); } catch (err) { console.warn('Nền 3D:', err); }
+  }).catch(() => {});
   // Không dựng lưới DEM lên GPU (mesh XYZ làm mất context, trắng màn rồi reset).
   // sampleDemGrid giữ trong module để lấy cao độ khi cần, không gọi trong khung này.
   void sampleDemGrid;
