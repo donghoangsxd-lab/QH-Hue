@@ -805,8 +805,8 @@ function treeDot(x, y, salt) {
 }
 
 /**
- * Tán cây trên từng vùng xanh (centroid + lưới bbox) rồi bổ sung dọc đường.
- * Lưới toàn đĩa step 22 trước đây hay trượt khỏi mảng xanh nhỏ → 0 cây.
+ * Tán cây: vùng xanh → ven đường (kể cả nội bộ width 4.2) → vòng dự phòng trên đĩa.
+ * Không lọc width>=5 (trước đó loại hết đường ở); ring lỗi dùng continue, không break.
  */
 export function scatterTrees(rings, r, cap, roads = []) {
   const out = [];
@@ -822,7 +822,8 @@ export function scatterTrees(rings, r, cap, roads = []) {
     return true;
   };
   for (const ring of rings || []) {
-    if (out.length >= limit || !ring || ring.length < 3) break;
+    if (out.length >= limit) break;
+    if (!ring || ring.length < 3) continue;
     const c = centroid(ring);
     if (pointInRing(c, ring)) push(c[0], c[1]);
     let minX = Infinity;
@@ -846,14 +847,15 @@ export function scatterTrees(rings, r, cap, roads = []) {
       }
     }
   }
-  // Ven đường: luôn có vài tán dù OSM thiếu polygon xanh.
-  const roadStep = 36;
+  const roadStep = 28;
   for (const road of roads || []) {
     if (out.length >= limit) break;
     const path = road.path;
     if (!path || path.length < 2) continue;
-    if ((road.width || 0) < 5) continue;
+    // Bỏ mặt nước / ray quá hẹp; giữ nội bộ 4.2 m (trước lọc <5 → 0 cây ven phố).
+    if ((road.width || 0) < 3.5) continue;
     let acc = 0;
+    const side = Math.max(5, (road.width || 4) * 0.55 + 3);
     for (let i = 1; i < path.length && out.length < limit; i++) {
       const a = path[i - 1];
       const b = path[i];
@@ -864,14 +866,24 @@ export function scatterTrees(rings, r, cap, roads = []) {
       const uy = dy / len;
       const px = -uy;
       const py = ux;
-      let t = acc > 0 ? roadStep - acc : roadStep * 0.5;
+      let t = acc > 0 ? roadStep - acc : roadStep * 0.4;
       while (t < len && out.length < limit) {
-        const x = a[0] + ux * t + px * 7;
-        const y = a[1] + uy * t + py * 7;
-        push(x, y);
+        push(a[0] + ux * t + px * side, a[1] + uy * t + py * side);
         t += roadStep;
       }
       acc = (acc + len) % roadStep;
+    }
+  }
+  // Dự phòng: vài vòng trên đĩa khi OSM xanh/đường chưa về hoặc thưa.
+  if (out.length < Math.min(24, limit)) {
+    const ringsN = Math.max(2, Math.floor(r / 120));
+    for (let ri = 1; ri <= ringsN && out.length < limit; ri++) {
+      const rr = (r * ri) / (ringsN + 0.5);
+      const n = Math.max(8, Math.floor((Math.PI * 2 * rr) / 45));
+      for (let i = 0; i < n && out.length < limit; i++) {
+        const a = (i / n) * Math.PI * 2 + ri * 0.35;
+        push(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
     }
   }
   return out;
@@ -2128,11 +2140,39 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
     }
-    // Tán sau khối nhà, nâng ~12 m — lưới cũ + vẽ trước volumes khiến 0 cây / bị che.
-    if (!coarse && (model.trees || []).length) {
-      const zTree = (showStack ? zVoids : zLinks) + PLATE + 12;
-      const canopy = blooms('trees', model.trees, zTree);
-      if (canopy) layers.push(canopy);
+    // Tán: ColumnLayer (không mask) — Scatterplot+Mask trước đây dễ biến mất trên OrbitView.
+    if ((model.trees || []).length && typeof deck.ColumnLayer === 'function') {
+      const zTree = (showStack ? zVoids : zLinks) + PLATE;
+      try {
+        layers.push(new deck.ColumnLayer({
+          id: 'tree-trunk',
+          data: model.trees,
+          coordinateSystem: CART,
+          modelMatrix: lift(zTree),
+          diskResolution: 5,
+          radius: 1.2,
+          extruded: true,
+          getPosition: (d) => d.position,
+          getElevation: 7,
+          getFillColor: [88, 58, 34, 255],
+          pickable: false
+        }));
+        layers.push(new deck.ColumnLayer({
+          id: 'tree-canopy',
+          data: model.trees,
+          coordinateSystem: CART,
+          modelMatrix: lift(zTree + 6),
+          diskResolution: 6,
+          extruded: true,
+          getPosition: (d) => d.position,
+          getRadius: (d) => Math.max(8, (d.radius || 16) * 0.55),
+          getElevation: 8,
+          getFillColor: (d) => d.color,
+          pickable: false
+        }));
+      } catch (err) {
+        console.warn('Tán cây:', err);
+      }
     }
     try {
       deckgl.setProps({ layers });
@@ -2399,9 +2439,10 @@ function showBuilt() {
   model.osmError = built.raw.osmError;
   model.towerPins = towerPinsOf(model.volumes);
   paintPanel(model, built.place, built.ward);
+  const treeN = (model.trees || []).length;
   $('status').textContent = model.meanF == null
-    ? 'Chưa có chiều cao mét trong ô.'
-    : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
+    ? `Chưa có chiều cao mét trong ô.${treeN ? ` Tán cây ${fmt0(treeN)}.` : ''}`
+    : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m². Tán cây ${fmt0(treeN)}.`;
   $('status').classList.add('done');
   if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
   const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);

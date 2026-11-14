@@ -172,7 +172,7 @@ if (js.includes('groundPack.sat && !showStack')) {
     throw new Error('sat chưa gắn sau first paint');
   }
 }
-if (!js.includes('LOD_RADIUS_M') || !js.includes('TREE_CAP_MAX') || !js.includes('treeCap') || !js.includes("blooms('trees'")) {
+if (!js.includes('LOD_RADIUS_M') || !js.includes('TREE_CAP_MAX') || !js.includes('treeCap') || !js.includes('tree-canopy')) {
   throw new Error('thiếu LOD / tán cây có trần');
 }
 if (js.includes('showStack && !coarse && model.volumes.length <= EDGE_VOLUME_CAP && (model.trees')) {
@@ -191,9 +191,13 @@ if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCa
   if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
   const fromRoad = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 10 }]);
   if (fromRoad.length < 2) throw new Error(`cây ven đường ${fromRoad.length}`);
+  const fromNoibo = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 4.2 }]);
+  if (fromNoibo.length < 2) throw new Error(`cây đường nội bộ ${fromNoibo.length}`);
+  const fallback = scatterTrees([], 200, 40, []);
+  if (fallback.length < 8) throw new Error(`cây dự phòng đĩa ${fallback.length}`);
 }
-if (!js.includes('dataset.trees') || !js.includes('PLATE + 12')) {
-  throw new Error('thiếu đếm tán / nâng tán trên khối nhà');
+if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('ColumnLayer')) {
+  throw new Error('thiếu đếm tán / ColumnLayer tán cây');
 }
 if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
   throw new Error('buildModel chưa chịu osm=null khi tải dần');
