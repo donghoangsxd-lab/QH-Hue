@@ -366,6 +366,8 @@ function initDividerDrag() {
 
   divider.addEventListener('pointerdown', (e) => {
     if (splitKind === 'offset') return;
+    // Droplist lớp từng nửa gắn trên nhãn tiêu đề: không bắt đầu kéo thanh chia.
+    if (e.target?.closest?.('.swipe-label, select')) return;
     e.preventDefault();
     e.stopPropagation();
     divider.setPointerCapture(e.pointerId);

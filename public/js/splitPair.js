@@ -1,7 +1,8 @@
 // Cặp so sánh khi chia đôi màn hình. Mặc định trái = hiện trạng, phải = quy hoạch (công trình) — đúng cách
-// chia đôi cũ. Hai danh sách trong panel Quy hoạch chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
-// QH (hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên
-// bị loại khỏi danh sách bên kia. Đổi cấp không đụng ô lớp ở panel.
+// chia đôi cũ. Droplist lớp mỗi bên gắn vào nhãn tiêu đề nửa màn hình (.swipe-label), không còn trong panel
+// Quy hoạch. Hai danh sách chọn linh hoạt: hiện trạng, quy hoạch, hoặc một cấp QH (hệ thống đô thị,
+// QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên bị loại khỏi danh sách bên kia.
+// Đổi cấp không đụng ô lớp ở panel.
 // Trục A (Quản lý phát triển đô thị): khóa cặp hiện trạng | quy hoạch và nhãn hệ thống đô thị; không chọn cấp QHC.
 import { isSplitOn, onViewChange, planMap } from './planMap.js';
 import { LEVELS } from './mapLevel.js';
@@ -109,22 +110,24 @@ export function refreshSplitPair() {
 }
 
 function paint() {
-  const box = document.getElementById('levelSplit');
   const on = isSplitOn();
   const adminUrban = isAdminUrbanSplit();
-  if (box) box.hidden = !on || adminUrban;
   const label = document.getElementById('levelHostQhLabel');
-  if (label) label.textContent = on && !adminUrban ? 'Lớp mỗi bên' : 'Cấp quy hoạch';
+  if (label) label.textContent = 'Cấp quy hoạch';
   document.body.classList.toggle('level-pair', isLevelPair());
   document.body.classList.toggle('admin-urban-split', adminUrban);
   ['left', 'right'].forEach(which => {
     const sel = document.getElementById(which === 'left' ? 'splitSideLeft' : 'splitSideRight');
     if (sel) fillSelect(sel, which);
   });
-  const leftLabel = document.querySelector('.swipe-label-left');
-  const rightLabel = document.querySelector('.swipe-label-right');
-  if (leftLabel) leftLabel.textContent = adminUrban ? 'ĐÔ THỊ HIỆN TRẠNG' : (byId.get(sides.left)?.swipe || '');
-  if (rightLabel) rightLabel.textContent = adminUrban ? 'ĐÔ THỊ QUY HOẠCH' : (byId.get(sides.right)?.swipe || '');
+  const leftPick = document.getElementById('swipePickLeft');
+  const rightPick = document.getElementById('swipePickRight');
+  const leftFixed = leftPick?.querySelector('.swipe-label-fixed');
+  const rightFixed = rightPick?.querySelector('.swipe-label-fixed');
+  if (leftPick) leftPick.classList.toggle('is-fixed', adminUrban);
+  if (rightPick) rightPick.classList.toggle('is-fixed', adminUrban);
+  if (leftFixed) leftFixed.textContent = adminUrban ? 'ĐÔ THỊ HIỆN TRẠNG' : (byId.get(sides.left)?.swipe || '');
+  if (rightFixed) rightFixed.textContent = adminUrban ? 'ĐÔ THỊ QUY HOẠCH' : (byId.get(sides.right)?.swipe || '');
   const text = document.getElementById('mapTitleText');
   if (text && on) {
     const title = adminUrban
@@ -143,6 +146,7 @@ function fillSelect(el, which) {
   const cur = sides[which];
   el.innerHTML = PAIR_OPTIONS.filter(o => o.id !== other).map(o => `<option value="${o.id}">${o.label}</option>`).join('');
   el.value = cur;
+  el.disabled = isAdminUrbanSplit();
 }
 
 function bindSelect(id, which, label) {
@@ -153,6 +157,10 @@ function bindSelect(id, which, label) {
   el.setAttribute('aria-label', label);
   el.title = label;
   el.addEventListener('change', () => setSplitSide(which, el.value));
+  // Không kéo thanh chia đôi khi bấm / mở droplist trên nhãn.
+  ['pointerdown', 'mousedown', 'click', 'touchstart'].forEach(type => {
+    el.addEventListener(type, (e) => e.stopPropagation());
+  });
 }
 
 export function initSplitPair(map) {

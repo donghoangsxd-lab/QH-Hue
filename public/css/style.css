@@ -206,20 +206,60 @@ body.split-offset .swipe-handle { display: none; }
 }
 #swipeDivider:hover .swipe-handle { border-color: var(--accent-cyan); }
 #swipeDivider.dragging .swipe-handle { transform: translate(-50%, -50%) scale(1.12); border-color: var(--accent-cyan); }
+/* Nhãn / droplist lớp từng nửa khi chia đôi — gộp chọn lớp vào tiêu đề nửa màn hình. */
 .swipe-label {
   position: absolute;
   top: calc(20px + var(--title-h));
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
   border-radius: var(--r-md);
   font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.4px;
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 .swipe-label-left { right: 16px; background: var(--bg-dark); color: var(--accent-cyan); border: 1px solid var(--border-color); }
 .swipe-label-right { left: 16px; background: var(--bg-dark); color: var(--accent-orange); border: 1px solid var(--border-color); }
+.swipe-side-select {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 4px 22px 4px 10px;
+  max-width: min(240px, 42vw);
+  border: none;
+  border-radius: inherit;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2394a3b8' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
+    no-repeat right 8px center;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: inherit;
+  cursor: pointer;
+  outline: none;
+}
+.swipe-label-left .swipe-side-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2322d3ee' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+}
+.swipe-label-right .swipe-side-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23fb923c' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+}
+.swipe-side-select:focus-visible { box-shadow: inset 0 0 0 1px currentColor; }
+.swipe-side-select option { color: var(--text-strong); background: var(--bg-panel); font-weight: 600; }
+.swipe-label-fixed {
+  display: inline-block;
+  padding: 4px 10px;
+  pointer-events: none;
+}
+.swipe-label.is-fixed .swipe-side-select { display: none; }
+.swipe-label.is-fixed .swipe-label-fixed { display: inline-block; }
+.swipe-label:not(.is-fixed) .swipe-label-fixed { display: none; }
+body.admin-urban-split .swipe-label { pointer-events: none; cursor: default; }
 .leaflet-control-zoom { display: none !important; }
 
 /* Hộp tiêu đề vừa chữ, căn giữa ngang màn hình (desktop). Không kéo tới cột nút. */
@@ -968,20 +1008,7 @@ body.compare-on #dtPicks { display: grid; }
   min-width: 140px; font-size: 12px; padding: 4px 6px;
 }
 .invest-admin-tools .invest-bound-upload { cursor: pointer; margin: 0; }
-.level-split { display: none; flex-direction: column; gap: 4px; }
-.level-split[hidden] { display: none !important; }
-body.compare-on .level-host { flex-wrap: wrap; }
-body.compare-on .level-split { display: flex; flex: 1 1 100%; }
-.level-split label {
-  display: flex; align-items: center; gap: 6px;
-  font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color-muted);
-}
-.level-split select {
-  flex: 1; min-width: 0;
-  background: var(--bg-input); color: var(--text-strong);
-  border: 1px solid var(--border-color); border-radius: var(--r-sm);
-  padding: 3px 6px; font: inherit; font-size: var(--fs-sm);
-}
+/* Droplist lớp mỗi bên khi chia đôi nằm trên .swipe-label (map), không còn trong panel. */
 .map-title-split { display: none; flex-shrink: 0; gap: 2px; padding: 2px; margin-left: 4px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: rgba(15, 23, 42, 0.6); }
 .map-title-seg {
   display: inline-flex; align-items: center; gap: 4px;
@@ -3349,27 +3376,82 @@ body.bottom-max .catalog-chart-wrap-bar { height: 120px; min-height: 112px; }
   font-weight: 700;
   background: var(--bg-panel);
 }
-/* % cố định tổng 100%: 10 cột (Ranh gộp trạng thái); Tên ~38%; PX ~11%. */
+/* % cố định tổng 100%: 11 cột (Cấp độ sau Tên); PX ~10%. */
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(1),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(1) { width: 3%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(2),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(2) { width: 6%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(2) { width: 5%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(3),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(3) { width: 38%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(3) { width: 30%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(4),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(4) { width: 11%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(4) { width: 9%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(5),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(5) { width: 9%; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(5) { width: 10%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(6),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(6) { width: 7%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(6) { width: 8%; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(7),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(7) { width: 7%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(7) { width: 6%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(8),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(8) { width: 6%; text-align: right; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(8) { width: 6%; text-align: center; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(9),
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(9) { width: 5%; text-align: right; }
 #catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(10),
-#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(10) { width: 8%; text-align: center; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(10) { width: 5%; text-align: right; }
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode th:nth-child(11),
+#catalogTableHost table.data-table.catalog-data-table.catalog-plan-mode td:nth-child(11) { width: 8%; text-align: center; }
+/* Mũi tên sắp xếp kiểu Excel: tam giác đặc, off xanh / on cam + số ưu tiên. */
+#catalogTableHost table.data-table.catalog-data-table th.catalog-sort-th {
+  white-space: nowrap;
+  overflow: visible;
+}
+#catalogTableHost .catalog-sort-label {
+  display: inline;
+  vertical-align: middle;
+}
+#catalogTableHost .catalog-sort-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #3b82f6;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+}
+#catalogTableHost .catalog-sort-btn:hover { background: rgba(59, 130, 246, 0.14); }
+#catalogTableHost .catalog-sort-btn.is-on { color: #f97316; }
+#catalogTableHost .catalog-sort-btn.is-on:hover { background: rgba(249, 115, 22, 0.16); }
+#catalogTableHost .catalog-sort-arrow {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid currentColor;
+}
+#catalogTableHost .catalog-sort-pri {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f97316;
+  pointer-events: none;
+}
+#catalogTableHost td.catalog-level {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-align: center;
+}
 /* Clamp trong span — không đổi display của td (tránh lệch cột giữa các hàng). */
 #catalogTableHost table.data-table.catalog-data-table td.st-name {
   text-align: left;
