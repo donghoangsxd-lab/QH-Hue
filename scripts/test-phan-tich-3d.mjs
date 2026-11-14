@@ -193,8 +193,8 @@ if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCa
   if (fromRoad.length < 2) throw new Error(`cây ven đường ${fromRoad.length}`);
   const fromNoibo = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 4.2 }]);
   if (fromNoibo.length < 2) throw new Error(`cây đường nội bộ ${fromNoibo.length}`);
-  const fallback = scatterTrees([], 200, 40, []);
-  if (fallback.length < 8) throw new Error(`cây dự phòng đĩa ${fallback.length}`);
+  const empty = scatterTrees([], 200, 40, []);
+  if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('ColumnLayer')) {
   throw new Error('thiếu đếm tán / ColumnLayer tán cây');

@@ -799,14 +799,14 @@ export function treeCap(r) {
 function treeDot(x, y, salt) {
   return {
     position: [x, y],
-    radius: 16 + (salt % 5) * 5,
-    color: salt % 2 ? [56, 168, 72, 255] : [34, 140, 58, 255]
+    radius: 3.2 + (salt % 3) * 0.8,
+    color: salt % 2 ? [56, 168, 72, 240] : [34, 140, 58, 240]
   };
 }
 
 /**
- * Tán cây: vùng xanh → ven đường (kể cả nội bộ width 4.2) → vòng dự phòng trên đĩa.
- * Không lọc width>=5 (trước đó loại hết đường ở); ring lỗi dùng continue, không break.
+ * Tán cây: chỉ vùng xanh OSM + ven đường (kể cả nội bộ 4.2 m).
+ * Không vòng dự phòng trên cả đĩa — lần trước phủ màng xanh toàn khung.
  */
 export function scatterTrees(rings, r, cap, roads = []) {
   const out = [];
@@ -836,23 +836,22 @@ export function scatterTrees(rings, r, cap, roads = []) {
       if (p[0] > maxX) maxX = p[0];
       if (p[1] > maxY) maxY = p[1];
     }
-    const step = Math.max(10, Math.min(18, Math.sqrt(Math.max(1, (maxX - minX) * (maxY - minY))) / 5));
+    const step = Math.max(14, Math.min(28, Math.sqrt(Math.max(1, (maxX - minX) * (maxY - minY))) / 4));
     for (let y = minY; y <= maxY && out.length < limit; y += step) {
       for (let x = minX; x <= maxX && out.length < limit; x += step) {
         salt += 1;
-        const jx = x + Math.sin(salt * 12.989) * (step * 0.28);
-        const jy = y + Math.cos(salt * 78.233) * (step * 0.28);
+        const jx = x + Math.sin(salt * 12.989) * (step * 0.22);
+        const jy = y + Math.cos(salt * 78.233) * (step * 0.22);
         if (!pointInRing([jx, jy], ring)) continue;
         push(jx, jy);
       }
     }
   }
-  const roadStep = 28;
+  const roadStep = 42;
   for (const road of roads || []) {
     if (out.length >= limit) break;
     const path = road.path;
     if (!path || path.length < 2) continue;
-    // Bỏ mặt nước / ray quá hẹp; giữ nội bộ 4.2 m (trước lọc <5 → 0 cây ven phố).
     if ((road.width || 0) < 3.5) continue;
     let acc = 0;
     const side = Math.max(5, (road.width || 4) * 0.55 + 3);
@@ -866,24 +865,12 @@ export function scatterTrees(rings, r, cap, roads = []) {
       const uy = dy / len;
       const px = -uy;
       const py = ux;
-      let t = acc > 0 ? roadStep - acc : roadStep * 0.4;
+      let t = acc > 0 ? roadStep - acc : roadStep * 0.45;
       while (t < len && out.length < limit) {
         push(a[0] + ux * t + px * side, a[1] + uy * t + py * side);
         t += roadStep;
       }
       acc = (acc + len) % roadStep;
-    }
-  }
-  // Dự phòng: vài vòng trên đĩa khi OSM xanh/đường chưa về hoặc thưa.
-  if (out.length < Math.min(24, limit)) {
-    const ringsN = Math.max(2, Math.floor(r / 120));
-    for (let ri = 1; ri <= ringsN && out.length < limit; ri++) {
-      const rr = (r * ri) / (ringsN + 0.5);
-      const n = Math.max(8, Math.floor((Math.PI * 2 * rr) / 45));
-      for (let i = 0; i < n && out.length < limit; i++) {
-        const a = (i / n) * Math.PI * 2 + ri * 0.35;
-        push(Math.cos(a) * rr, Math.sin(a) * rr);
-      }
     }
   }
   return out;
@@ -2140,7 +2127,7 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
     }
-    // Tán: ColumnLayer (không mask) — Scatterplot+Mask trước đây dễ biến mất trên OrbitView.
+    // Tán nhỏ, không mask, không vòng phủ cả đĩa (tránh màng xanh).
     if ((model.trees || []).length && typeof deck.ColumnLayer === 'function') {
       const zTree = (showStack ? zVoids : zLinks) + PLATE;
       try {
@@ -2149,11 +2136,11 @@ function bootMap(place, model, ground) {
           data: model.trees,
           coordinateSystem: CART,
           modelMatrix: lift(zTree),
-          diskResolution: 5,
-          radius: 1.2,
+          diskResolution: 4,
+          radius: 0.7,
           extruded: true,
           getPosition: (d) => d.position,
-          getElevation: 7,
+          getElevation: 5,
           getFillColor: [88, 58, 34, 255],
           pickable: false
         }));
@@ -2161,12 +2148,12 @@ function bootMap(place, model, ground) {
           id: 'tree-canopy',
           data: model.trees,
           coordinateSystem: CART,
-          modelMatrix: lift(zTree + 6),
-          diskResolution: 6,
+          modelMatrix: lift(zTree + 4.2),
+          diskResolution: 5,
+          radius: 3.4,
           extruded: true,
           getPosition: (d) => d.position,
-          getRadius: (d) => Math.max(8, (d.radius || 16) * 0.55),
-          getElevation: 8,
+          getElevation: 3.2,
           getFillColor: (d) => d.color,
           pickable: false
         }));
