@@ -2,7 +2,7 @@
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 4).
 // Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw).
 // parts: khối đế và tháp, min_height / height là mét thật, số tầng là số công bố, không trần.
-// Khối mặc định: tường be, mái đậm hơn. Màu theo số tầng (1-2, 3-5, 6-10, 11-50, trên 50 vẫn nhóm trên) chỉ khi Tách lớp hoặc bật «Màu theo tầng».
+// Khối mặc định: tường trắng clay, mái xám. Công trình công cộng tô màu nhóm (kể cả khi Gộp). Màu theo tầng khi bật «Màu theo tầng».
 // Dân phường không nhân theo diện tích ô.
 
 import { withAssetVersion } from './gbaVersion.js';
@@ -29,9 +29,9 @@ const OVERPASS = [
 const CLASS_NAME = ['1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng'];
 const VOLUME_FILL = [[255, 237, 213, 235], [253, 186, 116, 240], [234, 88, 12, 242], [154, 52, 18, 248]];
 const VOLUME_ROOF = [[214, 176, 140, 248], [196, 124, 62, 250], [160, 52, 8, 250], [98, 32, 12, 252]];
-export const WALL = [214, 204, 188, 240];
-export const ROOF = [128, 114, 98, 252];
-const EDGE = [72, 60, 50, 230];
+export const WALL = [248, 250, 252, 240];
+export const ROOF = [148, 163, 184, 252];
+const EDGE = [100, 116, 139, 220];
 const EDGE_FLOOR = [78, 32, 16, 220];
 export const OPEN_CAMERA = { rotationX: 42, rotationOrbit: -50 };
 // Flat color, không giả lập ánh sáng/bóng đổ. Preset chỉ còn màu nền CSS và đĩa khi tách lớp.
@@ -812,7 +812,7 @@ function scatterTrees(rings, r, cap) {
       out.push({
         x: jx,
         y: jy,
-        r: 8 + (salt % 4) * 2.4,
+        r: 14 + (salt % 4) * 4,
         shade: salt % 2 ? [70, 160, 72, 255] : [48, 130, 58, 255]
       });
     }
@@ -1338,6 +1338,15 @@ function buildModel(raw, origin, r, heights, floorPack) {
   });
   const claimed = new Set();
   const blocks = volumes.map((v) => ({ ...v, fill: WHITE_BLOCK, infra: false }));
+  const paintInfra = (i, color) => {
+    if (i < 0 || i >= blocks.length) return;
+    blocks[i].fill = color;
+    blocks[i].infra = true;
+    if (i < volumes.length) {
+      volumes[i].infraFill = color;
+      volumes[i].infra = true;
+    }
+  };
   facilities.slice().sort((a, b) => FACILITY[a.id].rank - FACILITY[b.id].rank).forEach((f) => {
     const meta = FACILITY[f.id];
     if (!meta) return;
@@ -1347,8 +1356,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
         if (claimed.has(i)) return;
         if (!pointInRing(centroid(b.rings[0]), f.rings[0])) return;
         claimed.add(i);
-        b.fill = meta.color;
-        b.infra = true;
+        paintInfra(i, meta.color);
         matched += 1;
       });
     }
@@ -1364,8 +1372,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
       });
       if (hit >= 0) {
         claimed.add(hit);
-        blocks[hit].fill = meta.color;
-        blocks[hit].infra = true;
+        paintInfra(hit, meta.color);
         matched = 1;
       }
     }
@@ -1526,7 +1533,7 @@ function paintKeys(showFloors) {
   if (!keys) return;
   const rows = showFloors
     ? [['#ffedd5', '1-2 tầng'], ['#fdba74', '3-5 tầng'], ['#ea580c', '6-10 tầng'], ['#9a3412', '11-50 tầng']]
-    : [['#d6ccbc', 'Tường'], ['#807262', 'Mái']];
+    : [['#f8fafc', 'Tường'], ['#94a3b8', 'Mái']];
   rows.push(
     ['#16a34a', 'Công viên'],
     ['#d97706', 'Trường'],
@@ -1543,11 +1550,11 @@ function paintLegend(showFloors) {
   const legend = $('legend');
   if (!legend) return;
   legend.replaceChildren(
-    legendCard(1, showFloors ? '#ea580c' : '#c4b8a4', 'Khối tích',
+    legendCard(1, showFloors ? '#ea580c' : '#e2e8f0', 'Khối tích',
       showFloors
         ? 'Màu theo bốn nhóm số tầng.'
-        : 'Tường be, mái đậm hơn. Bật «Màu theo tầng» khi cần đối chiếu.'),
-    legendCard(2, '#16a34a', 'Không gian mở', 'Công viên loang lục, mặt nước loang lam.'),
+        : 'Tường trắng clay, mái xám. Công trình công cộng tô màu nhóm.'),
+    legendCard(2, '#16a34a', 'Không gian mở', 'Công viên loang lục, mặt nước loang lam, tán cây trên vùng xanh OSM.'),
     legendCard(3, '#0284c7', 'Tiếp cận hạ tầng', 'Công trình hạ tầng theo loại. Vầng màu nhạt theo khoảng đi bộ.'),
     legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp và hướng ra mép vòng.')
   );
@@ -1706,7 +1713,17 @@ function bootMap(place, model, ground) {
         const zz = (d.z0 || 0) + d.h;
         return d.rings.map((ring) => ring.map((pt) => [pt[0], pt[1], zz]));
       },
-      getFillColor: (d) => volumeColors(d.bin, floorTint).roof
+      getFillColor: (d) => {
+        if (!floorTint && d.infraFill) {
+          return [
+            Math.max(0, d.infraFill[0] - 36),
+            Math.max(0, d.infraFill[1] - 36),
+            Math.max(0, d.infraFill[2] - 36),
+            250
+          ];
+        }
+        return volumeColors(d.bin, floorTint).roof;
+      }
     }));
   }
 
@@ -1847,9 +1864,10 @@ function bootMap(place, model, ground) {
     }
     const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
     if (openBloom) layers.push(openBloom);
-    // Tán cây procedural: chỉ khi tách lớp, không coarse, khối dưới trần cạnh.
-    if (showStack && !coarse && model.volumes.length <= EDGE_VOLUME_CAP && (model.trees || []).length) {
-      const canopy = blooms('trees', model.trees, zVoids + PLATE + 2.2);
+    // Tán cây: không gắn trần số khối (800 m thường > 900 nhà). Chỉ tắt trên touch.
+    if (!coarse && (model.trees || []).length) {
+      const zTree = (showStack ? zVoids : zLinks) + PLATE + 2.2;
+      const canopy = blooms('trees', model.trees, zTree);
       if (canopy) layers.push(canopy);
     }
     if (k > 0.12) {
@@ -1885,7 +1903,10 @@ function bootMap(place, model, ground) {
       byBase.get(key).push(v);
     });
     let volI = 0;
-    const wallOf = (d) => volumeColors(d.bin, floorTint).wall;
+    const wallOf = (d) => {
+      if (!floorTint && d.infraFill) return d.infraFill;
+      return volumeColors(d.bin, floorTint).wall;
+    };
     byBase.forEach((data, z0) => {
       layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0, wallOf));
       volI += 1;
