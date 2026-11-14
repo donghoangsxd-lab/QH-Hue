@@ -1249,9 +1249,10 @@ function rowHtml(p, idx, admin, labelNo = null) {
       : 'Hiện lô trong ranh. Bỏ chọn: chỉ còn đường ranh.')
     : 'Hiện ranh, tên và lô của đồ án';
   const n = labelNo == null ? idx + 1 : labelNo;
+  const listName = listLabelOf(p);
   return `<div class="project-row${dim ? ' is-off' : ''}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(p.full || p.name)} — bấm để mở đồ án">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${n}. ${escapeHtml(p.short || p.name)}${p.wards.length > 1 ? `<small class="layer-hint"> · ${p.wards.length} phường, xã</small>` : ''}</span></label>
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${n}. ${escapeHtml(listName)}${p.wards.length > 1 ? `<small class="layer-hint"> · ${p.wards.length} phường, xã</small>` : ''}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
@@ -1443,17 +1444,29 @@ function layerRowHtml(p, idx, projectOn, admin, g, li, { note = false } = {}) {
   </div>${kmlBtn}`;
 }
 
+/** Nhóm a/b: HT mặc định thu; QH mặc định mở (trục B). */
+function mapGroupHtml(phase, title, inner, open) {
+  const tip = open ? `Ẩn ${title}` : `Hiện ${title}`;
+  return `<div class="project-map-group${open ? '' : ' is-collapsed'}" data-map-phase="${phase}">
+    <button type="button" class="project-map-group-head" data-map-group-toggle aria-expanded="${open ? 'true' : 'false'}" title="${escapeHtml(tip)}">
+      <span class="project-map-group-title">${escapeHtml(title)}</span>
+      <span class="project-expand${open ? ' open' : ''}" aria-hidden="true">${ico('chev-down')}</span>
+    </button>
+    <div class="project-map-group-body"${open ? '' : ' hidden'}>${inner}</div>
+  </div>`;
+}
+
 function layersHtml(p, idx, projectOn, admin) {
   const info = layerInfo.get(p.name);
   if (!info || info.loading) return '<div class="project-layers"><div class="project-empty">Đang tải các lớp…</div></div>';
   if (info.error) return `<div class="project-layers"><div class="project-empty">Không tải được lớp: ${escapeHtml(info.error)}</div></div>`;
   if (!info.list.length) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
   const groups = [
-    { phase: 'HT', title: 'a. Các bản đồ hiện trạng' },
-    { phase: 'QH', title: 'b. Các bản đồ quy hoạch' }
+    { phase: 'HT', title: 'a. Các bản đồ hiện trạng', open: false },
+    { phase: 'QH', title: 'b. Các bản đồ quy hoạch', open: true }
   ];
   let netNoted = false;
-  const body = groups.map(({ phase, title }) => {
+  const body = groups.map(({ phase, title, open }) => {
     const rows = info.list.map((g, li) => {
       if (g.phase !== phase) return '';
       const html = layerRowHtml(p, idx, projectOn, admin, g, li, {
@@ -1463,10 +1476,7 @@ function layersHtml(p, idx, projectOn, admin) {
       return html;
     }).filter(Boolean).join('');
     if (!rows && !admin) return '';
-    return `<div class="project-map-group" data-map-phase="${phase}">
-      <div class="project-map-group-title">${escapeHtml(title)}</div>
-      ${rows || '<div class="project-empty">Chưa có lớp ở nhóm này.</div>'}
-    </div>`;
+    return mapGroupHtml(phase, title, rows || '<div class="project-empty">Chưa có lớp ở nhóm này.</div>', open);
   }).join('');
   const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
@@ -1475,6 +1485,16 @@ function layersHtml(p, idx, projectOn, admin) {
       <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
     </div>` : '';
   return `<div class="project-layers">${body || '<div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div>'}${search}</div>`;
+}
+
+/** Tên dòng danh sách: tiền tố cấp (QHC/QHPK/QHCT) trước tên rút gọn — không nhân đôi nếu đã có. */
+function listLabelOf(p) {
+  const raw = String(p?.short || p?.name || '').trim();
+  const key = String(p?.level || '').toUpperCase();
+  const prefix = key === 'QHC' || key === 'QHPK' || key === 'QHCT' ? key : '';
+  if (!prefix || !raw) return raw;
+  if (new RegExp(`^${prefix}(?![A-Za-z])`, 'i').test(raw)) return raw;
+  return `${prefix} ${raw}`;
 }
 
 function setAdjustOn(p, on) {
@@ -2929,6 +2949,22 @@ export function initProjectLayer(opts = {}) {
   loadHidden();
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.dossier-menu-wrap')) closeAllDossierMenus();
+  });
+  // Droplist nhóm a/b trong cây bản đồ (QHC tĩnh + đồ án nhập).
+  document.getElementById('layerPaneQuyHoach')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-map-group-toggle]');
+    if (!btn) return;
+    const group = btn.closest('.project-map-group');
+    const body = group?.querySelector('.project-map-group-body');
+    const chev = btn.querySelector('.project-expand');
+    if (!group || !body) return;
+    const open = group.classList.contains('is-collapsed');
+    group.classList.toggle('is-collapsed', !open);
+    body.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const title = group.querySelector('.project-map-group-title')?.textContent || 'nhóm';
+    btn.title = open ? `Ẩn ${title}` : `Hiện ${title}`;
+    chev?.classList.toggle('open', open);
   });
   const master = $('chk_projects');
   if (master) {

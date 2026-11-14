@@ -2286,13 +2286,41 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-expand.open .ico { transform: rotate(180deg); }
 .project-layers { margin: 1px 0 4px 9px; padding: 2px 0 2px 8px; border-left: 1px dashed rgba(var(--project-rgb), 0.45); }
 .project-map-group { margin: 0 0 4px; }
+.project-map-group-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 1px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.project-map-group-head:hover .project-map-group-title { color: var(--accent-cyan); }
+.project-map-group-head .project-expand {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--accent-cyan);
+  line-height: 0;
+}
+.project-map-group-head .project-expand .ico {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.15s ease;
+}
 .project-map-group-title {
-  margin: 2px 0 2px;
+  margin: 0;
   font-family: var(--axis-font);
   font-size: var(--axis-fs-row);
   font-weight: 700;
   color: var(--axis-color-strong);
 }
+.project-map-group-body { margin: 0; }
+.project-map-group.is-collapsed > .project-map-group-body { display: none; }
 .project-layer { display: flex; align-items: center; gap: 4px; min-height: var(--axis-row-h); font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); }
 .project-layer.is-off .project-layer-name span, .project-layer.is-off .project-layer-dot { opacity: 0.45; }
 .project-layer-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--axis-color); }

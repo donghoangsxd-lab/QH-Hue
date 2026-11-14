@@ -578,29 +578,39 @@
               </span>
             </div>
             <div class="project-layers" id="qhc25Layers">
-              <div class="project-map-group" data-map-phase="HT">
-                <div class="project-map-group-title">a. Các bản đồ hiện trạng</div>
-                <div id="qhc25HtktHt" class="qhc25-htkt" hidden></div>
+              <div class="project-map-group is-collapsed" data-map-phase="HT">
+                <button type="button" class="project-map-group-head" data-map-group-toggle aria-expanded="false" title="Hiện các lớp hiện trạng">
+                  <span class="project-map-group-title">a. Các bản đồ hiện trạng</span>
+                  <span class="project-expand" aria-hidden="true"><svg class="ico"><use href="#i-chev-down"/></svg></span>
+                </button>
+                <div class="project-map-group-body" hidden>
+                  <div id="qhc25HtktHt" class="qhc25-htkt" hidden></div>
+                </div>
               </div>
               <div class="project-map-group" data-map-phase="QH">
-                <div class="project-map-group-title">b. Các bản đồ quy hoạch</div>
-                <div class="project-layer">
-                  <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
-                    <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
-                </div>
-                <div class="project-gt25">
+                <button type="button" class="project-map-group-head" data-map-group-toggle aria-expanded="true" title="Ẩn các lớp quy hoạch">
+                  <span class="project-map-group-title">b. Các bản đồ quy hoạch</span>
+                  <span class="project-expand open" aria-hidden="true"><svg class="ico"><use href="#i-chev-down"/></svg></span>
+                </button>
+                <div class="project-map-group-body">
                   <div class="project-layer">
-                    <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Xổ mũi tên để xem lớp GIS quy hoạch thành phần; chỉ tải khi tick từng lớp con. Lớp hiện trạng giao thông nằm ở nhóm a.">
-                      <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
-                    <label class="project-rail" title="Đường sắt">
-                      <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
-                      <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                    </label>
-                    <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                    <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
+                      <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
                   </div>
-                  <div id="gt25Children" class="gt25-children" hidden></div>
+                  <div class="project-gt25">
+                    <div class="project-layer">
+                      <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Xổ mũi tên để xem lớp GIS quy hoạch thành phần; chỉ tải khi tick từng lớp con. Lớp hiện trạng giao thông nằm ở nhóm a.">
+                        <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
+                      <label class="project-rail" title="Đường sắt">
+                        <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
+                        <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                      </label>
+                      <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                    </div>
+                    <div id="gt25Children" class="gt25-children" hidden></div>
+                  </div>
+                  <div id="qhc25HtktQh" class="qhc25-htkt" hidden></div>
                 </div>
-                <div id="qhc25HtktQh" class="qhc25-htkt" hidden></div>
               </div>
             </div>
           </div>
@@ -615,23 +625,33 @@
               </span>
             </div>
             <div class="project-layers" id="qhc10Layers" hidden>
-              <div class="project-map-group" data-map-phase="HT">
-                <div class="project-map-group-title">a. Các bản đồ hiện trạng</div>
-                <div class="project-empty">Lô hiện trạng xem bằng bộ lọc giai đoạn dưới lớp sử dụng đất (khi lớp quy hoạch đang bật).</div>
+              <div class="project-map-group is-collapsed" data-map-phase="HT">
+                <button type="button" class="project-map-group-head" data-map-group-toggle aria-expanded="false" title="Hiện các lớp hiện trạng">
+                  <span class="project-map-group-title">a. Các bản đồ hiện trạng</span>
+                  <span class="project-expand" aria-hidden="true"><svg class="ico"><use href="#i-chev-down"/></svg></span>
+                </button>
+                <div class="project-map-group-body" hidden>
+                  <div class="project-empty">Lô hiện trạng xem bằng bộ lọc giai đoạn dưới lớp sử dụng đất (khi lớp quy hoạch đang bật).</div>
+                </div>
               </div>
               <div class="project-map-group" data-map-phase="QH">
-                <div class="project-map-group-title">b. Các bản đồ quy hoạch</div>
-                <div class="project-layer">
-                  <label class="project-layer-name" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu">
-                    <input type="checkbox" id="chk_qhc10" data-qhc-child="10"><i class="project-layer-dot" style="--dot:#38bdf8"></i><span>Quy hoạch sử dụng đất (trung tâm)</span></label>
-                </div>
-                <div class="project-layer">
-                  <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
-                    <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
-                  <label class="project-rail" title="Đường sắt">
-                    <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked aria-label="Đường sắt">
-                    <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                  </label>
+                <button type="button" class="project-map-group-head" data-map-group-toggle aria-expanded="true" title="Ẩn các lớp quy hoạch">
+                  <span class="project-map-group-title">b. Các bản đồ quy hoạch</span>
+                  <span class="project-expand open" aria-hidden="true"><svg class="ico"><use href="#i-chev-down"/></svg></span>
+                </button>
+                <div class="project-map-group-body">
+                  <div class="project-layer">
+                    <label class="project-layer-name" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu">
+                      <input type="checkbox" id="chk_qhc10" data-qhc-child="10"><i class="project-layer-dot" style="--dot:#38bdf8"></i><span>Quy hoạch sử dụng đất (trung tâm)</span></label>
+                  </div>
+                  <div class="project-layer">
+                    <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
+                      <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
+                    <label class="project-rail" title="Đường sắt">
+                      <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked aria-label="Đường sắt">
+                      <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
