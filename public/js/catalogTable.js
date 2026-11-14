@@ -15,7 +15,8 @@ import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
-  groupPlanRowsByLevel, rowsToCsv, downloadCsv, STATUS, PLAN_TABLE_COLS,
+  groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, rowsToCsv, downloadCsv,
+  STATUS, PLAN_TABLE_COLS, PLAN_SORT_COLUMNS,
   mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf
 } from './catalogTableCore.js';
 
@@ -45,6 +46,8 @@ let yearChart = null;
 let wardChart = null;
 /** 'year' | 'ward' — mặt cột phải; lật bằng #btnCatalogFlipChart. */
 let chartPage = 'year';
+/** Thứ tự ưu tiên sắp xếp cột (bấm mũi tên header); chỉ xếp đồ án cha. */
+let sortKeys = [];
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
@@ -199,6 +202,69 @@ function boundCatalogOptions() {
     .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
 }
 
+/** Droplist mã sổ tay khi ghi ngược đồ án ngoài sổ tay → ghép mapTenQH. */
+function soTayPickOptions(excludeTenQH = '') {
+  const force = String(excludeTenQH || '').trim();
+  const items = Array.isArray(soTayItems) ? soTayItems : [];
+  return items
+    .filter((it) => it && it.ma && it.ten)
+    .map((it) => {
+      const linked = String(it.mapTenQH || '').trim();
+      const note = linked
+        ? (linked === force ? ' · đang gắn ranh này' : ' · đã gắn ranh khác')
+        : '';
+      return {
+        value: it.ma,
+        label: `${it.ma} — ${it.ten}${note}`,
+        linked
+      };
+    })
+    .sort((a, b) => {
+      const aHit = a.linked === force ? 0 : (a.linked ? 2 : 1);
+      const bHit = b.linked === force ? 0 : (b.linked ? 2 : 1);
+      if (aHit !== bHit) return aHit - bHit;
+      return a.label.localeCompare(b.label, 'vi');
+    });
+}
+
+function syncAdoptKindUi() {
+  const kind = $('catalogAdoptKind')?.value || 'link';
+  const isNew = kind === 'new';
+  const panel = $('catalogEditPanel');
+  if (!panel || $('catalogEditMode')?.value !== 'adopt') return;
+  panel.querySelectorAll('[data-edit="adopt-link"]').forEach((el) => {
+    el.hidden = isNew;
+  });
+  panel.querySelectorAll('[data-edit="project"]').forEach((el) => {
+    el.hidden = !isNew;
+  });
+  panel.querySelectorAll('[data-edit="project-only"]').forEach((el) => {
+    el.hidden = !isNew;
+  });
+  panel.querySelectorAll('[data-edit="facts"]').forEach((el) => {
+    el.hidden = !isNew;
+  });
+  panel.querySelectorAll('[data-edit="meta"]').forEach((el) => {
+    el.hidden = !isNew;
+  });
+  const maInp = $('catalogEditMa');
+  if (maInp) {
+    maInp.readOnly = false;
+    maInp.required = isNew;
+    if (!isNew) maInp.removeAttribute('required');
+  }
+  const tenInp = $('catalogEditTen');
+  if (tenInp) {
+    tenInp.required = isNew;
+    if (!isNew) tenInp.removeAttribute('required');
+  }
+  const soTaySel = $('catalogEditSoTayMa');
+  if (soTaySel) soTaySel.required = !isNew;
+  $('catalogEditHint').textContent = isNew
+    ? 'Tạo mã/tên mới trong sổ tay và gắn với ranh đang có trên bản đồ (mapTenQH).'
+    : 'Chọn mã sổ tay đã có để gắn ranh đồ án ngoài sổ tay — không đổi file tĩnh, chỉ overlay.';
+}
+
 function setEditMode(mode, parentMa = '') {
   const panel = $('catalogEditPanel');
   const form = $('catalogEditForm');
@@ -206,22 +272,29 @@ function setEditMode(mode, parentMa = '') {
   form.reset();
   $('catalogEditMode').value = mode;
   $('catalogEditParentMa').value = parentMa || '';
+  const tenQHField = $('catalogEditTenQH');
+  if (tenQHField) tenQHField.value = mode === 'adopt' ? (parentMa || '') : '';
   const isDccb = mode === 'dccb';
   const isLink = mode === 'link';
+  const isAdopt = mode === 'adopt';
   const isEdit = mode === 'edit';
   const isProject = mode === 'project';
   $('catalogEditTitle').textContent = isLink
     ? `Gán ranh · ${parentMa}`
-    : (isEdit
-      ? `Sửa đồ án · ${parentMa}`
-      : (isDccb ? `Thêm ĐCCB · ${parentMa}` : 'Thêm đồ án quy hoạch'));
+    : (isAdopt
+      ? `Ghi sổ tay · ${parentMa}`
+      : (isEdit
+        ? `Sửa đồ án · ${parentMa}`
+        : (isDccb ? `Thêm ĐCCB · ${parentMa}` : 'Thêm đồ án quy hoạch')));
   $('catalogEditHint').textContent = isLink
     ? 'Chọn một ranh đồ án đã có trên bản đồ để gắn với mã sổ tay này.'
-    : (isEdit
-      ? 'Sửa tên, phường/xã, quyết định, diện tích, dân số — lưu overlay, không đụng file sổ tay gốc.'
-      : (isDccb
-        ? 'Dòng điều chỉnh cục bộ sẽ nằm dưới mã đồ án cha.'
-        : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).'));
+    : (isAdopt
+      ? 'Đồ án đang có trên bản đồ nhưng chưa có trong sổ tay: ghép mã có sẵn hoặc thêm tên mới.'
+      : (isEdit
+        ? 'Sửa tên, phường/xã, quyết định, diện tích, dân số — lưu overlay, không đụng file sổ tay gốc.'
+        : (isDccb
+          ? 'Dòng điều chỉnh cục bộ sẽ nằm dưới mã đồ án cha.'
+          : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).')));
 
   panel.querySelectorAll('[data-edit="project"]').forEach((el) => {
     el.hidden = !(isProject || isEdit);
@@ -241,6 +314,12 @@ function setEditMode(mode, parentMa = '') {
   panel.querySelectorAll('[data-edit="link"]').forEach((el) => {
     el.hidden = !isLink;
   });
+  panel.querySelectorAll('[data-edit="adopt"]').forEach((el) => {
+    el.hidden = !isAdopt;
+  });
+  panel.querySelectorAll('[data-edit="adopt-link"]').forEach((el) => {
+    el.hidden = !isAdopt;
+  });
 
   const maInp = $('catalogEditMa');
   if (maInp) {
@@ -251,7 +330,7 @@ function setEditMode(mode, parentMa = '') {
   const tenInp = $('catalogEditTen');
   if (tenInp) {
     tenInp.required = isProject || isEdit || isDccb;
-    if (isLink) tenInp.removeAttribute('required');
+    if (isLink || isAdopt) tenInp.removeAttribute('required');
   }
   const boundSel = $('catalogEditBound');
   if (boundSel) {
@@ -261,7 +340,23 @@ function setEditMode(mode, parentMa = '') {
     }`;
     boundSel.required = isLink;
   }
-  if (isDccb) {
+  const soTaySel = $('catalogEditSoTayMa');
+  if (soTaySel) {
+    const opts = soTayPickOptions(isAdopt ? parentMa : '');
+    soTaySel.innerHTML = `<option value="">— Chọn mã sổ tay —</option>${
+      opts.map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')
+    }`;
+    soTaySel.required = false;
+  }
+  if (isAdopt) {
+    const kind = $('catalogAdoptKind');
+    if (kind) kind.value = 'link';
+    if (tenInp) {
+      tenInp.placeholder = 'Tên trong sổ tay';
+      tenInp.value = parentMa || '';
+    }
+    syncAdoptKindUi();
+  } else if (isDccb) {
     if (tenInp) {
       tenInp.placeholder = 'ĐCCB …';
       tenInp.value = 'ĐCCB ';
@@ -271,6 +366,7 @@ function setEditMode(mode, parentMa = '') {
   }
   panel.hidden = false;
   if (isLink) boundSel?.focus();
+  else if (isAdopt) ($('catalogEditSoTayMa') || $('catalogAdoptKind'))?.focus();
   else if (isEdit) tenInp?.focus();
   else tenInp?.focus();
 }
@@ -286,6 +382,21 @@ function openLinkBound(ma) {
     return;
   }
   setEditMode('link', ma);
+}
+
+/** Đồ án ngoài sổ tay (chi_ban_do): ghép mã sổ tay có sẵn hoặc thêm tên mới + mapTenQH. */
+function openAdoptSoTay(tenQH) {
+  if (!isAdmin()) {
+    showToast('Cần đăng nhập Admin để ghi sổ tay', 'info');
+    return;
+  }
+  const name = String(tenQH || '').trim();
+  if (!name) return;
+  if (!(soTayItems || []).length) {
+    showToast('Chưa tải sổ tay — thử mở lại bảng danh mục', 'info');
+    return;
+  }
+  setEditMode('adopt', name);
 }
 
 function openAddProject() {
@@ -354,7 +465,7 @@ async function submitEdit(e) {
   const qd = String($('catalogEditQd')?.value || '').trim();
   const ngay = String($('catalogEditNgay')?.value || '').trim();
   const coQuan = String($('catalogEditCoQuan')?.value || '').trim();
-  if (mode !== 'link') {
+  if (mode !== 'link' && mode !== 'adopt') {
     if (!ten) {
       showToast('Nhập tên quy hoạch / ĐCCB', 'info');
       return;
@@ -380,6 +491,63 @@ async function submitEdit(e) {
       if (!ma || !tenQH) {
         showToast('Chọn ranh đồ án trên bản đồ', 'info');
         return;
+      }
+      const i = next.links.findIndex((x) => String(x?.ma || '') === ma);
+      if (i >= 0) next.links[i] = { ma, tenQH };
+      else next.links.push({ ma, tenQH });
+    } else if (mode === 'adopt') {
+      const tenQH = String($('catalogEditTenQH')?.value || $('catalogEditParentMa')?.value || '').trim();
+      if (!tenQH) {
+        showToast('Thiếu tên đồ án trên bản đồ', 'info');
+        return;
+      }
+      const adoptKind = $('catalogAdoptKind')?.value || 'link';
+      let ma = '';
+      if (adoptKind === 'new') {
+        ma = String($('catalogEditMa')?.value || '').trim().toUpperCase();
+        const name = String($('catalogEditTen')?.value || '').trim() || tenQH;
+        const cap = String($('catalogEditCap')?.value || 'QHPK').trim();
+        if (!ma) {
+          showToast('Nhập mã đồ án mới', 'info');
+          return;
+        }
+        if ((soTayItems || []).some((it) => it.ma === ma) || next.projects.some((p) => p.ma === ma)) {
+          showToast(`Mã ${ma} đã có trong sổ tay`, 'info');
+          return;
+        }
+        if (ngay && !planYearOf(ngay)) {
+          showToast('Ngày ban hành cần dạng dd/mm/yyyy', 'info');
+          return;
+        }
+        const area = parseAreaHa($('catalogEditArea')?.value);
+        next.projects.push({
+          ma,
+          ten: name,
+          cap,
+          dvhc: String($('catalogEditDvhc')?.value || '').trim(),
+          diaDiem: String($('catalogEditDvhc')?.value || '').trim(),
+          dienTichHa: area.ha,
+          dienTichText: area.text,
+          danSo: String($('catalogEditDanSo')?.value || '').trim(),
+          quyetDinh: qd,
+          ngay,
+          coQuan,
+          children: [],
+          soDccb: 0,
+          soDinhChinh: 0,
+          sheetNguon: 'admin',
+          ghiChu: 'Thêm bởi admin (từ bản đồ)'
+        });
+      } else {
+        ma = String($('catalogEditSoTayMa')?.value || '').trim();
+        if (!ma) {
+          showToast('Chọn mã sổ tay để ghép', 'info');
+          return;
+        }
+        if (!(soTayItems || []).some((it) => it.ma === ma) && !next.projects.some((p) => p.ma === ma)) {
+          showToast('Không tìm thấy mã sổ tay', 'error');
+          return;
+        }
       }
       const i = next.links.findIndex((x) => String(x?.ma || '') === ma);
       if (i >= 0) next.links[i] = { ma, tenQH };
@@ -464,11 +632,40 @@ async function submitEdit(e) {
     const okRemote = saved.remote ? 'lên máy chủ' : 'trên máy này (chưa đồng bộ bucket)';
     const label = mode === 'link'
       ? 'Đã gán ranh'
-      : (mode === 'edit' ? 'Đã sửa đồ án' : (mode === 'dccb' ? 'Đã ghi ĐCCB' : 'Đã ghi đồ án'));
+      : (mode === 'adopt'
+        ? 'Đã ghi sổ tay'
+        : (mode === 'edit' ? 'Đã sửa đồ án' : (mode === 'dccb' ? 'Đã ghi ĐCCB' : 'Đã ghi đồ án')));
     showToast(`${label} ${okRemote}`, saved.remote ? 'success' : 'info');
   } finally {
     editBusy = false;
   }
+}
+
+function sortHeaderHtml(label, key, opts = {}) {
+  const idAttr = opts.id ? ` id="${escapeHtml(opts.id)}"` : '';
+  if (!key) return `<th${idAttr}>${escapeHtml(label)}</th>`;
+  const idx = sortKeys.findIndex((s) => s.key === key);
+  const on = idx >= 0;
+  const pri = on ? String(idx + 1) : '';
+  const title = on
+    ? `Bỏ sắp xếp «${label}» (ưu tiên ${pri})`
+    : `Sắp xếp theo «${label}»`;
+  return `<th${idAttr} class="catalog-sort-th">
+    <span class="catalog-sort-label">${escapeHtml(label)}</span>
+    <button type="button" class="catalog-sort-btn${on ? ' is-on' : ''}" data-catalog-sort="${escapeHtml(key)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" aria-pressed="${on ? 'true' : 'false'}">
+      ${pri ? `<span class="catalog-sort-pri" aria-hidden="true">${escapeHtml(pri)}</span>` : ''}
+      <span class="catalog-sort-arrow" aria-hidden="true"></span>
+    </button>
+  </th>`;
+}
+
+function togglePlanSort(key) {
+  if (!PLAN_SORT_COLUMNS.some((c) => c.key === key)) return;
+  const i = sortKeys.findIndex((s) => s.key === key);
+  if (i >= 0) sortKeys.splice(i, 1);
+  else sortKeys.push({ key });
+  syncPlanColumns(true);
+  paintTable();
 }
 
 function syncPlanColumns(planOnly) {
@@ -478,25 +675,26 @@ function syncPlanColumns(planOnly) {
   const head = table.querySelector('thead tr');
   if (!head) return;
   if (planOnly) {
-    // colgroup % khớp CSS — 10 cột (Trạng thái + Ranh gộp thành Ranh); PX ngay trước Quyết định.
+    // colgroup % khớp CSS — 11 cột (thêm Cấp độ sau Tên); PX ngay trước Quyết định.
     let colgroup = table.querySelector('colgroup');
     if (!colgroup) {
       colgroup = document.createElement('colgroup');
       table.insertBefore(colgroup, table.firstChild);
     }
-    colgroup.innerHTML = `<col style="width:3%"><col style="width:6%"><col style="width:38%">
-      <col style="width:11%"><col style="width:9%"><col style="width:7%"><col style="width:7%">
-      <col style="width:6%"><col style="width:5%"><col style="width:8%">`;
+    colgroup.innerHTML = `<col style="width:3%"><col style="width:5%"><col style="width:30%">
+      <col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:6%">
+      <col style="width:6%"><col style="width:5%"><col style="width:5%"><col style="width:8%">`;
     head.innerHTML = `<th>STT</th>
-      <th>Mã</th>
-      <th id="catalogColName">Tên quy hoạch</th>
-      <th>Phường / xã</th>
-      <th>Quyết định</th>
-      <th>Ngày ban hành</th>
-      <th>Cấp phê duyệt</th>
-      <th>Diện tích</th>
-      <th>Dân số</th>
-      <th>Ranh</th>`;
+      ${sortHeaderHtml('Mã', 'ma')}
+      ${sortHeaderHtml('Tên quy hoạch', 'name', { id: 'catalogColName' })}
+      ${sortHeaderHtml('Cấp độ', 'level')}
+      ${sortHeaderHtml('Phường / xã', 'ward')}
+      ${sortHeaderHtml('Quyết định', 'quyetDinh')}
+      ${sortHeaderHtml('Ngày ban hành', 'ngay')}
+      ${sortHeaderHtml('Cấp phê duyệt', 'coQuan')}
+      ${sortHeaderHtml('Diện tích', 'area')}
+      ${sortHeaderHtml('Dân số', 'danSo')}
+      ${sortHeaderHtml('Ranh', 'ranh')}`;
   } else {
     const colgroup = table.querySelector('colgroup');
     if (colgroup) colgroup.remove();
@@ -636,8 +834,20 @@ function wardCellHtml(r) {
   return `<td class="catalog-ward" title="${escapeHtml(full)}">${escapeHtml(full)}</td>`;
 }
 
-/** Cột Ranh gộp: Có (N lớp) | Chưa có — N = số lớp bản đồ đang có trên map. */
+/** Cột Ranh gộp: Có (N lớp) | Chưa có — N = số lớp bản đồ đang có trên map.
+ *  chi_ban_do (ngoài sổ tay): Admin thêm nút «Sổ tay» để ghép mã có sẵn hoặc ghi tên mới. */
 function boundCellHtml(r) {
+  const tenQH = String(r.fullName || r.zoomKey || r.name || '').trim();
+  if (r.status === 'chi_ban_do') {
+    const n = Number(r.layerCount) || 0;
+    const zoom = (r.hasBoundary && r.zoomKey)
+      ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh · ${n} lớp bản đồ (không mở đồ án)">Có (${n})</button>`
+      : '<span class="catalog-bound-no">Chưa có</span>';
+    if (isAdmin() && tenQH) {
+      return `<span class="catalog-bound-actions">${zoom}<button type="button" class="catalog-bound-link" data-catalog-adopt-tenqh="${escapeHtml(tenQH)}" title="Ghép vào mã sổ tay có sẵn hoặc thêm tên mới">Sổ tay</button></span>`;
+    }
+    return zoom;
+  }
   if (r.hasBoundary && r.zoomKey) {
     const n = Number(r.layerCount) || 0;
     const label = `Có (${n})`;
@@ -650,14 +860,21 @@ function boundCellHtml(r) {
   return `<span class="catalog-bound-no">Chưa có</span>`;
 }
 
+function levelCellHtml(r) {
+  const label = levelLabelOf(r?.level);
+  if (!label || label === '—') return '<td class="catalog-level">—</td>';
+  return `<td class="catalog-level" title="${escapeHtml(label)}">${escapeHtml(label)}</td>`;
+}
+
 function planChildRowHtml(parent, child, isLast) {
   const tag = child.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB';
   const name = String(child.ten || tag).trim() || tag;
-  // Đủ 10 <td> giống hàng cha; PX kế thừa đồ án cha (cùng bộ lọc địa phương).
+  // Đủ 11 <td> giống hàng cha; cấp độ + PX kế thừa đồ án cha (không tách khi sắp xếp).
   return `<tr class="catalog-dccb-row${isLast ? ' is-last' : ''}" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
     <td class="st-num catalog-dccb-empty"></td>
     <td class="catalog-ma catalog-dccb-empty"></td>
     ${nameCellHtml(name, 'catalog-dccb-name')}
+    <td class="catalog-level catalog-dccb-empty" title="Theo đồ án cha">—</td>
     ${wardCellHtml(parent)}
     <td class="catalog-qd" title="${escapeHtml(child.quyetDinh || '')}">${cellOrDash(child.quyetDinh)}</td>
     <td class="catalog-date">${cellOrDash(child.ngay)}</td>
@@ -683,6 +900,7 @@ function planRowHtml(r, stt) {
     <td class="st-num">${stt}</td>
     <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${addDccb}${editBtn}</td>
     ${nameCellHtml(name)}
+    ${levelCellHtml(r)}
     ${wardCellHtml(r)}
     <td class="catalog-qd" title="${escapeHtml(r.quyetDinh || '')}">${cellOrDash(r.quyetDinh)}</td>
     <td class="catalog-date">${cellOrDash(r.ngay)}</td>
@@ -701,6 +919,9 @@ function paintTable() {
     status: source === 'plan' ? filterStatus : '',
     ward: source === 'plan' ? filterWard : ''
   });
+  if (source === 'plan' && sortKeys.length) {
+    visibleRows = sortPlanRowsByKeys(visibleRows, sortKeys);
+  }
   const body = $('catalogTableBody');
   const count = $('catalogCount');
   const unit = source === 'invest' ? 'dự án' : 'đồ án';
@@ -715,7 +936,11 @@ function paintTable() {
   if (source === 'plan') {
     const parts = [];
     let stt = 0;
-    for (const item of groupPlanRowsByLevel(visibleRows)) {
+    // Có sắp xếp cột → danh sách phẳng (không nhóm A/B/C); ĐCCB vẫn gắn ngay dưới cha.
+    const items = sortKeys.length
+      ? visibleRows.map((row) => ({ type: 'row', row }))
+      : groupPlanRowsByLevel(visibleRows);
+    for (const item of items) {
       if (item.type === 'group') {
         parts.push(
           `<tr class="catalog-group-row"><td colspan="${PLAN_TABLE_COLS}">${escapeHtml(item.label)} (${item.count})</td></tr>`
@@ -1003,6 +1228,7 @@ export async function openCatalogTable(opts = {}) {
   query = '';
   filterStatus = '';
   filterWard = '';
+  sortKeys = [];
   chartPage = 'year';
   const search = $('catalogSearch');
   if (search) search.value = '';
@@ -1123,6 +1349,7 @@ export function initCatalogTable() {
   });
   $('btnCatalogAdd')?.addEventListener('click', openAddProject);
   $('btnCatalogEditClose')?.addEventListener('click', closeEditPanel);
+  $('catalogAdoptKind')?.addEventListener('change', syncAdoptKindUi);
   $('catalogEditForm')?.addEventListener('submit', (e) => { void submitEdit(e); });
   $('btnCatalogExportCsv')?.addEventListener('click', exportCsv);
   $('btnCatalogExportPdf')?.addEventListener('click', () => { void exportPdf(); });
@@ -1142,6 +1369,12 @@ export function initCatalogTable() {
     closeCatalogTable();
     setBottomPanelCollapsed(true);
   });
+  $('catalogTable')?.querySelector('thead')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-catalog-sort]');
+    if (!btn || source !== 'plan') return;
+    e.preventDefault();
+    togglePlanSort(btn.dataset.catalogSort);
+  });
   $('catalogTableBody')?.addEventListener('click', (e) => {
     const add = e.target.closest('[data-catalog-add-dccb]');
     if (add) {
@@ -1156,6 +1389,11 @@ export function initCatalogTable() {
     const link = e.target.closest('[data-catalog-link-ma]');
     if (link) {
       openLinkBound(link.dataset.catalogLinkMa);
+      return;
+    }
+    const adopt = e.target.closest('[data-catalog-adopt-tenqh]');
+    if (adopt) {
+      openAdoptSoTay(adopt.dataset.catalogAdoptTenqh);
       return;
     }
     const btn = e.target.closest('[data-catalog-zoom]');
