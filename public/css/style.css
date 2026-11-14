@@ -222,17 +222,17 @@ body.split-offset .swipe-handle { display: none; }
 .swipe-label-right { left: 16px; background: var(--bg-dark); color: var(--accent-orange); border: 1px solid var(--border-color); }
 .leaflet-control-zoom { display: none !important; }
 
-/* Hộp tiêu đề vừa chữ. Mép trái cố định; không kéo tới cột nút. */
+/* Hộp tiêu đề vừa chữ, căn giữa ngang màn hình (desktop). Không kéo tới cột nút. */
 .map-title {
   --tone: var(--orange-rgb);
   position: absolute;
   top: 12px;
-  left: calc(12px + var(--right-w) + 16px);
+  left: 50%;
   right: auto;
   width: fit-content;
-  max-width: calc(100vw - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
+  max-width: calc(100vw - 2 * max(var(--info-left), calc(12px + var(--tb-btn) + 16px)));
   margin: 0;
-  transform: none;
+  transform: translateX(-50%);
   z-index: 1100;
   height: auto;
   box-sizing: border-box;
@@ -348,12 +348,12 @@ html.show-boot-notice .map-title { padding-bottom: 5px; }
 body.right-collapsed .map-title,
 body.bottom-collapsed .map-title,
 body.compare-on .map-title {
-  left: calc(12px + var(--right-w) + 16px);
+  left: 50%;
   right: auto;
   width: fit-content;
-  max-width: calc(100vw - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
+  max-width: calc(100vw - 2 * max(var(--info-left), calc(12px + var(--tb-btn) + 16px)));
   margin: 0;
-  transform: none;
+  transform: translateX(-50%);
 }
 /* Ngay dưới thanh tiêu đề, canh giữa thanh đó. Hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị. */
 .esc-hint {
