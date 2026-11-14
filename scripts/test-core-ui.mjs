@@ -648,6 +648,16 @@ assert.match(levelJs, /function togglePlanTab/);
 assert.match(levelJs, /setLevel\(id, \{ keepView: true \}\)/);
 assert.doesNotMatch(read('public/js/viewFlow.js'), /frameVisibleSchemes/);
 assert.doesNotMatch(read('public/js/projectLayer.js'), /frameVisibleSchemes/);
+{
+  const pl = read('public/js/projectLayer.js');
+  assert.match(pl, /function listedProjects/);
+  assert.match(pl, /function scheduleListForView/);
+  assert.match(pl, /projectInView\(p, bounds\)/);
+  assert.match(pl, /Trong khung nhìn · Esc hiện đủ/);
+  const clearFn = pl.slice(pl.indexOf('export function clearProjectFocus'), pl.indexOf('export function revealLotsCovering'));
+  assert.match(clearFn, /renderList\(\)/);
+  assert.match(read('docs/ui-spec.md'), /Trong khung nhìn · Esc hiện đủ/);
+}
 const flowSrc = read('public/js/viewFlow.js');
 const exitSrc = flowSrc.slice(flowSrc.indexOf('function onProjectExit'), flowSrc.indexOf('function wardToPick'));
 assert.match(exitSrc, /setLevel\(from, \{ keepView: true \}\)/);
@@ -659,6 +669,19 @@ assert.match(read('public/js/mapEngine.js'), /export function focusWard\(wardNam
 assert.match(read('public/js/uiComponents.js'), /export function selectWardDetail\(wardName, \{ fitView = true \} = \{\}\)/);
 assert.match(read('public/js/app.js'), /if \(!hasSharedCamera\(\)\) centerOnCity\(\{ animate: false \}\)/);
 assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
+{
+  const pl = read('public/js/projectLayer.js');
+  const outlineFn = pl.slice(pl.indexOf('function openOutlineProject'), pl.indexOf('function smallestProjectAt'));
+  assert.match(outlineFn, /switching/);
+  assert.match(outlineFn, /openProject\(p\)/);
+  assert.match(pl, /export function trySwitchProjectAt/);
+  // Ranh đồ án khác vẫn bấm được khi phóng gần: không khóa interactive bằng !below.
+  const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
+  assert.doesNotMatch(drawOut, /open \|\| !below/);
+  assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
+  const flow = read('public/js/viewFlow.js');
+  assert.match(flow, /trySwitchProjectAt\(latlng\)/);
+}
 assert.match(read('public/js/urbanFocus.js'), /current && !keepView\) fitFocus/);
 assert.match(read('public/js/chuyenNganh.js'), /keepCamera: !!e\.detail\?\.keepView/);
 assert.match(read('docs/ui-spec.md'), /Bấm QHC 1\/10\.000 khi đang xem QHC 1\/25\.000 giữ nguyên khung nhìn/);
