@@ -2162,7 +2162,8 @@ export function initChuyenNganh() {
     if (level === 'urban') {
       if (browseState().axis !== 'hanhchinh') axisBeforeUrban = browseState().axis;
       levelTab = true;
-      showAxis('hanhchinh', { url: false });
+      // keepView: bỏ chọn đồ án quay về đô thị — không centerOnCity.
+      showAxis('hanhchinh', { url: false, keepCamera: !!e.detail?.keepView });
       document.querySelector('[data-admin-tab="dothi"]')?.click();
       return;
     }

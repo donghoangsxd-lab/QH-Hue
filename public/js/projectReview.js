@@ -30,7 +30,7 @@ import { clusterTouching, ringsFromPolygons, groupCentroid, joinLabels, compareI
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 const CITY_NAME = 'Thành phố Huế';
-// Bấm nút thoát của thông tin đồ án (dạng gọn hoặc bảng đầy đủ): viewFlow.js đưa bản đồ về phường / toàn TP
+// Bấm nút thoát của thông tin đồ án (dạng gọn hoặc bảng đầy đủ): viewFlow.js đóng hồ sơ, giữ tâm và mức phóng
 export const PROJECT_VIEW_EXIT_EVENT = 'qh:project-view-exit';
 // Hàng chờ duyệt (submitCadPending) nhận tối đa 2 MB nội dung
 const SEND_MAX_BYTES = 2 * 1024 * 1024;

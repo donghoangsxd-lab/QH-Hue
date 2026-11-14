@@ -288,9 +288,10 @@ export function urbanFocusHolds(latlng) {
 export function initUrbanFocus() {
   // Rời lớp đô thị thì ẩn, quay lại (VD thoát đồ án vừa mở từ đô thị) thì vẽ lại; chọn lại chính lớp này (về toàn TP) thì bỏ chọn
   document.addEventListener(LEVEL_EVENT, (e) => {
-    const { level, prev } = e.detail || {};
+    const { level, prev, keepView } = e.detail || {};
     if (level === 'urban' && prev === 'urban') { clearUrbanFocus(); return; }
-    if (level === 'urban' && current) fitFocus();
+    // keepView: thoát đồ án quay lại lớp đô thị — không phóng lại ranh (kể cả ranh cả thành phố).
+    if (level === 'urban' && current && !keepView) fitFocus();
     render();
   });
   document.addEventListener(GP_SCOPE_EVENT, (e) => {
