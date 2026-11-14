@@ -8,9 +8,18 @@ export const HOSO_STEPS = [
   { id: 'qd', label: 'Quyết định', hint: 'Quyết định phê duyệt đồ án.', file: 'pdf', max: 2 * MB, accept: '.pdf' },
   { id: 'ql', label: 'Quy chế', hint: 'Quy chế theo đồ án. Khác quyết định phê duyệt.', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'quy-dinh' },
   { id: 'tm', label: 'Thuyết minh', file: 'pdf', max: 10 * MB, accept: '.pdf', docRole: 'thuyet-minh' },
-  { id: 'ranh', label: 'Bản vẽ ranh giới quy hoạch', file: 'draw', draw: 'boundary', sector: '', phase: 'quy-hoach', role: 'ranh-hoso' },
-  { id: 'dat-ht', label: 'Hiện trạng sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'hien-trang', role: 'ht-dat-hoso' },
-  { id: 'dat-qh', label: 'Quy hoạch sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'quy-hoach', role: 'qh-dat-hoso' }
+  {
+    id: 'ranh', label: 'Bản vẽ ranh giới quy hoạch', file: 'draw', draw: 'boundary', sector: '', phase: 'quy-hoach', role: 'ranh-hoso',
+    hint: 'Ô RG — file RG - tên đồ án.dxf (hoặc KML/KMZ).'
+  },
+  {
+    id: 'dat-ht', label: 'Hiện trạng sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'hien-trang', role: 'ht-dat-hoso',
+    hint: 'Ô HT + KH (tem đất, không bắt buộc) — cùng pattern Nhập DXF.'
+  },
+  {
+    id: 'dat-qh', label: 'Quy hoạch sử dụng đất', file: 'draw', draw: 'land', sector: 'sdd', phase: 'quy-hoach', role: 'qh-dat-hoso',
+    hint: 'Ô QH + KH (tem đất, không bắt buộc) — cùng pattern Nhập DXF.'
+  }
 ];
 
 export const PUBLISH_KIND = { ranh: 'ranh-gioi', 'dat-ht': 'hien-trang', 'dat-qh': 'su-dung-dat' };

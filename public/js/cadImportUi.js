@@ -20,10 +20,12 @@ import { projectBoundary, fitBoundary } from './projectLayer.js';
 import { boundaryFromLines } from './boundaryLines.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
-import { lotKeysOf } from './projectFiles.js';
+import { lotKeysOf, projectAreaOf } from './projectFiles.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 import { openEntryFlow } from './entryFlows.js';
 import { groupInfraParcels } from './touchGroups.js';
+import { ensureSoTayItems } from './catalogTable.js';
+import { schemePickOptions } from './catalogTableCore.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -1604,26 +1606,56 @@ function nameHits(names, query) {
   });
 }
 
+let pairOptsCache = [];
+
 function pairNames() {
-  return [...new Set((state.projectCatalog || []).map(p => String(p.tenQH || '').trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'vi'));
+  return pairOptsCache.map(o => o.value);
+}
+
+function pairOptHits(opts, query) {
+  const words = foldName(query).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return opts;
+  return opts.filter(o => {
+    const parts = foldName(`${o.label} ${o.value}`).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+async function refreshPairOpts() {
+  let sheet = [];
+  try { sheet = (await ensureSoTayItems()) || []; } catch { sheet = []; }
+  pairOptsCache = schemePickOptions(sheet, state.projectCatalog || [], {
+    areaHaOf: (p) => {
+      const m2 = projectAreaOf(p.tenQH);
+      if (!Number.isFinite(m2) || m2 === Infinity || m2 <= 0) return null;
+      return m2 / 10000;
+    }
+  });
+  return pairOptsCache;
 }
 
 function fillPairSelect() {
   const sel = $('cadPair');
   if (!sel) return;
   const prev = sel.value;
-  const names = pairNames();
-  const query = $('cadPairSearch')?.value || '';
-  const hits = nameHits(names, query);
-  const shown = prev && names.includes(prev) && !hits.includes(prev) ? [prev, ...hits] : hits;
-  sel.innerHTML = '<option value="">Đồ án mới (theo tên file)</option>'
-    + shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  if (!prev || shown.includes(prev)) sel.value = prev;
-  sel.size = Math.min(6, Math.max(2, shown.length + 1));
-  const count = $('cadPairCount');
-  if (count) count.textContent = names.length ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`) : '';
-  syncPopBox();
+  const paint = (opts) => {
+    const query = $('cadPairSearch')?.value || '';
+    const hits = pairOptHits(opts, query);
+    const prevOpt = prev && opts.find(o => o.value === prev);
+    const shown = prevOpt && !hits.some(o => o.value === prev) ? [prevOpt, ...hits] : hits;
+    sel.innerHTML = '<option value="">Đồ án mới (theo tên file)</option>'
+      + shown.map(o => {
+        const text = o.note ? `${o.label} · ${o.note}` : o.label;
+        return `<option value="${escapeHtml(o.value)}" title="${escapeHtml(text)}">${escapeHtml(text)}</option>`;
+      }).join('');
+    if (!prev || shown.some(o => o.value === prev)) sel.value = prev;
+    sel.size = Math.min(6, Math.max(2, shown.length + 1));
+    const count = $('cadPairCount');
+    if (count) count.textContent = opts.length ? (foldName(query).trim() ? `${hits.length}/${opts.length} đồ án` : `${opts.length} đồ án`) : '';
+    syncPopBox();
+  };
+  if (pairOptsCache.length) paint(pairOptsCache);
+  void refreshPairOpts().then(paint);
 }
 
 function suggestPair(name) {

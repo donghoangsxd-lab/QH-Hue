@@ -574,6 +574,11 @@ async function loadSoTay() {
   return soTayPromise;
 }
 
+/** Cùng nguồn sổ tay với bảng danh mục trục B — droplist Bổ sung / điều chỉnh tái dùng. */
+export async function ensureSoTayItems() {
+  return loadSoTay();
+}
+
 function areaHaOfProject(p) {
   const m2 = projectAreaOf(p.tenQH);
   if (!Number.isFinite(m2) || m2 === Infinity || m2 <= 0) return null;

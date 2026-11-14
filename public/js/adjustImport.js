@@ -1,4 +1,4 @@
-// Nhập hàng loạt › Điều chỉnh cục bộ: một hồ sơ đã có Quyết định gồm DXF (ranh + hatch đất), ảnh tờ bản vẽ scan và PDF Quyết định.
+// Tab Quy hoạch › Điều chỉnh cục bộ (#adjImportBox): DXF (ranh + hatch đất), ảnh scan và PDF Quyết định.
 // DXF đọc bằng adjustRecordFromDxf (không chấm QCVN); ảnh phải đặt vào ranh điều chỉnh (kéo, xoay trong scanGeoref.js) trước khi gửi.
 // Admin ghi thẳng, người dùng vào hàng chờ (adjustLayer.js). Lô gốc của đồ án giữ nguyên, hồ sơ chỉ vẽ phủ trên bản đồ quy hoạch.
 // Mỗi layer hatch trong DXF tự nhận loại đất theo tên (landPatternKey); layer chưa nhận hoặc nhận sai thì chọn tay,
@@ -12,6 +12,9 @@ import { sendAdjustment, sendAdjustDraw, attachAdjustPdfFile, schemeAdjustments,
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
 import { TT16_LAND_KEYS, TT16_STYLES, TT16_PATTERN_ZOOM, tt16SwatchCss } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
+import { ensureSoTayItems } from './catalogTable.js';
+import { schemePickOptions } from './catalogTableCore.js';
+import { projectAreaOf } from './projectFiles.js';
 
 const RANH = '#22d3ee';
 const SAT_PANE = 'adjImportSatPane';
@@ -47,7 +50,10 @@ let stampSkip = [];
 let stampPick = null;
 let khMatch = null;
 
-const kindOn = () => document.querySelector('input[name="bulkKind"]:checked')?.value === 'adjust';
+const kindOn = () => {
+  const box = $('adjImportBox');
+  return !!(box && !box.hidden);
+};
 
 function sizeText(bytes) {
   if (bytes < 1024) return `${fmtNum(bytes)} B`;
@@ -222,25 +228,54 @@ function nameHits(names, query) {
   });
 }
 
+let projectOptsCache = [];
+
 function projectNames() {
-  const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
-  const drawable = all.filter(p => !p.sheetOnly);
-  return [...new Set((drawable.length ? drawable : all).map(p => p.tenQH))].sort((a, b) => a.localeCompare(b, 'vi'));
+  return projectOptsCache.map(o => o.value);
+}
+
+function projectOptHits(opts, query) {
+  const words = foldName(query).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return opts;
+  return opts.filter(o => {
+    const parts = foldName(`${o.label} ${o.value}`).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+async function refreshProjectOpts() {
+  let sheet = [];
+  try { sheet = (await ensureSoTayItems()) || []; } catch { sheet = []; }
+  projectOptsCache = schemePickOptions(sheet, state.projectCatalog || [], {
+    areaHaOf: (p) => {
+      const m2 = projectAreaOf(p.tenQH);
+      if (!Number.isFinite(m2) || m2 === Infinity || m2 <= 0) return null;
+      return m2 / 10000;
+    }
+  });
+  return projectOptsCache;
 }
 
 function fillProjects() {
   const sel = $('adjProject');
   if (!sel) return;
   const cur = sel.value || $('cadPair')?.value || '';
-  const names = projectNames();
-  const query = $('adjProjectSearch')?.value || '';
-  const hits = nameHits(names, query);
-  const shown = cur && names.includes(cur) && !hits.includes(cur) ? [cur, ...hits] : hits;
-  sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}`;
-  if (cur && shown.includes(cur)) sel.value = cur;
-  sel.size = Math.min(6, Math.max(2, shown.length + 1));
-  const count = $('adjProjectCount');
-  if (count) count.textContent = names.length ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`) : '';
+  const paint = (opts) => {
+    const query = $('adjProjectSearch')?.value || '';
+    const hits = projectOptHits(opts, query);
+    const curOpt = cur && opts.find(o => o.value === cur);
+    const shown = curOpt && !hits.some(o => o.value === cur) ? [curOpt, ...hits] : hits;
+    sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${shown.map(o => {
+      const text = o.note ? `${o.label} · ${o.note}` : o.label;
+      return `<option value="${escapeHtml(o.value)}" title="${escapeHtml(text)}">${escapeHtml(text)}</option>`;
+    }).join('')}`;
+    if (cur && shown.some(o => o.value === cur)) sel.value = cur;
+    sel.size = Math.min(6, Math.max(2, shown.length + 1));
+    const count = $('adjProjectCount');
+    if (count) count.textContent = opts.length ? (foldName(query).trim() ? `${hits.length}/${opts.length} đồ án` : `${opts.length} đồ án`) : '';
+  };
+  if (projectOptsCache.length) paint(projectOptsCache);
+  void refreshProjectOpts().then(paint);
 }
 
 function row(kind, label, f, status, extra = '') {
@@ -603,34 +638,40 @@ async function submit() {
   }
 }
 
-/** Mở Nhập hàng loạt › Điều chỉnh cục bộ để gắn bản vẽ vào hồ sơ đã có mã. */
+/** Gắn bản vẽ vào hồ sơ điều chỉnh đã có mã (panel #adjImportBox phải đang hiện). */
 export function focusAdjustSupplement(tenQH, id) {
-  $('entryLegacy')?.setAttribute('open', '');
-  document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
-  const radio = document.querySelector('input[name="bulkKind"][value="adjust"]');
-  if (radio) {
-    radio.checked = true;
-    radio.dispatchEvent(new Event('change', { bubbles: true }));
-  }
+  const box = $('adjImportBox');
+  if (box) box.hidden = false;
   const search = $('adjProjectSearch');
   if (search) search.value = '';
   fillProjects();
   const sel = $('adjProject');
-  if (sel && tenQH) sel.value = tenQH;
+  if (sel && tenQH) {
+    const paint = () => {
+      if (![...sel.options].some(o => o.value === tenQH)) {
+        sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(tenQH)}">${escapeHtml(tenQH)}</option>`);
+      }
+      sel.value = tenQH;
+    };
+    paint();
+    void refreshProjectOpts().then(() => { fillProjects(); paint(); });
+  }
   if ($('adjExistingId') && id) $('adjExistingId').value = id;
   fillExisting(id);
+  drawPreview();
+  render();
   $('adjDrop')?.scrollIntoView({ block: 'nearest' });
 }
 
-function syncKind() {
-  const on = kindOn();
-  $('addBulk')?.classList.toggle('bulk-adjust', on);
-  if (on) { fillProjects(); fillExisting(); drawPreview(); } else clearPreview();
+export function setAdjustPanelVisible(on) {
+  const box = $('adjImportBox');
+  if (box) box.hidden = !on;
+  if (on) { fillProjects(); fillExisting(); drawPreview(); }
+  else clearPreview();
   render();
 }
 
 export function initAdjustImport() {
-  document.querySelectorAll('input[name="bulkKind"]').forEach(r => r.addEventListener('change', syncKind));
   $('adjProject')?.addEventListener('focus', fillProjects);
   $('adjProject')?.addEventListener('change', () => { readRecord(); fillExisting(); });
   $('adjProjectSearch')?.addEventListener('input', fillProjects);
@@ -682,5 +723,5 @@ export function initAdjustImport() {
   });
   $('btnAdjSubmit')?.addEventListener('click', submit);
   document.addEventListener('auth:change', render);
-  syncKind();
+  render();
 }

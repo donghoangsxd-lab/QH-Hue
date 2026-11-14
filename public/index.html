@@ -1121,20 +1121,7 @@
             <button type="button" class="entry-sub-btn" data-qmode="adjust" role="tab" aria-selected="false">Điều chỉnh cục bộ</button>
           </div>
           <div id="hoSoBox"></div>
-          <details class="entry-legacy" id="entryLegacy">
-            <summary>Nhập hàng loạt và quản trị</summary>
-        <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
-          <button type="button" class="add-mode-btn active" data-mode="addBulk" role="tab" aria-selected="true" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
-          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa hoặc thêm ô dân cư"><svg class="ico"><use href="#i-tool"/></svg>Quản trị</button>
-        </div>
-
-        <div id="addBulk">
-          <div class="cad-pending" id="cadPendingBox" hidden></div>
-          <div class="add-mode-switch bulk-kind" role="radiogroup" aria-label="Loại hồ sơ nhập">
-            <label class="bulk-kind-btn"><input type="radio" name="bulkKind" value="plan" checked>Đồ án / hiện trạng</label>
-            <label class="bulk-kind-btn" title="Điều chỉnh cục bộ: gửi trước PDF quyết định và tóm tắt. DXF và ảnh scan gắn sau."><input type="radio" name="bulkKind" value="adjust">Điều chỉnh cục bộ</label>
-          </div>
-          <div id="adjImportBox" class="adj-import">
+          <div id="adjImportBox" class="adj-import" hidden>
             <label class="cad-pair" for="adjProjectSearch">Đồ án được điều chỉnh
               <input type="search" id="adjProjectSearch" class="cad-pair-search" placeholder="Tìm tên đồ án" autocomplete="off" aria-controls="adjProject" title="Gõ một phần tên, không phân biệt dấu">
               <span class="cad-pair-count" id="adjProjectCount"></span>
@@ -1172,6 +1159,15 @@
             <button type="button" class="btn-submit" id="btnAdjSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>Gửi hồ sơ chờ phê duyệt</button>
             <div id="adjStatus" class="rp-status" role="status" aria-live="polite"></div>
           </div>
+          <details class="entry-legacy" id="entryLegacy" hidden>
+            <summary>Công cụ Admin</summary>
+        <div class="add-mode-switch" role="tablist" aria-label="Công cụ quản trị">
+          <button type="button" class="add-mode-btn active" data-mode="addBulk" role="tab" aria-selected="true" title="Nhập KML, KMZ, GeoJSON, shapefile; DXF đồ án (ô RG/HT/QH/KH)"><svg class="ico"><use href="#i-folder"/></svg>Nhập file</button>
+          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa hoặc thêm ô dân cư"><svg class="ico"><use href="#i-tool"/></svg>Quản trị</button>
+        </div>
+
+        <div id="addBulk">
+          <div class="cad-pending" id="cadPendingBox" hidden></div>
           <div class="form-grid">
             <label for="cadCrs">Hệ tọa độ</label>
             <select id="cadCrs">

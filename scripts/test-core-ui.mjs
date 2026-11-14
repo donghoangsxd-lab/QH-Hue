@@ -11,6 +11,7 @@ import { createSketchEditSession, minVertices } from '../public/js/sketchEdit.js
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
 const html = read('public/index.html');
+const css = read('public/css/style.css');
 
 function innerById(src, id) {
   const open = new RegExp(`<(?<tag>[a-zA-Z0-9:-]+)(?<attrs>[^>]*?)\\bid=["']${id}["'][^>]*>`).exec(src);
@@ -510,6 +511,8 @@ assert.match(html, /id="btnOverview"/);
 assert.doesNotMatch(title, /id="btnMapCatalog"/);
 assert.doesNotMatch(title, />Mục lục</);
 assert.match(title, /id="btnTitleDismiss"/);
+assert.match(css, /\.map-title-actions\s*\{[^}]*position:\s*absolute/);
+assert.match(css, /\.map-title-x\s*\{[^}]*width:\s*16px/);
 assert.doesNotMatch(title, /btnMapLevel|map-title-level/);
 
 const ctx = read('public/js/mapContext.js');
@@ -712,7 +715,6 @@ assert.match(legendJs, /btnDockBase/);
 assert.match(legendJs, /btnDockEnv/);
 assert.match(legendJs, /btnDockCollapse/);
 assert.match(legendJs, /is-collapsed/);
-const css = read('public/css/style.css');
 assert.match(css, /--text-title:\s*#fde68a/);
 assert.match(css, /\.mag-item\.is-current \.layer-main-label\s*\{[^}]*color:\s*var\(--text-title\)/);
 assert.match(css, /\.mag-menu button\s*\{[^}]*color:\s*var\(--text-title\)/);
@@ -1094,7 +1096,18 @@ assert.match(read('public/js/chuyenNganh.js'), /capacityPanelHtml/);
 assert.match(read('public/js/entryFlows.js'), /gateHosoCapacity/);
 assert.match(read('public/js/entryFlows.js'), /fillHoSchemes/);
 assert.match(read('public/js/entryFlows.js'), /id="hoSchemeSearch"/);
-assert.match(html, /data-cs-host="qhc-hue-2045"/);
+assert.match(read('public/js/entryFlows.js'), /schemePickOptions|refreshSchemeOpts/);
+assert.match(read('public/js/entryFlows.js'), /drawSlotsHtml|data-ho-slot/);
+assert.match(read('public/js/entryFlows.js'), /paintAdminTools|syncQuyHoachPanels/);
+assert.match(read('public/js/catalogTableCore.js'), /export function schemePickOptions/);
+assert.match(html, /id="adjImportBox"/);
+assert.match(html, /Công cụ Admin/);
+assert.doesNotMatch(html, /name="bulkKind"/);
+assert.doesNotMatch(html, /Nhập hàng loạt và quản trị/);
+assert.match(read('docs/ui-spec.md'), /schemePickOptions|sổ tay ∪ GIS/);
+assert.match(read('docs/ui-spec.md'), /Công cụ Admin/);
+assert.match(read('public/js/congSuatUi.js'), /data-cs-host|data-cs-scheme/);
+assert.match(read('public/js/chuyenNganh.js'), /qhc-hue-2045/);
 assert.match(read('docs/ui-spec.md'), /chưa đủ dữ liệu/);
 assert.match(read('public/data/htkt/cong-suat.json'), /"maDoAn": "qhc-hue-2045"/);
 assert.match(read('public/data/htkt/cong-suat.json'), /"giaTri": 600000/);

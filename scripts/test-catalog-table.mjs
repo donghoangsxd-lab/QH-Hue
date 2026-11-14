@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {
-  planRowsFromCatalog, planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
+  planRowsFromCatalog, planRowsFromSoTay, schemePickOptions, investRowsFromItems, filterCatalogRows,
   filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
   catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
   groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards,
@@ -105,6 +105,19 @@ assert.equal(missingMap.status, 'chi_so_tay');
 const orphan = merged.find((r) => /ABC/.test(r.name));
 assert.ok(orphan);
 assert.equal(orphan.status, 'chi_ban_do');
+
+const picks = schemePickOptions(sheet, catalog, {
+  areaHaOf: (p) => (p.tenQH.includes('Nam Giao') ? 170 : null)
+});
+assert.ok(picks.some((o) => o.value === 'QHCT Đàn Nam Giao và vùng phụ cận'));
+const onlySheet = picks.find((o) => /XYZ/.test(o.label) || /XYZ/.test(o.value));
+assert.ok(onlySheet, 'đồ án chỉ sổ tay phải có trong droplist Bổ sung');
+assert.match(onlySheet.note, /chưa có trên bản đồ/);
+assert.ok(picks.some((o) => /ABC/.test(o.value) && /ngoài sổ tay/.test(o.note || '')));
+const sheetOnlyCat = schemePickOptions([], [{ tenQH: 'QHPK chỉ sheet', sheetOnly: true }]);
+assert.equal(sheetOnlyCat.length, 1);
+assert.equal(sheetOnlyCat[0].value, 'QHPK chỉ sheet');
+assert.match(sheetOnlyCat[0].note, /chưa có ranh/);
 
 const thieu = classifyPlanStatus(sheet[0], { project: catalog[0] }, false);
 assert.equal(thieu.status, 'thieu');

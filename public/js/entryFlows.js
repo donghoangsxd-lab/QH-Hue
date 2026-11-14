@@ -2,7 +2,7 @@
 // Quản trị ghi thẳng lớp công bố. Cán bộ CanBo gửi hàng chờ. Chưa đăng nhập thì không gửi.
 import { map } from './mapEngine.js';
 import { state } from './state.js';
-import { escapeHtml, announceTool } from './utils.js';
+import { escapeHtml, announceTool, fmtNum } from './utils.js';
 import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
 import {
   isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit
@@ -17,10 +17,14 @@ import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from '.
 import { PDF_ADMIN_MAX_BYTES } from './pdfLimits.js';
 import { loadCongSuat } from './congSuat.js';
 import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
-import { pdfProblem, sendAdjustment } from './adjustLayer.js';
-import { focusAdjustSupplement } from './adjustImport.js';
+import { setAdjustPanelVisible } from './adjustImport.js';
 import { planLevelOf } from './generalPlan.js';
 import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
+import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
+import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { ensureSoTayItems } from './catalogTable.js';
+import { schemePickOptions } from './catalogTableCore.js';
+import { projectAreaOf } from './projectFiles.js';
 
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
@@ -348,10 +352,12 @@ function applyLandClip(step, source) {
       counts: null,
       clipNote: 'Chưa có ranh đồ án trong hồ sơ này, chưa lọc lô.'
     };
+    applyKhToHeld(step);
     return;
   }
   const clip = clipSchemeLots(source, boundary);
   held[step.id] = { ...base, features: clip.features, review: clip.review, counts: clip.counts, clipNote: '' };
+  applyKhToHeld(step);
 }
 
 function reclipLands() {
@@ -363,6 +369,133 @@ function reclipLands() {
   });
 }
 
+function featureAreaM2(f) {
+  if (!f || !f.geometry || typeof turf === 'undefined') return 0;
+  try { return turf.area(f); } catch (e) { return 0; }
+}
+
+function featureRings(f) {
+  const g = f && f.geometry;
+  if (!g) return [];
+  if (g.type === 'Polygon') return [g.coordinates];
+  if (g.type === 'MultiPolygon') return g.coordinates;
+  return [];
+}
+
+function clearStampProps(features) {
+  (features || []).forEach(f => {
+    const p = f.properties || (f.properties = {});
+    delete p.lotCode;
+    delete p.kyHieu;
+    delete p.TangCao;
+    delete p.MatDoXD;
+    delete p.HeSoSDD;
+    delete p.floors;
+    delete p.coverage;
+    delete p.far;
+    delete p.stampArea;
+  });
+}
+
+function writeStampProps(feature, stamp) {
+  const p = feature.properties || (feature.properties = {});
+  if (stamp.code) {
+    p.lotCode = stamp.code;
+    p.kyHieu = stamp.code;
+  }
+  if (stamp.floors) {
+    p.TangCao = String(stamp.floors);
+    p.floors = String(stamp.floors);
+  }
+  if (stamp.coverage) {
+    p.MatDoXD = String(stamp.coverage);
+    p.coverage = String(stamp.coverage);
+  }
+  if (stamp.far) {
+    p.HeSoSDD = String(stamp.far);
+    p.far = String(stamp.far);
+  }
+  const m2 = stampAreaM2(stamp.areaRaw, featureAreaM2(feature));
+  if (m2) p.stampArea = m2;
+}
+
+function stampProjector(stamps) {
+  const crs = CRS_PRESETS[crsId] || CRS_PRESETS.HUE_3;
+  if (crsId === 'WGS84' || (crs && crs.wgs84)) return (x, y) => [y, x];
+  const axes = detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] })));
+  const f = axes.valid ? axes.f : (x, y) => [x, y];
+  const use = crsId === 'custom'
+    ? { label: `VN-2000 KTT ${Number(crsLon0)}°`, lon0: Number(crsLon0), k0: Math.abs(Number(crsLon0) - 105) < 0.2 ? 0.9996 : 0.9999 }
+    : crs;
+  return (x, y) => {
+    const [E, N] = f(x, y);
+    if (!axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
+    return vn2000ToWgs84(E, N, use);
+  };
+}
+
+/** Gán tem KH vào lô đất đang giữ (sau cắt ranh). ≥ 2 tiêu chí tự khớp; còn lại hỏi tay trên bản đồ. */
+function applyKhToHeld(step) {
+  const bag = held[step.id];
+  if (!bag || step.draw !== 'land') return;
+  clearStampProps(bag.features);
+  const stamps = bag.khStamps || [];
+  if (!stamps.length || !bag.features?.length) {
+    bag.stampMatch = null;
+    bag.stampView = null;
+    return;
+  }
+  const lots = bag.features.map((f, i) => ({
+    key: String(i),
+    area: featureAreaM2(f),
+    rings: featureRings(f),
+    layer: String(f.properties?.layer || ''),
+    name: String(f.properties?.nhan || f.properties?.lotCode || '')
+  }));
+  const projected = projectStamps(stamps, stampProjector(stamps));
+  const match = matchStamps(projected, lots, {
+    assign: bag.stampAssign || {},
+    skip: bag.stampSkip || []
+  });
+  bag.stampMatch = match;
+  bag.stampView = projected;
+  const byKey = new Map(match.assigned.map(a => [a.key, a.stamp]));
+  bag.features.forEach((f, i) => {
+    const s = byKey.get(String(i));
+    if (s) writeStampProps(f, s);
+  });
+  if (!bag.stampPick || !match.pending.some(s => s.id === bag.stampPick)) {
+    bag.stampPick = match.pending[0] ? match.pending[0].id : null;
+  }
+}
+
+function stampBoxHtml(bag) {
+  const match = bag && bag.stampMatch;
+  const n = (bag && bag.khStamps && bag.khStamps.length) || 0;
+  if (!bag?.khFile) return '';
+  if (!n) {
+    return `<p class="entry-note lot-flag">File ký hiệu <b>${escapeHtml(bag.khFile.name)}</b> không đọc được tem đất.</p>`;
+  }
+  if (!bag.features?.length) {
+    return `<p class="entry-note">Đã đọc ${fmtNum(n)} tem từ <b>${escapeHtml(bag.khFile.name)}</b>. Chọn file sử dụng đất để gán vào lô.</p>`;
+  }
+  const pend = (match && match.pending) || [];
+  const done = (match && match.assigned.length) || 0;
+  const left = (match && match.unmatchedLots && match.unmatchedLots.length) || 0;
+  if (!pend.length) {
+    return `<p class="entry-note">Tem đất: đã gán ${fmtNum(done)}/${fmtNum(n)} từ <b>${escapeHtml(bag.khFile.name)}</b>.${left ? ` ${fmtNum(left)} lô chưa có tem.` : ''}</p>`;
+  }
+  const cur = pend.find(s => s.id === bag.stampPick) || pend[0];
+  const chips = pend.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-ho-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
+  return `<div class="cad-stamp">
+    <b>Tem chưa tự khớp (≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).</b>
+    <span>Chọn tem rồi bấm lô trên bản đồ. Mỗi lô một tem.</span>
+    <div class="cad-stamp-list">${chips}</div>
+    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
+      <button type="button" class="cad-clear" data-ho-stamp-skip="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
+  </div>`;
+}
+
 function showStepPreview() {
   const step = STEPS.find(s => s.id === stepId);
   const bag = step && held[step.id];
@@ -370,7 +503,11 @@ function showStepPreview() {
     clearPreview();
     return;
   }
-  const draw = (bag.features || []).slice();
+  const draw = (bag.features || []).map((f, i) => ({
+    type: 'Feature',
+    geometry: f.geometry,
+    properties: { ...(f.properties || {}), _lotIdx: i }
+  }));
   if (step.draw === 'land' && held.ranh && held.ranh.source) {
     held.ranh.source.forEach(feature => {
       if (!feature || !feature.geometry) return;
@@ -382,6 +519,39 @@ function showStepPreview() {
     });
   }
   showPreview(draw, bag.review || []);
+  paintStampMarkers(bag);
+}
+
+function paintStampMarkers(bag) {
+  if (!preview || !bag?.stampView?.length || typeof L === 'undefined') return;
+  const pending = new Set((bag.stampMatch?.pending || []).map(s => s.id));
+  bag.stampView.forEach(s => {
+    const on = pending.has(s.id);
+    const cur = s.id === bag.stampPick;
+    const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+    const mark = L.circleMarker([s.lat, s.lng], {
+      radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
+    }).bindTooltip(stampLabel(s), { sticky: true });
+    if (on) {
+      mark.on('click', () => {
+        bag.stampPick = s.id;
+        renderActive();
+      });
+    }
+    mark.addTo(preview);
+  });
+  if (bag.stampPick) {
+    preview.eachLayer(layer => {
+      if (!layer.feature || layer.feature.properties?._mau) return;
+      const idx = layer.feature.properties?._lotIdx;
+      if (idx == null) return;
+      layer.on('click', () => {
+        bag.stampAssign = { ...(bag.stampAssign || {}), [bag.stampPick]: String(idx) };
+        applyKhToHeld(STEPS.find(s => s.id === stepId));
+        renderActive();
+      });
+    });
+  }
 }
 
 function reviewBody(step, bag, tagged) {
@@ -424,11 +594,37 @@ function nameHits(names, query) {
   });
 }
 
+let schemeOptsCache = [];
+
 function schemeNames() {
-  const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
-  const drawable = all.filter(p => !p.sheetOnly);
-  return [...new Set((drawable.length ? drawable : all).map(p => String(p.tenQH).trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'vi'));
+  return schemeOptsCache.map(o => o.value);
+}
+
+function schemeOptHits(opts, query) {
+  const words = foldName(query).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return opts;
+  return opts.filter(o => {
+    const parts = foldName(`${o.label} ${o.value}`).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+function schemeOptionHtml(o) {
+  const text = o.note ? `${o.label} · ${o.note}` : o.label;
+  return `<option value="${escapeHtml(o.value)}" title="${escapeHtml(text)}">${escapeHtml(text)}</option>`;
+}
+
+async function refreshSchemeOpts() {
+  let sheet = [];
+  try { sheet = (await ensureSoTayItems()) || []; } catch { sheet = []; }
+  schemeOptsCache = schemePickOptions(sheet, state.projectCatalog || [], {
+    areaHaOf: (p) => {
+      const m2 = projectAreaOf(p.tenQH);
+      if (!Number.isFinite(m2) || m2 === Infinity || m2 <= 0) return null;
+      return m2 / 10000;
+    }
+  });
+  return schemeOptsCache;
 }
 
 /** Cấp facet từ tên đồ án (QHC mặc định 1/10.000; tên ghi 1/25.000 → QHC25). */
@@ -470,23 +666,25 @@ function syncSchemeNewRow() {
 function fillHoSchemes(prefer) {
   const sel = $('hoScheme');
   if (!sel || sel.tagName !== 'SELECT') return;
-  const names = schemeNames();
   const cur = prefer != null ? prefer : (sel.value || '');
-  const query = $('hoSchemeSearch')?.value || '';
-  const hits = nameHits(names, query);
-  const shown = cur && names.includes(cur) && !hits.includes(cur) ? [cur, ...hits] : hits;
-  sel.innerHTML = `<option value="">Chọn đồ án</option>${
-    shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
-  }`;
-  sel.value = cur && shown.includes(cur) ? cur : '';
-  sel.size = Math.min(6, Math.max(2, shown.length + 1));
-  const count = $('hoSchemeCount');
-  if (count) {
-    count.textContent = names.length
-      ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`)
-      : 'Chưa tải danh mục đồ án';
-  }
-  syncSchemeNewRow();
+  const paint = (opts) => {
+    const query = $('hoSchemeSearch')?.value || '';
+    const hits = schemeOptHits(opts, query);
+    const curOpt = cur && opts.find(o => o.value === cur);
+    const shown = curOpt && !hits.some(o => o.value === cur) ? [curOpt, ...hits] : hits;
+    sel.innerHTML = `<option value="">Chọn đồ án</option>${shown.map(schemeOptionHtml).join('')}`;
+    sel.value = cur && shown.some(o => o.value === cur) ? cur : '';
+    sel.size = Math.min(6, Math.max(2, shown.length + 1));
+    const count = $('hoSchemeCount');
+    if (count) {
+      count.textContent = opts.length
+        ? (foldName(query).trim() ? `${hits.length}/${opts.length} đồ án` : `${opts.length} đồ án`)
+        : 'Chưa tải danh mục đồ án';
+    }
+    syncSchemeNewRow();
+  };
+  if (schemeOptsCache.length) paint(schemeOptsCache);
+  void refreshSchemeOpts().then(paint);
 }
 
 function onSchemePicked() {
@@ -602,10 +800,6 @@ function renderHoSo() {
   const allow = allowedKeys();
   const locked = Array.isArray(allow) && allow.length === 1;
   const { pick: schemePick, neu: schemeNew } = captureScheme();
-  const adjSummary = $('hoAdjSummary')?.value || '';
-  const adjNote = $('hoAdjNote')?.value || '';
-  const adjId = $('hoAdjId')?.value || '';
-  const adjPdfName = held.adjPdf ? held.adjPdf.name : '';
   const level = $('hoLevel')?.value || (schemePick ? facetLevelOf(schemePick) : 'QHPK');
   const scope = locked ? scopeOfKey(allow[0]) : ($('hoScope')?.value || 'xa');
   const unit = locked ? allow[0] : ($('hoUnit')?.value || optionsFirst(scope));
@@ -625,29 +819,7 @@ function renderHoSo() {
   const clipNote = `Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.`;
   let body = '';
   if (hoMode === 'adjust') {
-    body = `${schemeSearchHtml()}
-    <p class="entry-note">Ghi bổ sung hồ sơ điều chỉnh cục bộ. Gửi trước PDF quyết định và tóm tắt. Bản vẽ scan và DXF gắn sau, không bắt buộc lúc này. Quản trị ghi thẳng. Cán bộ vào hàng chờ.</p>
-    <details class="entry-legacy" id="hoAdjust" open>
-      <summary>Ghi bổ sung hồ sơ điều chỉnh cục bộ</summary>
-      <p class="entry-note">Gửi trước PDF quyết định và tóm tắt. Bản vẽ scan và DXF gắn sau, không bắt buộc lúc này. Quản trị ghi thẳng. Cán bộ vào hàng chờ.</p>
-      <div class="form-grid">
-        <label for="hoAdjSummary">Tóm tắt</label>
-        <input id="hoAdjSummary" maxlength="300" placeholder="Ví dụ: Điều chỉnh chiều cao vị trí A" value="${escapeHtml(adjSummary)}">
-        <label for="hoAdjNote">Ghi chú</label>
-        <input id="hoAdjNote" maxlength="300" placeholder="Số quyết định, nguồn (không bắt buộc)" value="${escapeHtml(adjNote)}">
-        <label for="hoAdjId">Mã hồ sơ</label>
-        <input id="hoAdjId" maxlength="16" placeholder="Hiện sau khi gửi, dùng khi gắn bản vẽ" value="${escapeHtml(adjId)}">
-      </div>
-      <label class="cad-drop" for="hoAdjPdf">
-        <span class="cad-drop-main"><b>Quyết định (PDF)</b></span>
-        <span class="cad-drop-sub">${adjPdfName ? escapeHtml(adjPdfName) : 'Chỉ file PDF. Bản vẽ thêm sau.'}</span>
-        <input type="file" id="hoAdjPdf" accept=".pdf" hidden>
-      </label>
-      <div id="hoAdjPdfNote" class="entry-note"></div>
-      <button type="button" class="btn-submit" id="hoAdjSave">Gửi quyết định điều chỉnh</button>
-      <button type="button" class="btn-submit btn-secondary" id="hoAdjDraw">Bổ sung bản vẽ</button>
-      <div id="hoAdjStatus" class="rp-status" role="status"></div>
-    </details>`;
+    body = `<p class="entry-note">Điều chỉnh cục bộ: chọn đồ án, gửi PDF quyết định / DXF / ảnh scan ở khung bên dưới. Không chấm QCVN; lô gốc đồ án giữ nguyên. Quản trị ghi thẳng, cán bộ vào hàng chờ.</p>`;
   } else if (hoMode === 'net') {
     const sectors = `<div class="add-mode-switch entry-sub" id="htktSectors" role="tablist" aria-label="Ngành hạ tầng kỹ thuật">${
       SECTORS.map(s => `<button type="button" class="entry-sub-btn${s.id === netSector ? ' active' : ''}" data-sector="${s.id}">${escapeHtml(s.label)}</button>`).join('')
@@ -693,76 +865,98 @@ function renderHoSo() {
   });
   $('hoSave')?.addEventListener('click', saveHoSo);
   $('hoDownload')?.addEventListener('click', downloadHoSo);
-  $('hoAdjPdf')?.addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    const note = $('hoAdjPdfNote');
-    if (!file) return;
-    const bad = pdfProblem(file, isAdmin());
-    if (bad) {
-      held.adjPdf = null;
-      if (note) note.textContent = bad;
-      return;
-    }
-    held.adjPdf = file;
-    if (note) note.textContent = `${file.name} — bản vẽ scan và DXF không bắt buộc lúc này.`;
-  });
-  $('hoAdjSave')?.addEventListener('click', saveLocalAdjust);
-  $('hoAdjDraw')?.addEventListener('click', () => {
-    const tenQH = schemeName();
-    const id = ($('hoAdjId')?.value || '').trim().toLowerCase();
-    const status = $('hoAdjStatus');
-    if (!tenQH || !/^[a-f0-9]{16}$/.test(id)) {
-      if (status) status.textContent = 'Gửi quyết định trước, hoặc dán mã hồ sơ 16 ký tự.';
-      return;
-    }
-    focusAdjustSupplement(tenQH, id);
-  });
+  syncQuyHoachPanels();
   if ($('hoActive')) renderActive();
 }
 
-async function saveLocalAdjust() {
-  const status = $('hoAdjStatus');
-  const tenQH = schemeName();
-  const title = $('hoAdjSummary')?.value.trim() || '';
-  const note = $('hoAdjNote')?.value.trim() || '';
-  if (!signedIn()) {
-    if (status) status.textContent = 'Đăng nhập cán bộ hoặc quản trị để gửi hồ sơ.';
-    return;
+function syncQuyHoachPanels() {
+  const flow = $('flowQuyHoach');
+  const onAdjust = hoMode === 'adjust' && flow && !flow.hidden;
+  flow?.classList.toggle('qh-adjust-on', !!onAdjust);
+  setAdjustPanelVisible(!!onAdjust);
+  paintAdminTools();
+}
+
+function paintAdminTools() {
+  const legacy = $('entryLegacy');
+  if (!legacy) return;
+  const flow = $('flowQuyHoach');
+  const onQh = !!(flow && !flow.hidden && (hoMode === 'new' || hoMode === 'add'));
+  const admin = isAdmin();
+  legacy.hidden = !(onQh && admin);
+  if (legacy.hidden) legacy.removeAttribute('open');
+}
+
+/** Slot bản vẽ cùng pattern #cad-dxf-slots (RG / HT|QH / KH). */
+function drawSlotsHtml(step, got) {
+  if (step.file !== 'draw') return '';
+  const mainTitle = step.id === 'ranh' ? 'Ranh giới QH'
+    : step.id === 'dat-ht' ? 'Hiện trạng sử dụng đất'
+    : step.id === 'dat-qh' ? 'Quy hoạch sử dụng đất'
+    : step.label;
+  const mainHint = step.id === 'ranh' ? 'RG - ….dxf'
+    : step.id === 'dat-ht' ? 'HT - ….dxf'
+    : step.id === 'dat-qh' ? 'QH - ….dxf'
+    : '….dxf / .kml / .kmz';
+  const hasMain = !!got?.file;
+  const mainName = hasMain
+    ? `${got.file.name}${got.warning ? ` — ${got.warning}` : ''}${got.error ? ` — ${got.error}` : ''}${got.features ? ` — ${got.features.length} đối tượng` : ''}`
+    : mainHint;
+  let html = `<div class="cad-dxf-slots">
+    <div class="cad-slot-row${hasMain ? ' has-file' : ''}" data-ho-slot="main">
+      <label class="cad-drop cad-slot" for="hoFile">
+        <span class="cad-drop-main"><b>${escapeHtml(mainTitle)}</b></span>
+        <span class="cad-slot-name">${escapeHtml(mainName)}</span>
+        <input type="file" id="hoFile" accept=".dxf,.kml,.kmz" hidden>
+      </label>
+      <button type="button" class="cad-slot-clear" id="hoFileClear"${hasMain ? '' : ' hidden'} title="Bỏ file" aria-label="Bỏ file">×</button>
+    </div>`;
+  if (step.draw === 'land') {
+    const hasKh = !!got?.khFile;
+    const khName = hasKh
+      ? `${got.khFile.name}${got.khStamps?.length ? ` · ${fmtNum(got.khStamps.length)} tem` : ''}${got.khError ? ` · ${got.khError}` : ''}`
+      : 'KH - ….dxf · không bắt buộc';
+    html += `
+    <div class="cad-slot-row${hasKh ? ' has-file' : ''}" data-ho-slot="KH">
+      <label class="cad-drop cad-slot" for="hoKhFile">
+        <span class="cad-drop-main"><b>Ký hiệu lô (tem đất)</b></span>
+        <span class="cad-slot-name">${escapeHtml(khName)}</span>
+        <input type="file" id="hoKhFile" accept=".dxf" hidden>
+      </label>
+      <button type="button" class="cad-slot-clear" id="hoKhClear"${hasKh ? '' : ' hidden'} title="Bỏ file ký hiệu" aria-label="Bỏ file ký hiệu">×</button>
+    </div>
+    ${stampBoxHtml(got)}`;
   }
-  if (!tenQH) {
-    if (status) status.textContent = 'Chọn đồ án đã có hoặc nhập tên đồ án mới.';
-    return;
-  }
-  if (!title) {
-    if (status) status.textContent = 'Nhập tóm tắt điều chỉnh cục bộ.';
-    return;
-  }
-  if (!held.adjPdf) {
-    if (status) status.textContent = 'Chọn PDF quyết định. Bản vẽ scan và DXF gắn sau.';
-    return;
-  }
-  try {
-    if (status) status.textContent = 'Đang gửi quyết định…';
-    const out = await sendAdjustment({
-      tenQH,
-      title,
-      note,
-      pdfOnly: true,
-      sender: (state.authUser && (state.authUser.name || state.authUser.email)) || ''
-    }, held.adjPdf, null);
-    held.adjPdf = null;
-    const id = out.item && out.item.id || '';
-    if ($('hoAdjId')) $('hoAdjId').value = id;
-    const pdfNote = $('hoAdjPdfNote');
-    if (pdfNote) pdfNote.textContent = '';
-    if (status) {
-      status.textContent = out.approved
-        ? `Đã ghi quyết định. Mã ${id}. Bấm «Bổ sung bản vẽ» khi có DXF hoặc ảnh scan.`
-        : `Đã gửi, chờ quản trị duyệt. Mã ${id}. Có thể bổ sung bản vẽ trước khi duyệt.`;
-    }
-  } catch (err) {
-    if (status) status.textContent = err.message;
-  }
+  html += '</div>';
+  return html;
+}
+
+function clearHeldDraw(step) {
+  const bag = held[step.id] || {};
+  delete bag.file;
+  delete bag.error;
+  delete bag.warning;
+  delete bag.needCrs;
+  delete bag.features;
+  delete bag.source;
+  delete bag.counts;
+  delete bag.clipNote;
+  held[step.id] = bag;
+  clearPreview();
+}
+
+function clearHeldKh(step) {
+  const bag = held[step.id] || {};
+  delete bag.khFile;
+  delete bag.khStamps;
+  delete bag.khError;
+  bag.stampAssign = {};
+  bag.stampSkip = [];
+  bag.stampPick = null;
+  bag.stampMatch = null;
+  bag.stampView = null;
+  held[step.id] = bag;
+  clearStampProps(bag.features);
 }
 
 function renderActive() {
@@ -791,32 +985,66 @@ function renderActive() {
   const clipHtml = got?.clipNote
     ? `<p class="entry-note">${escapeHtml(got.clipNote)}</p>`
     : (got?.counts ? `<p class="entry-note lot-flag">${escapeHtml(clipSentence(got.counts))}</p>` : '');
-  const note = got
-    ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.warning ? ` — ${escapeHtml(got.warning)}` : ''}${got.error ? ` — ${escapeHtml(got.error)}` : ''}${got.features ? ` — ${got.features.length} đối tượng` : ''}</p>${clipHtml}`
-    : '';
-  box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}</h3>
-    <p class="entry-note">${limit}.${step.hint ? ` ${escapeHtml(step.hint)}` : ''} ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ.' : ''}</p>
-    ${crs}
+  const pdfDrop = step.file === 'pdf' ? `
     <label class="cad-drop" for="hoFile">
       <span class="cad-drop-main"><b>Chọn file</b></span>
       <span class="cad-drop-sub">${escapeHtml(step.label)}</span>
-      <input type="file" id="hoFile" accept="${step.file === 'pdf' ? '.pdf' : '.dxf,.kml,.kmz'}" hidden>
+      <input type="file" id="hoFile" accept=".pdf" hidden>
     </label>
-    ${note}`;
+    ${got ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.error ? ` — ${escapeHtml(got.error)}` : ''}</p>` : ''}` : '';
+  box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}</h3>
+    <p class="entry-note">${limit}.${step.hint ? ` ${escapeHtml(step.hint)}` : ''} ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ. Quy ước tên: RG / HT / QH / KH - tên đồ án.' : ''}</p>
+    ${crs}
+    ${pdfDrop}
+    ${drawSlotsHtml(step, got)}
+    ${clipHtml}`;
   $('hoCrs')?.addEventListener('change', () => {
     crsId = $('hoCrs').value;
     if ($('hoLon0')) $('hoLon0').disabled = crsId !== 'custom';
     if (got?.file && step.file === 'draw') takeDraw(step, got.file);
+    else if (got?.khStamps?.length) { applyKhToHeld(step); renderActive(); }
   });
   $('hoLon0')?.addEventListener('change', () => {
     crsLon0 = $('hoLon0').value;
     if (got?.file) takeDraw(step, got.file);
+    else if (got?.khStamps?.length) { applyKhToHeld(step); renderActive(); }
   });
   $('hoFile')?.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     if (step.file === 'pdf') takePdf(step, file);
     else takeDraw(step, file);
+  });
+  $('hoFileClear')?.addEventListener('click', () => {
+    clearHeldDraw(step);
+    if (step.id === 'ranh') reclipLands();
+    renderActive();
+  });
+  $('hoKhFile')?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) takeKh(step, file);
+  });
+  $('hoKhClear')?.addEventListener('click', () => {
+    clearHeldKh(step);
+    renderActive();
+  });
+  box.querySelectorAll('[data-ho-stamp]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bag = held[step.id];
+      if (!bag) return;
+      bag.stampPick = btn.getAttribute('data-ho-stamp');
+      renderActive();
+    });
+  });
+  box.querySelectorAll('[data-ho-stamp-skip]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bag = held[step.id];
+      if (!bag) return;
+      const id = btn.getAttribute('data-ho-stamp-skip');
+      bag.stampSkip = [...(bag.stampSkip || []), id];
+      applyKhToHeld(step);
+      renderActive();
+    });
   });
   showStepPreview();
 }
@@ -847,7 +1075,12 @@ function takePdf(step, file) {
 
 async function takeDraw(step, file) {
   const error = fileError(file, step);
-  if (error) { held[step.id] = { file, error }; renderActive(); return; }
+  const prev = held[step.id] || {};
+  if (error) {
+    held[step.id] = { ...prev, file, error };
+    renderActive();
+    return;
+  }
   const choice = {
     id: $('hoCrs')?.value || 'HUE_3',
     lon0: $('hoLon0')?.value
@@ -855,12 +1088,53 @@ async function takeDraw(step, file) {
   try {
     const parsed = await readDrawingFile(file, step.draw, choice);
     const features = parsed.error ? [] : tagFeatures(parsed.features, hoMeta(step));
-    held[step.id] = { file, error: parsed.error || '', warning: parsed.warning || '', needCrs: parsed.needCrs };
+    held[step.id] = {
+      ...prev,
+      file,
+      error: parsed.error || '',
+      warning: parsed.warning || '',
+      needCrs: parsed.needCrs
+    };
     applyLandClip(step, features);
     if (step.id === 'ranh') reclipLands();
   } catch (err) {
-    held[step.id] = { file, error: err.message || 'Không đọc được bản vẽ.' };
+    held[step.id] = { ...prev, file, error: err.message || 'Không đọc được bản vẽ.' };
     clearPreview();
+  }
+  renderActive();
+}
+
+async function takeKh(step, file) {
+  const prev = held[step.id] || {};
+  if (!/\.dxf$/i.test(file.name)) {
+    held[step.id] = { ...prev, khFile: file, khStamps: [], khError: 'File ký hiệu chỉ nhận DXF.' };
+    renderActive();
+    return;
+  }
+  if (file.size > DRAW_MAX_BYTES) {
+    held[step.id] = { ...prev, khFile: file, khStamps: [], khError: 'File tối đa 20 MB.' };
+    renderActive();
+    return;
+  }
+  try {
+    const stamps = parseLandStampDxf(await file.text());
+    held[step.id] = {
+      ...prev,
+      khFile: file,
+      khStamps: stamps,
+      khError: stamps.length ? '' : 'Không đọc được tem trong file.',
+      stampAssign: {},
+      stampSkip: [],
+      stampPick: null
+    };
+    applyKhToHeld(step);
+  } catch (err) {
+    held[step.id] = {
+      ...prev,
+      khFile: file,
+      khStamps: [],
+      khError: err.message || 'Không đọc được file ký hiệu.'
+    };
   }
   renderActive();
 }
@@ -1343,7 +1617,6 @@ export function openEntryFlow(id, opts = {}) {
   }
   if (flow === 'flowHtkt') hoMode = 'net';
   else if (hoMode === 'net') hoMode = landMode;
-  if (opts.legacy) $('entryLegacy')?.setAttribute('open', '');
   paintGroup('#ptTabs [data-pt]', 'data-pt', ptTab);
   paintGroup('#qhEntryTabs [data-qmode]', 'data-qmode', hoMode === 'net' ? 'add' : hoMode);
   paintGroup('#ktTabs [data-kmode]', 'data-kmode', ktMode);
@@ -1352,6 +1625,11 @@ export function openEntryFlow(id, opts = {}) {
   else {
     clearPreview();
     if ($('htktPointBox')) $('htktPointBox').hidden = true;
+    syncQuyHoachPanels();
+  }
+  if (opts.legacy && isAdmin()) {
+    const legacy = $('entryLegacy');
+    if (legacy && !legacy.hidden) legacy.setAttribute('open', '');
   }
   if (flow === 'flowPhatTrien') renderHanhChinh();
   if (flow === 'flowKienTruc') renderKienTruc();

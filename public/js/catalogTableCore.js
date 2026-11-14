@@ -306,6 +306,69 @@ export function planRowsFromCatalog(catalog) {
   return planRowsFromSoTay([], catalog);
 }
 
+/**
+ * Droplist Bổ sung / điều chỉnh / ghép CAD: hợp sổ tay ∪ GIS.
+ * value = tenQH khi đã khớp catalog (để publish/bucket đúng khóa); nhãn ưu tiên tên sổ tay.
+ */
+export function schemePickOptions(sheetItems, catalog, opts = {}) {
+  const list = Array.isArray(catalog) ? catalog : [];
+  const items = Array.isArray(sheetItems) ? sheetItems : [];
+  const areaHaOf = opts.areaHaOf;
+  const { matches, orphans } = matchSoTayToCatalog(items, list, {
+    levelOf: (p) => planLevelOf(p.tenQH || namesOfProject(p).tenQH),
+    areaHaOf: (p) => webAreaHa(p, areaHaOf)
+  });
+  const options = [];
+  const seen = new Set();
+
+  for (const item of items) {
+    const hit = matches.get(item.ma);
+    const p = hit?.project || null;
+    const tenQH = p ? String(p.tenQH || '').trim() : '';
+    const label = String(item.ten || tenQH || '').trim();
+    const value = tenQH || label;
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    const hasBoundary = !!(p && p.boundary);
+    let note = '';
+    if (!hit) note = 'chưa có trên bản đồ';
+    else if (!hasBoundary) note = 'chưa có ranh';
+    options.push({ value, label, note, hasBoundary, matched: !!hit });
+  }
+
+  for (const p of orphans) {
+    const value = String(p.tenQH || '').trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    const hasBoundary = !!p.boundary;
+    options.push({
+      value,
+      label: value,
+      note: hasBoundary ? 'ngoài sổ tay' : 'ngoài sổ tay · chưa có ranh',
+      hasBoundary,
+      matched: false
+    });
+  }
+
+  // sheetOnly không vào orphans (matchSoTay lọc !sheetOnly) — vẫn hiện để bổ sung hồ sơ.
+  for (const p of list) {
+    if (!p?.sheetOnly) continue;
+    const value = String(p.tenQH || '').trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    options.push({
+      value,
+      label: value,
+      note: 'chưa có ranh',
+      hasBoundary: false,
+      matched: false
+    });
+  }
+
+  options.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  return options;
+}
+
 function sheetEntry(row, re) {
   if (!row) return '';
   const key = Object.keys(row).find(k => re.test(k));

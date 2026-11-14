@@ -20,5 +20,8 @@ assert.equal(visibleEntrySteps({ hoMode: 'adjust', netSector: 'cap-nuoc', stepLi
 assert.ok(DRAW_SUPPORTS.dxf.includes('hoso'));
 assert.ok(DRAW_SUPPORTS.geojson.includes('batch'));
 assert.ok(!DRAW_SUPPORTS.shp.includes('hoso'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'ranh')?.hint?.includes('RG'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'dat-ht')?.hint?.includes('KH'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'dat-qh')?.hint?.includes('QH'));
 
 console.log('test-entry-steps: ok');
