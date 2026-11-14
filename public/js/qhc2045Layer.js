@@ -14,7 +14,7 @@
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
-import { map, wardNameAt, outerWardLines, openOutlinedPopup, openDockPopup, attachSelectionOutline, ensureQuyHoachPane, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
+import { map, wardNameAt, outerWardLines, openOutlinedPopup, openDockPopup, attachSelectionOutline, ensureQuyHoachPane, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup, clickLandLot } from './mapEngine.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
@@ -34,7 +34,7 @@ import {
   loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail,
   pickRouteShields, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
 } from './qhcRoads.js';
-import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs, regulationsPaneHtml } from './lotPopup.js';
+import { metricCellsHtml, landUseBannerHtml, landCardTabsHtml, bindLandCardTabs, regulationsPaneHtml, shortLandUse } from './lotPopup.js';
 import { layerDecisionOf, layerDocsOf } from './layerDecisions.js';
 
 export { isCoreWard };
@@ -249,7 +249,10 @@ function drawLand() {
     bubblingMouseEvents: false,
     filter: (f) => f.properties.c !== SEA_CODE && shownStages.has(f.properties.t) && featureHits(f, box),
     style: lotStyle
-  }).on('click', (e) => { if (!passToolClick(m, e)) openLotPopup(e.layer.feature, e.latlng); });
+  }).on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    clickQhcLot(e.layer.feature, e.latlng, m, e);
+  });
   layers.land.addTo(m);
   restack();
 }
@@ -874,6 +877,90 @@ function qhcLotCardHtml(f, latlng, opts) {
   </div>`;
 }
 
+const qhcFeatIds = new WeakMap();
+let qhcFeatSeq = 0;
+function qhcFeatureId(f) {
+  let id = qhcFeatIds.get(f);
+  if (id == null) { id = `qhc${++qhcFeatSeq}`; qhcFeatIds.set(f, id); }
+  return id;
+}
+
+function latlngOfLot(p, fallback) {
+  if (fallback?.lat != null && fallback?.lng != null) return fallback;
+  if (p?._latlng?.lat != null) return p._latlng;
+  try {
+    const c = turf.centroid(p.geometry || p._feature?.geometry).geometry.coordinates;
+    return { lat: c[1], lng: c[0] };
+  } catch (e) {
+    return fallback || map?.getCenter?.();
+  }
+}
+
+/** Lô QHC 1/10.000 → dạng dùng chung với Shift+chọn nhiều. */
+function qhc10Lot(f, latlng) {
+  const prop = f.properties || {};
+  const land = landOf(data.land.zones[prop.z], prop.c);
+  const areaHa = Number(prop.a) || 0;
+  const label = land.label || 'Đất khác';
+  return {
+    geometry: f.geometry,
+    phase: 'QH',
+    file: 'QHC 1/10.000',
+    pickLevel: 'qhc10',
+    id: qhcFeatureId(f),
+    layer: land.key || label,
+    name: label,
+    area: areaHa > 0 ? areaHa * 10000 : 0,
+    mixId: land.key || label,
+    mixLabel: shortLandUse(label) || label,
+    mixColor: (land.key && TT16_STYLES[land.key]?.color) || land.tone || '#94a3b8',
+    _feature: f,
+    _latlng: latlng
+  };
+}
+
+/** Vùng QHC 1/25.000 → dạng dùng chung với Shift+chọn nhiều. */
+function qhc25Lot(f, latlng) {
+  const prop = f.properties || {};
+  const isGreen = prop.L === 'x';
+  const zone = isGreen ? 'Không gian cây xanh' : (data.vision?.cats?.zones?.[prop.k] || 'Khác');
+  const name = prop.n ? String(prop.n).trim() : zone;
+  let areaM2 = 0;
+  try { areaM2 = turf.area(f); } catch (e) { areaM2 = 0; }
+  const color = isGreen ? GREEN_COLOR : visionColor(zone);
+  return {
+    geometry: f.geometry,
+    phase: 'QH',
+    file: 'QHC 1/25.000',
+    pickLevel: 'qhc25',
+    id: qhcFeatureId(f),
+    layer: zone,
+    name,
+    area: areaM2,
+    mixId: zone,
+    mixLabel: shortLandUse(name) || name,
+    mixColor: color,
+    _feature: f,
+    _latlng: latlng
+  };
+}
+
+function clickQhcLot(f, latlng, host, e, opts) {
+  const m = host || active?.m || target();
+  const lot = qhc10Lot(f, latlng);
+  clickLandLot(lot, m, e, {
+    openSingle: (p, mapHost) => openLotPopup(p._feature || f, latlngOfLot(p, latlng), opts)
+  });
+}
+
+function clickQhcVision(f, latlng, host, e) {
+  const m = host || active?.m || target();
+  const lot = qhc25Lot(f, latlng);
+  clickLandLot(lot, m, e, {
+    openSingle: (p, mapHost) => openVisionPopup(p._feature || f, latlngOfLot(p, latlng))
+  });
+}
+
 function openLotPopup(f, latlng, opts) {
   const host = active?.m || target();
   if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
@@ -882,7 +969,7 @@ function openLotPopup(f, latlng, opts) {
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcLotCardHtml(f, latlng, opts));
   attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
-  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô · giữ Shift để chọn thêm lô');
   bindLandCardTabs(popup.getElement());
   if (opts?.hideProject) bindQhcDossier(popup);
   popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
@@ -916,7 +1003,10 @@ function drawVision() {
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
     pane: PANE[0], renderer: r, bubblingMouseEvents: false,
     style: visionFillStyle
-  }).on('click', (e) => { if (!passToolClick(m, e)) openVisionPopup(e.layer.feature, e.latlng); });
+  }).on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    clickQhcVision(e.layer.feature, e.latlng, m, e);
+  });
   const waterLayer = L.geoJSON({ type: 'FeatureCollection', features: waters }, {
     pane: PANE[0], renderer: r, interactive: false,
     style: visionWaterStyle
@@ -924,7 +1014,10 @@ function drawVision() {
   const greenLayer = L.geoJSON({ type: 'FeatureCollection', features: greens }, {
     pane: PANE[0], renderer: r, bubblingMouseEvents: false,
     style: visionGreenStyle
-  }).on('click', (e) => { if (!passToolClick(m, e)) openVisionPopup(e.layer.feature, e.latlng); });
+  }).on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    clickQhcVision(e.layer.feature, e.latlng, m, e);
+  });
   const lineLayer = L.geoJSON({ type: 'FeatureCollection', features: lines }, {
     pane: PANE[0], renderer: r,
     style: (f) => ({ ...visionLineStyle(cats.lines[f.properties.k]), opacity: 0.95 }),
@@ -1049,8 +1142,8 @@ function openVisionPopup(f, latlng) {
   attachSelectionOutline(host, f.geometry, popup);
   qhcLotPop = { popup, f, map: host };
   const again = f.properties.L === 'x'
-    ? 'Bấm lại vào không gian cây xanh để hiện bảng thông tin'
-    : 'Bấm lại vào vùng chức năng để hiện bảng thông tin';
+    ? 'Bấm lại vào không gian cây xanh · giữ Shift để chọn thêm'
+    : 'Bấm lại vào vùng · giữ Shift để chọn thêm vùng';
   addPopupCollapseToggle(popup, 'viền vùng', again);
   bindLandCardTabs(popup.getElement());
   bindQhcDossier(popup);
@@ -1158,13 +1251,13 @@ export function qhcClick(e, m) {
   if (!qhcMap) return false;
   if (layers.land && m.hasLayer(layers.land)) {
     const f = featureAt(layers.land.getLayers().map(l => l.feature), lng, lat);
-    if (f) { openLotPopup(f, e.latlng); return true; }
+    if (f) { clickQhcLot(f, e.latlng, m, e); return true; }
   }
   if (layers.vision && m.hasLayer(layers.vision)) {
     const green = featureAt(layers.vision.greens || [], lng, lat);
-    if (green) { openVisionPopup(green, e.latlng); return true; }
+    if (green) { clickQhcVision(green, e.latlng, m, e); return true; }
     const f = featureAt(layers.vision.fills, lng, lat);
-    if (f) { openVisionPopup(f, e.latlng); return true; }
+    if (f) { clickQhcVision(f, e.latlng, m, e); return true; }
   }
   return false;
 }

@@ -3,9 +3,10 @@
 // (quy mô, độ phủ trên đất ở) → chuyển phê duyệt vào hàng chờ → Admin phê duyệt thì ghi Sheet qua khung Nhập hàng loạt
 // (Ten_QH = <mã>, khớp / gộp công trình đã có). Bản đồ đẩy lớp hiện trạng lên trước rồi lớp quy hoạch; chia đôi màn hình
 // thì hiện trạng bên trái, quy hoạch bên phải.
-import { map, layers, setReviewScope, setLandVisible, openLotPopup } from './mapEngine.js';
+import { map, layers, setReviewScope, setLandVisible, clickLandLot } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit, setViewMode, passToolClick } from './planMap.js';
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
+import { planLevelOf } from './generalPlan.js';
 import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml, announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
@@ -538,7 +539,13 @@ function drawPhase(phase) {
         if (lot.decisionKind && !session.pendingId) { openDecision(lot.id); return; }
         // Xem đồ án đã lưu: bấm lô xem thông tin lô (lớp thửa đang bật thì thửa thay popup lô) thay vì chọn dòng bảng.
         // Lô thô trong cache file đồ án không có file: gắn tên đồ án để popup lô đất có nút sửa / xóa (ghi file đồ án)
-        if (session.view && lot.src) { openLotPopup({ ...lot.src, file: lot.src.file || session.project }, m, e.latlng); return; }
+        if (session.view && lot.src) {
+          const file = lot.src.file || session.project;
+          const pickLevel = planLevelOf(file) === 'QHCT' ? 'qhct'
+            : planLevelOf(file) === 'QHC' ? 'qhc10' : 'qhpk';
+          clickLandLot({ ...lot.src, file, pickLevel }, m, e);
+          return;
+        }
         focusRow(lot.ask ? `ask:${lot.layer}` : lot.role === 'score' && lot.phase === 'QH' ? `lot:${lot.id}` : `land:${lot.landKey}`, false);
       });
     g.addLayer(shape);

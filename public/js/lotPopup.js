@@ -257,8 +257,8 @@ function fmtPct(pct) {
   return '0%';
 }
 
-/** Thẻ panel khi chọn nhiều lô (Shift): tổng diện tích + tỷ lệ từng loại đất. */
-export function multiLandCardHtml(summary, { hint } = {}) {
+/** Thẻ panel khi chọn nhiều lô cùng cấp (Shift): tổng diện tích + tỷ lệ từng loại đất. */
+export function multiLandCardHtml(summary, { hint, eyebrow } = {}) {
   const s = summary || { count: 0, totalM2: 0, types: [] };
   const n = s.count || 0;
   const types = Array.isArray(s.types) ? s.types : [];
@@ -274,12 +274,13 @@ export function multiLandCardHtml(summary, { hint } = {}) {
       <span class="lp-mix-area">${escapeHtml(fmtAreaM2(t.areaM2))}</span>
     </div>`;
   }).join('');
-  const tip = hint || 'Giữ Shift và bấm lô để thêm hoặc bỏ chọn.';
+  const tip = hint || 'Giữ Shift và bấm lô cùng cấp để thêm hoặc bỏ chọn.';
+  const eye = eyebrow || `Đã chọn ${n} lô`;
   return `<div class="pp land-popup land-popup-card land-popup-multi">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
         <div class="lp-eyebrow">
-          <span class="lp-eyebrow-label">Đã chọn ${n} lô</span>
+          <span class="lp-eyebrow-label">${escapeHtml(eye)}</span>
         </div>
         <div class="lp-title-row"><span class="lp-title">Tổng hợp sử dụng đất</span></div>
       </div>

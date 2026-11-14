@@ -63,7 +63,9 @@ export function initPlanMap(mainMap, mainLayers) {
     maxBounds: leftMap.options.maxBounds,
     maxBoundsViscosity: leftMap.options.maxBoundsViscosity ?? 1.0,
     touchZoom: true,
-    zoomSnap: leftMap.options.zoomSnap
+    zoomSnap: leftMap.options.zoomSnap,
+    // Đồng bộ map chính: Shift dùng chọn nhiều lô, không boxZoom.
+    boxZoom: false
   }).setView(leftMap.getCenter(), leftMap.getZoom());
   bindNotchZoom(planMap);
 

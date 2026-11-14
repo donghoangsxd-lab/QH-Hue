@@ -5,7 +5,7 @@
 // Tổng quan QHPK 1/2.000 (chỉ ranh các đồ án) và chọn phường không vẽ các ranh này.
 // Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ tím / cyan.
 import { state } from './state.js';
-import { map, addPopupCollapseToggle, expandCollapsedPopup, syncFocusedProjectToLot, openDockPopup, attachSelectionOutline, ensureQuyHoachPane } from './mapEngine.js';
+import { map, addPopupCollapseToggle, expandCollapsedPopup, syncFocusedProjectToLot, openDockPopup, attachSelectionOutline, ensureQuyHoachPane, clickLandLot } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -266,6 +266,7 @@ export async function qhctFeatureAt(latlng) {
 
 /** Cùng popup bấm trái lên lô tĩnh. hideProject: không hiện dòng đồ án. */
 export function showQhctLot(m, f, latlng, opts) {
+  // Không có sự kiện chuột (menu / đối chiếu): mở một lô, không Shift.
   openQhctPopup(m, f, latlng, opts);
 }
 
@@ -287,8 +288,61 @@ function openQhctPopup(m, f, latlng, opts) {
     name: props.chucNang || ''
   });
   bindLandCardTabs(popup.getElement());
-  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô · giữ Shift để chọn thêm lô');
   popup.on('remove', () => { if (qhctLotPop?.popup === popup) qhctLotPop = null; });
+}
+
+const qhctFeatIds = new WeakMap();
+let qhctFeatSeq = 0;
+function qhctFeatureId(f) {
+  let id = qhctFeatIds.get(f);
+  if (id == null) { id = `qhct${++qhctFeatSeq}`; qhctFeatIds.set(f, id); }
+  return id;
+}
+
+function qhctLot(f, latlng) {
+  const prop = f.properties || {};
+  const label = prop.chucNang || 'Lô QHCT';
+  const key = landPatternKey([prop.chucNang, prop.kyHieu].filter(Boolean).join(' '));
+  const color = (key && TT16_STYLES[key]?.color) || prop.mau || DEFAULT_COLOR;
+  let areaM2 = Number(prop.dienTich) || 0;
+  if (!areaM2) {
+    try { areaM2 = turf.area(f); } catch (e) { areaM2 = 0; }
+  }
+  return {
+    geometry: f.geometry,
+    phase: 'QH',
+    file: prop.tenQH || 'QHCT 1/500',
+    pickLevel: 'qhct',
+    id: qhctFeatureId(f),
+    layer: prop.chucNang || '',
+    name: label,
+    lotCode: prop.kyHieu || '',
+    area: areaM2,
+    mixId: key || label,
+    mixLabel: shortLandUse(label) || label,
+    mixColor: color,
+    _feature: f,
+    _latlng: latlng
+  };
+}
+
+function latlngOfQhct(p, fallback) {
+  if (fallback?.lat != null) return fallback;
+  if (p?._latlng?.lat != null) return p._latlng;
+  try {
+    const c = turf.centroid(p.geometry || p._feature?.geometry).geometry.coordinates;
+    return { lat: c[1], lng: c[0] };
+  } catch (e) {
+    return fallback || map?.getCenter?.();
+  }
+}
+
+function clickQhctLot(m, f, latlng, e, opts) {
+  const lot = qhctLot(f, latlng);
+  clickLandLot(lot, m, e, {
+    openSingle: (p, host) => openQhctPopup(host || m, p._feature || f, latlngOfQhct(p, latlng), opts)
+  });
 }
 
 function draw(m) {
@@ -300,7 +354,10 @@ function draw(m) {
     pane: PANE,
     renderer,
     style: lotFill
-  }).on('click', (e) => openQhctPopup(m, e.layer.feature, e.latlng));
+  }).on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    clickQhctLot(m, e.layer.feature, e.latlng, e);
+  });
   layer.addTo(m);
   drawn.set(m, { layer, renderer });
 }

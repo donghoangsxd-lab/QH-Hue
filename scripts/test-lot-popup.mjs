@@ -113,5 +113,8 @@ assert.match(multi, /lp-mix-row/);
 assert.match(multi, /Giữ Shift/);
 assert.match(multi, /Đất ở/);
 assert.match(multi, /Cây xanh/);
+const multiLv = multiLandCardHtml(mix, { eyebrow: 'QHPK 1/2.000 · Đã chọn 3 lô', hint: 'cùng cấp' });
+assert.match(multiLv, /QHPK 1\/2\.000 · Đã chọn 3 lô/);
+assert.match(multiLv, /cùng cấp/);
 
 console.log('lot popup ok');

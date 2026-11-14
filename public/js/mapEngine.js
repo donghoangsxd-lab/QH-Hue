@@ -244,8 +244,11 @@ export function initMap() {
     maxZoom: MAP_MAX_ZOOM,
     maxBounds: L.latLngBounds(MAP_BOUNDS),
     maxBoundsViscosity: 1.0,
-    touchZoom: true
+    touchZoom: true,
+    // Shift dành cho chọn nhiều lô; tắt boxZoom mặc định (Shift+kéo phóng khung).
+    boxZoom: false
   }).setView(frame.getCenter(), CITY_ZOOM);
+  bindShiftKeyTrack(map);
   bindNotchZoom(map);
   blockPagePinch();
 
@@ -2384,9 +2387,12 @@ function infraLotShape(lot, item, m, detailed) {
   bindLotHover(shape);
   if (item) bindNameTip(shape, item);
   shape.on('click', (e) => {
-    if (passToolClick(m, e)) return;
-    if (item) openLandPopup(lot, m, { facility: item });
-    else openLandPopup(lot, m);
+    if (item) {
+      if (passToolClick(m, e)) return;
+      openLandPopup(lot, m, { facility: item });
+      return;
+    }
+    clickLandLot(lot, m, e);
   });
   return shape;
 }
@@ -2397,24 +2403,61 @@ function landLotShape(p, m, detailed) {
     bubblingMouseEvents: false
   });
   bindLotHover(shape);
-  shape.on('click', (e) => {
-    if (passToolClick(m, e)) return;
-    const shift = !!e.originalEvent?.shiftKey;
-    if (shift) {
-      e.originalEvent?.preventDefault?.();
-      toggleLandLotSelection(p, m);
-      openLandSelectionPopup(m);
-      return;
-    }
-    openLandPopup(p, m);
-  });
+  shape.on('click', (e) => clickLandLot(p, m, e));
   return shape;
 }
 
-// ——— Chọn nhiều lô đất quy hoạch (giữ Shift) ———
-let selectedLandLots = []; // [{ key, p }]
+// ——— Chọn nhiều lô cùng một cấp quy hoạch (giữ Shift) ———
+// pickLevel: qhc25 | qhc10 | qhpk | qhct — không trộn lô khác cấp trong một lần chọn.
+let selectedLandLots = []; // [{ key, p, openSingle }]
 let selectedLandMap = null;
+let selectedPickLevel = null;
 let landSelSeq = 0;
+let shiftKeyHeld = false;
+let shiftKeyTrackBound = false;
+
+const PICK_LEVEL_LABEL = {
+  qhc25: 'QHC 1/25.000',
+  qhc10: 'QHC 1/10.000',
+  qhpk: 'QHPK 1/2.000',
+  qhct: 'QHCT 1/500'
+};
+
+function lotPickLevel(p) {
+  if (p?.pickLevel) return p.pickLevel;
+  const lv = planLevelOf(p?.file);
+  if (lv === 'QHCT') return 'qhct';
+  if (lv === 'QHC') return 'qhc10';
+  return 'qhpk';
+}
+
+function bindShiftKeyTrack() {
+  if (shiftKeyTrackBound || typeof window === 'undefined') return;
+  shiftKeyTrackBound = true;
+  const sync = (e) => { shiftKeyHeld = !!e.shiftKey; };
+  // keydown/keyup + mousedown/pointerdown (capture): Canvas Leaflet đôi khi không giữ shiftKey tới click.
+  window.addEventListener('keydown', sync, true);
+  window.addEventListener('keyup', sync, true);
+  window.addEventListener('mousedown', sync, true);
+  window.addEventListener('pointerdown', sync, true);
+  window.addEventListener('blur', () => { shiftKeyHeld = false; });
+  // Đổi cấp bản đồ: bỏ chọn nhiều lô (chỉ gom trong cùng cấp).
+  document.addEventListener(LEVEL_EVENT, () => {
+    if (!selectedLandLots.length) return;
+    clearLandLotSelection();
+    landSelSeq++;
+    map?.closePopup();
+    planMap?.closePopup();
+    clearSingleIsochrone();
+  });
+}
+
+/** Shift từ phím đang giữ hoặc sự kiện chuột (originalEvent / window.event). */
+function isShiftClick(e) {
+  const oe = e?.originalEvent;
+  return !!(shiftKeyHeld || oe?.shiftKey || e?.shiftKey
+    || (typeof window !== 'undefined' && window.event?.shiftKey));
+}
 
 function landLotKey(p) {
   return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || ''].join('|');
@@ -2427,6 +2470,10 @@ function landLotAreaM2(p) {
 }
 
 function landLotTypeMeta(p) {
+  if (p?.mixLabel) {
+    const label = shortLandUse(p.mixLabel) || p.mixLabel;
+    return { id: p.mixId || label, label, color: p.mixColor || '#94a3b8' };
+  }
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
   const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
@@ -2438,15 +2485,27 @@ function landLotTypeMeta(p) {
 function clearLandLotSelection() {
   selectedLandLots = [];
   selectedLandMap = null;
+  selectedPickLevel = null;
 }
 
-function toggleLandLotSelection(p, m) {
+function defaultLandOpenSingle(lot, host) {
+  openLandPopup(lot, host, { fromMulti: true });
+}
+
+function toggleLandLotSelection(p, m, openSingle) {
   const key = landLotKey(p);
-  if (selectedLandMap && selectedLandMap !== m) selectedLandLots = [];
+  const level = lotPickLevel(p);
+  // Đổi bản đồ hoặc đổi cấp (QHC ↔ QHPK ↔ QHCT): bắt đầu tập chọn mới.
+  if ((selectedLandMap && selectedLandMap !== m)
+    || (selectedPickLevel && selectedPickLevel !== level)) {
+    selectedLandLots = [];
+  }
   selectedLandMap = m;
+  selectedPickLevel = level;
   const i = selectedLandLots.findIndex(x => x.key === key);
   if (i >= 0) selectedLandLots.splice(i, 1);
-  else selectedLandLots.push({ key, p });
+  else selectedLandLots.push({ key, p, openSingle: openSingle || defaultLandOpenSingle });
+  if (!selectedLandLots.length) selectedPickLevel = null;
 }
 
 function attachMultiSelectionOutlines(m, lots, popup) {
@@ -2475,9 +2534,16 @@ function openMultiLandPopup(m) {
     return { id: meta.id, label: meta.label, areaM2: landLotAreaM2(p), color: meta.color };
   });
   const summary = summarizeLotAreas(rows);
-  const popup = openDockPopup(m, 'land-lot-popup', multiLandCardHtml(summary));
+  const levelName = PICK_LEVEL_LABEL[selectedPickLevel] || PICK_LEVEL_LABEL[lotPickLevel(selectedLandLots[0]?.p)] || '';
+  const n = summary.count || selectedLandLots.length;
+  const popup = openDockPopup(m, 'land-lot-popup', multiLandCardHtml(summary, {
+    eyebrow: levelName ? `${levelName} · Đã chọn ${n} lô` : `Đã chọn ${n} lô`,
+    hint: levelName
+      ? `Giữ Shift và bấm lô ${levelName} để thêm hoặc bỏ chọn (chỉ trong cùng cấp).`
+      : 'Giữ Shift và bấm lô cùng cấp để thêm hoặc bỏ chọn.'
+  }));
   attachMultiSelectionOutlines(m, selectedLandLots.map(x => x.p), popup);
-  addPopupCollapseToggle(popup, 'viền các lô đã chọn', 'Giữ Shift và bấm lô để thêm hoặc bỏ chọn');
+  addPopupCollapseToggle(popup, 'viền các lô đã chọn', 'Giữ Shift và bấm lô cùng cấp để thêm hoặc bỏ chọn');
   popup.on('remove', () => {
     if (landSelSeq === sel) clearLandLotSelection();
     if (openLandInfo?.popup === popup) openLandInfo = null;
@@ -2493,7 +2559,9 @@ function openLandSelectionPopup(m) {
     return;
   }
   if (selectedLandLots.length === 1) {
-    openLandPopup(selectedLandLots[0].p, m, { fromMulti: true });
+    const item = selectedLandLots[0];
+    ++landSelSeq;
+    (item.openSingle || defaultLandOpenSingle)(item.p, m);
     return;
   }
   openMultiLandPopup(m);
@@ -2782,20 +2850,52 @@ function facilityAnalyzeOpts(facility, m, popup) {
   };
 }
 
+/**
+ * Bấm lô quy hoạch: thường = một lô; giữ Shift = thêm/bỏ chọn nhiều lô cùng cấp
+ * (QHC 1/25 · QHC 1/10 · QHPK · QHCT). Highlight viền + panel tổng diện tích / tỷ lệ loại đất.
+ * opts.openSingle(p, m): mở thẻ đúng cấp; mặc định thẻ DXF openLandPopup.
+ */
+export function clickLandLot(p, m, e, opts = {}) {
+  if (!p || !m) return;
+  if (e && passToolClick(m, e)) return;
+  if (!p.pickLevel) p.pickLevel = lotPickLevel(p);
+  const openSingle = opts.openSingle || defaultLandOpenSingle;
+  if (e && isShiftClick(e)) {
+    e.originalEvent?.preventDefault?.();
+    toggleLandLotSelection(p, m, openSingle);
+    openLandSelectionPopup(m);
+    return;
+  }
+  selectedLandLots = [{ key: landLotKey(p), p, openSingle }];
+  selectedLandMap = m;
+  selectedPickLevel = lotPickLevel(p);
+  if (opts.openSingle) openSingle(p, m);
+  else openLandPopup(p, m);
+}
+
 function openLandPopup(p, m, opts) {
   // Thẻ lô trong panel B (#planInfoSlot dưới brief), giữ bốn tab cấp — mọi cỡ màn hình.
-  const sel = ++landSelSeq;
+  ++landSelSeq;
   ensureQuyHoachPane();
   const facility = opts?.facility || null;
   const projectName = p.file || facility?.tenQH || '';
   // hideProject (menu «Xem thông tin lô»): chỉ thẻ lô, không đổi bảng đồ án (ui-spec).
   if (!opts?.hideProject) syncFocusedProjectToLot(projectName);
-  if (reuseLandInfo(p, m, opts)) return;
   // Bấm thường: một lô. fromMulti: còn đúng 1 lô sau khi bỏ chọn bằng Shift.
+  // Cập nhật trước reuseLandInfo để bấm lại cùng lô vẫn giữ đúng tập chọn.
   if (!opts?.fromMulti) {
-    selectedLandLots = facility ? [] : [{ key: landLotKey(p), p }];
-    selectedLandMap = facility ? null : m;
+    if (facility) {
+      selectedLandLots = [];
+      selectedLandMap = null;
+      selectedPickLevel = null;
+    } else {
+      if (!p.pickLevel) p.pickLevel = lotPickLevel(p);
+      selectedLandLots = [{ key: landLotKey(p), p, openSingle: defaultLandOpenSingle }];
+      selectedLandMap = m;
+      selectedPickLevel = lotPickLevel(p);
+    }
   }
+  if (reuseLandInfo(p, m, opts)) return;
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
   const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
@@ -2831,11 +2931,8 @@ function openLandPopup(p, m, opts) {
     addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   }
   trackLandInfo(popup, p, m, opts);
-  popup.on('remove', () => {
-    if (landSelSeq === sel && selectedLandLots.length === 1 && selectedLandLots[0].key === landLotKey(p)) {
-      clearLandLotSelection();
-    }
-  });
+  // Không xóa selectedLandLots khi đóng thẻ một lô: sync đồ án / dock có thể gỡ popup
+  // giữa hai lần Shift+click. Tập chọn chỉ reset khi bấm thường hoặc đóng thẻ multi.
   fillLotBuildup(popup, p);
 }
 
