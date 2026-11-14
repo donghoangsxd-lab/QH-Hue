@@ -706,12 +706,12 @@ export function highlightWardNames(names, { fitView = true } = {}) {
   }
 }
 
-export function focusWard(wardName) {
+export function focusWard(wardName, { fitView = true } = {}) {
   state.selectedWard = wardName || CITY_NAME;
   const wardSelector = document.getElementById('wardSelector');
   if (wardSelector) wardSelector.value = state.selectedWard;
 
-  highlightWardBoundary(state.selectedWard, { fitView: true });
+  highlightWardBoundary(state.selectedWard, { fitView });
   renderGroupedPoints();
   return refreshHeatmapOnly();
 }

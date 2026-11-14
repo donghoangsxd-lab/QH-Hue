@@ -254,7 +254,8 @@ function enterCity() {
     if (!KEEP.has(el.id)) setChecked(el.id, false);
   });
   setChecked('chk_bound', true);
-  setLevel(getLevel());
+  // Giữ khung: chỉ làm mới lớp phụ / checkbox, không fitCenter khi về TP.
+  setLevel(getLevel(), { keepView: true });
 }
 
 function enterWard(name) {
@@ -460,7 +461,8 @@ function onEscape(e) {
   }
   if (!isCity(state.selectedWard)) {
     e.preventDefault();
-    selectWardDetail(CITY_NAME);
+    // Esc bỏ chọn phường/xã: giữ tâm và mức phóng (cùng luật Esc đô thị / bỏ đồ án).
+    selectWardDetail(CITY_NAME, { fitView: false });
   }
 }
 

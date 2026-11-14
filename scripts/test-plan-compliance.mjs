@@ -212,7 +212,7 @@ assert.match(ui, /Kết luận/);
 assert.match(qhctSrc, /annotateCompliance\('QHCT'/);
 assert.match(card, /annotateCompliance\('QHPK'/);
 assert.match(lots, /complianceHtml/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261113b'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261114'/);
 assert.match(read('rules/tuan-thu-lo/README.md'), /Thêm một nguyên tắc/);
 
 console.log('test-plan-compliance: ok');
