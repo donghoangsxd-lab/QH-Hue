@@ -3,7 +3,7 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch, treeCap
+  filterMassing, namesMatch, treeCap, scatterTrees
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -184,6 +184,16 @@ if (!js.includes('infraFill') || !js.includes('Tường trắng clay')) {
 if (WALL[0] < 240 || ROOF[0] >= WALL[0]) throw new Error('palette clay chưa trắng / mái chưa đậm hơn');
 if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCap('x') !== 0) {
   throw new Error(`treeCap ${treeCap(200)} ${treeCap(800)}`);
+}
+{
+  const park = [[-40, -40], [40, -40], [40, 40], [-40, 40], [-40, -40]];
+  const fromPark = scatterTrees([park], 200, 40, []);
+  if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
+  const fromRoad = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 10 }]);
+  if (fromRoad.length < 2) throw new Error(`cây ven đường ${fromRoad.length}`);
+}
+if (!js.includes('dataset.trees') || !js.includes('PLATE + 12')) {
+  throw new Error('thiếu đếm tán / nâng tán trên khối nhà');
 }
 if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
   throw new Error('buildModel chưa chịu osm=null khi tải dần');

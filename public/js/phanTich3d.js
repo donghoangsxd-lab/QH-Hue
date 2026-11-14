@@ -796,25 +796,82 @@ export function treeCap(r) {
   return Math.min(TREE_CAP_MAX, Number.isFinite(n) && n > 0 ? n : 0);
 }
 
-function scatterTrees(rings, r, cap) {
+function treeDot(x, y, salt) {
+  return {
+    position: [x, y],
+    radius: 16 + (salt % 5) * 5,
+    color: salt % 2 ? [56, 168, 72, 255] : [34, 140, 58, 255]
+  };
+}
+
+/**
+ * Tán cây trên từng vùng xanh (centroid + lưới bbox) rồi bổ sung dọc đường.
+ * Lưới toàn đĩa step 22 trước đây hay trượt khỏi mảng xanh nhỏ → 0 cây.
+ */
+export function scatterTrees(rings, r, cap, roads = []) {
   const out = [];
   const limit = Math.max(0, Math.min(TREE_CAP_MAX, Number(cap) || 0));
-  if (!rings.length || limit < 1) return out;
-  const step = 22;
+  if (limit < 1) return out;
+  const rMax2 = (r - 6) * (r - 6);
   let salt = 1;
-  for (let y = -r + 14; y <= r - 14 && out.length < limit; y += step) {
-    for (let x = -r + 14; x <= r - 14 && out.length < limit; x += step) {
-      salt += 1;
-      const jx = x + Math.sin(salt * 12.989) * 9;
-      const jy = y + Math.cos(salt * 78.233) * 9;
-      if (jx * jx + jy * jy > (r - 8) * (r - 8)) continue;
-      if (!rings.some((ring) => pointInRing([jx, jy], ring))) continue;
-      out.push({
-        x: jx,
-        y: jy,
-        r: 14 + (salt % 4) * 4,
-        shade: salt % 2 ? [70, 160, 72, 255] : [48, 130, 58, 255]
-      });
+  const push = (x, y) => {
+    if (out.length >= limit) return false;
+    if (x * x + y * y > rMax2) return true;
+    out.push(treeDot(x, y, salt));
+    salt += 1;
+    return true;
+  };
+  for (const ring of rings || []) {
+    if (out.length >= limit || !ring || ring.length < 3) break;
+    const c = centroid(ring);
+    if (pointInRing(c, ring)) push(c[0], c[1]);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of ring) {
+      if (p[0] < minX) minX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] > maxY) maxY = p[1];
+    }
+    const step = Math.max(10, Math.min(18, Math.sqrt(Math.max(1, (maxX - minX) * (maxY - minY))) / 5));
+    for (let y = minY; y <= maxY && out.length < limit; y += step) {
+      for (let x = minX; x <= maxX && out.length < limit; x += step) {
+        salt += 1;
+        const jx = x + Math.sin(salt * 12.989) * (step * 0.28);
+        const jy = y + Math.cos(salt * 78.233) * (step * 0.28);
+        if (!pointInRing([jx, jy], ring)) continue;
+        push(jx, jy);
+      }
+    }
+  }
+  // Ven đường: luôn có vài tán dù OSM thiếu polygon xanh.
+  const roadStep = 36;
+  for (const road of roads || []) {
+    if (out.length >= limit) break;
+    const path = road.path;
+    if (!path || path.length < 2) continue;
+    if ((road.width || 0) < 5) continue;
+    let acc = 0;
+    for (let i = 1; i < path.length && out.length < limit; i++) {
+      const a = path[i - 1];
+      const b = path[i];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const px = -uy;
+      const py = ux;
+      let t = acc > 0 ? roadStep - acc : roadStep * 0.5;
+      while (t < len && out.length < limit) {
+        const x = a[0] + ux * t + px * 7;
+        const y = a[1] + uy * t + py * 7;
+        push(x, y);
+        t += roadStep;
+      }
+      acc = (acc + len) % roadStep;
     }
   }
   return out;
@@ -1394,11 +1451,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
 
   const nodes = collectNodes(majorLines, r);
   const corners = discPosts(r);
-  const trees = scatterTrees(greenRings, r, treeCap(r)).map((t) => ({
-    position: [t.x, t.y],
-    radius: t.r,
-    color: t.shade
-  }));
+  const trees = scatterTrees(greenRings, r, treeCap(r), roads);
   const area = Math.PI * r * r;
   const mix = shannon(groupArea);
   const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
@@ -1864,12 +1917,6 @@ function bootMap(place, model, ground) {
     }
     const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
     if (openBloom) layers.push(openBloom);
-    // Tán cây: không gắn trần số khối (800 m thường > 900 nhà). Chỉ tắt trên touch.
-    if (!coarse && (model.trees || []).length) {
-      const zTree = (showStack ? zVoids : zLinks) + PLATE + 2.2;
-      const canopy = blooms('trees', model.trees, zTree);
-      if (canopy) layers.push(canopy);
-    }
     if (k > 0.12) {
       const access = blooms('access', model.access, zUses + PLATE + 0.3);
       if (access) layers.push(access);
@@ -2080,6 +2127,12 @@ function bootMap(place, model, ground) {
           pickable: false
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
+    }
+    // Tán sau khối nhà, nâng ~12 m — lưới cũ + vẽ trước volumes khiến 0 cây / bị che.
+    if (!coarse && (model.trees || []).length) {
+      const zTree = (showStack ? zVoids : zLinks) + PLATE + 12;
+      const canopy = blooms('trees', model.trees, zTree);
+      if (canopy) layers.push(canopy);
     }
     try {
       deckgl.setProps({ layers });
@@ -2362,6 +2415,7 @@ function showBuilt() {
   document.body.dataset.area = String(Math.round(model.area));
   document.body.dataset.roads = String(model.roads.length);
   document.body.dataset.greens = String(model.greens.length);
+  document.body.dataset.trees = String((model.trees || []).length);
   document.body.dataset.waters = String(model.waters.length);
   document.body.dataset.arrows = String(model.arrows.length);
   document.body.dataset.greenPct = String(model.green);
