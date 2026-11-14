@@ -3687,6 +3687,13 @@ body.bottom-max .catalog-chart-wrap-bar { height: 120px; min-height: 112px; }
   font-weight: 700;
 }
 .catalog-bound-link:hover { background: rgba(251, 191, 36, 0.22); }
+.catalog-bound-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
 .catalog-bound-no { color: var(--text-muted); font-size: var(--fs-xs); }
 .catalog-empty { color: var(--text-muted); text-align: center; padding: 16px 8px; }
 @media (max-width: 840px) {

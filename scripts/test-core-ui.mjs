@@ -365,6 +365,8 @@ assert.match(read('public/js/catalogTable.js'), /wardCellHtml|Phường \/ xã/)
 assert.match(read('public/js/catalogTableCore.js'), /'Phường \/ xã'/);
 assert.match(read('public/js/projectLayer.js'), /export function zoomToProjectBoundary/);
 assert.match(read('public/js/catalogTable.js'), /zoomToProjectBoundary|catalog-bound-link|data-catalog-link-ma/);
+assert.match(read('public/js/catalogTable.js'), /openAdoptSoTay|data-catalog-adopt-tenqh|catalogAdoptKind/);
+assert.match(read('public/index.html'), /id="catalogAdoptKind"|id="catalogEditSoTayMa"/);
 assert.match(read('public/js/catalogTableCore.js'), /links: \[\]|mapTenQH|patches: \[\]/);
 assert.match(read('public/js/catalogTable.js'), /openEditProject|data-catalog-edit-ma|mode === 'edit'/);
 assert.match(read('public/index.html'), /id="catalogEditBound"/);

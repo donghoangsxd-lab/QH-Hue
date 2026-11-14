@@ -22,17 +22,31 @@ export function layerCountOfCatalogProject(p) {
 }
 
 export const CATALOG_HEADERS_PLAN = [
-  'STT', 'Mã', 'Tên quy hoạch', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
+  'STT', 'Mã', 'Tên quy hoạch', 'Cấp độ', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
   'Diện tích (ha)', 'Dân số', 'Ranh'
 ];
 export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
 export const PLAN_TABLE_COLS = CATALOG_HEADERS_PLAN.length;
 
+/** Khóa sắp xếp cột bảng plan (không gồm STT — số thứ tự sau khi xếp). */
+export const PLAN_SORT_COLUMNS = [
+  { key: 'ma', label: 'Mã' },
+  { key: 'name', label: 'Tên quy hoạch' },
+  { key: 'level', label: 'Cấp độ' },
+  { key: 'ward', label: 'Phường / xã' },
+  { key: 'quyetDinh', label: 'Quyết định' },
+  { key: 'ngay', label: 'Ngày ban hành' },
+  { key: 'coQuan', label: 'Cấp phê duyệt' },
+  { key: 'area', label: 'Diện tích' },
+  { key: 'danSo', label: 'Dân số' },
+  { key: 'ranh', label: 'Ranh' }
+];
+
 export { STATUS };
 
-const LEVEL_SCALE = {
-  QHC: 'QHC',
+export const LEVEL_SCALE = {
+  QHC: 'QHC 1/10.000',
   QHPK: 'QHPK 1/2.000',
   QHCT: 'QHCT 1/500'
 };
@@ -45,6 +59,11 @@ const LEVEL_GROUP_LABEL = {
   QHCT: 'C. QHCT'
 };
 
+export function levelLabelOf(level) {
+  const id = String(level || '').toUpperCase();
+  return LEVEL_SCALE[id] || String(level || '').trim() || '—';
+}
+
 /** Năm phê duyệt từ cột ngày sổ tay (dd/mm/yyyy). */
 export function planYearOf(ngay) {
   const raw = String(ngay || '').trim();
@@ -56,6 +75,75 @@ export function planYearOf(ngay) {
 
 function levelRank(level) {
   return Object.prototype.hasOwnProperty.call(LEVEL_RANK, level) ? LEVEL_RANK[level] : 9;
+}
+
+function parsePlanDateMs(ngay) {
+  const m = String(ngay || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  return Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+}
+
+function parseVnNumber(raw) {
+  const s = String(raw || '').replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '.');
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function cmpText(a, b) {
+  return String(a || '').localeCompare(String(b || ''), 'vi', { sensitivity: 'base', numeric: true });
+}
+
+function cmpNumNullLast(a, b) {
+  const aOk = a != null && Number.isFinite(a);
+  const bOk = b != null && Number.isFinite(b);
+  if (!aOk && !bOk) return 0;
+  if (!aOk) return 1;
+  if (!bOk) return -1;
+  return a - b;
+}
+
+/** Giá trị so sánh một cột — chỉ dùng trên đồ án cha. */
+export function planSortValue(row, key) {
+  switch (key) {
+    case 'ma': return String(row.maDoAn || '');
+    case 'name': return String(row.name || row.fullName || '');
+    case 'level': return levelRank(row.level);
+    case 'ward': return String(row.ward || '');
+    case 'quyetDinh': return String(row.quyetDinh || '');
+    case 'ngay': return parsePlanDateMs(row.ngay);
+    case 'coQuan': return String(row.coQuan || '');
+    case 'area': return Number.isFinite(row.areaHa) ? row.areaHa : parseVnNumber(row.areaText);
+    case 'danSo': return parseVnNumber(row.danSo);
+    case 'ranh': return row.hasBoundary ? (1000 + (Number(row.layerCount) || 0)) : 0;
+    default: return '';
+  }
+}
+
+function comparePlanField(a, b, key) {
+  if (key === 'level' || key === 'ngay' || key === 'area' || key === 'danSo' || key === 'ranh') {
+    return cmpNumNullLast(planSortValue(a, key), planSortValue(b, key));
+  }
+  return cmpText(planSortValue(a, key), planSortValue(b, key));
+}
+
+/**
+ * Sắp xếp đồ án chính theo nhiều cột (thứ tự ưu tiên = thứ tự mảng sorts).
+ * ĐCCB/đính chính luôn đi theo cha — không tách/xáo hàng con.
+ */
+export function sortPlanRowsByKeys(rows, sorts) {
+  const list = Array.isArray(rows) ? rows.slice() : [];
+  const keys = (Array.isArray(sorts) ? sorts : [])
+    .map((s) => (typeof s === 'string' ? { key: s } : s))
+    .filter((s) => s && PLAN_SORT_COLUMNS.some((c) => c.key === s.key));
+  if (!keys.length) return sortPlanRows(list);
+  return list.sort((a, b) => {
+    for (const { key } of keys) {
+      const d = comparePlanField(a, b, key);
+      if (d) return d;
+    }
+    return cmpText(a.maDoAn || a.name, b.maDoAn || b.name);
+  });
 }
 
 function sortPlanRows(rows) {
@@ -588,6 +676,7 @@ export function rowsToCsv(rows, source = 'plan') {
       stt,
       r.maDoAn || '',
       r.name,
+      levelLabelOf(r.level),
       r.ward || '',
       r.quyetDinh || '',
       r.ngay || '',
@@ -601,6 +690,7 @@ export function rowsToCsv(rows, source = 'plan') {
         '',
         '',
         c.ten || '',
+        levelLabelOf(r.level),
         r.ward || '',
         c.quyetDinh || '',
         c.ngay || '',

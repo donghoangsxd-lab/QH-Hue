@@ -3,7 +3,7 @@ import {
   planRowsFromCatalog, planRowsFromSoTay, schemePickOptions, investRowsFromItems, filterCatalogRows,
   filterKeyFromMapLevel, rowsToCsv, catalogFilterOptions, catalogStatusStats,
   catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
-  groupPlanRowsByLevel, planYearOf, matchCatalogWard, resolvePlanWards,
+  groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, planYearOf, matchCatalogWard, resolvePlanWards,
   mergeSoTayEdits, nextDccbId
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName, matchSoTayToCatalog } from '../public/js/soTayMatch.js';
@@ -140,14 +140,27 @@ assert.equal(filterCatalogRows(invest, { level: 'dvtm' }).length, 1);
 
 const csv = rowsToCsv(filterCatalogRows(merged, {}), 'plan');
 assert.match(csv, /Tên quy hoạch/);
+assert.match(csv, /Cấp độ/);
 assert.match(csv, /Phường \/ xã/);
 assert.match(csv, /Ranh/);
 assert.doesNotMatch(csv, /Trạng thái/);
 assert.match(csv, /Đàn Nam Giao/);
 assert.match(csv, /Phường Thuận Hóa/);
+assert.match(csv, /QHPK 1\/2\.000|QHC 1\/10\.000|QHCT 1\/500/);
 assert.match(csv, /Có \(/);
 assert.ok(nam.hasBoundary === true);
 assert.ok(Number(nam.layerCount) >= 1);
+assert.equal(levelLabelOf('QHC'), 'QHC 1/10.000');
+assert.equal(levelLabelOf('QHPK'), 'QHPK 1/2.000');
+assert.equal(levelLabelOf('QHCT'), 'QHCT 1/500');
+
+const sortedByName = sortPlanRowsByKeys(merged, [{ key: 'name' }, { key: 'level' }]);
+assert.ok(sortedByName.length >= 2);
+const namSorted = sortedByName.find((r) => r.maDoAn === 'TH.B.001');
+assert.ok(namSorted);
+assert.equal(namSorted.children?.[0]?.id, 'TH.B.001.01');
+const byWardThenLevel = sortPlanRowsByKeys(merged, [{ key: 'ward' }, { key: 'level' }]);
+assert.ok(byWardThenLevel.every((r) => !Array.isArray(r.children) || r.children.every((c) => typeof c === 'object')));
 
 const stats = catalogStatusStats(merged);
 assert.ok(stats.total >= 3);
@@ -222,5 +235,23 @@ const forced = matchSoTayToCatalog(
 );
 assert.equal(forced.matches.get('TH.A.001')?.project?.tenQH, 'QHPK Khu vực An Cựu');
 assert.equal(forced.matches.get('TH.A.001')?.forced, true);
+
+// Ghi ngược chi_ban_do: thêm mã mới + mapTenQH → không còn orphan «ABC».
+const adoptEdits = mergeSoTayEdits(sheet, {
+  projects: [{
+    ma: 'ZZ.ABC.01',
+    ten: 'QHPK chỉ trên bản đồ ABC',
+    cap: 'QHPK',
+    sheetNguon: 'admin',
+    ghiChu: 'Thêm bởi admin (từ bản đồ)',
+    children: []
+  }],
+  links: [{ ma: 'ZZ.ABC.01', tenQH: 'QHPK chỉ trên bản đồ ABC' }],
+  dccb: [],
+  patches: []
+});
+const afterAdopt = planRowsFromSoTay(adoptEdits, catalog);
+assert.ok(afterAdopt.some((r) => r.maDoAn === 'ZZ.ABC.01' && r.matched));
+assert.ok(!afterAdopt.some((r) => r.status === 'chi_ban_do' && /ABC/.test(r.name || r.fullName || '')));
 
 console.log('test-catalog-table: ok');
