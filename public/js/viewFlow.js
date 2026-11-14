@@ -10,7 +10,8 @@
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: nhìn rộng chỉ ranh; bấm ranh / tick mới tải lô. Zoom ≥ PLACE_DETAIL_ZOOM (hoặc đang
-//      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn, không fitBounds toàn đồ án.
+//      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn; bấm lại ranh đồ án đang mở giữ khung.
+//      Đang chọn A: bấm ranh / nền trong B cùng cấp → chọn B và fitBounds toàn ranh (không cần Esc).
 //      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
 //      Bỏ chọn đồ án (bỏ tick, đóng hồ sơ, Esc, tắt cả cấp): giữ tâm và mức phóng, không centerOnCity.
 //    - QHCT 1/500: nhìn rộng ranh + tên; tick / bấm → chi tiết. Zoom lớn: mở lô tại khung như QHPK.
@@ -23,7 +24,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
@@ -307,9 +308,15 @@ function leaveProject() {
   syncEscHint();
 }
 
-// Lớp có cấp đồ án (QHC 1/10.000): bấm nền ngoài đồ án đang mở thì thu gọn về tổng quan
+// Bấm nền ngoài đồ án đang mở: nếu điểm thuộc đồ án cùng cấp khác thì chọn + phóng tới; không thì thu gọn.
 function leaveScopeFocus(latlng) {
-  if (state.focusedProject && !projectContains(state.focusedProject, latlng)) leaveProject();
+  if (state.focusedProject && !projectContains(state.focusedProject, latlng)) {
+    if (trySwitchProjectAt(latlng)) {
+      syncEscHint();
+      return;
+    }
+    leaveProject();
+  }
   if (isCoreOpen() && !coreContains(latlng)) setCoreOpen(false);
   syncEscHint();
 }

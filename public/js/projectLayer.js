@@ -13,7 +13,9 @@
 // Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
 // QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
 // bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn. Zoom ≥ PLACE_DETAIL_ZOOM: bỏ chế độ chỉ-ranh —
-// mở lô đồ án tại tâm khung (openLotsAtView), bấm ranh giữ khung (không fitBounds toàn đồ án).
+// mở lô đồ án tại tâm khung (openLotsAtView); bấm lại ranh đồ án đang mở giữ khung. Đang chọn đồ án A: ranh đồ án
+// khác vẫn bắt chuột — bấm sang B thì chọn B và fitBounds toàn ranh (không cần Esc / zoom out).
+// Đang chọn đồ án: #projectList lọc theo khung nhìn; Esc / clearProjectFocus trả đủ danh sách cấp đang bật.
 // Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
 // trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
 // Lô QHC 1/10.000 (trung tâm và đồ án nhập) chỉ khi đang chọn: phủ tối ngoài ranh. Bỏ chọn thì ẩn lô và phủ tối, còn đường ranh.
@@ -688,9 +690,15 @@ export function openLotsAtView(kind) {
   return openProjectAt(m.getCenter(), kind);
 }
 
-/** Bấm ranh trên bản đồ: zoom lớn → giữ khung + mở lô; nhìn rộng → phóng tới toàn đồ án. */
+/**
+ * Bấm ranh trên bản đồ.
+ * Đang phóng gần và bấm đúng đồ án đang mở → giữ khung + mở/làm mới lô.
+ * Bấm đồ án khác (kể cả khi đang phóng gần / đã chọn A) → chọn và phóng tới toàn ranh.
+ * Nhìn rộng → phóng tới toàn đồ án.
+ */
 function openOutlineProject(p, m) {
-  if (atPlaceDetail(m)) {
+  const switching = !!(state.focusedProject && state.focusedProject !== p.name);
+  if (atPlaceDetail(m) && !switching) {
     if (p.level === 'QHC') selectQhcScheme(p);
     else openSchemeDetail(p);
     return;
@@ -698,11 +706,8 @@ function openOutlineProject(p, m) {
   openProject(p);
 }
 
-/**
- * Đồ án nhỏ nhất cấp kind (QHPK / QHCT / QHC) chứa điểm: bật lô và viền, giữ nguyên khung nhìn.
- * Không có đồ án tại điểm → null.
- */
-export function openProjectAt(latlng, kind) {
+/** Đồ án nhỏ nhất cấp kind chứa điểm latlng (trong ranh), hoặc null. */
+function smallestProjectAt(latlng, kind) {
   if (!latlng || !kind || typeof turf === 'undefined') return null;
   const pt = [latlng.lng, latlng.lat];
   let best = null;
@@ -718,6 +723,30 @@ export function openProjectAt(latlng, kind) {
       if (turf.booleanPointInPolygon(pt, turf.feature(geom))) { best = p; bestSize = size; }
     } catch (e) { /* ranh lỗi */ }
   });
+  return best;
+}
+
+/**
+ * Đang chọn đồ án A, bấm điểm thuộc đồ án B cùng cấp đang xem → mở B và phóng tới toàn ranh.
+ * Không có B tại điểm → false (người gọi tự thu gọn A).
+ */
+export function trySwitchProjectAt(latlng) {
+  if (!latlng || !state.focusedProject) return false;
+  const kind = levelScope();
+  if (!kind) return false;
+  const best = smallestProjectAt(latlng, kind);
+  if (!best || best.name === state.focusedProject) return false;
+  openProject(best);
+  revealInList(best);
+  return true;
+}
+
+/**
+ * Đồ án nhỏ nhất cấp kind (QHPK / QHCT / QHC) chứa điểm: bật lô và viền, giữ nguyên khung nhìn.
+ * Không có đồ án tại điểm → null.
+ */
+export function openProjectAt(latlng, kind) {
+  const best = smallestProjectAt(latlng, kind);
   if (!best) return null;
   const lotsOn = best.level !== 'QHPK' || state.lotProjects.has(best.name);
   if (state.focusedProject === best.name && focusName === best.name && lotsOn) return best.name;
@@ -811,6 +840,8 @@ export function clearProjectFocus() {
   drawFocus();
   markPicked(null);
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+  // Esc / bỏ chọn: trả danh sách đủ đồ án cấp đang bật (không còn lọc theo khung nhìn).
+  renderList();
   if (getLevel() === 'qhc10' || wasQhc) refreshProjectLots();
 }
 
@@ -1077,13 +1108,50 @@ function mountStatic(box) {
   });
 }
 
+/** Ranh đồ án giao khung nhìn bản đồ đang hiện (hoặc chưa có ranh → vẫn giữ trong list). */
+function projectInView(p, view) {
+  if (!view) return true;
+  const b = boundsOf(p);
+  if (!b || !b.isValid()) return true;
+  return view.intersects(b);
+}
+
+function keepInFocusList(p) {
+  if (p.name === state.focusedProject) return true;
+  if (focusExtra?.names?.includes(p.name)) return true;
+  if (levelPeers.some(x => x.name === p.name)) return true;
+  return false;
+}
+
+/**
+ * Đang chọn đồ án và không gõ tìm: chỉ đồ án giao khung nhìn (+ đồ án đang focus / peers).
+ * Esc bỏ chọn → state.focusedProject null → đủ danh sách cấp đang bật. Ô tìm quét cả danh mục.
+ */
+function listedProjects(q) {
+  let items = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || dossierSearchText(p).includes(q));
+  if (!state.focusedProject || q) return items;
+  const view = viewHost()?.getBounds?.();
+  const bounds = view && view.isValid?.() ? view : null;
+  return items.filter(({ p }) => keepInFocusList(p) || projectInView(p, bounds));
+}
+
+let listViewTimer = 0;
+function scheduleListForView() {
+  if (!state.focusedProject) return;
+  clearTimeout(listViewTimer);
+  listViewTimer = setTimeout(() => {
+    listViewTimer = 0;
+    if (state.focusedProject) renderList();
+  }, 120);
+}
+
 function renderList() {
   renderHead();
   const box = $('projectList');
   if (!box) return;
   parkStatic();
   const q = foldText(query.trim());
-  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || dossierSearchText(p).includes(q));
+  const visible = listedProjects(q);
   const admin = isAdmin();
   const legacyN = projects.filter(p => p.legacy).length;
   const migrating = busy === '__migrate__';
@@ -1119,7 +1187,10 @@ function renderList() {
     return items.filter(({ p }) => (seen.has(p.name) ? false : seen.add(p.name))).sort(bySchemeName);
   };
   const openTabs = listedLevels();
-  box.innerHTML = migrateBtn + LIST_LEVELS.filter(level => openTabs.has(GROUP_LEVEL[level.key])).map(level => {
+  const viewNote = state.focusedProject
+    ? `<div class="project-scope" title="Đang xem đồ án: danh sách chỉ còn đồ án giao khung nhìn. Bấm Esc để hiện đủ danh sách.">${ico('coverage')}<span>Trong khung nhìn · Esc hiện đủ</span></div>`
+    : '';
+  box.innerHTML = migrateBtn + viewNote + LIST_LEVELS.filter(level => openTabs.has(GROUP_LEVEL[level.key])).map(level => {
     const scoped = coreOnly && level.key === 'QHPK';
     const all = visible.filter(({ p }) => p.level === level.key);
     const items = scoped ? all.filter(({ p }) => p.wards.some(isCoreWard)) : all;
@@ -2381,8 +2452,9 @@ function drawOutlinesOn(m, list, below) {
       fillOpacity: fillOp
     };
     const shown = open && quietOutline ? { ...style, opacity: 0, fillOpacity: 0 } : style;
-    // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
-    if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
+    // Chỉ ranh đồ án đã mở lô (hoặc đang focus khi tắt lớp QHPK) không bắt chuột — click rơi xuống lô.
+    // Ranh đồ án khác vẫn bấm được khi phóng gần để chuyển sang và fitBounds toàn ranh.
+    if (open || (!state.showProjects && p.name === state.focusedProject)) {
       const shape = L.geoJSON(geom, { style: shown, interactive: false });
       shapes.push(shape);
       group.addLayer(shape);
@@ -2415,7 +2487,7 @@ function drawOutlinesOn(m, list, below) {
   }, 0);
 }
 
-// QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được.
+// Ranh đồ án chưa mở lô bấm được cả khi phóng gần (kể cả đang chọn đồ án khác). Đồ án đã mở lô: ranh không bắt chuột.
 // So sánh cấp độ: mỗi bản đồ chỉ ranh đúng cấp được chọn ở droplist.
 const LEVEL_KEY = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 const levelKeyOf = (id) => LEVEL_KEY[id] || null;
@@ -3072,6 +3144,7 @@ export function initProjectLayer(opts = {}) {
   };
   map?.on('zoomend', onHostZoom);
   planMap?.on('zoomend', onHostZoom);
+  [map, planMap].filter(Boolean).forEach(m => m.on('moveend zoomend', scheduleListForView));
   onCompareChange(redrawOutlines);
   onFacet((kind) => { if (kind === 'area') renderList(); });
   belowZoom = (() => {
