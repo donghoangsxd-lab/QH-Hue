@@ -191,26 +191,32 @@ if (WALL[0] < 240 || ROOF[0] >= WALL[0]) throw new Error('palette clay chưa tr�
 if (treeCap(200) !== 50 || treeCap(800) !== 200 || treeCap(100) !== 25 || treeCap('x') !== 0) {
   throw new Error(`treeCap ${treeCap(200)} ${treeCap(800)}`);
 }
-if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE_MIN_W}`);
+if (!(STREET_TREE_MIN_W <= 4.2)) throw new Error(`STREET_TREE_MIN_W phải ≤ noibo (${STREET_TREE_MIN_W})`);
 {
   const park = [[-40, -40], [40, -40], [40, 40], [-40, 40], [-40, -40]];
   const fromPark = scatterTrees([park], 200, 40, []);
   if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
-  const narrow = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 10 }]);
-  if (narrow.length !== 0) throw new Error(`đường 10m không được có cây (${narrow.length})`);
-  const noibo = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 4.2 }]);
-  if (noibo.length !== 0) throw new Error(`đường nội bộ không được có cây (${noibo.length})`);
-  const wide = scatterTrees([], 200, 40, [{ path: [[-120, 0], [120, 0]], width: 14 }]);
-  if (wide.length < 2) throw new Error(`đường ≥13.5m phải có cây (${wide.length})`);
+  // Cổng cứng: đoạn đường ngắn thật — phải ra cây trước khi đưa lên web.
+  const shortNoibo = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 4.2 }]);
+  if (shortNoibo.length < 4) throw new Error(`đoạn nội bộ 80m phải có ≥4 tán (got ${shortNoibo.length})`);
+  const shortTertiary = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 8 }]);
+  if (shortTertiary.length < 4) throw new Error(`đoạn tertiary 80m phải có ≥4 tán (got ${shortTertiary.length})`);
+  const shortTruc = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 16 }]);
+  if (shortTruc.length < 4) throw new Error(`đoạn trục 80m phải có ≥4 tán (got ${shortTruc.length})`);
+  // Hai bên lề: tán không được dồn một phía (y gần như cùng dấu).
+  const sides = shortNoibo.filter((t) => Math.abs(t.position[1]) > 1);
+  const pos = sides.filter((t) => t.position[1] > 0).length;
+  const neg = sides.filter((t) => t.position[1] < 0).length;
+  if (pos < 1 || neg < 1) throw new Error(`phải trồng hai bên lề (pos=${pos} neg=${neg})`);
+  const foot = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 2 }]);
+  if (foot.length !== 0) throw new Error(`lối đi bộ 2m không được có cây (${foot.length})`);
   const empty = scatterTrees([], 200, 40, []);
   if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
-  const parkFirst = scatterTrees(
-    [[[-30, -30], [30, -30], [30, 30], [-30, 30], [-30, -30]]],
-    200,
-    40,
-    [{ path: [[-90, 0], [90, 0]], width: 4.2 }]
-  );
-  if (parkFirst.length < 4) throw new Error(`ưu tiên cây công viên ${parkFirst.length}`);
+  // Công viên lớn không được nuốt hết — vẫn còn tán trên đường nội bộ.
+  const bigPark = [[-120, -120], [120, -120], [120, 120], [-120, 120], [-120, -120]];
+  const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 4.2 }]);
+  const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 12 && Math.abs(t.position[0]) > 130);
+  if (nearRoad.length < 6) throw new Error(`giữ budget ven đường khi có công viên lớn (ven đường ${nearRoad.length})`);
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
   throw new Error('thiếu đếm tán / tán billboard (sphere-like)');

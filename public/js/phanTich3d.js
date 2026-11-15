@@ -51,8 +51,8 @@ const EDGE_VOLUME_CAP = 900;
 const LOD_RADIUS_M = 500;
 /** Trần tán cây procedural (ScatterplotLayer), không mesh. */
 const TREE_CAP_MAX = 220;
-/** Chỉ gieo tán ven đường có bề rộng ≥ ngưỡng này (m) — đường lớn / trục. */
-const STREET_TREE_MIN_W = 13.5;
+/** Gieo tán ven đường có bề rộng ≥ ngưỡng này (m). Khớp ROAD_WIDTH.noibo trở lên. */
+const STREET_TREE_MIN_W = 4;
 const INFRA_LOT_DRAW_CAP = 40;
 const GLOW_STEPS = 4;
 const USE_FILL = {
@@ -178,7 +178,7 @@ const ROAD_COLOR = {
   rail: [120, 86, 150, 230],
   water: [96, 176, 214, 220]
 };
-/** khuvuc ≥ STREET_TREE_MIN_W để có hàng cây ven đường lớn. */
+/** Bề rộng ước lượng theo hạng OSM — mọi hạng ≥ STREET_TREE_MIN_W đều có hàng cây. */
 const ROAD_WIDTH = { truc: 16, khuvuc: 14, tertiary: 8, noibo: 4.2, xedap: 2.4, dibo: 2, rail: 5, water: 4 };
 const ARROW_RANK = new Set(['truc', 'khuvuc', 'tertiary']);
 
@@ -819,8 +819,8 @@ function treeDot(x, y, salt) {
 }
 
 /**
- * Tán cây: công viên/vùng xanh trước (phần lớn budget), rồi ven đường ≥ STREET_TREE_MIN_W.
- * treeRows: hàng cây OSM (natural=tree_row) — gieo như đường đủ rộng.
+ * Tán cây: công viên trước (≤ 55% budget), giữ phần còn lại cho ven đường ≥ STREET_TREE_MIN_W.
+ * Trồng hai bên lề. treeRows OSM gieo trên tâm hàng.
  */
 export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const out = [];
@@ -835,7 +835,9 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
     salt += 1;
     return true;
   };
-  const parkBudget = Math.max(40, Math.floor(limit * 0.72));
+  // Giữ chỗ cho hàng cây ven đường — công viên không được nuốt hết trần.
+  const streetReserve = Math.min(limit, Math.max(20, Math.floor(limit * 0.4)));
+  const parkBudget = Math.max(0, limit - streetReserve);
   for (const ring of rings || []) {
     if (out.length >= parkBudget) break;
     if (!ring || ring.length < 3) continue;
@@ -863,10 +865,11 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       }
     }
   }
-  const plantAlong = (path, width, stepM, sideM, budget) => {
+  const plantAlong = (path, width, stepM, sideM, budget, bothSides) => {
     if (!path || path.length < 2) return;
     let acc = 0;
-    const side = sideM != null ? sideM : Math.max(5, (width || 4) * 0.55 + 3);
+    const side = sideM != null ? sideM : Math.max(3.5, (width || 4) * 0.45 + 2.5);
+    const sides = bothSides === false ? [1] : (side === 0 ? [0] : [1, -1]);
     for (let i = 1; i < path.length && out.length < budget; i++) {
       const a = path[i - 1];
       const b = path[i];
@@ -877,9 +880,12 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       const uy = dy / len;
       const px = -uy;
       const py = ux;
-      let t = acc > 0 ? stepM - acc : stepM * 0.4;
+      let t = acc > 0 ? stepM - acc : stepM * 0.35;
       while (t < len && out.length < budget) {
-        push(a[0] + ux * t + px * side, a[1] + uy * t + py * side);
+        for (const s of sides) {
+          if (out.length >= budget) break;
+          push(a[0] + ux * t + px * side * s, a[1] + uy * t + py * side * s);
+        }
         t += stepM;
       }
       acc = (acc + len) % stepM;
@@ -887,13 +893,15 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   };
   for (const row of treeRows || []) {
     if (out.length >= limit) break;
-    plantAlong(row.path, STREET_TREE_MIN_W, 18, 0, limit);
+    plantAlong(row.path, STREET_TREE_MIN_W, 16, 0, limit, false);
   }
-  const roadStep = 34;
+  // Bước thưa theo bề rộng: đường hẹp (nội bộ) thưa hơn trục.
   for (const road of roads || []) {
     if (out.length >= limit) break;
-    if ((road.width || 0) < STREET_TREE_MIN_W) continue;
-    plantAlong(road.path, road.width, roadStep, null, limit);
+    const w = road.width || 0;
+    if (w < STREET_TREE_MIN_W) continue;
+    const stepM = w >= 13 ? 22 : w >= 7 ? 26 : 32;
+    plantAlong(road.path, w, stepM, null, limit, true);
   }
   return out;
 }
