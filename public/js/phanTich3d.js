@@ -45,7 +45,11 @@ export const LIGHT_PRESETS = {
     }
   }
 };
-const GOOGLE_SAT = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+// scale=2 → ô 512 px (sắc hơn ~1 cấp zoom, không thêm số request).
+const GOOGLE_SAT = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}&scale=2`;
+const SAT_TILE_PX = 512;
+const SAT_MAX_TILES = 100;
+const SAT_MAX_CANVAS = 4096;
 const EDGE_VOLUME_CAP = 900;
 /** Từ bán kính này (hoặc pointer coarse): bỏ mái/cạnh khối, giản PathLayer lô. */
 const LOD_RADIUS_M = 500;
@@ -487,18 +491,26 @@ function loadTileImage(url) {
 /** Ghép vệ tinh Google (lyrs=s, không nhãn POI). Tên đường lấy từ OSM TextLayer. */
 export async function composeGoogleGround(lat, lng, r, origin) {
   // Zoom cao khi bán kính nhỏ–trung; r lớn vẫn cố z17+. Hạ z nếu quá nhiều ô.
-  let z = r <= 200 ? 19 : r <= 400 ? 18 : 17;
+  let z = r <= 250 ? 19 : r <= 500 ? 18 : 17;
   let tiles = tilesFor(lat, lng, r * 1.08, z);
-  if (tiles.length > 64 && z > 16) {
+  while (tiles.length > SAT_MAX_TILES && z > 16) {
     z -= 1;
     tiles = tilesFor(lat, lng, r * 1.08, z);
   }
-  if (!tiles.length || tiles.length > 64) return null;
+  if (!tiles.length || tiles.length > SAT_MAX_TILES) return null;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+  let minTx = Infinity;
+  let maxTx = -Infinity;
+  let minTy = Infinity;
+  let maxTy = -Infinity;
   const cells = tiles.map(([tz, tx, ty], i) => {
+    if (tx < minTx) minTx = tx;
+    if (tx > maxTx) maxTx = tx;
+    if (ty < minTy) minTy = ty;
+    if (ty > maxTy) maxTy = ty;
     const [west, north] = tileCornerLngLat(tz, tx, ty);
     const [east, south] = tileCornerLngLat(tz, tx + 1, ty + 1);
     const corners = [
@@ -518,8 +530,11 @@ export async function composeGoogleGround(lat, lng, r, origin) {
   const spanX = maxX - minX;
   const spanY = maxY - minY;
   if (!(spanX > 1 && spanY > 1)) return null;
-  const px = Math.min(2048, Math.max(512, Math.round(Math.sqrt(cells.length) * 256)));
-  const scale = px / Math.max(spanX, spanY);
+  // Canvas theo lưới ô × 512 px (scale=2), kẹp SAT_MAX_CANVAS — tránh sqrt(n)*256 làm mất nét.
+  const nativeW = (maxTx - minTx + 1) * SAT_TILE_PX;
+  const nativeH = (maxTy - minTy + 1) * SAT_TILE_PX;
+  const fit = Math.min(1, SAT_MAX_CANVAS / Math.max(nativeW, nativeH));
+  const scale = (Math.max(nativeW, nativeH) * fit) / Math.max(spanX, spanY);
   const w = Math.max(2, Math.round(spanX * scale));
   const h = Math.max(2, Math.round(spanY * scale));
   const sat = document.createElement('canvas');

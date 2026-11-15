@@ -333,7 +333,7 @@ if (!html.includes('id="floorColors" type="checkbox" checked')) throw new Error(
 if (!js.includes('school_mn') || !js.includes('FAC_COUNT_IDS') || !panel.includes('school_mn') || !panel.includes('school_thpt') || !panel.includes("'10-PCCC': 'pccc'")) {
   throw new Error('thiếu tách cấp trường TT16 (3D + view3dPanel)');
 }
-if (!js.includes('r <= 200 ? 19') || !js.includes('tiles.length > 64') || !(js.includes('Math.min(2048') || js.includes('Math.min(1792'))) {
+if (!js.includes('r <= 250 ? 19') || !js.includes('SAT_MAX_TILES') || !js.includes('SAT_MAX_CANVAS') || !js.includes('scale=2')) {
   throw new Error('composeGoogleGround chưa nâng zoom/canvas/tile cap');
 }
 if (!osm.includes('tree_row') || !osm.includes('relation["type"="multipolygon"]')) {
