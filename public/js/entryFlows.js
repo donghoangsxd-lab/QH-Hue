@@ -43,11 +43,30 @@ function inHueBbox(lat, lng) {
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
 
-/** Tooltip gọn thay đoạn thuyết minh dài trên form Đề xuất. */
+/** Tooltip gọn — một vòng tròn, dấu ? giữa (không dùng SVG có sẵn vòng → tránh đôi viền). */
 function tipHtml(text, label = 'Gợi ý') {
   const tip = String(text || '').trim();
   if (!tip) return '';
-  return `<button type="button" class="entry-help" title="${escapeHtml(tip)}" aria-label="${escapeHtml(label)}"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>`;
+  return `<button type="button" class="entry-help" title="${escapeHtml(tip)}" aria-label="${escapeHtml(label)}"><span class="entry-help-q" aria-hidden="true">?</span></button>`;
+}
+
+/** Ba chỉ tiêu công suất gọn trên form đồ án mới (khớp CAPACITY_METRICS). */
+const HO_CAP_INLINE = [
+  { sector: 'cap-dien', chiTieu: 'cong-suat', label: 'Công suất cấp điện', unit: 'kVA' },
+  { sector: 'cap-nuoc', chiTieu: 'cong-suat', label: 'Công suất cấp nước', unit: 'm³/ngđ' },
+  { sector: 'thoat-nuoc-thai', chiTieu: 'cong-suat', label: 'Thoát nước', unit: 'm³/ngđ' }
+];
+
+function hoCapacityInlineHtml(draft = {}) {
+  const values = draft.values || {};
+  return `<div class="entry-row entry-row-3">${HO_CAP_INLINE.map((m) => {
+    const row = values[m.sector] || {};
+    return `<div class="entry-field">
+      <label>${escapeHtml(m.label)}</label>
+      <input data-ho-cs="${escapeHtml(m.sector)}" data-ho-chi="${escapeHtml(m.chiTieu)}" inputmode="decimal" value="${escapeHtml(row.giaTri || '')}" placeholder="${escapeHtml(m.unit)}" aria-label="${escapeHtml(m.label)}">
+      <input type="hidden" data-ho-unit="${escapeHtml(m.sector)}" value="${escapeHtml(row.donVi || m.unit)}">
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function entryPairs(fields) {
@@ -101,8 +120,8 @@ let ptTab = 'dvhc';
 let ktMode = 'quyche';
 let daGeom = null;
 let hoCs = { id: '', parent: '', values: {} };
-/** Diện tích (ha) / dân số tùy chọn — đối chiếu ±1% với ranh đo được. */
-let hoExtra = { areaHa: '', danSo: '' };
+/** Diện tích (ha) / dân số HT·QH tùy chọn — diện tích lệch ranh > 1% thì lỗi. */
+let hoExtra = { areaHa: '', danSoHt: '', danSoQh: '' };
 let crsId = 'HUE_3';
 let crsLon0 = '';
 const held = {};
@@ -279,11 +298,12 @@ function selectedArea(scopeId, unitId) {
 
 function officerBar() {
   if (isAdmin()) {
-    return `<div class="entry-officer-bar"><span class="entry-badge">Quản trị</span>${tipHtml('Đang đăng nhập quản trị. Chỉ tiêu, công trình và bản vẽ ghi thẳng bản công bố. Đồ án đã có lớp sử dụng đất hoặc ranh thì không thêm bản sao.')}</div>`;
+    const who = state.authUser && (state.authUser.email || state.authUser.name) || 'Quản trị';
+    return `<div class="entry-officer-bar"><span class="entry-badge" title="${escapeHtml(who)}">${escapeHtml(who)}</span>${tipHtml('Đang đăng nhập quản trị. Chỉ tiêu, công trình và bản vẽ ghi thẳng bản công bố. Đồ án đã có lớp sử dụng đất hoặc ranh thì không thêm bản sao.')}</div>`;
   }
   if (signedIn()) {
-    const who = state.authUser && (state.authUser.name || state.authUser.email) || '';
-    return `<div class="entry-officer-bar"><span class="entry-badge">Cán bộ · ${escapeHtml(who)}</span>${tipHtml('Danh sách đơn vị lấy từ tab CanBo. Bản gửi vào hàng chờ, chưa hiện trên bản đồ công khai.')}</div>`;
+    const who = state.authUser && (state.authUser.email || state.authUser.name) || 'Cán bộ';
+    return `<div class="entry-officer-bar"><span class="entry-badge" title="${escapeHtml(who)}">${escapeHtml(who)}</span>${tipHtml('Danh sách đơn vị lấy từ tab CanBo. Bản gửi vào hàng chờ, chưa hiện trên bản đồ công khai.')}</div>`;
   }
   return `<div class="entry-officer-bar"><span class="entry-badge">Chưa đăng nhập</span>${tipHtml('Đăng nhập Google. Email có trong tab CanBo và Trạng thái TRUE mới gửi được, đúng đơn vị được giao. Quản trị không bị khóa đơn vị.')}</div>`;
 }
@@ -712,7 +732,10 @@ function areaInputError() {
 
 function rememberHoExtra() {
   if ($('hoAreaHa')) hoExtra.areaHa = $('hoAreaHa').value || '';
-  if ($('hoDanSo')) hoExtra.danSo = $('hoDanSo').value || '';
+  if ($('hoDanSoHt')) hoExtra.danSoHt = $('hoDanSoHt').value || '';
+  if ($('hoDanSoQh')) hoExtra.danSoQh = $('hoDanSoQh').value || '';
+  // Tương thích ô dân số cũ nếu còn trong DOM.
+  if ($('hoDanSo') && !$('hoDanSoHt')) hoExtra.danSoHt = $('hoDanSo').value || '';
 }
 
 function showStepPreview(opts = {}) {
@@ -1002,35 +1025,42 @@ function hoMetaHtml(locked, scope, unit, levels) {
     </div>`;
 }
 
-/** Meta đồ án mới: tên + cấp bắt buộc; diện tích/dân số tùy chọn (diện tích lệch ranh > 1% → lỗi khi lưu). */
+/** Meta đồ án mới: tên|cấp; Diện tích|DS HT|DS QH; công suất điện|nước|thoát nước; đơn vị|phạm vi. */
 function hoNewMetaHtml(locked, scope, unit, levels, schemeNew) {
   const measured = ranhMeasuredHa();
-  const measuredTxt = measured != null
-    ? `${fmtNum(Math.round(measured * 100) / 100)} ha đo từ ranh`
-    : 'Chưa có ranh';
+  const measuredShort = measured != null
+    ? `${fmtNum(Math.round(measured * 100) / 100)} (đo từ ranh)`
+    : 'Đo từ ranh khi có';
   const areaErr = areaInputError();
-  const areaTip = 'Diện tích nhập tùy chọn. Lệch hơn 1% so với diện tích đo từ ranh thì báo lỗi, không lưu.';
+  const areaTip = 'Để trống thì dùng diện tích đo từ ranh. Nhập số lệch hơn 1% so với ranh → báo lỗi, không lưu.';
   return `<div class="entry-form" id="hoSchemeNewRow">
-      <div class="entry-field entry-field-full">
-        <label for="hoSchemeNew">Tên đồ án <span class="entry-req">*</span></label>
-        <input id="hoSchemeNew" maxlength="120" required placeholder="Tên trên bản đồ / bucket" value="${escapeHtml(schemeNew)}">
-      </div>
-      <div class="entry-row">
+      <div class="entry-row entry-row-name-level">
+        <div class="entry-field">
+          <label for="hoSchemeNew">Tên đồ án <span class="entry-req">*</span></label>
+          <input id="hoSchemeNew" maxlength="120" required placeholder="Tên trên bản đồ / bucket" value="${escapeHtml(schemeNew)}">
+        </div>
         <div class="entry-field">
           <label for="hoLevel">Cấp <span class="entry-req">*</span></label>
           <select id="hoLevel" required>${levels}</select>
         </div>
+      </div>
+      <div class="entry-row entry-row-3">
         <div class="entry-field">
-          <label for="hoDanSo">Dân số</label>
-          <input id="hoDanSo" type="text" inputmode="numeric" placeholder="Tùy chọn" value="${escapeHtml(hoExtra.danSo)}">
+          <label for="hoAreaHa">Diện tích (ha)${tipHtml(areaTip)}</label>
+          <input id="hoAreaHa" type="text" inputmode="decimal" placeholder="${escapeHtml(measuredShort)}" value="${escapeHtml(hoExtra.areaHa)}">
+          <span id="hoAreaMeasured" class="entry-sub" title="${escapeHtml(measuredShort)}">${escapeHtml(measured != null ? measuredShort : 'Chưa có ranh')}</span>
+          ${areaErr ? `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(areaErr)}</p>` : ''}
+        </div>
+        <div class="entry-field">
+          <label for="hoDanSoHt">Dân số hiện trạng</label>
+          <input id="hoDanSoHt" type="text" inputmode="numeric" placeholder="người" value="${escapeHtml(hoExtra.danSoHt)}">
+        </div>
+        <div class="entry-field">
+          <label for="hoDanSoQh">Dân số quy hoạch</label>
+          <input id="hoDanSoQh" type="text" inputmode="numeric" placeholder="người" value="${escapeHtml(hoExtra.danSoQh)}">
         </div>
       </div>
-      <div class="entry-field entry-field-full">
-        <label for="hoAreaHa">Diện tích (ha)${tipHtml(areaTip)}</label>
-        <input id="hoAreaHa" type="text" inputmode="decimal" placeholder="Tùy chọn" value="${escapeHtml(hoExtra.areaHa)}">
-        <span id="hoAreaMeasured" class="entry-sub" title="${escapeHtml(measuredTxt)}">${escapeHtml(measuredTxt)}</span>
-        ${areaErr ? `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(areaErr)}</p>` : ''}
-      </div>
+      ${hoCapacityInlineHtml(hoCs)}
       <div class="entry-row">
         <div class="entry-field">
           <label for="hoScope">Đơn vị</label>
@@ -1137,11 +1167,13 @@ function renderHoSo() {
   if (hoMode === 'new' && !steps.some(s => s.id === stepId)) stepId = 'ranh';
   else if (steps.length && !steps.some(s => s.id === stepId)) stepId = steps[0].id;
   const ranhReady = hasRanhPolygon();
+  const ranhTip = 'Bắt buộc với đồ án mới. DXF / KML / KMZ (ô RG). Polyline chưa khép sẽ tự đóng thành vùng. Bản vẽ VN-2000 cần đúng kinh tuyến trục. Quy ước tên: RG / HT / QH / KH - tên đồ án.';
   const nav = steps.map((s, i) => {
     const done = held[s.id] && !held[s.id].error && ((held[s.id].features && held[s.id].features.length) || held[s.id].file);
     const lockOpt = hoMode === 'new' && s.id !== 'ranh' && !ranhReady;
     const req = s.requiredNew && hoMode === 'new' ? ' *' : '';
-    return `<button type="button" class="entry-step-btn${s.id === stepId ? ' on' : ''}${lockOpt ? ' locked' : ''}" data-step="${s.id}"${lockOpt ? ' disabled title="Tải ranh giới trước"' : ''}>${i + 1}. ${escapeHtml(s.label)}${req}${done ? ' · có file' : ''}</button>`;
+    const tip = s.id === 'ranh' ? tipHtml(ranhTip, 'Gợi ý ranh giới') : '';
+    return `<button type="button" class="entry-step-btn${s.id === stepId ? ' on' : ''}${lockOpt ? ' locked' : ''}" data-step="${s.id}"${lockOpt ? ' disabled title="Tải ranh giới trước"' : ''}><span class="entry-step-label">${i + 1}. ${escapeHtml(s.label)}${req}${done ? ' · có file' : ''}</span>${tip}</button>`;
   }).join('');
   const levels = FACET_LEVELS.map(l => `<option value="${l.id}"${l.id === level ? ' selected' : ''}>${escapeHtml(l.label)}</option>`).join('');
   const files = `<div class="entry-steps" id="hoNav">${nav}</div>
@@ -1150,11 +1182,14 @@ function renderHoSo() {
     <button type="button" class="btn-submit btn-secondary" id="hoDownload">Tải GeoJSON đã gắn trục</button>
     <div id="hoStatus" class="rp-status" role="status"></div>`;
   const clipNote = `Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.`;
-  const tipNew = `Đồ án mới: (1) tải ranh DXF/KML/KMZ — polyline hở tự khép, bản đồ phóng tới ranh; (2) nhập tên + cấp (bắt buộc). Tối thiểu tên + ranh để hiện trên bản đồ. PDF / sử dụng đất / dân số / diện tích là tùy chọn. ${clipNote}`;
-  const tipAdd = `Bổ sung quyết định, quy chế, thuyết minh, ranh hoặc sử dụng đất vào đồ án đã có. ${clipNote}`;
+  const tipNew = `Đồ án mới: (1) tải ranh DXF/KML/KMZ — polyline hở tự khép, bản đồ phóng tới ranh; (2) nhập tên + cấp (bắt buộc). Tối thiểu tên + ranh để hiện trên bản đồ. PDF / sử dụng đất / lớp hạ tầng / dân số / diện tích / công suất là tùy chọn. ${clipNote}`;
+  const tipAdd = `Bổ sung quyết định, quy chế, thuyết minh, ranh, sử dụng đất hoặc lớp hạ tầng vào đồ án đã có. ${clipNote}`;
+  const tipAdjust = 'Điều chỉnh cục bộ: chọn đồ án, gửi PDF quyết định / DXF / ảnh scan ở khung bên dưới. Không chấm QCVN; lô gốc đồ án giữ nguyên. Quản trị ghi thẳng, cán bộ vào hàng chờ.';
+  let modeTip = '';
   let body = '';
   if (hoMode === 'adjust') {
-    body = `<div class="entry-head">${tipHtml('Điều chỉnh cục bộ: chọn đồ án, gửi PDF quyết định / DXF / ảnh scan ở khung bên dưới. Không chấm QCVN; lô gốc đồ án giữ nguyên. Quản trị ghi thẳng, cán bộ vào hàng chờ.')}</div>`;
+    modeTip = tipAdjust;
+    body = '';
   } else if (hoMode === 'net') {
     const sectors = `<div class="add-mode-switch entry-sub" id="htktSectors" role="tablist" aria-label="Ngành hạ tầng kỹ thuật">${
       SECTORS.map(s => `<button type="button" class="entry-sub-btn${s.id === netSector ? ' active' : ''}" data-sector="${s.id}">${escapeHtml(s.label)}</button>`).join('')
@@ -1165,18 +1200,19 @@ function renderHoSo() {
       ${hoMetaHtml(locked, scope, unit, levels)}
       ${files}`;
   } else if (hoMode === 'add') {
-    body = `<div class="entry-head">${tipHtml(tipAdd)}</div>
-      ${schemeSearchHtml()}
+    modeTip = tipAdd;
+    body = `${schemeSearchHtml()}
       ${hoMetaHtml(locked, scope, unit, levels)}
       ${hosoCapacityHtml(hoCs)}
       ${files}`;
   } else {
-    body = `<div class="entry-head">${tipHtml(tipNew)}</div>
-      ${hoNewMetaHtml(locked, scope, unit, levels, schemeNew)}
-      ${hosoCapacityHtml(hoCs)}
+    modeTip = tipNew;
+    body = `${hoNewMetaHtml(locked, scope, unit, levels, schemeNew)}
       ${files}`;
   }
   root.innerHTML = body;
+  const modeHelp = $('qhModeHelp');
+  if (modeHelp) modeHelp.innerHTML = modeTip ? tipHtml(modeTip) : '';
   $('htktSectors')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sector]');
     if (!btn) return;
@@ -1202,8 +1238,15 @@ function renderHoSo() {
       else measured?.insertAdjacentHTML('afterend', `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(err)}</p>`);
     } else if (warn) warn.remove();
   });
+  $('hoDanSoHt')?.addEventListener('input', rememberHoExtra);
+  $('hoDanSoQh')?.addEventListener('input', rememberHoExtra);
   $('hoDanSo')?.addEventListener('input', rememberHoExtra);
+  // Tip trong nút bước không đổi step.
+  $('hoNav')?.querySelectorAll('.entry-help').forEach((btn) => {
+    btn.addEventListener('click', (e) => e.stopPropagation());
+  });
   $('hoNav')?.addEventListener('click', (e) => {
+    if (e.target.closest('.entry-help')) return;
     const btn = e.target.closest('[data-step]');
     if (!btn || btn.disabled) return;
     if (hoMode === 'new' && btn.dataset.step !== 'ranh' && !hasRanhPolygon()) {
@@ -1351,9 +1394,13 @@ function renderActive(previewOpts = {}) {
       <input type="file" id="hoFile" accept=".pdf" hidden>
     </label>
     ${got ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.error ? ` — ${escapeHtml(got.error)}` : ''}</p>` : ''}` : '';
-  const stepTip = [limit, step.hint || '', step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục. Quy ước tên: RG / HT / QH / KH - tên đồ án.' : '']
+  const stepTip = [limit, step.hint || '', step.file === 'draw' && step.id !== 'ranh' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục. Quy ước tên: RG / HT / QH / KH - tên đồ án.' : '']
     .filter(Boolean).join(' ');
-  box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}${tipHtml(stepTip)}</h3>
+  // Ranh: tip đã gắn vào nút checklist — không lặp tiêu đề + ? riêng hàng.
+  const title = step.id === 'ranh'
+    ? ''
+    : `<h3 class="entry-step-title">${escapeHtml(step.label)}${tipHtml(stepTip)}</h3>`;
+  box.innerHTML = `${title}
     ${crs}
     ${pdfDrop}
     ${drawSlotsHtml(step, got)}
@@ -1646,10 +1693,12 @@ async function saveHoSo() {
         notes.push(gate.sentences.join(' ') || (gate.label === 'OK' ? 'quy mô hạ tầng: OK' : 'quy mô hạ tầng: chưa đủ dữ liệu'));
       }
     }
-    if (hoExtra.danSo.trim()) notes.push(`dân số ${hoExtra.danSo.trim()}`);
+    if (hoExtra.danSoHt.trim()) notes.push(`dân số HT ${hoExtra.danSoHt.trim()}`);
+    if (hoExtra.danSoQh.trim()) notes.push(`dân số QH ${hoExtra.danSoQh.trim()}`);
     const measured = ranhMeasuredHa();
     if (measured != null) notes.push(`ranh ${fmtNum(Math.round(measured * 100) / 100)} ha`);
     if (parseAreaHaInput(hoExtra.areaHa) > 0) notes.push(`diện tích nhập ${hoExtra.areaHa.trim()} ha`);
+    else if (measured != null) notes.push(`diện tích theo ranh ${fmtNum(Math.round(measured * 100) / 100)} ha`);
     const area = selectedArea('hoScope', 'hoUnit');
     const unitKey = area ? unitKeyOf(area.type, area.code) : '';
     for (const step of visibleSteps()) {

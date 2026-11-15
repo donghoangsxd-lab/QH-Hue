@@ -52,7 +52,10 @@ export function visibleEntrySteps({ hoMode, netSector, stepList }) {
   const steps = stepList || allEntrySteps();
   if (hoMode === 'net') return steps.filter(s => s.draw === 'network' && s.sector === netSector);
   if (hoMode === 'adjust') return [];
-  return steps.filter(s => s.draw !== 'network');
+  // Đồ án mới / Bổ sung: hồ sơ PDF·đất rồi đủ lớp HT/QH hạ tầng (giao thông, cấp nước…).
+  const base = steps.filter(s => s.draw !== 'network');
+  const nets = steps.filter(s => s.draw === 'network');
+  return [...base, ...nets];
 }
 
 export const DRAW_SUPPORTS = {

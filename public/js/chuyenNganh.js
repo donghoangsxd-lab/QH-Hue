@@ -1712,16 +1712,18 @@ function setUrbanLayer(on) {
   urban.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-/** Trục A + chia đôi: lớp Hệ thống đô thị, tắt QHC, cặp HT|QH (trái hiện trạng / phải quy hoạch). */
+/**
+ * Chia đôi mặc định: hệ thống đô thị HT (trái, QĐ 614) | QH (phải, QĐ 756), tắt nền QHC.
+ * Trục A giữ khóa droplist; mọi trục đều áp cặp này khi vừa bật chia đôi.
+ */
 function applyAdminUrbanSplit(on) {
-  if (!adminMapOn) return;
   if (on) {
     setLevel('urban', { keepView: true });
     showUrbanPlanOnBase(false);
     setClassicSplitSides();
     return;
   }
-  showUrbanPlanOnBase(adminColumn === 'QH');
+  if (adminMapOn) showUrbanPlanOnBase(adminColumn === 'QH');
 }
 
 function enterAdminMap() {
@@ -2314,8 +2316,12 @@ export function initChuyenNganh() {
     paintXahoiList();
     applyLayerQuery();
   });
+  let splitWasOn = false;
   onViewChange(({ view, split }) => {
-    if (adminMapOn && split) {
+    const justOn = !!split && !splitWasOn;
+    splitWasOn = !!split;
+    // Vừa bật chia đôi (mọi trục): mặc định cặp đô thị HT|QH. Trục A đang chia đôi: giữ khóa mỗi lần đổi view.
+    if (justOn || (adminMapOn && split)) {
       applyAdminUrbanSplit(true);
       paintViewSwitch();
       return;

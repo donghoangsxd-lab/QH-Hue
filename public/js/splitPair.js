@@ -1,24 +1,27 @@
-// Cặp so sánh khi chia đôi màn hình. Mặc định trái = hiện trạng, phải = quy hoạch (công trình) — đúng cách
-// chia đôi cũ. Droplist lớp mỗi bên gắn vào nhãn tiêu đề nửa màn hình (.swipe-label), không còn trong panel
-// Quy hoạch. Hai danh sách chọn linh hoạt: hiện trạng, quy hoạch, hoặc một cấp QH (hệ thống đô thị,
-// QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên bị loại khỏi danh sách bên kia.
-// Đổi cấp không đụng ô lớp ở panel.
-// Trục A (Quản lý phát triển đô thị): khóa cặp hiện trạng | quy hoạch và nhãn hệ thống đô thị; không chọn cấp QHC.
+// Cặp so sánh khi chia đôi màn hình. Mặc định khi bật: trái = hiện trạng hệ thống đô thị (QĐ 614),
+// phải = quy hoạch hệ thống đô thị (QĐ 756). Droplist lớp mỗi bên gắn vào nhãn tiêu đề nửa màn hình
+// (.swipe-label). Có thể đổi sang cấp QH (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500);
+// cấp đang chọn ở một bên bị loại khỏi danh sách bên kia. Đổi cấp không đụng ô lớp ở panel.
+// Trục A: khóa cặp đô thị HT|QH và nhãn cố định; không chọn cấp QHC.
 import { isSplitOn, onViewChange, planMap } from './planMap.js';
 import { LEVELS } from './mapLevel.js';
 import { browseState } from './facetStore.js';
 
 export const SPLIT_PAIR_EVENT = 'qh:split-pair';
 
+const URBAN_HT_LABEL = 'HIỆN TRẠNG HỆ THỐNG ĐÔ THỊ';
+const URBAN_QH_LABEL = 'QUY HOẠCH HỆ THỐNG ĐÔ THỊ';
+
 export const PAIR_OPTIONS = [
-  { id: 'ht', label: 'HIỆN TRẠNG', swipe: 'BẢN ĐỒ HIỆN TRẠNG' },
-  { id: 'qh', label: 'QUY HOẠCH', swipe: 'BẢN ĐỒ QUY HOẠCH' },
-  ...LEVELS.map(l => ({ id: l.id, label: l.label, swipe: l.label }))
+  { id: 'ht', label: URBAN_HT_LABEL, swipe: URBAN_HT_LABEL },
+  { id: 'qh', label: URBAN_QH_LABEL, swipe: URBAN_QH_LABEL },
+  // `urban` trùng nghĩa cặp ht|qh mặc định — không đưa vào droplist.
+  ...LEVELS.filter(l => l.id !== 'urban').map(l => ({ id: l.id, label: l.label, swipe: l.label }))
 ];
 
 const KEY = 'qh_split_pair';
-const CLASSIC_TITLE = 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ';
-const ADMIN_URBAN_TITLE = 'SO SÁNH HỆ THỐNG ĐÔ THỊ HIỆN TRẠNG – QUY HOẠCH';
+const CLASSIC_TITLE = 'SO SÁNH HỆ THỐNG ĐÔ THỊ HIỆN TRẠNG – QUY HOẠCH';
+const ADMIN_URBAN_TITLE = CLASSIC_TITLE;
 const byId = new Map(PAIR_OPTIONS.map(o => [o.id, o]));
 let leftMap = null;
 let sides = { left: 'ht', right: 'qh' };
@@ -93,7 +96,7 @@ export function setSplitSide(which, id) {
   emit();
 }
 
-/** Ép cặp hiện trạng | quy hoạch (dùng khi trục A bật chia đôi). */
+/** Ép cặp hệ thống đô thị HT | QH (mặc định khi bật chia đôi; trục A khóa droplist). */
 export function setClassicSplitSides() {
   if (sides.left === 'ht' && sides.right === 'qh') {
     paint();
@@ -126,8 +129,8 @@ function paint() {
   const rightFixed = rightPick?.querySelector('.swipe-label-fixed');
   if (leftPick) leftPick.classList.toggle('is-fixed', adminUrban);
   if (rightPick) rightPick.classList.toggle('is-fixed', adminUrban);
-  if (leftFixed) leftFixed.textContent = adminUrban ? 'ĐÔ THỊ HIỆN TRẠNG' : (byId.get(sides.left)?.swipe || '');
-  if (rightFixed) rightFixed.textContent = adminUrban ? 'ĐÔ THỊ QUY HOẠCH' : (byId.get(sides.right)?.swipe || '');
+  if (leftFixed) leftFixed.textContent = adminUrban ? URBAN_HT_LABEL : (byId.get(sides.left)?.swipe || '');
+  if (rightFixed) rightFixed.textContent = adminUrban ? URBAN_QH_LABEL : (byId.get(sides.right)?.swipe || '');
   const text = document.getElementById('mapTitleText');
   if (text && on) {
     const title = adminUrban
@@ -153,7 +156,6 @@ function bindSelect(id, which, label) {
   const el = document.getElementById(id);
   if (!el || el.dataset.bound) return;
   el.dataset.bound = '1';
-  el.classList.add('split-side-select', `split-side-${which}`);
   el.setAttribute('aria-label', label);
   el.title = label;
   el.addEventListener('change', () => setSplitSide(which, el.value));

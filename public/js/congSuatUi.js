@@ -131,7 +131,7 @@ export function hosoCapacityHtml(draft = {}) {
     </div>`;
   }).join('');
   return `<details class="cn-capacity">
-    <summary>Quy mô hạ tầng của đồ án <span class="entry-help" title="Khi ghi số, hệ thống đối chiếu trần cấp trên. Vượt trần thì chưa lưu. Thiếu số thì ghi «chưa đủ dữ liệu», không tính là đạt." role="img" aria-label="Gợi ý quy mô"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></span></summary>
+    <summary>Quy mô hạ tầng của đồ án <span class="entry-help" title="Khi ghi số, hệ thống đối chiếu trần cấp trên. Vượt trần thì chưa lưu. Thiếu số thì ghi «chưa đủ dữ liệu», không tính là đạt." role="img" aria-label="Gợi ý quy mô"><span class="entry-help-q" aria-hidden="true">?</span></span></summary>
     <div class="entry-form">
       <div class="entry-row">
         <div class="entry-field"><label for="hoCsId">Mã đồ án</label>

@@ -153,12 +153,12 @@
       aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
       <label class="swipe-label swipe-label-left" id="swipePickLeft">
         <select id="splitSideLeft" class="swipe-side-select" aria-label="Lớp bên trái"></select>
-        <span class="swipe-label-fixed" hidden>ĐÔ THỊ HIỆN TRẠNG</span>
+        <span class="swipe-label-fixed" hidden>HIỆN TRẠNG HỆ THỐNG ĐÔ THỊ</span>
       </label>
       <span class="swipe-handle"><svg class="ico"><use href="#i-swap"/></svg></span>
       <label class="swipe-label swipe-label-right" id="swipePickRight">
         <select id="splitSideRight" class="swipe-side-select" aria-label="Lớp bên phải"></select>
-        <span class="swipe-label-fixed" hidden>ĐÔ THỊ QUY HOẠCH</span>
+        <span class="swipe-label-fixed" hidden>QUY HOẠCH HỆ THỐNG ĐÔ THỊ</span>
       </label>
     </div>
 
@@ -1119,7 +1119,13 @@
 
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form propose-sheet map-float" id="tabAdd" hidden>
-        <div class="float-head"><b>Đề xuất</b><button type="button" class="float-close" id="btnProposeClose" aria-label="Đóng đề xuất"><svg class="ico"><use href="#i-close"/></svg></button></div>
+        <div class="float-head">
+          <b class="float-head-title">CHỌN LOẠI DỮ LIỆU ĐỀ XUẤT</b>
+          <div class="float-head-actions">
+            <div id="entryOfficer"></div>
+            <button type="button" class="float-close" id="btnProposeClose" aria-label="Đóng đề xuất"><svg class="ico"><use href="#i-close"/></svg></button>
+          </div>
+        </div>
         <div class="add-mode-switch entry-flows" id="entryFlows" role="tablist" aria-label="Sáu trục đề xuất">
           <button type="button" class="entry-flow-btn active" data-flow="flowPhatTrien" role="tab" aria-selected="true">Phát triển đô thị</button>
           <button type="button" class="entry-flow-btn" data-flow="flowQuyHoach" role="tab" aria-selected="false">Quy hoạch</button>
@@ -1128,7 +1134,6 @@
           <button type="button" class="entry-flow-btn" data-flow="flowKienTruc" role="tab" aria-selected="false">Kiến trúc</button>
           <button type="button" class="entry-flow-btn" data-flow="flowDuAn" role="tab" aria-selected="false">Dự án</button>
         </div>
-        <div id="entryOfficer"></div>
         <div id="flowPhatTrien">
           <div class="add-mode-switch entry-sub" id="ptTabs" role="tablist" aria-label="Thành phần phát triển đô thị">
             <button type="button" class="entry-sub-btn active" data-pt="dvhc" role="tab" aria-selected="true">Đơn vị hành chính</button>
@@ -1137,10 +1142,11 @@
           <div id="flowPhatTrienBody"></div>
         </div>
         <div id="flowQuyHoach" hidden>
-          <div class="add-mode-switch entry-sub" id="qhEntryTabs" role="tablist" aria-label="Thành phần quy hoạch">
+          <div class="add-mode-switch entry-sub entry-sub-help" id="qhEntryTabs" role="tablist" aria-label="Thành phần quy hoạch">
             <button type="button" class="entry-sub-btn active" data-qmode="new" role="tab" aria-selected="true">Đồ án mới</button>
             <button type="button" class="entry-sub-btn" data-qmode="add" role="tab" aria-selected="false">Bổ sung hồ sơ</button>
             <button type="button" class="entry-sub-btn" data-qmode="adjust" role="tab" aria-selected="false">Điều chỉnh cục bộ</button>
+            <span id="qhModeHelp" class="entry-mode-help"></span>
           </div>
           <div id="hoSoBox"></div>
           <div id="adjImportBox" class="adj-import" hidden>
@@ -1479,7 +1485,7 @@
         </div>
         <div id="flowHtxh" hidden>
           <div class="entry-head">
-            <button type="button" class="entry-help" title="Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án." aria-label="Gợi ý"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            <button type="button" class="entry-help" title="Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án." aria-label="Gợi ý"><span class="entry-help-q" aria-hidden="true">?</span></button>
           </div>
           <div id="addSingle">
         <div class="entry-form">

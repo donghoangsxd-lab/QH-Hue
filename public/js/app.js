@@ -388,7 +388,7 @@ export async function submitInfraPoint(prefix, extra = {}) {
 const VIEW_TITLES = {
   QH: 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ',
   HT: 'BẢN ĐỒ HIỆN TRẠNG THÀNH PHỐ HUẾ',
-  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ'
+  split: 'SO SÁNH HỆ THỐNG ĐÔ THỊ HIỆN TRẠNG – QUY HOẠCH'
 };
 const TITLE_OFF_KEY = 'qhhue_title_off';
 function initMapTitle() {

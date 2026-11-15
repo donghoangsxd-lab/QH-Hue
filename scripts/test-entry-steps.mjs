@@ -21,6 +21,8 @@ assert.ok(onlyNet.every(s => s.sector === 'cap-nuoc'));
 assert.equal(visibleEntrySteps({ hoMode: 'adjust', netSector: 'cap-nuoc', stepList: all }).length, 0);
 const land = visibleEntrySteps({ hoMode: 'new', netSector: 'cap-nuoc', stepList: all });
 assert.equal(land[0].id, 'ranh');
+assert.ok(land.some(s => s.draw === 'network'), 'do an moi co ca lop HT/QH ha tang');
+assert.ok(land.length > HOSO_STEPS.length);
 assert.ok(DRAW_SUPPORTS.dxf.includes('hoso'));
 assert.ok(DRAW_SUPPORTS.geojson.includes('batch'));
 assert.ok(!DRAW_SUPPORTS.shp.includes('hoso'));
