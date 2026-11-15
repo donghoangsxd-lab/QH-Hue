@@ -105,7 +105,23 @@ assert.ok(tram, 'thieu diem cong trinh dau moi');
 
 const bound = readDrawingText(dxf, 'dxf', 'boundary', { id: 'HUE_3' });
 assert.ok(bound.features.some(f => f.geometry.type === 'Polygon'));
-assert.ok(bound.features.some(f => f.geometry.type === 'LineString'));
+assert.ok(bound.features.every(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'),
+  'ranh chi giu vung; LINE 2 diem khong thanh polygon');
+
+// Polyline hở ≥ 3 đỉnh → tự khép thành Polygon
+const openDxf = `0\nSECTION\n2\nENTITIES\n${[
+  dxfPair(0, 'LWPOLYLINE'), dxfPair(8, 'RG'), dxfPair(90, 4), dxfPair(70, 0),
+  dxfPair(10, e.toFixed(3)), dxfPair(20, n.toFixed(3)),
+  dxfPair(10, (e + 100).toFixed(3)), dxfPair(20, n.toFixed(3)),
+  dxfPair(10, (e + 100).toFixed(3)), dxfPair(20, (n + 100).toFixed(3)),
+  dxfPair(10, e.toFixed(3)), dxfPair(20, (n + 100).toFixed(3))
+].join('')}0\nENDSEC\n0\nEOF\n`;
+const openBound = readDrawingText(openDxf, 'dxf', 'boundary', { id: 'HUE_3' });
+assert.equal(openBound.features.length, 1);
+assert.equal(openBound.features[0].geometry.type, 'Polygon');
+assert.equal(openBound.features[0].properties.closedFromLine, true);
+assert.ok((openBound.closedCount || 0) >= 1);
+assert.match(String(openBound.warning || ''), /tự khép|tu khep/i);
 
 const tagged = tagFeatures(land.features, {
   scheme: 'QHPK Thu thap', level: 'QHPK', sector: 'sdd', kind: 'hien-trang',

@@ -16,7 +16,8 @@ Ghi qua `stageOrPublish` (`entryKernel.js`) khi mẫu H: Admin → `adminFn`, Ca
 
 | Ý nghiệp vụ | Cửa UI mặc định | Parser | Action ghi | Không dùng làm đường chính |
 |-------------|-----------------|--------|------------|----------------------------|
-| Đồ án mới / bổ sung (checklist + DXF/KML/KMZ + KH) | `#hoSoBox` (B › mới/bổ sung) | `schemeIngest` / `drawingReaders` | `publishSchemeDraw` / `submitChoDuyet` | `#entryLegacy` (O batch) |
+| Đồ án mới (tối thiểu tên + ranh) | `#hoSoBox` › Đồ án mới: bước 1 ranh → tên + cấp bắt buộc; PDF/HT/QH/diện tích/dân số tùy chọn; diện tích lệch ranh > 1% → lỗi | `schemeIngest` / `drawingReaders` (`normalizeBoundaryFeatures` tự khép polyline) | `publishSchemeDraw` / `submitChoDuyet` | `#entryLegacy` (O batch) |
+| Bổ sung hồ sơ vào đồ án đã có | `#hoSoBox` › Bổ sung + `schemePickOptions` | cùng parser | cùng action ghi | Nuốt DXF tại catalog |
 | Batch TT16 / SHP·GeoJSON / điểm chức năng / dân số | `#entryLegacy` «Batch TT16» | `cadImportUi` | `importCadBatch` / `submitCadPending` | Không thay checklist hoso |
 | ĐCCB ghi hồ sơ | `#adjImportBox` | `adjustRecordFromDxf` | `submitAdjust` / `putAdjustDraw` | Form «Nhập hồ sơ» thứ hai trên Thẩm định (chỉ QCVN + prefill) |
 | ĐCCB chấm QCVN | Thẩm định › Điều chỉnh | `runAdjust` | — (deep-link + prefill → adj) | Ghi thẳng từ review mà bỏ adj |

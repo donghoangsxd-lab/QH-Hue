@@ -147,7 +147,53 @@ function pointFeature(ins, crs, axes) {
 
 function finish(features, stats, extra) {
   const warning = [extra && extra.warning, hueWarning(features)].filter(Boolean).join(' ');
-  return { features, stats, warning, crsLabel: extra && extra.crsLabel || '' };
+  return { features, stats, warning, crsLabel: extra && extra.crsLabel || '', ...(extra && extra.closedCount ? { closedCount: extra.closedCount } : {}) };
+}
+
+/** Đóng LineString (≥ 3 đỉnh) thành Polygon khép kín. */
+export function closeLineToPolygon(coords) {
+  if (!Array.isArray(coords) || coords.length < 3) return null;
+  const ring = [];
+  for (const c of coords) {
+    if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue;
+    const q = ring[ring.length - 1];
+    if (!q || Math.hypot(c[0] - q[0], c[1] - q[1]) > 1e-9) ring.push([c[0], c[1]]);
+  }
+  if (ring.length < 3) return null;
+  const a = ring[0], b = ring[ring.length - 1];
+  if (a[0] !== b[0] || a[1] !== b[1]) ring.push([a[0], a[1]]);
+  if (ring.length < 4) return null;
+  return { type: 'Polygon', coordinates: [ring] };
+}
+
+/**
+ * Ranh: Polygon giữ nguyên; LineString / MultiLineString (≥ 3 đỉnh) tự khép thành vùng.
+ * Đoạn thẳng 2 điểm bỏ (không đủ thành vùng).
+ */
+export function normalizeBoundaryFeatures(features) {
+  const out = [];
+  let closedCount = 0;
+  (features || []).forEach(f => {
+    const g = f && f.geometry;
+    if (!g) return;
+    if (g.type === 'Polygon' || g.type === 'MultiPolygon') {
+      out.push(f);
+      return;
+    }
+    const lines = g.type === 'LineString' ? [g.coordinates]
+      : (g.type === 'MultiLineString' ? g.coordinates : []);
+    lines.forEach(line => {
+      const poly = closeLineToPolygon(line);
+      if (!poly) return;
+      closedCount++;
+      out.push({
+        type: 'Feature',
+        geometry: poly,
+        properties: { ...(f.properties || {}), closedFromLine: true }
+      });
+    });
+  });
+  return { features: out, closedCount };
 }
 
 function readBag(bag, kind, crs, axes) {
@@ -157,11 +203,19 @@ function readBag(bag, kind, crs, axes) {
     return finish(features, { ...bag.stats, label: bag.inserts.length, labelOrphan: orphans.length }, { crsLabel: crs.label });
   }
   if (kind === 'boundary') {
-    const features = [
+    const raw = [
       ...bag.polygons.map(p => polyFeature(p, crs, axes)),
       ...bag.lines.map(l => lineFeature(l, crs, axes))
     ];
-    return finish(features, bag.stats, { crsLabel: crs.label });
+    const { features, closedCount } = normalizeBoundaryFeatures(raw);
+    const warn = closedCount
+      ? `Đã tự khép ${closedCount} đường thành vùng ranh.`
+      : '';
+    return finish(features, { ...bag.stats, closedOpen: closedCount }, {
+      crsLabel: crs.label,
+      warning: warn,
+      closedCount
+    });
   }
   const features = [
     ...bag.lines.map(l => lineFeature(l, crs, axes)),

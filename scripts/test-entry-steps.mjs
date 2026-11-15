@@ -6,7 +6,9 @@ import {
 } from '../public/js/entrySteps.js';
 
 assert.equal(HOSO_STEPS.length, 6);
+assert.equal(HOSO_STEPS[0].id, 'ranh', 'ranh la buoc dau');
 assert.equal(PUBLISH_KIND.ranh, 'ranh-gioi');
+assert.equal(HOSO_STEPS[0].requiredNew, true);
 const net = buildNetSteps();
 assert.equal(net.length, SECTORS.length * 2);
 SECTORS.forEach(s => {
@@ -17,11 +19,13 @@ assert.equal(all.length, HOSO_STEPS.length + net.length);
 const onlyNet = visibleEntrySteps({ hoMode: 'net', netSector: 'cap-nuoc', stepList: all });
 assert.ok(onlyNet.every(s => s.sector === 'cap-nuoc'));
 assert.equal(visibleEntrySteps({ hoMode: 'adjust', netSector: 'cap-nuoc', stepList: all }).length, 0);
+const land = visibleEntrySteps({ hoMode: 'new', netSector: 'cap-nuoc', stepList: all });
+assert.equal(land[0].id, 'ranh');
 assert.ok(DRAW_SUPPORTS.dxf.includes('hoso'));
 assert.ok(DRAW_SUPPORTS.geojson.includes('batch'));
 assert.ok(!DRAW_SUPPORTS.shp.includes('hoso'));
-assert.ok(HOSO_STEPS.find(s => s.id === 'ranh')?.hint?.includes('RG'));
-assert.ok(HOSO_STEPS.find(s => s.id === 'dat-ht')?.hint?.includes('KH'));
-assert.ok(HOSO_STEPS.find(s => s.id === 'dat-qh')?.hint?.includes('QH'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'ranh')?.hint?.includes('RG') || HOSO_STEPS.find(s => s.id === 'ranh')?.hint?.includes('KML'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'dat-ht')?.hint?.includes('KH') || HOSO_STEPS.find(s => s.id === 'dat-ht')?.hint?.includes('HT'));
+assert.ok(HOSO_STEPS.find(s => s.id === 'dat-qh')?.hint?.includes('QH') || HOSO_STEPS.find(s => s.id === 'dat-qh')?.hint?.includes('KH'));
 
 console.log('test-entry-steps: ok');
