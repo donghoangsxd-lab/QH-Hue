@@ -1571,7 +1571,7 @@ var KIEN_TRUC_SHEET = "KienTruc";
 var CANBO_SHEET = "CanBo";
 var CHO_DUYET_SHEET = "ChoDuyet";
 var CHO_DUYET_HEADERS = ["Id", "Email", "HoTen", "DonVi", "Loai", "DoAn", "TrangThai", "ThoiGian", "LyDo", "Gcs", "TomTat"];
-var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true, "van-ban": true, "quy-che": true, "du-an": true };
+var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true, "van-ban": true, "quy-che": true, "du-an": true, "so-tay-dccb": true };
 var CHI_TIEU_HEADERS = ["UnitKey", "UnitType", "UnitCode", "UnitName", "Field", "Value", "Officer", "ThoiGianCapNhat"];
 var KIEN_TRUC_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude", "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note", "Loai", "KhuVuc", "LinkAnh", "Link3D"];
 
@@ -1855,8 +1855,8 @@ function choDuyetRow_(values) {
 function addChoDuyet(body) {
   var kind = String(body.kind || "");
   if (!CHO_DUYET_KINDS[kind]) throw new Error("Loại hồ sơ không hợp lệ");
-  // Đề xuất dự án: mọi email Google đã xác thực phía Cloud Run; không khóa tab CanBo.
-  if (kind === "du-an") {
+  // Đề xuất dự án / ĐCCB text sổ tay: mọi email Google đã xác thực phía Cloud Run; không khóa tab CanBo.
+  if (kind === "du-an" || kind === "so-tay-dccb") {
     if (!body.email) throw new Error("Chưa đăng nhập Google");
   } else {
     assertCanWrite_(body.email, body.unit, false);

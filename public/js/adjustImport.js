@@ -616,10 +616,18 @@ async function submit() {
     const note = $('adjNote')?.value.trim() || '';
     const name = $('adjProject')?.value || '';
     let out;
+    let soTayMa = '';
+    try {
+      const { ensureSoTayItems } = await import('./catalogTable.js');
+      const { soTayMaForTenQH } = await import('./catalogTableCore.js');
+      const items = await ensureSoTayItems();
+      soTayMa = soTayMaForTenQH(name, items);
+    } catch (e) { /* sổ tay chưa tải */ }
+    const link = soTayMa ? { soTayMa } : {};
     if (!record) {
-      out = await sendAdjustment({ tenQH: name, title, note, sender, pdfOnly: true }, files.pdf, null);
+      out = await sendAdjustment({ tenQH: name, title, note, sender, pdfOnly: true, ...link }, files.pdf, null);
     } else {
-      const payload = { ...record.payload, ...(title ? { title } : {}), sender, note };
+      const payload = { ...record.payload, ...(title ? { title } : {}), sender, note, ...link };
       out = await sendAdjustment(payload, files.pdf, scanPart);
     }
     const savedId = out.item && out.item.id;

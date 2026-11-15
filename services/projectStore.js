@@ -2561,12 +2561,15 @@ function adjustView(it) {
     id: it.id, tenQH: it.tenQH, slug: it.slug, status: it.status, title, summary: title, codes: it.codes || [],
     boundary: it.boundary || null, bbox: it.bbox || null, lots: it.lots || 0, at: it.at || 0, stamp: it.stamp || '',
     sender: it.sender || '', note: it.note || '', verdict: it.verdict || '', pdf: it.pdf || null,
-    scan: it.scan || null, approvedAt: it.approvedAt || 0
+    scan: it.scan || null, approvedAt: it.approvedAt || 0,
+    soTayMa: it.soTayMa || '', dccbId: it.dccbId || ''
   };
 }
 
 /** Hồ sơ mới: đủ ranh + lô, hoặc pdfOnly (chỉ quyết định + tóm tắt, bản vẽ gắn sau). Admin ghi thẳng, người khác vào hàng chờ. */
-async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, note, verdict, approved, by, pdfOnly, owner }) {
+async function saveAdjustment({
+  tenQH, boundary, lots, codes, title, sender, note, verdict, approved, by, pdfOnly, owner, id: wantId, soTayMa, dccbId
+}) {
   const summary = cleanText(title, 300);
   const bound = pdfOnly ? null : cleanPolygonGeometry(boundary);
   const mode = adjustSubmitMode({
@@ -2583,13 +2586,19 @@ async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, not
     if (clean.some(l => !l)) throw adjustError('Có lô đất sai hình học hoặc nằm ngoài TP. Huế', 400);
   }
   const { name, slug } = await listedProject(tenQH);
+  const cur = await readAdjustIndex();
   if (!approved) {
-    const cur = await readAdjustIndex();
     if (cur.data.items.filter(x => x.status === 'pending').length >= ADJUST_PENDING_MAX) {
       throw adjustError('Hàng chờ duyệt điều chỉnh cục bộ đang đầy, vui lòng thử lại sau', 503);
     }
   }
-  const id = crypto.randomBytes(8).toString('hex');
+  let id = crypto.randomBytes(8).toString('hex');
+  const pref = String(wantId || '').trim().toLowerCase();
+  if (pref) {
+    if (!ADJUST_ID_RE.test(pref)) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+    if (cur.data.items.some(x => x && x.id === pref)) throw adjustError('Mã hồ sơ điều chỉnh đã có', 409);
+    id = pref;
+  }
   if (mode.mode === 'draw') {
     const text = JSON.stringify({ v: 1, id, tenQH: name, boundary: bound, lots: clean });
     if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hình ranh và lô đất lớn hơn 1,5 MB, hãy giản lược đỉnh trong CAD', 413);
@@ -2605,11 +2614,51 @@ async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, not
     boundary: bound, bbox: bound ? bboxOf(bound) : null, lots: clean.length, at, stamp: vnStamp(at),
     sender: cleanText(sender, 80), note: cleanText(note, 300), verdict: cleanText(verdict, 40), pdf: null
   };
+  const ma = cleanText(soTayMa, 32);
+  if (ma) meta.soTayMa = ma;
+  const childId = cleanText(dccbId, 40);
+  if (childId) meta.dccbId = childId;
   if (approved) { meta.approvedAt = at; meta.by = cleanText(by, 120); }
   const who = cleanText(owner, 120).toLowerCase();
   if (who) meta.owner = who;
-  const saved = await updateAdjustIndex(cur => ({ ...cur, items: [...cur.items, meta] }));
+  const saved = await updateAdjustIndex(c => ({ ...c, items: [...c.items, meta] }));
   return { ...adjustView(meta), via: saved.via };
+}
+
+/** Tạo hoặc lấy stub pdfOnly theo id (ĐCCB text → gắn bản vẽ sau). */
+async function ensureAdjustStub({ tenQH, title, id, soTayMa, dccbId, approved, by, owner }) {
+  const want = String(id || '').trim().toLowerCase();
+  if (want && !ADJUST_ID_RE.test(want)) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+  if (want) {
+    const cur = await readAdjustIndex();
+    const hit = cur.data.items.find(x => x && x.id === want);
+    if (hit) {
+      let next = hit;
+      const ma = cleanText(soTayMa, 32);
+      const childId = cleanText(dccbId, 40);
+      if ((ma && hit.soTayMa !== ma) || (childId && hit.dccbId !== childId)) {
+        await updateAdjustIndex(c => ({
+          ...c,
+          items: c.items.map(x => (x.id === want
+            ? { ...x, soTayMa: ma || x.soTayMa || '', dccbId: childId || x.dccbId || '' }
+            : x))
+        }));
+        next = { ...hit, soTayMa: ma || hit.soTayMa || '', dccbId: childId || hit.dccbId || '' };
+      }
+      return { ...adjustView(next), existed: true };
+    }
+  }
+  return saveAdjustment({
+    tenQH,
+    title: title || 'Điều chỉnh cục bộ',
+    pdfOnly: true,
+    id: want || undefined,
+    soTayMa,
+    dccbId,
+    approved: !!approved,
+    by,
+    owner
+  });
 }
 
 /** Gắn ranh + lô vào hồ sơ đã có (thường là hồ sơ mới chỉ có quyết định). Người gửi chỉ gắn khi còn chờ duyệt và chưa có lô. */
@@ -3330,7 +3379,7 @@ module.exports = {
   saveProjectDoc, removeProjectDoc, docRoleLabel, saveNet, saveKienTrucPdf, saveCtPhapPdf, saveCtPhapAnh, removeCtPhapAnh,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
-  saveAdjustment, attachAdjustDraw, attachAdjustPdf, attachAdjustScan, listAdjustments, listOwnAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
+  saveAdjustment, ensureAdjustStub, attachAdjustDraw, attachAdjustPdf, attachAdjustScan, listAdjustments, listOwnAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
   patchAdjustLot, approveAdjustment, removeAdjustment,
   listSchemeSddScans, putSchemeSddScan, deleteSchemeSddScan, schemeSddScanObject
 };

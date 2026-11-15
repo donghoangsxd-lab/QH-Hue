@@ -20,7 +20,8 @@ const KIND_LABEL = {
   'ban-ve': 'Bản vẽ hạ tầng',
   'van-ban': 'Văn bản PDF',
   'quy-che': 'Quy chế kiến trúc',
-  'du-an': 'Dự án đầu tư'
+  'du-an': 'Dự án đầu tư',
+  'so-tay-dccb': 'ĐCCB sổ tay (text)'
 };
 const PDF_KIND = new Set(['van-ban', 'quy-che']);
 const HTKT_SET = new Set(HTKT_POINT_CODES);
@@ -140,7 +141,9 @@ function pendingPoints() {
 function rowHtml(row) {
   const id = escapeHtml(row.id || '');
   const kind = KIND_LABEL[row.kind] || row.kind || '';
-  const view = PDF_KIND.has(row.kind) ? 'Xem PDF' : 'Xem trên bản đồ';
+  const view = PDF_KIND.has(row.kind)
+    ? 'Xem PDF'
+    : (row.kind === 'so-tay-dccb' ? 'Xem tóm tắt' : 'Xem trên bản đồ');
   return `<article class="cad-item">
     <b>${escapeHtml(kind)}</b>
     <span>${escapeHtml(row.unit || '')}${row.tenQH ? ` · ${escapeHtml(row.tenQH)}` : ''}</span>
@@ -239,6 +242,22 @@ async function onListClick(event) {
     }
     if (button.dataset.act === 'preview') {
       const data = await post('previewChoDuyet', { id });
+      if ((button.dataset.kind || data.kind) === 'so-tay-dccb') {
+        clearPreview();
+        clearKeep();
+        const f = data.fields || {};
+        const bits = [
+          f.ma && `Mã cha: ${f.ma}`,
+          f.ten && `Tên: ${f.ten}`,
+          f.quyetDinh && `QĐ: ${f.quyetDinh}`,
+          f.ngay && `Ngày: ${f.ngay}`,
+          f.coQuan && `Cấp: ${f.coQuan}`
+        ].filter(Boolean);
+        if (status) status.textContent = bits.length
+          ? `ĐCCB text chờ duyệt — ${bits.join(' · ')}. Bấm Duyệt để ghi vào sổ tay.`
+          : (data.summary || 'ĐCCB text chờ duyệt.');
+        return;
+      }
       if (data.pdf || PDF_KIND.has(button.dataset.kind || '')) {
         clearPreview();
         clearKeep();

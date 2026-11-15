@@ -11,13 +11,15 @@ import {
 } from './investLayer.js';
 import { postAdmin } from './wardRoads.js';
 import { gcsUrl } from './api.js';
+import { postEntry } from './entryKernel.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
   groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, rowsToCsv, downloadCsv,
   STATUS, PLAN_TABLE_COLS, PLAN_SORT_COLUMNS, formatPhaseLayerLabel,
-  mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf
+  mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf,
+  newAdjustId, soTayMaForTenQH, tenQHOfSoTayItem
 } from './catalogTableCore.js';
 
 const $ = (id) => document.getElementById(id);
@@ -293,7 +295,9 @@ function setEditMode(mode, parentMa = '') {
       : (isEdit
         ? 'Sửa tên, phường/xã, quyết định, diện tích, dân số — lưu overlay, không đụng file sổ tay gốc.'
         : (isDccb
-          ? 'Dòng điều chỉnh cục bộ sẽ nằm dưới mã đồ án cha.'
+          ? (isAdmin()
+            ? 'Ghi ĐCCB text dưới mã đồ án cha. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.'
+            : 'Gửi ĐCCB text chờ Admin duyệt. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.')
           : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).')));
 
   panel.querySelectorAll('[data-edit="project"]').forEach((el) => {
@@ -364,6 +368,8 @@ function setEditMode(mode, parentMa = '') {
   } else if (tenInp) {
     tenInp.placeholder = 'Tên đồ án quy hoạch';
   }
+  const saveBtn = $('btnCatalogEditSave');
+  if (saveBtn) saveBtn.textContent = (isDccb && !isAdmin()) ? 'Gửi chờ duyệt' : 'Ghi';
   panel.hidden = false;
   if (isLink) boundSel?.focus();
   else if (isAdopt) ($('catalogEditSoTayMa') || $('catalogAdoptKind'))?.focus();
@@ -408,12 +414,126 @@ function openAddProject() {
 }
 
 function openAddDccb(ma) {
-  if (!isAdmin()) {
-    showToast('Cần đăng nhập Admin để thêm ĐCCB', 'info');
+  if (!ma) return;
+  // User/cán bộ: gửi text ĐCCB chờ duyệt; Admin ghi thẳng. File bản vẽ → nút Đề xuất bên phải.
+  if (!isAdmin() && !state.authToken) {
+    showToast('Đăng nhập Google rồi bấm lại + để gửi ĐCCB text chờ duyệt. File PDF/DXF/… dùng nút Đề xuất bên phải.', 'info');
     return;
   }
-  if (!ma) return;
   setEditMode('dccb', ma);
+}
+
+async function ensureAdjustStubForDccb({ tenQH, title, adjustId, soTayMa, dccbId }) {
+  const name = String(tenQH || '').trim();
+  if (!name || !adjustId) return null;
+  try {
+    const data = await postEntry('ensureAdjustStub', {
+      tenQH: name,
+      title: title || 'Điều chỉnh cục bộ',
+      id: adjustId,
+      soTayMa,
+      dccbId
+    });
+    return data.item || null;
+  } catch (err) {
+    // Đồ án chưa có trên catalog bản đồ — ĐCCB text vẫn giữ adjustId.
+    return null;
+  }
+}
+
+async function openDccbAttach(parentRow, child) {
+  const ma = String(parentRow?.maDoAn || parentRow?.id || '').trim();
+  const parent = (soTayItems || []).find((it) => it.ma === ma) || parentRow;
+  const tenQH = String(parentRow?.zoomKey || parentRow?.fullName || tenQHOfSoTayItem(parent) || '').trim();
+  const title = String(child?.ten || 'Điều chỉnh cục bộ').trim();
+  let adjustId = String(child?.adjustId || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{16}$/.test(adjustId)) adjustId = newAdjustId();
+  if (!tenQH) {
+    showToast('Đồ án chưa có tên trên bản đồ — gắn ranh trước hoặc mở Đề xuất › Điều chỉnh thủ công.', 'info');
+    return;
+  }
+  await ensureAdjustStubForDccb({
+    tenQH,
+    title,
+    adjustId,
+    soTayMa: ma,
+    dccbId: child?.id
+  });
+  // Ghi adjustId vào overlay nếu dòng ĐCCB chưa có (Admin).
+  if (isAdmin() && ma && child?.id && !child.adjustId) {
+    try {
+      const next = {
+        v: 1,
+        saved: soTayEdits.saved || 0,
+        projects: [...(soTayEdits.projects || [])],
+        dccb: [...(soTayEdits.dccb || [])],
+        links: [...(soTayEdits.links || [])],
+        patches: [...(soTayEdits.patches || [])]
+      };
+      const i = next.dccb.findIndex((x) => String(x?.child?.id || '') === String(child.id));
+      const row = { ma, child: { ...child, adjustId, ten: title } };
+      if (i >= 0) next.dccb[i] = row;
+      else next.dccb.push(row);
+      await persistEdits(next);
+      soTayEdits = { ...next, saved: Date.now() };
+      writeLocalEdits(soTayEdits);
+      applyEditsToBase();
+      await refresh();
+    } catch (err) { /* vẫn mở form gắn file */ }
+  }
+  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+  const { openEntryFlow } = await import('./entryFlows.js');
+  const { focusAdjustSupplement } = await import('./adjustImport.js');
+  openEntryFlow('flowQuyHoach', { qmode: 'adjust' });
+  focusAdjustSupplement(tenQH, adjustId);
+  showToast(`Đã mở Đề xuất › Điều chỉnh — gắn PDF/DXF cho «${title}».`, 'info');
+}
+
+async function submitPendingDccb() {
+  const ma = String($('catalogEditParentMa')?.value || '').trim();
+  const ten = String($('catalogEditTen')?.value || '').trim();
+  const qd = String($('catalogEditQd')?.value || '').trim();
+  const ngay = String($('catalogEditNgay')?.value || '').trim();
+  const coQuan = String($('catalogEditCoQuan')?.value || '').trim();
+  if (!ma || !ten) {
+    showToast('Nhập tên ĐCCB', 'info');
+    return;
+  }
+  if (ngay && !planYearOf(ngay)) {
+    showToast('Ngày ban hành cần dạng dd/mm/yyyy', 'info');
+    return;
+  }
+  const parent = (soTayItems || []).find((it) => it.ma === ma);
+  if (!parent) {
+    showToast('Không tìm thấy đồ án cha', 'error');
+    return;
+  }
+  const adjustId = newAdjustId();
+  const dccbId = nextDccbId(ma, parent.children);
+  editBusy = true;
+  try {
+    await postEntry('submitChoDuyet', {
+      kind: 'so-tay-dccb',
+      unitKey: 'tp:TP',
+      tenQH: tenQHOfSoTayItem(parent) || parent.ten || ma,
+      summary: `ĐCCB · ${ten}`.slice(0, 180),
+      fields: {
+        ma,
+        ten,
+        quyetDinh: qd,
+        ngay,
+        coQuan,
+        id: dccbId,
+        adjustId
+      }
+    });
+    closeEditPanel();
+    showToast('Đã gửi ĐCCB chờ Admin duyệt. Sau khi duyệt, dùng «Gắn hồ sơ» trên dòng ĐCCB để thêm PDF/DXF.', 'success');
+  } catch (err) {
+    showToast(err?.message || 'Không gửi được ĐCCB', 'error');
+  } finally {
+    editBusy = false;
+  }
 }
 
 function openEditProject(ma) {
@@ -459,8 +579,14 @@ function parseAreaHa(raw) {
 
 async function submitEdit(e) {
   e.preventDefault();
-  if (editBusy || !isAdmin()) return;
+  if (editBusy) return;
   const mode = $('catalogEditMode')?.value || 'project';
+  // Chỉ ĐCCB text cho phép user gửi chờ duyệt; thêm/sửa đồ án và gán ranh vẫn chỉ Admin.
+  if (mode === 'dccb' && !isAdmin()) {
+    await submitPendingDccb();
+    return;
+  }
+  if (!isAdmin()) return;
   const ten = String($('catalogEditTen')?.value || '').trim();
   const qd = String($('catalogEditQd')?.value || '').trim();
   const ngay = String($('catalogEditNgay')?.value || '').trim();
@@ -578,10 +704,12 @@ async function submitEdit(e) {
         showToast('Không tìm thấy đồ án cha', 'error');
         return;
       }
+      const adjustId = newAdjustId();
+      const dccbId = nextDccbId(ma, parent.children);
       next.dccb.push({
         ma,
         child: {
-          id: nextDccbId(ma, parent.children),
+          id: dccbId,
           loaiDong: 'dccb',
           ten,
           quyetDinh: qd,
@@ -589,9 +717,17 @@ async function submitEdit(e) {
           coQuan,
           dienTichText: '',
           danSo: '',
-          ghiChu: 'Thêm bởi admin'
+          ghiChu: 'Thêm bởi admin',
+          adjustId
         }
       });
+      // Stub hồ sơ điều chỉnh để nút «Gắn hồ sơ» mở đúng id.
+      const tenQH = tenQHOfSoTayItem(parent);
+      if (tenQH) {
+        try {
+          await ensureAdjustStubForDccb({ tenQH, title: ten, adjustId, soTayMa: ma, dccbId });
+        } catch (stubErr) { /* ĐCCB text vẫn lưu */ }
+      }
     } else {
       const ma = String($('catalogEditMa')?.value || '').trim().toUpperCase();
       const cap = String($('catalogEditCap')?.value || 'QHPK').trim();
@@ -631,12 +767,8 @@ async function submitEdit(e) {
     } else if (mode === 'adopt') {
       offerTenQH = String($('catalogEditTenQH')?.value || $('catalogEditParentMa')?.value || '').trim();
       offerMode = ($('catalogAdoptKind')?.value === 'new') ? 'new' : 'add';
-    } else if (mode === 'dccb') {
-      const parentMa = String($('catalogEditParentMa')?.value || '').trim();
-      const parent = (soTayItems || []).find((it) => it.ma === parentMa);
-      offerTenQH = parent?.tenQH || parent?.ten || parentMa;
-      offerMode = 'adjust';
     }
+    // ĐCCB: không mở Điều chỉnh file — PDF/DXF/KML/GeoJSON qua nút Đề xuất bên phải.
     const saved = await persistEdits(next);
     soTayEdits = { ...next, saved: Date.now() };
     writeLocalEdits(soTayEdits);
@@ -649,7 +781,8 @@ async function submitEdit(e) {
       : (mode === 'adopt'
         ? 'Đã ghi sổ tay'
         : (mode === 'edit' ? 'Đã sửa đồ án' : (mode === 'dccb' ? 'Đã ghi ĐCCB' : 'Đã ghi đồ án')));
-    showToast(`${label} ${okRemote}`, saved.remote ? 'success' : 'info');
+    const fileHint = mode === 'dccb' ? ' Dùng «Gắn hồ sơ» trên dòng ĐCCB để thêm PDF/DXF.' : '';
+    showToast(`${label} ${okRemote}.${fileHint}`, saved.remote ? 'success' : 'info');
     if (offerTenQH && offerMode) offerCatalogSchemeEntry(offerTenQH, offerMode);
   } finally {
     editBusy = false;
@@ -904,18 +1037,18 @@ function dataCellHtml(r) {
   return `<td class="catalog-data" title="${escapeHtml(tip)}">${escapeHtml(label)}</td>`;
 }
 
-/** Nút + cuối hàng: thêm thông tin / lớp (user gửi duyệt; Admin thêm trực tiếp hoặc gán ranh / sổ tay). */
+/** Nút + cuối hàng: chỉ ĐCCB text (user → chờ duyệt; Admin ghi thẳng). File bản vẽ → nút Đề xuất bên phải. */
 function addDataCellHtml(r) {
   const tenQH = String(r.zoomKey || r.fullName || r.name || '').trim();
   const ma = String(r.maDoAn || '').trim();
-  if (!tenQH && !ma) return '<td class="catalog-add-cell">—</td>';
+  if (!ma) return '<td class="catalog-add-cell">—</td>';
   const attrs = [
     tenQH ? `data-catalog-add-tenqh="${escapeHtml(tenQH)}"` : '',
-    ma ? `data-catalog-add-ma="${escapeHtml(ma)}"` : '',
+    `data-catalog-add-ma="${escapeHtml(ma)}"`,
     r.status ? `data-catalog-add-status="${escapeHtml(r.status)}"` : '',
     r.hasBoundary ? 'data-catalog-add-bound="1"' : ''
   ].filter(Boolean).join(' ');
-  return `<td class="catalog-add-cell"><button type="button" class="catalog-add-data" ${attrs} title="Thêm thông tin hoặc lớp dữ liệu" aria-label="Thêm thông tin hoặc lớp dữ liệu">${ico('plus')}</button></td>`;
+  return `<td class="catalog-add-cell"><button type="button" class="catalog-add-data" ${attrs} title="Bổ sung ĐCCB text (chờ Admin duyệt). File PDF/DXF/…: nút Đề xuất bên phải." aria-label="Bổ sung ĐCCB text">${ico('plus')}</button></td>`;
 }
 
 function levelCellHtml(r) {
@@ -927,8 +1060,11 @@ function levelCellHtml(r) {
 function planChildRowHtml(parent, child, isLast) {
   const tag = child.loaiDong === 'dinh_chinh' ? 'Đính chính' : 'ĐCCB';
   const name = String(child.ten || tag).trim() || tag;
+  const attach = child.loaiDong !== 'dinh_chinh'
+    ? `<button type="button" class="catalog-dccb-attach" data-catalog-dccb-attach="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id || '')}" title="Gắn hồ sơ PDF/DXF (Đề xuất › Điều chỉnh)" aria-label="Gắn hồ sơ điều chỉnh">${ico('plus')}</button>`
+    : '';
   // Đủ 13 <td> giống hàng cha; cấp độ + PX kế thừa đồ án cha (không tách khi sắp xếp).
-  return `<tr class="catalog-dccb-row${isLast ? ' is-last' : ''}" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}">
+  return `<tr class="catalog-dccb-row${isLast ? ' is-last' : ''}" data-catalog-parent="${escapeHtml(parent.id)}" data-catalog-child="${escapeHtml(child.id)}"${child.adjustId ? ` data-catalog-adjust="${escapeHtml(child.adjustId)}"` : ''}>
     <td class="st-num catalog-dccb-empty"></td>
     <td class="catalog-ma catalog-dccb-empty"></td>
     ${nameCellHtml(name, 'catalog-dccb-name')}
@@ -941,24 +1077,22 @@ function planChildRowHtml(parent, child, isLast) {
     <td class="catalog-pop">${cellOrDash(child.danSo)}</td>
     <td class="catalog-docs catalog-dccb-empty" title="${escapeHtml(tag)}">—</td>
     <td class="catalog-data catalog-dccb-empty">—</td>
-    <td class="catalog-add-cell catalog-dccb-empty"></td>
+    <td class="catalog-add-cell">${attach}</td>
   </tr>`;
 }
 
 function planRowHtml(r, stt) {
   const name = displayName(r);
   const ma = String(r.maDoAn || '').trim();
-  const addDccb = (isAdmin() && ma)
-    ? `<button type="button" class="catalog-add-dccb" data-catalog-add-dccb="${escapeHtml(ma)}" title="Thêm điều chỉnh cục bộ" aria-label="Thêm điều chỉnh cục bộ">${ico('plus')}</button>`
-    : '';
+  // Sửa/xóa chỉ Admin; thêm ĐCCB text dùng cột + cuối hàng (mọi user đã đăng nhập).
   const editBtn = (isAdmin() && ma)
-    ? `<button type="button" class="catalog-edit-row" data-catalog-edit-ma="${escapeHtml(ma)}" title="Sửa tên, phường/xã, quyết định, diện tích, dân số" aria-label="Sửa đồ án">${ico('pen')}</button>`
+    ? `<button type="button" class="catalog-edit-row" data-catalog-edit-ma="${escapeHtml(ma)}" title="Sửa tên, phường/xã, quyết định, diện tích, dân số (chỉ Admin)" aria-label="Sửa đồ án">${ico('pen')}</button>`
     : '';
   const kids = Array.isArray(r.children) ? r.children : [];
   const hasKids = kids.length > 0;
   const parent = `<tr class="catalog-parent-row${hasKids ? ' has-kids' : ''}" data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
     <td class="st-num">${stt}</td>
-    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${addDccb}${editBtn}</td>
+    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${editBtn}</td>
     ${nameCellHtml(name)}
     ${levelCellHtml(r)}
     ${wardCellHtml(r)}
@@ -1375,8 +1509,8 @@ async function onZoom(key) {
   }
 }
 
-/** Nút + cuối hàng: Admin thiếu ranh/sổ tay → gán; còn lại mở Bổ sung (user gửi duyệt / Admin thêm trực tiếp). */
-async function onAddDataClick(btn) {
+/** Nút + cuối hàng: chỉ ĐCCB text. Admin thiếu ranh/sổ tay vẫn được gán trước; file bản vẽ → Đề xuất bên phải. */
+function onAddDataClick(btn) {
   const tenQH = String(btn.dataset.catalogAddTenqh || '').trim();
   const ma = String(btn.dataset.catalogAddMa || '').trim();
   const status = String(btn.dataset.catalogAddStatus || '').trim();
@@ -1389,19 +1523,11 @@ async function onAddDataClick(btn) {
     openLinkBound(ma);
     return;
   }
-  if (!tenQH) {
-    showToast('Chưa có tên đồ án để bổ sung dữ liệu', 'info');
+  if (!ma) {
+    showToast('Đồ án chưa có mã sổ tay — không bổ sung ĐCCB text được. File bản vẽ dùng nút Đề xuất bên phải.', 'info');
     return;
   }
-  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
-  const { focusHoSoSupplement } = await import('./entryFlows.js');
-  focusHoSoSupplement(tenQH, { qmode: 'add' });
-  showToast(
-    isAdmin()
-      ? `Đã mở Đề xuất › Bổ sung cho «${tenQH}» (Admin thêm trực tiếp).`
-      : `Đã mở Đề xuất › Bổ sung cho «${tenQH}» — gửi chờ Admin duyệt.`,
-    'info'
-  );
+  openAddDccb(ma);
 }
 
 export function initCatalogTable() {
@@ -1467,9 +1593,22 @@ export function initCatalogTable() {
     togglePlanSort(btn.dataset.catalogSort);
   });
   $('catalogTableBody')?.addEventListener('click', (e) => {
-    const add = e.target.closest('[data-catalog-add-dccb]');
-    if (add) {
-      openAddDccb(add.dataset.catalogAddDccb);
+    const attach = e.target.closest('[data-catalog-dccb-attach]');
+    if (attach) {
+      const parentId = attach.dataset.catalogDccbAttach;
+      const childId = attach.dataset.catalogChild;
+      const parent = visibleRows.find((r) => r.id === parentId)
+        || rowsCache.find((r) => r.id === parentId);
+      const child = (parent?.children || []).find((c) => String(c.id) === String(childId));
+      if (!parent || !child) {
+        showToast('Không tìm thấy dòng ĐCCB', 'info');
+        return;
+      }
+      if (!isAdmin() && !state.authToken) {
+        showToast('Đăng nhập Google để gắn PDF/DXF cho ĐCCB.', 'info');
+        return;
+      }
+      void openDccbAttach(parent, child);
       return;
     }
     const edit = e.target.closest('[data-catalog-edit-ma]');
@@ -1495,7 +1634,7 @@ export function initCatalogTable() {
     }
     const addData = e.target.closest('.catalog-add-data');
     if (addData) {
-      void onAddDataClick(addData);
+      onAddDataClick(addData);
       return;
     }
     const btn = e.target.closest('[data-catalog-zoom]');

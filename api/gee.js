@@ -17,6 +17,7 @@ const sat = require('../services/satService');
 const satTiles = require('../services/satTileCache');
 const tree = require('../services/treePriority');
 const projects = require('../services/projectStore');
+const soTayDccbLink = require('../services/soTayDccbLink');
 const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
 const osmOpen = require('../services/osmOpen');
@@ -422,6 +423,24 @@ async function scriptEntry(action, payload) {
     if (/Email không được ghi|Chưa đăng nhập Google/.test(msg)) throw httpError(403, msg);
     throw err;
   }
+}
+
+/** Hồ sơ điều chỉnh đã duyệt → dòng ĐCCB sổ tay (khóa adjustId). */
+async function syncApprovedAdjustToSoTay(item) {
+  const ma = String(item && item.soTayMa || '').trim();
+  const adjustId = String(item && item.id || '').trim();
+  const ten = String(item && (item.title || item.summary) || '').trim() || 'Điều chỉnh cục bộ';
+  if (!ma || !soTayDccbLink.ADJUST_ID_RE.test(adjustId)) return null;
+  return soTayDccbLink.upsertDccbByAdjustId({
+    ma,
+    child: {
+      id: String(item.dccbId || '').trim() || undefined,
+      ten,
+      adjustId,
+      ghiChu: 'Đồng bộ từ hồ sơ điều chỉnh'
+    },
+    callAppsScript: (params, payload) => scriptEntry(params.action, payload)
+  });
 }
 
 async function stageChoDuyet(actor, spec) {
@@ -3634,14 +3653,18 @@ module.exports = async (req, res) => {
       if (!edits) return res.status(400).json({ error: true, message: 'Thiếu dữ liệu sổ tay bổ sung' });
       const projects = Array.isArray(edits.projects) ? edits.projects : [];
       const dccb = Array.isArray(edits.dccb) ? edits.dccb : [];
-      if (projects.length > 500 || dccb.length > 2000) {
+      const links = Array.isArray(edits.links) ? edits.links : [];
+      const patches = Array.isArray(edits.patches) ? edits.patches : [];
+      if (projects.length > 500 || dccb.length > 2000 || links.length > 2000 || patches.length > 2000) {
         return res.status(413).json({ error: true, message: 'Quá nhiều bản ghi sổ tay bổ sung' });
       }
       const payload = {
         v: 1,
         saved: Date.now(),
         projects,
-        dccb
+        dccb,
+        links,
+        patches
       };
       const content = JSON.stringify(payload);
       if (content.length > 1500000) {
@@ -4348,12 +4371,17 @@ module.exports = async (req, res) => {
         }
         const saved = await projects.saveAdjustment({
           tenQH, title: body.title, sender: body.sender, note: body.note, pdfOnly: true,
-          approved: !!admin, by: admin ? admin.email : '', owner: actor ? actor.email : ''
+          approved: !!admin, by: admin ? admin.email : '', owner: actor ? actor.email : '',
+          id: body.id, soTayMa: body.soTayMa, dccbId: body.dccbId
         });
         try {
           const pdf = await projects.attachAdjustPdf({
             id: saved.id, fileName: body.name, buffer, stagedToken: staged, admin: !!admin
           });
+          if (saved.status === 'approved') {
+            try { await syncApprovedAdjustToSoTay({ ...saved, soTayMa: body.soTayMa, dccbId: body.dccbId }); }
+            catch (syncErr) { /* hồ sơ đã lưu; bảng danh mục cập nhật lần sau */ }
+          }
           return res.status(200).json({ success: true, item: { ...saved, pdf } });
         } catch (err) {
           try { await projects.removeAdjustment(saved.id); } catch (e) { /* hồ sơ không còn file nếu xóa chỉ mục lỗi */ }
@@ -4363,9 +4391,51 @@ module.exports = async (req, res) => {
       const saved = await projects.saveAdjustment({
         tenQH, boundary: body.boundary, lots: body.lots, codes: body.codes, title: body.title,
         sender: body.sender, note: body.note, verdict: body.verdict, approved: !!admin, by: admin ? admin.email : '',
-        owner: actor ? actor.email : ''
+        owner: actor ? actor.email : '',
+        id: body.id, soTayMa: body.soTayMa, dccbId: body.dccbId
       });
+      if (saved.status === 'approved') {
+        try { await syncApprovedAdjustToSoTay({ ...saved, soTayMa: body.soTayMa, dccbId: body.dccbId }); }
+        catch (syncErr) { /* hồ sơ đã lưu */ }
+      }
       return res.status(200).json({ success: true, item: saved });
+    }
+
+    // Stub hồ sơ điều chỉnh từ dòng ĐCCB sổ tay (chưa có PDF/DXF).
+    if (action === 'ensureAdjustStub') {
+      requirePostFromApp(req);
+      const actor = await signedActor(req);
+      const admin = actor && isAdminEmail(actor.email) ? actor : null;
+      if (!admin && !actor) return res.status(401).json({ error: true, message: 'Cần đăng nhập Google' });
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const title = sanitizeSheetText(body.title, 300) || 'Điều chỉnh cục bộ';
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const saved = await projects.ensureAdjustStub({
+          tenQH,
+          title,
+          id: body.id,
+          soTayMa: body.soTayMa,
+          dccbId: body.dccbId,
+          approved: !!admin,
+          by: admin ? admin.email : '',
+          owner: actor ? actor.email : ''
+        });
+        if (saved.status === 'approved' || admin) {
+          try {
+            await syncApprovedAdjustToSoTay({
+              ...saved,
+              soTayMa: body.soTayMa || saved.soTayMa,
+              dccbId: body.dccbId || saved.dccbId,
+              title
+            });
+          } catch (syncErr) { /* stub đã có */ }
+        }
+        return res.status(200).json({ success: true, item: saved });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không tạo được hồ sơ điều chỉnh' });
+      }
     }
 
     if (action === 'putAdjustDraw') {
@@ -4502,7 +4572,23 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       const user = await requireAdmin(req);
       const id = String(readJsonBody(req).id || '');
-      const done = action === 'approveAdjust' ? await projects.approveAdjustment(id, user.email) : await projects.removeAdjustment(id);
+      if (action === 'approveAdjust') {
+        const items = await projects.listAdjustments({ admin: true });
+        const before = items.find((x) => x && x.id === id) || null;
+        const done = await projects.approveAdjustment(id, user.email);
+        if (before) {
+          try {
+            await syncApprovedAdjustToSoTay({
+              id: before.id,
+              title: before.title || before.summary,
+              soTayMa: before.soTayMa,
+              dccbId: before.dccbId
+            });
+          } catch (syncErr) { /* đã duyệt hồ sơ */ }
+        }
+        return res.status(200).json({ success: true, ...done });
+      }
+      const done = await projects.removeAdjustment(id);
       return res.status(200).json({ success: true, ...done });
     }
 
@@ -4862,6 +4948,7 @@ module.exports = async (req, res) => {
         role: body.role,
         summary: body.summary,
         features: body.features,
+        fields: body.fields,
         lotReview: body.lotReview,
         clip: body.clip
       });
@@ -4955,6 +5042,7 @@ module.exports = async (req, res) => {
           features.push({ name: obj.tenQH || '', geometry: obj.geometry, props: { ...(obj.fields || {}) } });
         }
         const pdf = obj.pdf && obj.pdf.name ? { name: String(obj.pdf.name).slice(0, 120), bytes: Number(obj.pdf.bytes) || 0 } : null;
+        const showFields = (obj.kind === 'du-an' || obj.kind === 'so-tay-dccb') && obj.fields ? obj.fields : undefined;
         return res.status(200).json({
           success: true,
           id,
@@ -4963,7 +5051,7 @@ module.exports = async (req, res) => {
           tenQH: row.tenQH || '',
           unit: row.unit || '',
           features,
-          fields: obj.kind === 'du-an' && obj.fields ? obj.fields : undefined,
+          fields: showFields,
           pdf,
           lotReview: Array.isArray(obj.lotReview) ? obj.lotReview : [],
           clip: obj.clip || null
@@ -4985,7 +5073,47 @@ module.exports = async (req, res) => {
         callAppsScript: (params, payload) => scriptEntry(params.action, payload),
         publishKienTruc: (point, email) => publishKienTrucPoint(point, email),
         publishInvest: publishInvestFromStage,
-        readPendingPdf: (name) => choDuyet.readPdf(name)
+        readPendingPdf: (name) => choDuyet.readPdf(name),
+        publishSoTayDccb: async (packet) => {
+          const f = packet.fields || {};
+          const ma = String(f.ma || '').trim();
+          const ten = String(f.ten || '').trim();
+          if (!ma || !ten) throw httpError(400, 'Thiếu mã hoặc tên ĐCCB');
+          let adjustId = String(f.adjustId || '').trim().toLowerCase();
+          if (!soTayDccbLink.ADJUST_ID_RE.test(adjustId)) {
+            adjustId = crypto.randomBytes(8).toString('hex');
+          }
+          const dccbId = String(f.id || '').trim() || `${ma}.${adjustId.slice(0, 4)}`;
+          const tenQH = String(packet.tenQH || '').trim();
+          if (tenQH) {
+            try {
+              await projects.ensureAdjustStub({
+                tenQH,
+                title: ten,
+                id: adjustId,
+                soTayMa: ma,
+                dccbId,
+                approved: true,
+                by: packet.email || ''
+              });
+            } catch (stubErr) {
+              // Đồ án chưa có trên catalog bản đồ — vẫn ghi ĐCCB text.
+            }
+          }
+          await soTayDccbLink.upsertDccbByAdjustId({
+            ma,
+            child: {
+              id: dccbId,
+              ten,
+              quyetDinh: String(f.quyetDinh || '').trim(),
+              ngay: String(f.ngay || '').trim(),
+              coQuan: String(f.coQuan || '').trim(),
+              ghiChu: `Đề xuất · ${packet.email || ''}`.slice(0, 120),
+              adjustId
+            },
+            callAppsScript: (params, payload) => scriptEntry(params.action, payload)
+          });
+        }
       });
       const keepNote = keepIds.length ? `Giữ hình gốc: ${keepIds.join(', ')}` : '';
       await scriptEntry('setChoDuyet', {

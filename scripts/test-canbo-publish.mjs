@@ -66,6 +66,28 @@ assert.equal(invest.tenQH, 'Khu đô thị mới');
 assert.equal(invest.geometry.type, 'Polygon');
 assert.throws(() => stageSpec({ kind: 'du-an', unit: 'tp:TP', fields: {} }), /tên dự án hoặc ranh/);
 assert.ok(script.includes('"du-an": true'));
+const dccb = stageSpec({
+  kind: 'so-tay-dccb',
+  unit: 'tp:TP',
+  tenQH: 'QHPK thử',
+  summary: 'ĐCCB · Khu A',
+  fields: {
+    ma: 'TH.B.001',
+    ten: 'ĐCCB khu A',
+    quyetDinh: '1/QĐ',
+    ngay: '01/01/2024',
+    coQuan: 'UBND',
+    adjustId: 'aabbccddeeff0011',
+    dccbId: 'TH.B.001.02'
+  }
+});
+assert.equal(dccb.kind, 'so-tay-dccb');
+assert.equal(dccb.fields.ma, 'TH.B.001');
+assert.equal(dccb.fields.adjustId, 'aabbccddeeff0011');
+assert.throws(() => stageSpec({ kind: 'so-tay-dccb', unit: 'tp:TP', fields: { ma: 'X' } }), /mã đồ án hoặc tên/);
+assert.ok(script.includes('"so-tay-dccb": true'));
+assert.match(fs.readFileSync(new URL('../services/reviewPublish.js', import.meta.url), 'utf8'), /publishSoTayDccb|so-tay-dccb|adjustId/);
+assert.match(fs.readFileSync(new URL('../api/gee.js', import.meta.url), 'utf8'), /publishSoTayDccb|ensureAdjustStub|upsertDccbByAdjustId/);
 const storeSrc = fs.readFileSync(new URL('../services/choDuyetStore.js', import.meta.url), 'utf8');
 assert.match(storeSrc, /cho-duyet\/\$\{id\}\.json/);
 assert.match(storeSrc, /private, no-store/);

@@ -5,7 +5,7 @@ import {
   catalogWardLevelStats, catalogYearLevelStats, catalogWardFilterOptions,
   groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, planYearOf, matchCatalogWard, resolvePlanWards,
   docsStatusOfCatalogProject, phaseLayerCountsOfCatalogProject, formatPhaseLayerLabel,
-  mergeSoTayEdits, nextDccbId
+  mergeSoTayEdits, nextDccbId, newAdjustId
 } from '../public/js/catalogTableCore.js';
 import { nameScore, areaScore, classifyPlanStatus, foldPlanName, matchSoTayToCatalog } from '../public/js/soTayMatch.js';
 import { WARD_NAMES } from '../public/js/facetStore.js';
@@ -220,9 +220,22 @@ assert.equal(grouped[0].type, 'group');
 assert.equal(grouped[0].label, 'A. QHC');
 assert.ok(grouped.some(g => g.type === 'group' && g.label === 'B. QHPK'));
 
+const linkAdjId = newAdjustId();
+assert.match(linkAdjId, /^[a-f0-9]{16}$/);
 const mergedEdits = mergeSoTayEdits(sheet, {
   projects: [{ ma: 'ZZ.B.001', ten: 'QHPK thử admin', cap: 'QHPK', quyetDinh: '1/QĐ', ngay: '01/01/2024', coQuan: 'UBND tỉnh', children: [] }],
-  dccb: [{ ma: 'TH.B.001', child: { id: nextDccbId('TH.B.001', nam.children), loaiDong: 'dccb', ten: 'ĐCCB thử', quyetDinh: '2/QĐ', ngay: '02/02/2024', coQuan: 'UBND tỉnh' } }],
+  dccb: [{
+    ma: 'TH.B.001',
+    child: {
+      id: nextDccbId('TH.B.001', nam.children),
+      loaiDong: 'dccb',
+      ten: 'ĐCCB thử',
+      quyetDinh: '2/QĐ',
+      ngay: '02/02/2024',
+      coQuan: 'UBND tỉnh',
+      adjustId: linkAdjId
+    }
+  }],
   links: [{ ma: 'TH.A.001', tenQH: 'QHPK Khu vực An Cựu' }],
   patches: [{
     ma: 'TH.A.001',
@@ -235,8 +248,31 @@ const mergedEdits = mergeSoTayEdits(sheet, {
   }]
 });
 assert.ok(mergedEdits.some((r) => r.ma === 'ZZ.B.001'));
-assert.ok(mergedEdits.find((r) => r.ma === 'TH.B.001').children.some((c) => /ĐCCB thử/.test(c.ten)));
+const dccbChild = mergedEdits.find((r) => r.ma === 'TH.B.001').children.find((c) => /ĐCCB thử/.test(c.ten));
+assert.ok(dccbChild);
+assert.equal(dccbChild.adjustId, linkAdjId);
 assert.equal(mergedEdits.find((r) => r.ma === 'TH.A.001').mapTenQH, 'QHPK Khu vực An Cựu');
+// Cập nhật cùng adjustId không nhân đôi hàng ĐCCB.
+const remapped = mergeSoTayEdits(mergedEdits, {
+  projects: [],
+  dccb: [{
+    ma: 'TH.B.001',
+    child: {
+      id: dccbChild.id,
+      loaiDong: 'dccb',
+      ten: 'ĐCCB thử (đổi tên)',
+      quyetDinh: '3/QĐ',
+      ngay: '03/03/2024',
+      coQuan: 'UBND tỉnh',
+      adjustId: linkAdjId
+    }
+  }],
+  links: [],
+  patches: []
+});
+const sameAdj = remapped.find((r) => r.ma === 'TH.B.001').children.filter((c) => c.adjustId === linkAdjId);
+assert.equal(sameAdj.length, 1);
+assert.equal(sameAdj[0].ten, 'ĐCCB thử (đổi tên)');
 const patched = mergedEdits.find((r) => r.ma === 'TH.A.001');
 assert.equal(patched.ten, 'QHC thử nhóm A (đã sửa)');
 assert.equal(patched.dvhc, 'Phường An Đông');
