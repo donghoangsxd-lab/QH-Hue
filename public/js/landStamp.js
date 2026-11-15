@@ -991,19 +991,35 @@ export function matchStamps(stamps, lots, opt = {}) {
   return { assigned, pending: pendingUnique, unmatchedLots };
 }
 
-/** Diện tích ghi trên tem → m². So với diện tích polygon để phân biệt ha (5.230) và m² (5.230 = 5230). */
+/**
+ * Diện tích ghi trên tem → m².
+ * Tem QH ghi ha (0.9 / 0,9 / 0.90 / 1.34 / 5.23) hoặc m² (4994.4);
+ * có hatch thì chọn phương án gần diện tích lô nhất (sai số ≤ 40%).
+ * Không phụ thuộc «phải đủ 3 chữ số thập phân» mới nhân 10.000.
+ */
 export function stampAreaM2(raw, lotM2) {
-  const tok = numToken(String(raw || '').trim().replace(/\s/g, ''));
-  const s = tok ? tok.raw : String(raw || '').trim().replace(/\s/g, '').replace(',', '.');
+  let text = String(raw || '').trim().replace(/\s/g, '');
+  const asHa = /ha$/i.test(text);
+  const asM2 = /m2|m²$/i.test(text);
+  text = text.replace(/ha$/i, '').replace(/m2$/i, '').replace(/m²$/i, '');
+  const tok = numToken(text);
+  const s = tok ? tok.raw : text.replace(',', '.');
   const n = tok ? tok.value : Number(s);
   if (!Number.isFinite(n) || n <= 0) return null;
   const dec = (s.split('.')[1] || '').length;
-  const cands = [n];
-  if (dec >= 3 && n < 500) cands.push(n * 10000);
-  if (dec === 3 && n >= 1) cands.push(Number(s.replace(/\./g, '')));
+  const cands = [];
+  if (asHa) cands.push(n * 10000);
+  else if (asM2) cands.push(n);
+  else {
+    cands.push(n);
+    // Mọi số < 100 đều thử ha→m² (0.9 → 9000), không cần đủ 3 thập phân.
+    if (n < 100) cands.push(n * 10000);
+    // Kiểu Việt 5.230 có thể là 5230 m² (chấm nghìn).
+    if (dec === 3 && n >= 1) cands.push(Number(s.replace(/\./g, '')));
+  }
   if (!(lotM2 > 0)) {
-    if (dec >= 3 && n < 500) return Math.round(n * 10000);
-    if (n >= 20) return Math.round(n);
+    if (asHa || (!asM2 && n < 100 && dec >= 1)) return Math.round(n * 10000);
+    if (asM2 || n >= 20) return Math.round(n);
     return null;
   }
   let best = null;
@@ -1014,8 +1030,8 @@ export function stampAreaM2(raw, lotM2) {
     if (r < bestR) { bestR = r; best = c; }
   });
   if (best != null && bestR <= 0.4) return Math.round(best);
-  if (dec >= 3 && n < 500) return Math.round(n * 10000);
-  if (n >= 20) return Math.round(n);
+  if (asHa || (!asM2 && n < 100 && dec >= 1)) return Math.round(n * 10000);
+  if (asM2 || n >= 20) return Math.round(n);
   return null;
 }
 

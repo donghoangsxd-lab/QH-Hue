@@ -413,12 +413,13 @@ function drawStampMarks() {
   const pending = new Set(((current.stampMatch && current.stampMatch.pending) || []).map(s => s.id));
   view.forEach(s => {
     const on = pending.has(s.id);
+    if (!on) return;
     const cur = s.id === current.stampPick;
-    const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+    const color = cur ? '#f472b6' : '#fb923c';
     const mark = L.circleMarker([s.lat, s.lng], {
       radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
     }).bindTooltip(stampLabel(s), { sticky: true });
-    if (on) mark.on('click', (e) => {
+    mark.on('click', (e) => {
       L.DomEvent.stop(e);
       khState.pick = s.id;
       current.stampPick = s.id;

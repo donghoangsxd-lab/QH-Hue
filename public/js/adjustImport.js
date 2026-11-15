@@ -304,8 +304,9 @@ function drawPreview(fit = false) {
     const pending = new Set(khMatch.pending.map(s => s.id));
     khMatch.view.forEach(s => {
       const on = pending.has(s.id);
+      if (!on) return;
       const cur = s.id === stampPick;
-      const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+      const color = cur ? '#f472b6' : '#fb923c';
       if (cur) {
         L.marker([s.lat, s.lng], {
           interactive: false,
@@ -320,7 +321,7 @@ function drawPreview(fit = false) {
       const mark = L.circleMarker([s.lat, s.lng], {
         radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
       }).bindTooltip(stampLabel(s), { sticky: true });
-      if (on) mark.on('click', () => { stampPick = s.id; render(); drawPreview(); });
+      mark.on('click', () => { stampPick = s.id; render(); drawPreview(); });
       mark.addTo(preview);
     });
   }
