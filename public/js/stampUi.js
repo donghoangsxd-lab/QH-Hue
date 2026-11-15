@@ -2,13 +2,14 @@
 import { escapeHtml, fmtNum } from './utils.js';
 import { stampLabel, stampPendingWhy } from './landStamp.js';
 
-const HINT_DEFAULT = 'Bấm + rồi chọn lô chấm đỏ trên bản đồ (có thể nhiều lô cùng loại nếu tổng diện tích khớp tem ± 1%). ? xem lỗi · × xóa tem.';
+const HINT_DEFAULT = 'Bấm + → con trỏ đổi dấu cộng, chọn lần lượt lô chấm đỏ (viền sáng khi rê chuột). Xong bấm OK để ghi. ? xem lỗi · × xóa tem.';
 
 /**
- * Khung danh sách tem chờ gán tay — bảng thẳng cột, 3 nút ? / × / +.
+ * Khung danh sách tem chờ gán tay — bảng thẳng cột, 3 nút ? / × / +, OK ghi nháp.
  * @param {object} opts
  * @param {Array} opts.pending
  * @param {string} [opts.pickId]
+ * @param {boolean} [opts.assignMode] đang ở chế độ chọn lô trên bản đồ
  * @param {object} [opts.draft]  stampId → string[] khóa lô đang chọn
  * @param {Array} [opts.lots]    để ? giải thích lỗi
  * @param {string} [opts.title]
@@ -18,15 +19,18 @@ const HINT_DEFAULT = 'Bấm + rồi chọn lô chấm đỏ trên bản đồ (c
  * @param {string} opts.skipAttr
  * @param {string} [opts.whyAttr]
  * @param {string} [opts.plusAttr]
+ * @param {string} [opts.okAttr]
  * @param {string} [opts.skipExtra]
  * @param {string} [opts.whyExtra]
  * @param {string} [opts.plusExtra]
+ * @param {string} [opts.okExtra]
  */
 export function stampPendingBoxHtml(opts = {}) {
   const pending = opts.pending || [];
   if (!pending.length) return '';
   const cur = pending.find(s => s.id === opts.pickId) || pending[0];
   const draft = opts.draft || {};
+  const assignMode = !!opts.assignMode;
   const n = pending.length;
   const title = opts.title
     || `Có ${fmtNum(n)} tem chưa ghép được tự động do phát hiện lỗi. Cần ghép thủ công:`;
@@ -34,15 +38,17 @@ export function stampPendingBoxHtml(opts = {}) {
   const skipAttr = opts.skipAttr || 'data-stamp-skip';
   const whyAttr = opts.whyAttr || 'data-stamp-why';
   const plusAttr = opts.plusAttr || 'data-stamp-plus';
+  const okAttr = opts.okAttr || 'data-stamp-ok';
   const skipExtra = opts.skipExtra ? ` ${opts.skipExtra}` : '';
   const whyExtra = opts.whyExtra ? ` ${opts.whyExtra}` : '';
   const plusExtra = opts.plusExtra ? ` ${opts.plusExtra}` : '';
+  const okExtra = opts.okExtra ? ` ${opts.okExtra}` : '';
   const lots = opts.lots || [];
 
   const rows = pending.map(s => {
     const on = s.id === cur.id;
     const keys = draft[s.id] || [];
-    const plusOn = on && keys.length > 0;
+    const plusOn = on && (assignMode || keys.length > 0);
     const why = escapeHtml(stampPendingWhy(s, lots));
     return `<tr class="cad-stamp-row${on ? ' on' : ''}" ${pickAttr}="${escapeHtml(s.id)}">
       <td class="cad-stamp-code">${escapeHtml(s.code || 'Tem')}</td>
@@ -53,16 +59,22 @@ export function stampPendingBoxHtml(opts = {}) {
       <td class="cad-stamp-acts">
         <button type="button" class="cad-stamp-btn cad-stamp-why" title="${why}" aria-label="Xem lỗi" ${whyExtra} ${whyAttr}="${escapeHtml(s.id)}">?</button>
         <button type="button" class="cad-stamp-btn cad-stamp-del" title="Xóa tem khỏi danh sách" aria-label="Xóa tem" ${skipExtra} ${skipAttr}="${escapeHtml(s.id)}">×</button>
-        <button type="button" class="cad-stamp-btn cad-stamp-plus${plusOn ? ' is-on' : ''}" title="${plusOn ? 'Bấm để xác nhận gán' : 'Chọn tem rồi bấm lô trên bản đồ'}" aria-label="Gán tem" ${plusExtra} ${plusAttr}="${escapeHtml(s.id)}">+</button>
+        <button type="button" class="cad-stamp-btn cad-stamp-plus${plusOn ? ' is-on' : ''}" title="${assignMode && on ? 'Đang chọn lô trên bản đồ' : 'Bắt đầu chọn lô trên bản đồ'}" aria-label="Chọn lô" ${plusExtra} ${plusAttr}="${escapeHtml(s.id)}">+</button>
       </td>
     </tr>`;
   }).join('');
 
   const draftKeys = draft[cur.id] || [];
-  const now = draftKeys.length
-    ? `Đang gán: <b>${escapeHtml(stampLabel(cur))}</b> — đã chọn ${fmtNum(draftKeys.length)} lô`
-    : `Đang gán: <b>${escapeHtml(stampLabel(cur))}</b> — bấm + rồi chọn lô chấm đỏ`;
+  let now = `Tem: <b>${escapeHtml(stampLabel(cur))}</b>`;
+  if (assignMode && cur.id === opts.pickId) {
+    now += draftKeys.length
+      ? ` — đã chọn ${fmtNum(draftKeys.length)} lô đỏ · bấm OK để ghi`
+      : ' — rê chuột lô đỏ (viền sáng), bấm để chọn · xong bấm OK';
+  } else {
+    now += ' — bấm + để chọn lô trên bản đồ';
+  }
 
+  const okDisabled = !(assignMode && draftKeys.length);
   const cls = opts.extraClass ? `cad-stamp ${opts.extraClass}` : 'cad-stamp';
   return `<div class="${cls}">
     <b class="cad-stamp-title">${escapeHtml(title)}</b>
@@ -75,7 +87,10 @@ export function stampPendingBoxHtml(opts = {}) {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div class="cad-stamp-now"><span>${now}</span></div>
+    <div class="cad-stamp-now">
+      <span>${now}</span>
+      <button type="button" class="cad-stamp-ok"${okDisabled ? ' disabled' : ''} title="Ghi gán tem vào lô đã chọn" ${okExtra} ${okAttr}="${escapeHtml(cur.id)}">OK</button>
+    </div>
   </div>`;
 }
 

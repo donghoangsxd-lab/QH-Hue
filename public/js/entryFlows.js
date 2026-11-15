@@ -88,8 +88,10 @@ let preview = null;
 let previewHalo = null;
 let previewRenderer = null;
 let previewHost = null;
-/** Click bản đồ khi đang gán tem → chọn lô preview (tránh ranh/canvas chặn layer.click). */
+/** Click / rê chuột bản đồ khi đang chế độ chọn lô gán tem. */
 let stampLotClick = null;
+let stampLotMove = null;
+let stampHoverIdx = -1;
 
 /** Cùng cadImportUi: đang xem QH thì planMap phủ kín — preview phải vẽ lên đó, không phải map hiện trạng ẩn. */
 function viewMap() {
@@ -149,12 +151,24 @@ const isAdmin = isAdminEntry;
 const signedIn = isEntrySignedIn;
 const allowedKeys = allowedEntryKeys;
 
+function setStampLotPickCursor(on) {
+  [map, planMap].filter(Boolean).forEach((m) => {
+    try {
+      const el = m.getContainer && m.getContainer();
+      if (el) el.classList.toggle('stamp-lot-pick', !!on);
+    } catch (e) { /* map chưa sẵn */ }
+  });
+}
+
 function unbindStampLotClick() {
-  if (!stampLotClick) return;
   [previewHost, map, planMap].filter(Boolean).forEach((m) => {
-    try { m.off('click', stampLotClick); } catch (e) { /* khác host */ }
+    if (stampLotClick) try { m.off('click', stampLotClick); } catch (e) { /* khác host */ }
+    if (stampLotMove) try { m.off('mousemove', stampLotMove); } catch (e) { /* khác host */ }
   });
   stampLotClick = null;
+  stampLotMove = null;
+  stampHoverIdx = -1;
+  setStampLotPickCursor(false);
 }
 
 function clearPreview() {
@@ -693,7 +707,9 @@ function applyKhToHeld(step) {
   });
   if (!bag.stampPick || !match.pending.some(s => s.id === bag.stampPick)) {
     bag.stampPick = match.pending[0] ? match.pending[0].id : null;
+    bag.stampAssignMode = false;
   }
+  if (!match.pending.length) bag.stampAssignMode = false;
 }
 
 function stampBoxHtml(bag) {
@@ -721,12 +737,14 @@ function stampBoxHtml(bag) {
   return warn + stampPendingBoxHtml({
     pending: pend,
     pickId: bag.stampPick,
+    assignMode: !!bag.stampAssignMode,
     draft: bag.stampDraft || {},
     lots: bag.stampLots || [],
     pickAttr: 'data-ho-stamp',
     skipAttr: 'data-ho-stamp-skip',
     whyAttr: 'data-ho-stamp-why',
-    plusAttr: 'data-ho-stamp-plus'
+    plusAttr: 'data-ho-stamp-plus',
+    okAttr: 'data-ho-stamp-ok'
   });
 }
 
@@ -852,6 +870,7 @@ function commitStampAssign(bag, stampId, keys, { warn = true } = {}) {
   const cmp = stamp ? stampAreaVsLots(stamp, lots, keys) : null;
   bag.stampAssign = { ...(bag.stampAssign || {}), [stampId]: keys.length === 1 ? keys[0] : keys };
   if (bag.stampDraft) delete bag.stampDraft[stampId];
+  bag.stampAssignMode = false;
   applyKhToHeld(STEPS.find(s => s.id === stepId));
   if (warn && cmp && cmp.ratio != null && cmp.ratio > STAMP_AREA_TOL) {
     const pct = Math.round(cmp.ratio * 1000) / 10;
@@ -859,18 +878,59 @@ function commitStampAssign(bag, stampId, keys, { warn = true } = {}) {
   }
 }
 
-/** Bấm lô khi đang chọn tem: gán 1 hoặc nhiều lô cùng loại (tổng DT ± 1%). */
+function lotBaseStyle(feat) {
+  const hex = landColor(feat?.properties?.layer || feat?.properties?.nhan || '') || '#94a3b8';
+  return { color: hex, weight: 1.8, opacity: 1, fillColor: hex, fillOpacity: 0.48 };
+}
+
+function applyLotOutline(layer, kind) {
+  if (!layer) return;
+  const paint = (ly) => {
+    if (!ly || !ly.setStyle) return;
+    if (kind === 'hover') {
+      ly.setStyle({ color: '#fde047', weight: 3.5, opacity: 1, fillOpacity: 0.55 });
+    } else if (kind === 'draft') {
+      ly.setStyle({ color: '#fbbf24', weight: 3, opacity: 1, fillOpacity: 0.52 });
+    } else if (kind === 'base' && ly.feature) {
+      ly.setStyle(lotBaseStyle(ly.feature));
+    }
+  };
+  paint(layer);
+  if (layer.eachLayer) layer.eachLayer(paint);
+}
+
+function findLotLayer(idx) {
+  if (!preview || idx == null) return null;
+  let found = null;
+  preview.eachLayer((layer) => {
+    if (found) return;
+    if (layer.feature?.properties?._lotIdx === idx) found = layer;
+  });
+  return found;
+}
+
+function refreshStampLotOutlines(bag) {
+  if (!preview || !bag) return;
+  const draft = new Set((bag.stampDraft && bag.stampPick && bag.stampDraft[bag.stampPick]) || []);
+  preview.eachLayer((layer) => {
+    const idx = layer.feature?.properties?._lotIdx;
+    if (idx == null) return;
+    if (draft.has(String(idx))) applyLotOutline(layer, 'draft');
+    else if (stampHoverIdx === idx) applyLotOutline(layer, 'hover');
+    else applyLotOutline(layer, 'base');
+  });
+}
+
+/** Bấm lô đỏ khi đang chế độ +: thêm/bỏ nháp — chưa ghi cho đến khi OK. */
 function toggleStampLot(bag, lotIdx) {
+  if (!bag?.stampAssignMode) return;
   const id = bag.stampPick;
   if (!id) return;
   const stamp = (bag.stampView || []).find(s => s.id === id);
   if (!stamp) return;
   const feat = bag.features[lotIdx];
   if (!feat) return;
-  if (!lotMissingStampAttrs(feat.properties)) {
-    announceTool('Lô đã có thuộc tính tem — chọn lô chấm đỏ.');
-    return;
-  }
+  if (!lotMissingStampAttrs(feat.properties)) return;
   const key = String(lotIdx);
   const draft = [...((bag.stampDraft && bag.stampDraft[id]) || [])];
   const at = draft.indexOf(key);
@@ -895,43 +955,35 @@ function toggleStampLot(bag, lotIdx) {
     draft.push(key);
   }
   bag.stampDraft = { ...(bag.stampDraft || {}), [id]: draft };
-  if (!draft.length) {
-    renderActive({ fit: false, focusStamp: true });
-    return;
-  }
-  const metas = draft.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
-  const cmp = stampAreaVsLots(stamp, metas, draft);
-  if (cmp.ok) {
-    commitStampAssign(bag, id, draft, { warn: false });
-    renderActive({ fit: false, focusStamp: true });
-    return;
-  }
-  if (draft.length === 1) {
-    // Một lô lệch > 1%: giữ nháp, + xanh — bấm + để gán kèm cảnh báo.
-    announceTool('Diện tích lô lệch hơn 1% so với tem. Bấm + (xanh) để gán thủ công, hoặc chọn thêm lô cùng loại.');
-  } else {
-    const pct = cmp.ratio != null ? Math.round(cmp.ratio * 1000) / 10 : '?';
-    announceTool(`Đã chọn ${draft.length} lô — tổng lệch ${pct}% so với tem (cần ≤ 1%).`);
-  }
+  renderActive({ fit: false, focusStamp: false });
+}
+
+/** Bấm + → vào chế độ chọn lô (con trỏ dấu cộng). */
+function startStampAssignMode(bag, stampId) {
+  bag.stampPick = stampId;
+  bag.stampAssignMode = true;
+  announceTool('Đang chọn lô: bấm các lô chấm đỏ, rồi OK để ghi.');
   renderActive({ fit: false, focusStamp: true });
 }
 
-function confirmStampPlus(bag, stampId) {
-  bag.stampPick = stampId;
-  const draft = (bag.stampDraft && bag.stampDraft[stampId]) || [];
+/** OK → ghi nháp tem → lô. */
+function confirmStampOk(bag, stampId) {
+  const id = stampId || bag.stampPick;
+  if (!id) return;
+  bag.stampPick = id;
+  const draft = (bag.stampDraft && bag.stampDraft[id]) || [];
   if (!draft.length) {
-    renderActive({ fit: false, focusStamp: true });
+    announceTool('Chưa chọn lô đỏ nào.');
     return;
   }
-  const stamp = (bag.stampView || []).find(s => s.id === stampId);
+  const stamp = (bag.stampView || []).find(s => s.id === id);
   const metas = draft.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
   const cmp = stamp ? stampAreaVsLots(stamp, metas, draft) : null;
   if (draft.length > 1 && !(cmp && cmp.ok)) {
-    announceTool('Nhiều lô: tổng diện tích phải khớp tem trong ± 1% trước khi gán.');
-    renderActive({ fit: false, focusStamp: true });
+    announceTool('Nhiều lô: tổng diện tích phải khớp tem trong ± 1% trước khi OK.');
     return;
   }
-  commitStampAssign(bag, stampId, draft, { warn: true });
+  commitStampAssign(bag, id, draft, { warn: true });
   renderActive({ fit: false, focusStamp: true });
 }
 
@@ -984,14 +1036,35 @@ function lotIndexAt(bag, lat, lng) {
 function bindStampLotPick(bag) {
   unbindStampLotClick();
   const host = viewMap();
-  if (!host || !bag?.stampPick || !(bag.features || []).length) return;
+  if (!host || !bag?.stampAssignMode || !bag.stampPick || !(bag.features || []).length) {
+    setStampLotPickCursor(false);
+    return;
+  }
+  setStampLotPickCursor(true);
   stampLotClick = (e) => {
     if (!e?.latlng) return;
     const idx = lotIndexAt(bag, e.latlng.lat, e.latlng.lng);
     if (idx < 0) return;
+    const feat = bag.features[idx];
+    if (!lotMissingStampAttrs(feat?.properties)) return;
     toggleStampLot(bag, idx);
   };
+  stampLotMove = (e) => {
+    if (!e?.latlng) return;
+    const idx = lotIndexAt(bag, e.latlng.lat, e.latlng.lng);
+    const feat = idx >= 0 ? bag.features[idx] : null;
+    const can = !!(feat && lotMissingStampAttrs(feat.properties));
+    const next = can ? idx : -1;
+    if (next === stampHoverIdx) return;
+    const prev = stampHoverIdx;
+    stampHoverIdx = next;
+    const draft = new Set((bag.stampDraft && bag.stampDraft[bag.stampPick]) || []);
+    if (prev >= 0 && !draft.has(String(prev))) applyLotOutline(findLotLayer(prev), 'base');
+    if (next >= 0 && !draft.has(String(next))) applyLotOutline(findLotLayer(next), 'hover');
+  };
   host.on('click', stampLotClick);
+  host.on('mousemove', stampLotMove);
+  refreshStampLotOutlines(bag);
 }
 
 function paintStampMarkers(bag) {
@@ -1025,7 +1098,7 @@ function paintStampMarkers(bag) {
     if (!on) return;
     const cur = s.id === bag.stampPick;
     const color = cur ? '#f472b6' : '#fb923c';
-    if (cur) {
+    if (cur && bag.stampAssignMode) {
       L.marker([s.lat, s.lng], {
         pane: 'lotPreview',
         interactive: false,
@@ -1048,12 +1121,10 @@ function paintStampMarkers(bag) {
     }).bindTooltip(stampLabel(s), { sticky: true });
     mark.on('click', (e) => {
       if (L.DomEvent) L.DomEvent.stop(e);
-      bag.stampPick = s.id;
-      renderActive({ fit: false, focusStamp: true });
+      startStampAssignMode(bag, s.id);
     });
     mark.addTo(preview);
   });
-  // Chọn lô qua click bản đồ (point-in-polygon trên bag.features) — lô tạm sau cắt ranh vẫn pair được.
   bindStampLotPick(bag);
 }
 
@@ -1592,6 +1663,7 @@ function clearHeldKh(step) {
   bag.stampSkip = [];
   bag.stampDraft = {};
   bag.stampPick = null;
+  bag.stampAssignMode = false;
   bag.stampMatch = null;
   bag.stampView = null;
   bag.stampLots = null;
@@ -1703,7 +1775,15 @@ function renderActive(previewOpts = {}) {
       e.stopPropagation();
       const bag = held[step.id];
       if (!bag) return;
-      confirmStampPlus(bag, btn.getAttribute('data-ho-stamp-plus'));
+      startStampAssignMode(bag, btn.getAttribute('data-ho-stamp-plus'));
+    });
+  });
+  box.querySelectorAll('[data-ho-stamp-ok]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bag = held[step.id];
+      if (!bag || btn.disabled) return;
+      confirmStampOk(bag, btn.getAttribute('data-ho-stamp-ok'));
     });
   });
   box.querySelectorAll('[data-ho-stamp-skip]').forEach(btn => {
@@ -1715,6 +1795,7 @@ function renderActive(previewOpts = {}) {
       bag.stampSkip = [...(bag.stampSkip || []), id];
       if (bag.stampDraft) delete bag.stampDraft[id];
       if (bag.stampAssign) delete bag.stampAssign[id];
+      bag.stampAssignMode = false;
       applyKhToHeld(step);
       const next = bag.stampMatch?.pending?.[0];
       renderActive(next
@@ -1810,7 +1891,8 @@ async function takeKh(step, file) {
     stampAssign: {},
     stampSkip: [],
     stampDraft: {},
-    stampPick: null
+    stampPick: null,
+    stampAssignMode: false
   };
   if (!error && stamps.length) applyKhToHeld(step);
   syncPlanViewToEntryLevel(entryFacetLevel());
