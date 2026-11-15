@@ -3,7 +3,7 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch, treeCap, scatterTrees, STREET_TREE_MIN_W
+  filterMassing, namesMatch, treeCap, scatterTrees, STREET_TREE_MIN_W, roadWidthMeters
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -191,31 +191,35 @@ if (WALL[0] < 240 || ROOF[0] >= WALL[0]) throw new Error('palette clay chưa tr�
 if (treeCap(200) !== 50 || treeCap(800) !== 200 || treeCap(100) !== 25 || treeCap('x') !== 0) {
   throw new Error(`treeCap ${treeCap(200)} ${treeCap(800)}`);
 }
-if (!(STREET_TREE_MIN_W <= 4.2)) throw new Error(`STREET_TREE_MIN_W phải ≤ noibo (${STREET_TREE_MIN_W})`);
+if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE_MIN_W}`);
 {
+  // Lộ giới Huế: residential/tertiary ≥ 13,5; primary ~36; service/ngõ hẹp.
+  if (roadWidthMeters({ highway: 'residential' }, 'noibo') < 13.5) throw new Error('residential phải ≥ 13.5m');
+  if (roadWidthMeters({ highway: 'tertiary' }, 'tertiary') < 13.5) throw new Error('tertiary phải ≥ 13.5m');
+  if (roadWidthMeters({ highway: 'primary' }, 'truc') < 30) throw new Error('primary phải ~36m');
+  if (roadWidthMeters({ highway: 'service' }, 'noibo') >= 13.5) throw new Error('service phải là ngõ hẹp');
+  if (roadWidthMeters({ highway: 'residential', width: '36' }, 'noibo') !== 36) throw new Error('tag width=36');
+  if (roadWidthMeters({ highway: 'residential', lanes: '4' }, 'noibo') < 13.5) throw new Error('lanes=4');
+
   const park = [[-40, -40], [40, -40], [40, 40], [-40, 40], [-40, -40]];
   const fromPark = scatterTrees([park], 200, 40, []);
   if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
-  // Cổng cứng: đoạn đường ngắn thật — phải ra cây trước khi đưa lên web.
-  const shortNoibo = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 4.2 }]);
-  if (shortNoibo.length < 4) throw new Error(`đoạn nội bộ 80m phải có ≥4 tán (got ${shortNoibo.length})`);
-  const shortTertiary = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 8 }]);
-  if (shortTertiary.length < 4) throw new Error(`đoạn tertiary 80m phải có ≥4 tán (got ${shortTertiary.length})`);
-  const shortTruc = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 16 }]);
-  if (shortTruc.length < 4) throw new Error(`đoạn trục 80m phải có ≥4 tán (got ${shortTruc.length})`);
-  // Hai bên lề: tán không được dồn một phía (y gần như cùng dấu).
-  const sides = shortNoibo.filter((t) => Math.abs(t.position[1]) > 1);
+  // Cổng cứng: đoạn 80m lộ giới 13,5 / 36 — phải ra cây hai bên trước khi đưa lên web.
+  const short135 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 13.5 }]);
+  if (short135.length < 4) throw new Error(`đoạn 13.5m × 80m phải có ≥4 tán (got ${short135.length})`);
+  const short36 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 36 }]);
+  if (short36.length < 4) throw new Error(`đoạn 36m × 80m phải có ≥4 tán (got ${short36.length})`);
+  const sides = short135.filter((t) => Math.abs(t.position[1]) > 1);
   const pos = sides.filter((t) => t.position[1] > 0).length;
   const neg = sides.filter((t) => t.position[1] < 0).length;
   if (pos < 1 || neg < 1) throw new Error(`phải trồng hai bên lề (pos=${pos} neg=${neg})`);
-  const foot = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 2 }]);
-  if (foot.length !== 0) throw new Error(`lối đi bộ 2m không được có cây (${foot.length})`);
+  const alley = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 5.5 }]);
+  if (alley.length !== 0) throw new Error(`ngõ 5.5m không được có cây hàng lộ giới (${alley.length})`);
   const empty = scatterTrees([], 200, 40, []);
   if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
-  // Công viên lớn không được nuốt hết — vẫn còn tán trên đường nội bộ.
   const bigPark = [[-120, -120], [120, -120], [120, 120], [-120, 120], [-120, -120]];
-  const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 4.2 }]);
-  const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 12 && Math.abs(t.position[0]) > 130);
+  const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 13.5 }]);
+  const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 18 && Math.abs(t.position[0]) > 130);
   if (nearRoad.length < 6) throw new Error(`giữ budget ven đường khi có công viên lớn (ven đường ${nearRoad.length})`);
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {

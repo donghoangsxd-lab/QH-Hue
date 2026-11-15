@@ -51,8 +51,8 @@ const EDGE_VOLUME_CAP = 900;
 const LOD_RADIUS_M = 500;
 /** Trần tán cây procedural (ScatterplotLayer), không mesh. */
 const TREE_CAP_MAX = 220;
-/** Gieo tán ven đường có bề rộng ≥ ngưỡng này (m). Khớp ROAD_WIDTH.noibo trở lên. */
-const STREET_TREE_MIN_W = 4;
+/** Gieo tán khi lộ giới ≥ 13,5 m (đường phân khu vực trở lên theo QH đô thị Huế). */
+const STREET_TREE_MIN_W = 13.5;
 const INFRA_LOT_DRAW_CAP = 40;
 const GLOW_STEPS = 4;
 const USE_FILL = {
@@ -178,9 +178,38 @@ const ROAD_COLOR = {
   rail: [120, 86, 150, 230],
   water: [96, 176, 214, 220]
 };
-/** Bề rộng ước lượng theo hạng OSM — mọi hạng ≥ STREET_TREE_MIN_W đều có hàng cây. */
-const ROAD_WIDTH = { truc: 16, khuvuc: 14, tertiary: 8, noibo: 4.2, xedap: 2.4, dibo: 2, rail: 5, water: 4 };
+/**
+ * Lộ giới mặc định theo QH đô thị Huế (không lấy bề rộng «làn hẹp» kiểu châu Âu).
+ * residential/unclassified thường vẫn 13,5 m; living_street/service mới là ngõ hẹp.
+ */
+const ROAD_WIDTH = { truc: 36, khuvuc: 22.5, tertiary: 13.5, noibo: 13.5, xedap: 3, dibo: 2.5, rail: 5, water: 4 };
+/** Override theo đúng tag highway OSM — tách ngõ hẹp khỏi residential. */
+const HIGHWAY_WIDTH = {
+  motorway: 40, motorway_link: 22, trunk: 36, trunk_link: 22,
+  primary: 36, primary_link: 22,
+  secondary: 22.5, secondary_link: 15,
+  tertiary: 13.5, tertiary_link: 11.5,
+  unclassified: 13.5, residential: 13.5,
+  living_street: 7.5, service: 5.5,
+  cycleway: 3, pedestrian: 4, footway: 2.5, path: 2, steps: 2
+};
 const ARROW_RANK = new Set(['truc', 'khuvuc', 'tertiary']);
+
+/** Lộ giới (m): ưu tiên tag width → lanes → HIGHWAY_WIDTH → ROAD_WIDTH[rank]. */
+export function roadWidthMeters(tags = {}, rank = null) {
+  const raw = tags.width != null ? String(tags.width) : (tags['width:carriageway'] != null ? String(tags['width:carriageway']) : '');
+  const fromTag = Number(String(raw).replace(',', '.').replace(/[^\d.]/g, ''));
+  if (Number.isFinite(fromTag) && fromTag >= 2 && fromTag <= 80) return fromTag;
+  const lanes = Number(tags.lanes);
+  if (Number.isFinite(lanes) && lanes >= 1 && lanes <= 12) {
+    // Làn ~3,5 m + vỉa hè hai bên tối thiểu ~3 m (đường đô thị VN).
+    return Math.max(STREET_TREE_MIN_W, lanes * 3.5 + 6);
+  }
+  const hw = String(tags.highway || '');
+  if (hw && HIGHWAY_WIDTH[hw] != null) return HIGHWAY_WIDTH[hw];
+  if (rank && ROAD_WIDTH[rank] != null) return ROAD_WIDTH[rank];
+  return 0;
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -1353,9 +1382,10 @@ function buildModel(raw, origin, r, heights, floorPack) {
           roadM[rank] += lineLength(clipped.parts);
           const color = ROAD_COLOR[rank];
           const roadName = String(tags.name || '').trim();
+          const width = roadWidthMeters(tags, rank);
           for (const part of clipped.parts) {
-            roads.push({ path: part, color, width: ROAD_WIDTH[rank], name: roadName, rank });
-            if (rank === 'truc' || rank === 'khuvuc') majorLines.push(part);
+            roads.push({ path: part, color, width, name: roadName, rank });
+            if (width >= STREET_TREE_MIN_W || rank === 'truc' || rank === 'khuvuc') majorLines.push(part);
           }
           if (ARROW_RANK.has(rank)) {
             for (const ex of clipped.exits) {
