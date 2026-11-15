@@ -1,9 +1,11 @@
 // Sáu trục đề xuất: Phát triển đô thị, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc, Dự án.
 // Quản trị ghi thẳng lớp công bố. Cán bộ CanBo gửi hàng chờ. Chưa đăng nhập thì không gửi.
 import { map } from './mapEngine.js';
+import { planMap, getViewMode, isSplitOn, setViewMode } from './planMap.js';
+import { setLevel } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, announceTool, fmtNum } from './utils.js';
-import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
+import { SECTORS, FACET_LEVELS, listAreas, setBrowseState } from './facetStore.js';
 import {
   isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit, stageOrPublish
 } from './entryKernel.js';
@@ -37,18 +39,31 @@ let updateRadiusPreview = () => {};
 let preview = null;
 let previewHalo = null;
 let previewRenderer = null;
+let previewHost = null;
 
-/** Pane preview hồ sơ: trên lớp QH/lô (≤450), dưới marker/tooltip (600+). */
-const LOT_PREVIEW_Z = 580;
+/** Cùng cadImportUi: đang xem QH thì planMap phủ kín — preview phải vẽ lên đó, không phải map hiện trạng ẩn. */
+function viewMap() {
+  return (planMap && getViewMode() === 'QH' && !isSplitOn() ? planMap : map);
+}
+
+/** Pane preview: trên projectFocusPane (620), dưới tooltip (650). */
+const LOT_PREVIEW_Z = 635;
 
 function lotRenderer() {
-  if (!map.getPane('lotPreview')) {
-    const pane = map.createPane('lotPreview');
+  const m = viewMap();
+  if (!m) return null;
+  if (!m.getPane('lotPreview')) {
+    const pane = m.createPane('lotPreview');
     pane.style.zIndex = String(LOT_PREVIEW_Z);
   } else {
-    map.getPane('lotPreview').style.zIndex = String(LOT_PREVIEW_Z);
+    m.getPane('lotPreview').style.zIndex = String(LOT_PREVIEW_Z);
   }
-  if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
+  if (previewHost !== m) {
+    previewRenderer = null;
+    previewHost = m;
+  }
+  // Canvas: nhiều lô QH không làm đơ SVG; cùng pane với halo/tem.
+  if (!previewRenderer) previewRenderer = L.canvas({ pane: 'lotPreview' });
   return previewRenderer;
 }
 let stepId = 'ranh';
@@ -85,8 +100,10 @@ const signedIn = isEntrySignedIn;
 const allowedKeys = allowedEntryKeys;
 
 function clearPreview() {
-  if (previewHalo && map) map.removeLayer(previewHalo);
-  if (preview && map) map.removeLayer(preview);
+  [previewHost, map, planMap].filter(Boolean).forEach((m) => {
+    if (previewHalo) try { m.removeLayer(previewHalo); } catch (e) { /* khác host */ }
+    if (preview) try { m.removeLayer(preview); } catch (e) { /* khác host */ }
+  });
   previewHalo = null;
   preview = null;
 }
@@ -94,9 +111,10 @@ function clearPreview() {
 /** Chừa panel đề xuất bên phải khi zoom tới tem / lô. */
 function previewFitOpts(pad = 40, maxZoom = 18) {
   const opts = { maxZoom, animate: true, paddingTopLeft: [pad, pad], paddingBottomRight: [pad, pad] };
-  if (!map) return opts;
+  const host = viewMap();
+  if (!host) return opts;
   try {
-    const m = map.getContainer().getBoundingClientRect();
+    const m = host.getContainer().getBoundingClientRect();
     const panel = $('tabAdd') || $('rightPanel');
     const r = panel && !panel.hidden && panel.offsetWidth ? panel.getBoundingClientRect() : null;
     const cover = r && r.left < m.right && r.bottom > m.top
@@ -108,11 +126,12 @@ function previewFitOpts(pad = 40, maxZoom = 18) {
 }
 
 function focusStampOnMap(bag, id) {
-  if (!map || typeof L === 'undefined' || !bag || !id) return;
+  const host = viewMap();
+  if (!host || typeof L === 'undefined' || !bag || !id) return;
   const s = (bag.stampView || []).find(x => x.id === id);
   if (!s || !Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
   try {
-    map.fitBounds(L.latLng(s.lat, s.lng).toBounds(120), previewFitOpts(48, 18));
+    host.fitBounds(L.latLng(s.lat, s.lng).toBounds(120), previewFitOpts(48, 18));
   } catch (e) { /* tem lệch CRS */ }
 }
 
@@ -129,22 +148,23 @@ function showPreview(features, review, opts = {}) {
     });
   });
   (features || []).forEach(feature => draw.push(feature));
-  if (!map || typeof L === 'undefined' || !draw.length) return;
+  const host = viewMap();
+  if (!host || typeof L === 'undefined' || !draw.length) return;
   const fc = asCollection(draw);
   const ranhNew = draw.filter(f => f.properties && f.properties._mau === 'ranh-moi');
-  lotRenderer();
+  const renderer = lotRenderer();
   // Viền trắng dưới nét đỏ — đọc được trên lớp QH nhiều màu.
   if (ranhNew.length) {
     previewHalo = L.geoJSON(asCollection(ranhNew), {
       pane: 'lotPreview',
-      renderer: lotRenderer(),
+      renderer,
       interactive: false,
       style: { color: '#ffffff', weight: 10, opacity: 0.95, fill: false }
-    }).addTo(map);
+    }).addTo(host);
   }
   preview = L.geoJSON(fc, {
     pane: 'lotPreview',
-    renderer: lotRenderer(),
+    renderer,
     style: (f) => {
       if (f.properties && f.properties._mau === 'ranh') {
         return { color: '#0f172a', weight: 2, dashArray: '6 4', fillOpacity: 0 };
@@ -185,15 +205,20 @@ function showPreview(features, review, opts = {}) {
         fillOpacity: 0.28
       };
     },
-    pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#b45309', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.95 })
+    pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+      pane: 'lotPreview',
+      renderer,
+      radius: 6, color: '#b45309', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.95
+    })
   });
-  preview.addTo(map);
+  preview.addTo(host);
+  previewHost = host;
   if (previewHalo && previewHalo.bringToFront) previewHalo.bringToFront();
   if (preview.bringToFront) preview.bringToFront();
   if (!fit) return;
   try {
     const b = preview.getBounds();
-    if (b.isValid()) map.fitBounds(b, previewFitOpts(40, 17));
+    if (b.isValid()) host.fitBounds(b, previewFitOpts(40, 17));
   } catch (e) { /* ranh rỗng */ }
 }
 
@@ -645,6 +670,7 @@ function showStepPreview(opts = {}) {
 
 function paintStampMarkers(bag) {
   if (!preview || !bag?.stampView?.length || typeof L === 'undefined') return;
+  const renderer = lotRenderer();
   const pending = new Set((bag.stampMatch?.pending || []).map(s => s.id));
   bag.stampView.forEach(s => {
     if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
@@ -653,6 +679,7 @@ function paintStampMarkers(bag) {
     const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
     const mark = L.circleMarker([s.lat, s.lng], {
       pane: 'lotPreview',
+      renderer,
       radius: cur ? 11 : on ? 8 : 5,
       color: '#fff',
       weight: 2,
@@ -764,6 +791,34 @@ function facetLevelOf(name) {
   return 'QHC10';
 }
 
+/** Facet hồ sơ (QHC25/…) → nút cấp trục B (qhc25/qhpk/…). */
+const FACET_TO_MAP_LEVEL = {
+  QHC25: 'qhc25',
+  QHC10: 'qhc10',
+  QHPK: 'qhpk',
+  QHCT: 'qhct'
+};
+
+/**
+ * Đưa bản đồ về trục B + đúng cấp đồ án đang nhập, chế độ xem QH —
+ * để preview ranh/lô đối chiếu lớp nền cùng tỷ lệ (VD QHPK → QHPK 1/2.000).
+ */
+function syncPlanViewToEntryLevel(facetRaw) {
+  const facet = String(facetRaw || '').trim();
+  const mapLv = FACET_TO_MAP_LEVEL[facet];
+  if (!mapLv) return;
+  document.dispatchEvent(new CustomEvent('qh:axis-tab', {
+    detail: { id: 'quyhoach', keepCamera: true }
+  }));
+  setBrowseState({ axis: 'quyhoach', level: facet }, { url: true });
+  setLevel(mapLv, { keepView: true });
+  if (!isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
+}
+
+function entryFacetLevel() {
+  return $('hoLevel')?.value || facetLevelOf(schemeName()) || '';
+}
+
 function captureScheme() {
   const el = $('hoScheme');
   const neu = $('hoSchemeNew')?.value || '';
@@ -821,6 +876,7 @@ function onSchemePicked() {
   if (!name) return;
   const level = $('hoLevel');
   if (level) level.value = facetLevelOf(name);
+  syncPlanViewToEntryLevel(level?.value || facetLevelOf(name));
 }
 
 function hoMeta(step) {
@@ -1015,6 +1071,10 @@ function renderHoSo() {
   $('hoSchemeSearch')?.addEventListener('input', () => fillHoSchemes());
   $('hoScheme')?.addEventListener('focus', () => fillHoSchemes());
   $('hoScheme')?.addEventListener('change', onSchemePicked);
+  $('hoLevel')?.addEventListener('change', () => {
+    syncPlanViewToEntryLevel($('hoLevel').value);
+    if ($('hoActive')) renderActive({ fit: false });
+  });
   $('hoScope')?.addEventListener('change', () => { if ($('hoUnit')) $('hoUnit').innerHTML = optionsHtml($('hoScope').value, ''); renderActive(); });
   $('hoAreaHa')?.addEventListener('input', () => {
     rememberHoExtra();
@@ -1285,6 +1345,8 @@ async function takeDraw(step, file) {
       closedCount: parsed.closedCount || 0
     };
     applyLandClip(step, features);
+    // Đổi trục B + cấp trước khi vẽ preview (planMap + lớp nền cùng tỷ lệ).
+    syncPlanViewToEntryLevel(entryFacetLevel());
     if (step.id === 'ranh') {
       reclipLands();
       stepId = 'ranh';
@@ -1311,6 +1373,7 @@ async function takeKh(step, file) {
     stampPick: null
   };
   if (!error && stamps.length) applyKhToHeld(step);
+  syncPlanViewToEntryLevel(entryFacetLevel());
   renderActive();
 }
 

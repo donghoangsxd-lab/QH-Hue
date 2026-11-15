@@ -1,5 +1,6 @@
 // Quản trị: facade hàng chờ — ChoDuyet (B/C-net/E/F) + điểm FALSE (C-điểm/D) trên máy.
 import { map, approvePointStatus } from './mapEngine.js';
+import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml } from './utils.js';
@@ -7,6 +8,9 @@ import { DRAW_SUPPORTS } from './entrySteps.js';
 import { HTKT_POINT_CODES } from './pointEntrySchema.js';
 
 const $ = (id) => document.getElementById(id);
+/** Cùng entryFlows / cadImportUi: preview lên bản đồ đang hiện. */
+const viewMap = () => (planMap && getViewMode() === 'QH' && !isSplitOn() ? planMap : map);
+const LOT_PREVIEW_Z = 635;
 const KIND_LABEL = {
   'chi-tieu': 'Chỉ tiêu đô thị',
   'kien-truc': 'Công trình kiến trúc',
@@ -23,16 +27,23 @@ const HTKT_SET = new Set(HTKT_POINT_CODES);
 
 let preview = null;
 let previewRenderer = null;
+let previewHost = null;
 let pdfUrl = '';
 
 function lotRenderer() {
-  if (!map.getPane('lotPreview')) {
-    const pane = map.createPane('lotPreview');
-    pane.style.zIndex = '580';
+  const m = viewMap();
+  if (!m) return null;
+  if (!m.getPane('lotPreview')) {
+    const pane = m.createPane('lotPreview');
+    pane.style.zIndex = String(LOT_PREVIEW_Z);
   } else {
-    map.getPane('lotPreview').style.zIndex = '580';
+    m.getPane('lotPreview').style.zIndex = String(LOT_PREVIEW_Z);
   }
-  if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
+  if (previewHost !== m) {
+    previewRenderer = null;
+    previewHost = m;
+  }
+  if (!previewRenderer) previewRenderer = L.canvas({ pane: 'lotPreview' });
   return previewRenderer;
 }
 let openId = '';
@@ -44,7 +55,9 @@ function clearKeep() {
 }
 
 function clearPreview() {
-  if (preview && map) map.removeLayer(preview);
+  [previewHost, map, planMap].filter(Boolean).forEach((m) => {
+    if (preview) try { m.removeLayer(preview); } catch (e) { /* khác host */ }
+  });
   preview = null;
 }
 
@@ -69,7 +82,8 @@ function showFeatures(features, review) {
     rows.push({ geometry: item.geometry, props: { _mau: 'do', _status: item.status, nhan: item.name || '' } });
   });
   (features || []).forEach(row => rows.push(row));
-  if (!map || typeof L === 'undefined' || !rows.length) return;
+  const host = viewMap();
+  if (!host || typeof L === 'undefined' || !rows.length) return;
   const fc = {
     type: 'FeatureCollection',
     features: rows.map(row => ({
@@ -78,9 +92,10 @@ function showFeatures(features, review) {
       properties: row.props || {}
     }))
   };
+  const renderer = lotRenderer();
   preview = L.geoJSON(fc, {
     pane: 'lotPreview',
-    renderer: lotRenderer(),
+    renderer,
     style: (f) => {
       if (f.properties && f.properties._mau === 'do') {
         const cut = f.properties._status === 'cat';
@@ -94,12 +109,16 @@ function showFeatures(features, review) {
       }
       return { color: '#b45309', weight: 2, fillColor: '#fdba74', fillOpacity: 0.35 };
     },
-    pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#9a3412', weight: 2, fillColor: '#fb923c', fillOpacity: 0.95 })
+    pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+      pane: 'lotPreview', renderer,
+      radius: 6, color: '#9a3412', weight: 2, fillColor: '#fb923c', fillOpacity: 0.95
+    })
   });
-  preview.addTo(map);
+  preview.addTo(host);
+  previewHost = host;
   try {
     const bounds = preview.getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.15));
+    if (bounds.isValid()) host.fitBounds(bounds.pad(0.15));
   } catch (e) { /* ranh rỗng */ }
 }
 

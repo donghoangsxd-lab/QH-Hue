@@ -1144,6 +1144,10 @@ assert.match(read('public/js/drawingReaders.js'), /normalizeBoundaryFeatures|clo
 assert.match(read('public/js/entryFlows.js'), /hasRanhPolygon|areaInputError|AREA_TOL|hoAreaHa/);
 assert.match(read('public/js/entryFlows.js'), /ranh-moi|#ef4444|LOT_PREVIEW_Z|previewHalo/);
 assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|#ea580c|focusStamp/);
+assert.match(read('public/js/entryFlows.js'), /function viewMap|getViewMode\(\) === 'QH'|planMap/);
+assert.match(read('public/js/entryFlows.js'), /LOT_PREVIEW_Z = 635|projectFocusPane/);
+assert.match(read('public/js/entryFlows.js'), /syncPlanViewToEntryLevel|FACET_TO_MAP_LEVEL|qh:axis-tab/);
+assert.match(read('public/js/entryFlows.js'), /QHPK:\s*'qhpk'|setLevel\(mapLv/);
 assert.match(read('public/js/entrySteps.js'), /requiredNew/);
 assert.match(read('docs/ui-spec.md'), /polyline hở|lệch hơn 1%|#ef4444/);
 assert.match(read('public/js/adjustImport.js'), /prefillAdjustHandoff/);
