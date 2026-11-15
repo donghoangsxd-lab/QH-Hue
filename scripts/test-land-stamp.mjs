@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch } from '../public/js/landStamp.js';
+import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
 const dxf = `0
 SECTION
@@ -469,5 +470,108 @@ const posOnly = matchStamps([{
 }], [{ key: 'solo', area: 5000, layer: '', rings: shared }]);
 assert.equal(posOnly.assigned.length, 0);
 assert.equal(posOnly.pending.length, 1);
+
+// Gốc block / điểm E≈0 + N≈Huế chiếu VN-2000 ra Lào — không được thắng điểm INSERT.
+const hueE = 556000;
+const hueN = 1815000;
+const polluted = {
+  code: 'TM-B3', areaRaw: '', floors: '5', coverage: '60', far: '5',
+  x: hueE, y: hueN,
+  points: [[hueE, hueN], [0, hueN], [1, 1], [10, 20]]
+};
+const toWgs = (E, N) => vn2000ToWgs84(E, N, CRS_PRESETS.HUE_3);
+const [laosLat, laosLng] = toWgs(0, hueN);
+assert.ok(laosLng < 105, `mốc Lào ${laosLng}`);
+const fixed = projectStamps([polluted], toWgs);
+assert.equal(fixed.length, 1);
+assert.ok(fixed[0].lng > 106.5 && fixed[0].lng < 108.5, `tem phải ở Huế, không Lào (${fixed[0].lng})`);
+assert.ok(fixed[0].lat > 15.5 && fixed[0].lat < 17.2, `vĩ độ Huế (${fixed[0].lat})`);
+assert.ok(!fixed[0].cands.some(p => p.lng < 105), 'không còn ứng viên bên Lào');
+
+// ATTRIB local trong block + INSERT thật — vị trí tem = điểm chèn.
+const localBlockDxf = `0
+SECTION
+2
+BLOCKS
+0
+BLOCK
+2
+TEMLO
+10
+0
+20
+0
+0
+ATTDEF
+2
+Ký hiệu
+10
+2
+20
+3
+1
+XX
+0
+ATTDEF
+2
+Tầng cao
+10
+2
+20
+1
+1
+5
+0
+ENDBLK
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+INSERT
+2
+TEMLO
+10
+${hueE}
+20
+${hueN}
+0
+ATTRIB
+2
+Ký hiệu
+1
+TM-B3
+10
+2
+20
+3
+0
+ATTRIB
+2
+Tầng cao
+1
+5
+10
+2
+20
+1
+0
+SEQEND
+0
+ENDSEC
+0
+EOF
+`;
+const localStamps = parseLandStampDxf(localBlockDxf);
+assert.equal(localStamps.length, 1);
+assert.equal(localStamps[0].code, 'TM-B3');
+assert.equal(localStamps[0].x, hueE);
+assert.equal(localStamps[0].y, hueN);
+assert.ok(localStamps[0].points.every(([x, y]) => Math.hypot(x - hueE, y - hueN) <= 200),
+  'points chỉ quanh INSERT, không giữ ATTRIB local (2,3)');
+const localProj = projectStamps(localStamps, toWgs);
+assert.ok(localProj[0].lng > 106.5, `INSERT local-attr → Huế (${localProj[0].lng})`);
 
 console.log('land-stamp: ok');

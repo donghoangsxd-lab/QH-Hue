@@ -140,27 +140,54 @@ function xform(x, y, tr) {
   return [tr.x + lx * c - ly * s, tr.y + lx * s + ly * c];
 }
 
+/** Bán kính (đơn vị bản vẽ) quanh điểm INSERT: bỏ điểm local gốc block (E≈0 → nhảy Lào khi chiếu VN-2000). */
+const STAMP_NEAR_INSERT_M = 200;
+
+function nearInsert(x, y, ix, iy, maxD = STAMP_NEAR_INSERT_M) {
+  return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(ix) && Number.isFinite(iy)
+    && Math.hypot(x - ix, y - iy) <= maxD;
+}
+
+/**
+ * ATTRIB sau INSERT: đã WCS (gần điểm chèn) giữ nguyên; còn lại là local trong định nghĩa block → xform.
+ * Tránh đẩy (0..vài chục, …) hoặc gốc block lên bản đồ như thể Đông/Bắc tuyệt đối.
+ */
+function worldAttrXY(a, tr) {
+  if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
+  const dIns = Math.hypot(a.x - tr.x, a.y - tr.y);
+  const dBase = Math.hypot(a.x - tr.bx, a.y - tr.by);
+  if (dIns <= STAMP_NEAR_INSERT_M || (Number.isFinite(dIns) && dIns <= dBase + 1e-6)) {
+    return [a.x, a.y];
+  }
+  return xform(a.x, a.y, tr);
+}
+
 function expandBlock(defs, name, tr, depth, attribs) {
   const texts = [];
-  const attrs = attribs.map(a => ({ ...a }));
+  const attrs = [];
   const pts = [];
   if (Number.isFinite(tr.x) && Number.isFinite(tr.y)) pts.push([tr.x, tr.y]);
-  attrs.forEach(a => { if (Number.isFinite(a.x) && Number.isFinite(a.y)) pts.push([a.x, a.y]); });
+  (attribs || []).forEach(a => {
+    const xy = worldAttrXY(a, tr);
+    const row = { tag: a.tag, text: a.text, x: xy ? xy[0] : a.x, y: xy ? xy[1] : a.y };
+    attrs.push(row);
+    if (xy && nearInsert(xy[0], xy[1], tr.x, tr.y)) pts.push(xy);
+  });
   const def = defs.get(String(name || '').toLowerCase());
   if (!def || depth > 4) return { texts, attrs, pts };
   def.texts.forEach(t => {
     const [x, y] = xform(t.x, t.y, tr);
     texts.push({ text: t.text, x, y, h: (t.h > 0 ? t.h : 2) * Math.max(Math.abs(tr.sx), Math.abs(tr.sy), 1) });
-    pts.push([x, y]);
+    if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
   });
   const taken = new Set(attrs.map(a => normTag(a.tag)));
   def.attdefs.forEach(a => {
     const [x, y] = xform(a.x, a.y, tr);
-    pts.push([x, y]);
+    if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
     if (taken.has(normTag(a.tag))) return;
     attrs.push({ tag: a.tag, text: a.text, x, y });
   });
-  def.pts.forEach(([x, y]) => pts.push(xform(x, y, tr)));
+  // Không đưa mọi đỉnh hình học block vào pts — dễ lẫn tọa độ gốc định nghĩa.
   def.inserts.forEach(ch => {
     const child = defs.get(String(ch.name || '').toLowerCase());
     const sub = expandBlock(defs, ch.name, {
@@ -171,41 +198,36 @@ function expandBlock(defs, name, tr, depth, attribs) {
     sub.texts.forEach(t => {
       const [x, y] = place(t.x, t.y);
       texts.push({ ...t, x, y });
-      pts.push([x, y]);
+      if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
     });
     sub.attrs.forEach(a => {
       if (taken.has(normTag(a.tag))) return;
       const [x, y] = place(a.x, a.y);
       attrs.push({ ...a, x, y });
       taken.add(normTag(a.tag));
-      pts.push([x, y]);
+      if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
     });
-    sub.pts.forEach(([x, y]) => pts.push(place(x, y)));
+    sub.pts.forEach(([x, y]) => {
+      const [wx, wy] = place(x, y);
+      if (nearInsert(wx, wy, tr.x, tr.y)) pts.push([wx, wy]);
+    });
   });
   return { texts, attrs, pts };
 }
 
-function contentCentroid(pts, insert) {
-  const rest = pts.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1])
-    && (Math.abs(p[0] - insert[0]) > 1e-6 || Math.abs(p[1] - insert[1]) > 1e-6));
-  if (!rest.length) return null;
-  const xs = rest.map(p => p[0]);
-  const ys = rest.map(p => p[1]);
-  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
-}
-
+/** Neo bản đồ = điểm INSERT; chỉ giữ điểm phụ gần INSERT (không dùng gốc block). */
 function candidatePoints(insert, pts) {
   const out = [];
   const push = (p) => {
     if (!p || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) return;
+    if (!nearInsert(p[0], p[1], insert[0], insert[1])) return;
     const eps = Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 180 ? 1e-7 : 0.05;
     if (out.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < eps)) return;
     out.push(p);
   };
   push(insert);
-  push(contentCentroid(pts, insert));
-  pts.forEach(push);
-  return out;
+  (pts || []).forEach(push);
+  return out.length ? out : (Number.isFinite(insert[0]) && Number.isFinite(insert[1]) ? [insert] : []);
 }
 
 /** TEXT / MTEXT / CIRCLE / INSERT trong ENTITIES. Block lồng và chữ trong định nghĩa block được bung ra. */
@@ -540,7 +562,9 @@ export function parseLandStampDxf(text) {
 
 export function projectStamps(stamps, toLatLng) {
   return (stamps || []).map(s => {
-    const raw = (s.points && s.points.length) ? s.points : [[s.x, s.y]];
+    if (!Number.isFinite(s.x) || !Number.isFinite(s.y)) return null;
+    // Luôn neo INSERT trước; điểm phụ chỉ khi gần INSERT (lọc gốc block / ATTRIB local).
+    const raw = candidatePoints([s.x, s.y], s.points || []);
     const cands = [];
     raw.forEach(([x, y]) => {
       const [lat, lng] = toLatLng(x, y);
