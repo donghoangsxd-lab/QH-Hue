@@ -1,0 +1,107 @@
+{
+  "osm3s": { "timestamp_osm_base": "2026-11-15T12:00:00Z" },
+  "elements": [
+    {
+      "type": "way",
+      "id": 1,
+      "tags": { "highway": "residential", "name": "Hem A", "width": "6" },
+      "geometry": [
+        { "lat": 16.4685, "lon": 107.577 },
+        { "lat": 16.4685, "lon": 107.581 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 2,
+      "tags": { "highway": "residential", "name": "Hem B", "width": "8" },
+      "geometry": [
+        { "lat": 16.4695, "lon": 107.577 },
+        { "lat": 16.4695, "lon": 107.581 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 3,
+      "tags": { "highway": "residential", "name": "Hem C", "width": "9" },
+      "geometry": [
+        { "lat": 16.4715, "lon": 107.577 },
+        { "lat": 16.4715, "lon": 107.581 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 4,
+      "tags": { "highway": "unclassified", "width:carriageway": "7" },
+      "geometry": [
+        { "lat": 16.4725, "lon": 107.577 },
+        { "lat": 16.4725, "lon": 107.581 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 5,
+      "tags": { "highway": "service", "name": "Ngo hep" },
+      "geometry": [
+        { "lat": 16.473, "lon": 107.578 },
+        { "lat": 16.473, "lon": 107.580 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 6,
+      "tags": { "highway": "living_street" },
+      "geometry": [
+        { "lat": 16.4678, "lon": 107.578 },
+        { "lat": 16.4678, "lon": 107.580 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 7,
+      "tags": { "highway": "footway" },
+      "geometry": [
+        { "lat": 16.4705, "lon": 107.5785 },
+        { "lat": 16.4705, "lon": 107.5795 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 8,
+      "tags": { "highway": "primary", "name": "Le Loi", "width": "6" },
+      "geometry": [
+        { "lat": 16.4700, "lon": 107.5765 },
+        { "lat": 16.4700, "lon": 107.5815 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 9,
+      "tags": { "highway": "tertiary", "name": "Pho ngang", "width": "5.5" },
+      "geometry": [
+        { "lat": 16.4680, "lon": 107.579 },
+        { "lat": 16.4730, "lon": 107.579 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 10,
+      "tags": { "leisure": "park", "name": "Cong vien nho" },
+      "geometry": [
+        { "lat": 16.4698, "lon": 107.5788 },
+        { "lat": 16.4698, "lon": 107.5792 },
+        { "lat": 16.4702, "lon": 107.5792 },
+        { "lat": 16.4702, "lon": 107.5788 },
+        { "lat": 16.4698, "lon": 107.5788 }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 11,
+      "tags": { "waterway": "canal" },
+      "geometry": [
+        { "lat": 16.4690, "lon": 107.5782 },
+        { "lat": 16.4720, "lon": 107.5782 }
+      ]
+    }
+  ]
+}

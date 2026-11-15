@@ -53,8 +53,19 @@ node["public_transport"~"^(platform|stop_position)$"](${s});
 );out geom;`;
 }
 
+function hasMapFeatures(data) {
+  return (data.elements || []).some((el) => {
+    const t = el && el.tags;
+    return t && (t.highway || t.railway || t.waterway || t.leisure || t.landuse || t.natural || t.amenity || t.place);
+  });
+}
+
 function dated(data) {
-  return data && Array.isArray(data.elements) && /^\d{4}-\d{2}-\d{2}/.test(String((data.osm3s || {}).timestamp_osm_base || ''));
+  if (!data || !Array.isArray(data.elements)) return false;
+  // Overpass 200 + remark timeout / elements rỗng — không cache dài, không trả như bản đồ tốt.
+  if (data.remark) return false;
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String((data.osm3s || {}).timestamp_osm_base || ''))) return false;
+  return hasMapFeatures(data);
 }
 
 async function fetchOsm(lat, lng, r) {
@@ -101,8 +112,15 @@ module.exports = async (req, res) => {
   }
   try {
     const data = await fetchOsm(lat, lng, r);
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
-    res.setHeader('CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+    const highwayN = (data.elements || []).filter((el) => el.tags && el.tags.highway).length;
+    // Bản có ngày nhưng gần như không có đường: cache ngắn để Overpass kịp phục hồi.
+    if (highwayN < 1) {
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=60');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=120, stale-while-revalidate=60');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+    }
     return res.status(200).json(data);
   } catch (err) {
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=60');
@@ -113,3 +131,4 @@ module.exports = async (req, res) => {
 
 module.exports.fetchOsm = fetchOsm;
 module.exports.dated = dated;
+module.exports.hasMapFeatures = hasMapFeatures;
