@@ -840,10 +840,11 @@ export function treeCap(r) {
 export { STREET_TREE_MIN_W };
 
 function treeDot(x, y, salt) {
+  // Bán kính tán đủ lớn để thấy khi camera vòng 500–800 m (3–4 m gần như chấm).
   return {
     position: [x, y],
-    radius: 3.2 + (salt % 3) * 0.8,
-    color: salt % 2 ? [56, 168, 72, 240] : [34, 140, 58, 240]
+    radius: 9.5 + (salt % 4) * 1.6,
+    color: salt % 2 ? [46, 178, 72, 250] : [28, 150, 58, 250]
   };
 }
 
@@ -2272,10 +2273,12 @@ function bootMap(place, model, ground) {
           id: 'tree-canopy',
           data: model.trees,
           coordinateSystem: CART,
-          modelMatrix: lift(zTree + 5.2),
+          modelMatrix: lift(zTree + 6.5),
           getPosition: (d) => d.position,
-          getRadius: (d) => d.radius || 3.5,
+          getRadius: (d) => Math.max(9, d.radius || 10),
           radiusUnits: 'meters',
+          radiusMinPixels: 4,
+          radiusMaxPixels: 28,
           getFillColor: (d) => d.color,
           billboard: true,
           stroked: false,

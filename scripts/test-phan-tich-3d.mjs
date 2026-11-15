@@ -207,8 +207,12 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   // Cổng cứng: đoạn 80m lộ giới 13,5 / 36 — phải ra cây hai bên trước khi đưa lên web.
   const short135 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 13.5 }]);
   if (short135.length < 4) throw new Error(`đoạn 13.5m × 80m phải có ≥4 tán (got ${short135.length})`);
+  if ((short135[0].radius || 0) < 9) throw new Error(`bán kính tán quá nhỏ khi camera xa (${short135[0].radius})`);
   const short36 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 36 }]);
   if (short36.length < 4) throw new Error(`đoạn 36m × 80m phải có ≥4 tán (got ${short36.length})`);
+  if (!js.includes('radiusMinPixels: 4') || !js.includes('Math.max(9, d.radius')) {
+    throw new Error('tree-canopy chưa kẹp pixel / bán kính đủ lớn trên màn hình');
+  }
   const sides = short135.filter((t) => Math.abs(t.position[1]) > 1);
   const pos = sides.filter((t) => t.position[1] > 0).length;
   const neg = sides.filter((t) => t.position[1] < 0).length;
