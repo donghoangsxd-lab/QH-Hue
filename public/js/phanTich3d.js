@@ -59,6 +59,10 @@ const TREE_CAP_MAX = 220;
 const STREET_TREE_MIN_W = 13.5;
 /** Ngưỡng trồng ven đường (m): living_street 7,5 trở lên — khớp hàng cây trên ảnh vệ tinh. */
 const STREET_TREE_PLANT_W = 7.5;
+/** Không trồng trong bán kính này quanh nút giao (≥2 đường gặp nhau). */
+const JUNCTION_CLEAR_M = 14;
+/** Gom đỉnh đường cùng cụm nếu cách nhau ≤ khoảng này (m). */
+const JUNCTION_JOIN_M = 6;
 const INFRA_LOT_DRAW_CAP = 40;
 const GLOW_STEPS = 4;
 const USE_FILL = {
@@ -883,7 +887,78 @@ export function treeCap(r) {
   return Math.min(TREE_CAP_MAX, Number.isFinite(n) && n > 0 ? n : 0);
 }
 
-export { STREET_TREE_MIN_W, STREET_TREE_PLANT_W };
+export { STREET_TREE_MIN_W, STREET_TREE_PLANT_W, JUNCTION_CLEAR_M };
+
+function nearAnyPoint(x, y, points, clearM) {
+  for (let i = 0; i < (points || []).length; i++) {
+    const p = points[i];
+    if (Math.hypot(x - p[0], y - p[1]) < clearM) return true;
+  }
+  return false;
+}
+
+/** Giao điểm hai đoạn AB × CD (null nếu không cắt trong đoạn). */
+function segmentCrossing(a, b, c, d) {
+  const ax = b[0] - a[0];
+  const ay = b[1] - a[1];
+  const bx = d[0] - c[0];
+  const by = d[1] - c[1];
+  const den = ax * by - ay * bx;
+  if (Math.abs(den) < 1e-9) return null;
+  const cx = c[0] - a[0];
+  const cy = c[1] - a[1];
+  const t = (cx * by - cy * bx) / den;
+  const u = (cx * ay - cy * ax) / den;
+  if (t < -0.02 || t > 1.02 || u < -0.02 || u > 1.02) return null;
+  return [a[0] + t * ax, a[1] + t * ay];
+}
+
+/** Tâm nút giao: cụm đỉnh ≥2 đường, hoặc giao cắt hình học giữa hai đường. */
+export function collectRoadJunctions(roads = [], joinM = JUNCTION_JOIN_M) {
+  const samples = [];
+  (roads || []).forEach((road, ri) => {
+    const path = road && road.path;
+    if (!path || path.length < 2) return;
+    for (let i = 0; i < path.length; i++) {
+      samples.push({ x: path[i][0], y: path[i][1], ri });
+    }
+  });
+  const junctions = [];
+  const used = new Set();
+  for (let i = 0; i < samples.length; i++) {
+    if (used.has(i)) continue;
+    const hit = new Set([samples[i].ri]);
+    let sx = samples[i].x;
+    let sy = samples[i].y;
+    let n = 1;
+    for (let j = i + 1; j < samples.length; j++) {
+      if (used.has(j)) continue;
+      if (Math.hypot(samples[j].x - samples[i].x, samples[j].y - samples[i].y) > joinM) continue;
+      used.add(j);
+      hit.add(samples[j].ri);
+      sx += samples[j].x;
+      sy += samples[j].y;
+      n += 1;
+    }
+    if (hit.size >= 2) junctions.push([sx / n, sy / n]);
+  }
+  // OSM thường không lặp đỉnh tại ngã tư nếu cắt giữa đoạn — bắt giao hình học.
+  const list = (roads || []).filter((road) => road && road.path && road.path.length >= 2);
+  for (let i = 0; i < list.length; i++) {
+    const pa = list[i].path;
+    for (let j = i + 1; j < list.length; j++) {
+      const pb = list[j].path;
+      for (let ia = 1; ia < pa.length; ia++) {
+        for (let ib = 1; ib < pb.length; ib++) {
+          const hit = segmentCrossing(pa[ia - 1], pa[ia], pb[ib - 1], pb[ib]);
+          if (!hit) continue;
+          if (!nearAnyPoint(hit[0], hit[1], junctions, joinM)) junctions.push(hit);
+        }
+      }
+    }
+  }
+  return junctions;
+}
 
 const SKIP_TREE_RANK = new Set(['xedap', 'dibo', 'rail', 'water']);
 
@@ -926,9 +1001,25 @@ export function pathLengthMeters(path) {
   return n;
 }
 
+/** Đường sát công viên/vùng xanh (≤ maxDist m tới đỉnh ring hoặc nằm trong ring). */
+function roadNearGreen(road, rings, maxDist = 35) {
+  const path = road && road.path;
+  if (!path || path.length < 2 || !(rings || []).length) return false;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i];
+    for (const ring of rings) {
+      if (!ring || ring.length < 3) continue;
+      if (pointInRing(p, ring)) return true;
+      for (let j = 0; j < ring.length; j++) {
+        if (Math.hypot(p[0] - ring[j][0], p[1] - ring[j][1]) <= maxDist) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
- * Tán cây: đường xe trước (khớp hàng cây vệ tinh), rồi tree_row OSM, rồi công viên.
- * Lề sát mép lòng đường — không đẩy nửa lộ giới vào giữa lô.
+ * Tán cây: đường xe trước (ưu tiên tuyến bao công viên), skip nút giao, rồi tree_row, rồi công viên.
  */
 export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const out = [];
@@ -936,9 +1027,22 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   if (limit < 1) return out;
   const rMax2 = (r - 6) * (r - 6);
   let salt = 1;
+  // 1) Ven đường trước — ~72% trần; ưu tiên đường bao quanh công viên rồi lộ giới/dài.
+  const plantRoads = (roads || [])
+    .filter(isPlantableStreet)
+    .map((road) => ({
+      road,
+      len: pathLengthMeters(road.path),
+      nearGreen: roadNearGreen(road, rings) ? 1 : 0
+    }))
+    .sort((a, b) => (b.nearGreen - a.nearGreen) || (b.road.width - a.road.width) || (b.len - a.len))
+    .map((row) => row.road);
+  const junctions = collectRoadJunctions(plantRoads);
   const push = (x, y, source) => {
     if (out.length >= limit) return false;
     if (x * x + y * y > rMax2) return true;
+    // Cây phố không đặt trong nút giao — tránh tán giữa ngã tư.
+    if (source === 'street' && nearAnyPoint(x, y, junctions, JUNCTION_CLEAR_M)) return true;
     out.push(treeDot(x, y, salt, source));
     salt += 1;
     return true;
@@ -946,8 +1050,8 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const plantAlong = (path, width, stepM, sideM, budget, bothSides, source) => {
     if (!path || path.length < 2) return;
     let acc = 0;
-    // Vỉa hè / hàng cây: ~0,28×lộ giới + đệm, kẹp 3–12 m (trước đây 0,5× đẩy vào lô nhà).
-    const side = sideM != null ? sideM : Math.min(12, Math.max(3.2, (width || 8) * 0.28 + 1.5));
+    // Lề ≈ mép lòng đường (0,42×lộ giới), kẹp 3,5–10 m — bám hàng cây trên sat, không đẩy vào giữa lô.
+    const side = sideM != null ? sideM : Math.min(10, Math.max(3.5, (width || 8) * 0.42));
     const sides = bothSides === false ? [1] : (side === 0 ? [0] : [1, -1]);
     for (let i = 1; i < path.length && out.length < budget; i++) {
       const a = path[i - 1];
@@ -971,12 +1075,6 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       acc = (acc + len) % stepM;
     }
   };
-  // 1) Ven đường trước — ~72% trần; living_street trở lên (không chờ tree_row công viên ăn budget).
-  const plantRoads = (roads || [])
-    .filter(isPlantableStreet)
-    .map((road) => ({ road, len: pathLengthMeters(road.path) }))
-    .sort((a, b) => (b.road.width - a.road.width) || (b.len - a.len))
-    .map((row) => row.road);
   const streetBudget = plantRoads.length
     ? Math.min(limit, Math.max(40, Math.floor(limit * 0.72)))
     : 0;
@@ -1082,7 +1180,33 @@ function nearestAmong(nearest, ids) {
   return best;
 }
 
+function isProofTrees() {
+  try {
+    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+    return !!(q && (q.get('proofTrees') === '1' || q.get('proofTrees') === 'true'));
+  } catch (err) {
+    return false;
+  }
+}
+
+/** Chứng minh cây phố 3D: ?proofTrees=1 nạp fixture tĩnh (không phụ thuộc Overpass). */
+async function loadOsmProofFixture() {
+  try {
+    if (!isProofTrees()) return null;
+    const res = await fetch('/data/osm-3d-proof.json', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Fixture có ngày + highway; chấp nhận cả khi osmDated chặt (đồng bộ client).
+    if (osmDated(data) || (Array.isArray(data.elements) && data.elements.some((el) => el.tags && el.tags.highway))) {
+      return data;
+    }
+  } catch (err) { /* không có fixture */ }
+  return null;
+}
+
 async function loadOsm(place) {
+  const proof = await loadOsmProofFixture();
+  if (proof) return proof;
   try {
     const res = await fetch(`/api/osmClip?lat=${place.lat}&lng=${place.lng}&r=${place.r}`, { signal: AbortSignal.timeout(28000) });
     if (res.ok) {
@@ -2348,8 +2472,9 @@ function bootMap(place, model, ground) {
     // Tán neo baseZ; khi Gộp tắt depth kẻo bị tường nhà che (không nâng ảo 14 m).
     if ((model.trees || []).length) {
       const zTree = (showStack ? zVoids : zLinks) + baseZ;
-      const trunkH = 5;
-      const canopyZ = zTree + 6.5;
+      const proof = isProofTrees();
+      const trunkH = proof ? 7 : 5;
+      const canopyZ = zTree + (proof ? 7.5 : 6.5);
       try {
         if (typeof deck.ColumnLayer === 'function') {
           layers.push(new deck.ColumnLayer({
@@ -2357,8 +2482,8 @@ function bootMap(place, model, ground) {
             data: model.trees,
             coordinateSystem: CART,
             modelMatrix: lift(zTree),
-            diskResolution: 4,
-            radius: 0.55,
+            diskResolution: 6,
+            radius: proof ? 1.1 : 0.55,
             extruded: true,
             getPosition: (d) => d.position,
             getElevation: trunkH,
@@ -2372,13 +2497,16 @@ function bootMap(place, model, ground) {
           coordinateSystem: CART,
           modelMatrix: lift(canopyZ),
           getPosition: (d) => d.position,
-          getRadius: (d) => Math.max(9, d.radius || 10),
+          // proofTrees: tán nhỏ + thân cột — thấy từng cây dọc lề bám đường OSM trên sat.
+          getRadius: (d) => (proof && d.source === 'street' ? 5.5 : Math.max(9, d.radius || 10)),
           radiusUnits: 'meters',
-          radiusMinPixels: 5,
-          radiusMaxPixels: 32,
-          getFillColor: (d) => d.color,
+          radiusMinPixels: proof ? 3 : 5,
+          radiusMaxPixels: proof ? 14 : 32,
+          getFillColor: (d) => (proof && d.source === 'street' ? [132, 204, 22, 240] : d.color),
           billboard: true,
-          stroked: false,
+          stroked: !!proof,
+          getLineColor: proof ? [21, 128, 61, 255] : [0, 0, 0, 0],
+          lineWidthMinPixels: proof ? 1 : 0,
           pickable: false,
           parameters: showStack ? undefined : { depthTest: false }
         }));
@@ -2416,6 +2544,10 @@ function bootMap(place, model, ground) {
   }
 
   camera = fitState(view.k);
+  if (isProofTrees()) {
+    // Góc thấp hơn để ảnh chứng minh thấy hàng tán dọc đường (không nhìn thẳng xuống).
+    camera = { ...camera, rotationX: 52, rotationOrbit: -62, zoom: (camera.zoom || 0) - 0.15 };
+  }
   deckgl = new deck.Deck({
     parent,
     views: orbit,
@@ -2430,6 +2562,7 @@ function bootMap(place, model, ground) {
     parameters: { clearColor: hexToClear(preset.css.canvas) },
     useDevicePixels: 1
   });
+  if (isProofTrees()) window.__qh3dDeck = deckgl;
   parent.querySelector('canvas')?.addEventListener('webglcontextlost', (e) => {
     gpuOk = false;
     e.preventDefault();

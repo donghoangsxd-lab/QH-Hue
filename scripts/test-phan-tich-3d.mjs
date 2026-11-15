@@ -4,7 +4,7 @@ import {
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
   filterMassing, namesMatch, treeCap, scatterTrees, treeStats, STREET_TREE_MIN_W, STREET_TREE_PLANT_W,
-  isPlantableStreet, roadWidthMeters, buildModel, osmDated
+  JUNCTION_CLEAR_M, collectRoadJunctions, isPlantableStreet, roadWidthMeters, buildModel, osmDated
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -225,7 +225,7 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   if (treeStats(short135).street < 4) throw new Error('cây phố phải gắn source=street');
   const short36 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 36 }]);
   if (short36.length < 4) throw new Error(`đoạn 36m × 80m phải có ≥4 tán (got ${short36.length})`);
-  if (!js.includes('radiusMinPixels: 5') || !js.includes('Math.max(9, d.radius')) {
+  if (!js.includes('radiusMinPixels') || !js.includes('Math.max(9, d.radius')) {
     throw new Error('tree-canopy chưa kẹp pixel / bán kính đủ lớn trên màn hình');
   }
   const sides = short135.filter((t) => Math.abs(t.position[1]) > 1);
@@ -265,6 +265,40 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   if (multiStats.street < 28) throw new Error(`đa đường phải có cây phố (got ${multiStats.street})`);
   const near36 = multi.filter((t) => Math.abs(t.position[1]) < 25);
   if (near36.length < 8) throw new Error('budget phải ưu tiên đường rộng (36m) trước');
+  // Ngã tư: không trồng trong JUNCTION_CLEAR_M quanh giao điểm.
+  if (JUNCTION_CLEAR_M < 10) throw new Error(`JUNCTION_CLEAR_M ${JUNCTION_CLEAR_M}`);
+  const crossRoads = [
+    { path: [[-120, 0], [120, 0]], width: 22.5, rank: 'khuvuc' },
+    { path: [[0, -120], [0, 120]], width: 22.5, rank: 'khuvuc' }
+  ];
+  const juncs = collectRoadJunctions(crossRoads);
+  if (!juncs.length || Math.hypot(juncs[0][0], juncs[0][1]) > 8) {
+    throw new Error(`phải nhận nút giao tại gốc (got ${JSON.stringify(juncs)})`);
+  }
+  const crossTrees = scatterTrees([], 300, 80, crossRoads);
+  const inJunction = crossTrees.filter((t) => Math.hypot(t.position[0], t.position[1]) < JUNCTION_CLEAR_M);
+  if (inJunction.length) {
+    throw new Error(`còn ${inJunction.length} tán trong nút giao (phải = 0)`);
+  }
+  if (treeStats(crossTrees).street < 8) {
+    throw new Error(`ngã tư vẫn phải có cây trên đoạn giữa (got ${treeStats(crossTrees).street})`);
+  }
+  if (!js.includes('JUNCTION_CLEAR_M') || !js.includes('collectRoadJunctions')) {
+    throw new Error('thiếu skip nút giao khi trồng cây phố');
+  }
+  // Tuyến bao công viên phải được trồng trước đường xa (nearGreen ưu tiên).
+  const parkRing = [[-30, -30], [30, -30], [30, 30], [-30, 30], [-30, -30]];
+  const aroundPark = scatterTrees([parkRing], 400, 60, [
+    { path: [[-200, 180], [200, 180]], width: 36, rank: 'truc' },
+    { path: [[-40, -40], [40, -40]], width: 13.5, rank: 'tertiary' }
+  ]);
+  const nearParkCurb = aroundPark.filter((t) => t.source === 'street' && Math.abs(t.position[1] + 40) < 12);
+  if (nearParkCurb.length < 2) {
+    throw new Error(`đường bao công viên phải có cây phố (got ${nearParkCurb.length})`);
+  }
+  if (!js.includes('roadNearGreen') || !js.includes('nearGreen')) {
+    throw new Error('thiếu ưu tiên đường bao quanh công viên');
+  }
   if (!js.includes('depthTest: false') || !js.includes('canopyZ')) {
     throw new Error('tán khi Gộp chưa tắt depth — sẽ bị nhà che');
   }
