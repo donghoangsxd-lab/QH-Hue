@@ -3,7 +3,7 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch, treeCap, scatterTrees
+  filterMassing, namesMatch, treeCap, scatterTrees, STREET_TREE_MIN_W
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -188,31 +188,46 @@ if (!js.includes('infraFill') || !js.includes('Tường trắng clay')) {
   throw new Error('thiếu whitebox / tô màu công trình công cộng trên volumes');
 }
 if (WALL[0] < 240 || ROOF[0] >= WALL[0]) throw new Error('palette clay chưa trắng / mái chưa đậm hơn');
-if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCap('x') !== 0) {
+if (treeCap(200) !== 50 || treeCap(800) !== 200 || treeCap(100) !== 25 || treeCap('x') !== 0) {
   throw new Error(`treeCap ${treeCap(200)} ${treeCap(800)}`);
 }
+if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE_MIN_W}`);
 {
   const park = [[-40, -40], [40, -40], [40, 40], [-40, 40], [-40, -40]];
   const fromPark = scatterTrees([park], 200, 40, []);
   if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
-  const fromRoad = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 10 }]);
-  if (fromRoad.length < 2) throw new Error(`cây ven đường ${fromRoad.length}`);
-  const fromNoibo = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 4.2 }]);
-  if (fromNoibo.length < 2) throw new Error(`cây đường nội bộ ${fromNoibo.length}`);
+  const narrow = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 10 }]);
+  if (narrow.length !== 0) throw new Error(`đường 10m không được có cây (${narrow.length})`);
+  const noibo = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 4.2 }]);
+  if (noibo.length !== 0) throw new Error(`đường nội bộ không được có cây (${noibo.length})`);
+  const wide = scatterTrees([], 200, 40, [{ path: [[-120, 0], [120, 0]], width: 14 }]);
+  if (wide.length < 2) throw new Error(`đường ≥13.5m phải có cây (${wide.length})`);
   const empty = scatterTrees([], 200, 40, []);
   if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
-}
-if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
-  throw new Error('thiếu đếm tán / tán billboard (sphere-like)');
-}
-{
-  const roadFirst = scatterTrees(
+  const parkFirst = scatterTrees(
     [[[-30, -30], [30, -30], [30, 30], [-30, 30], [-30, -30]]],
     200,
     40,
     [{ path: [[-90, 0], [90, 0]], width: 4.2 }]
   );
-  if (roadFirst.length < 4) throw new Error(`ưu tiên cây ven đường ${roadFirst.length}`);
+  if (parkFirst.length < 4) throw new Error(`ưu tiên cây công viên ${parkFirst.length}`);
+}
+if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
+  throw new Error('thiếu đếm tán / tán billboard (sphere-like)');
+}
+if (!js.includes('STREET_TREE_MIN_W') || !js.includes('osmGeomRings') || !js.includes('relation["type"="multipolygon"]') || !js.includes('tree_row')) {
+  throw new Error('thiếu ngưỡng đường lớn / parse relation OSM / tree_row');
+}
+if (js.includes('applyFloorTint(exploded)')) throw new Error('Màu theo tầng vẫn gắn Gộp/Tách');
+if (!html.includes('id="floorColors" type="checkbox" checked')) throw new Error('checkbox Màu theo tầng chưa checked mặc định');
+if (!js.includes('school_mn') || !js.includes('FAC_COUNT_IDS') || !panel.includes('school_mn') || !panel.includes('school_thpt') || !panel.includes("'10-PCCC': 'pccc'")) {
+  throw new Error('thiếu tách cấp trường TT16 (3D + view3dPanel)');
+}
+if (!js.includes('r <= 200 ? 19') || !js.includes('tiles.length > 64') || !(js.includes('Math.min(2048') || js.includes('Math.min(1792'))) {
+  throw new Error('composeGoogleGround chưa nâng zoom/canvas/tile cap');
+}
+if (!osm.includes('tree_row') || !osm.includes('relation["type"="multipolygon"]')) {
+  throw new Error('api/osmClip chưa có relation/tree_row');
 }
 if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
   throw new Error('buildModel chưa chịu osm=null khi tải dần');

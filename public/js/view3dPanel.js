@@ -11,14 +11,18 @@ let ring = null;
 const TYPE_TO_FAC = {
   '1-CV': 'park',
   '2-BDX': 'parking',
-  '3-MN': 'school',
-  '4-TH': 'school',
-  '5-THCS': 'school',
-  '6-THPT': 'school',
+  '3-MN': 'school_mn',
+  '4-TH': 'school_th',
+  '5-THCS': 'school_thcs',
+  '6-THPT': 'school_thpt',
   '7-YT': 'health',
   '8-VH': 'culture',
   '9-TM': 'market',
-  '13-BUS': 'bus'
+  '10-PCCC': 'pccc',
+  '11-NT': 'nt',
+  '12-CSD': 'csd',
+  '13-BUS': 'bus',
+  '14-NOXH': 'noxh'
 };
 
 function packLocalInfra(lat, lng, r) {

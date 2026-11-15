@@ -32,17 +32,22 @@ function queryFor(lat, lng, r) {
   const search = box(lat, lng, SEARCH_M, mLat, mLng);
   const c = `${circle.south},${circle.west},${circle.north},${circle.east}`;
   const s = `${search.south},${search.west},${search.north},${search.east}`;
+  // relation multipolygon: công viên / rừng OSM thường là relation, không chỉ way.
   return `[out:json][timeout:25];(
 way["leisure"~"^(park|garden|nature_reserve|pitch)$"](${c});
 way["landuse"~"^(grass|meadow|recreation_ground|village_green|forest|orchard|reservoir|basin)$"](${c});
 way["natural"~"^(wood|water|wetland|grassland|scrub)$"](${c});
+way["natural"="tree_row"](${c});
+relation["type"="multipolygon"]["leisure"~"^(park|garden|nature_reserve)$"](${c});
+relation["type"="multipolygon"]["landuse"~"^(grass|meadow|recreation_ground|forest|orchard)$"](${c});
+relation["type"="multipolygon"]["natural"~"^(wood|scrub|grassland)$"](${c});
 way["place"="square"](${c});
 way["highway"="pedestrian"]["area"="yes"](${c});
 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|pedestrian|footway|path|cycleway|steps)$"](${c});
 way["railway"~"^(rail|light_rail|subway|tram|narrow_gauge)$"](${c});
 way["waterway"~"^(river|stream|canal|drain)$"](${c});
-node["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking)$"](${s});
-way["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking)$"](${s});
+node["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking|fire_station)$"](${s});
+way["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking|fire_station)$"](${s});
 node["highway"="bus_stop"](${s});
 node["public_transport"~"^(platform|stop_position)$"](${s});
 );out geom;`;
