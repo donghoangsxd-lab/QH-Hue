@@ -417,6 +417,7 @@
 
     <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A3 → 4A0 -->
     <div class="print-preview" id="printPreview" hidden>
+      <div class="print-max-guide" id="printMaxGuide" aria-hidden="true" title="Giới hạn nới khung"></div>
       <div class="print-frame" id="printFrame">
         <span class="print-frame-tag" id="printFrameTag">Vùng in</span>
         <i class="print-cross"></i>
@@ -462,7 +463,7 @@
         <label class="print-title-lbl">Ghi chú
           <textarea id="printNote" rows="3" maxlength="600" autocomplete="off" spellcheck="true" placeholder="Ghi chú in trên bản đồ (ô Ghi chú)"></textarea>
         </label>
-        <p class="print-hint">Kéo bản đồ vào khung; kéo góc giữ đúng tỷ lệ vùng map của khổ đang chọn (không 1:1 — cột ghi chú đã trừ theo khổ). Khổ lớn → khung mặc định nhỏ hơn. Chia đôi → PDF hai ô HT | QH.</p>
+        <p class="print-hint">Panel trái và sáu nút trục tạm ẩn để nới khung. Kéo góc khung trắng tới ranh đỏ đứt (giữ tỷ lệ vùng map của khổ; cột ghi chú đã trừ). Khổ lớn → khung mặc định nhỏ hơn. Chia đôi → PDF hai ô HT | QH.</p>
         <div class="print-dock-actions">
           <button type="button" class="print-btn" id="printCancel">Hủy</button>
           <button type="button" class="print-btn print-btn-go" id="printGo">Xuất PDF</button>
