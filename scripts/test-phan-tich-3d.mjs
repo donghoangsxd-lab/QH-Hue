@@ -226,7 +226,10 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 18 && Math.abs(t.position[0]) > 130);
   if (nearRoad.length < 20) throw new Error(`ưu tiên ven đường trước công viên (ven đường ${nearRoad.length})`);
   if (!js.includes('depthTest: false') || !js.includes('canopyZ')) {
-    throw new Error('tán khi Gộp chưa nâng / tắt depth — sẽ bị nhà che');
+    throw new Error('tán khi Gộp chưa tắt depth — sẽ bị nhà che');
+  }
+  if (!js.includes('baseZ') || !js.includes('groundPack && groundPack.sat ? 0.15')) {
+    throw new Error('khối chưa neo sát nền sat (baseZ) — sẽ lơ lửng PLATE 3m');
   }
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {

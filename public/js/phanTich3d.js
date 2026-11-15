@@ -135,7 +135,8 @@ function towerPinsOf(volumes) {
     .filter((v) => v.h >= TOWER_PIN_M || (v.partLabel && /Tháp/i.test(String(v.partLabel))))
     .map((v) => {
       const c = centroid(v.rings[0]);
-      return { position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 2] };
+      // Z tương đối nóc; draw() cộng baseZ (sat ≈ 0, không sat = PLATE).
+      return { position: [c[0], c[1], (v.z0 || 0) + v.h + 2] };
     });
 }
 
@@ -1938,6 +1939,8 @@ function bootMap(place, model, ground) {
     const zVolumes = planeZ('volumes');
     const showStack = k > 0.08;
     const heavy = coarse || place.r >= LOD_RADIUS_M;
+    // Có vệ tinh ở z≈0: neo khối/cây sát nền. Không sat: tấm PLATE làm mặt đất.
+    const baseZ = groundPack && groundPack.sat ? 0.15 : PLATE;
     const disc = plateRing(place.r);
     const groundTone = LIGHT_PRESETS[moodName].ground;
     const layers = [
@@ -1976,7 +1979,7 @@ function bootMap(place, model, ground) {
       id: 'rim',
       data: [{ path: disc.concat([disc[0]]) }],
       coordinateSystem: CART,
-      modelMatrix: lift(zLinks + PLATE + 0.2),
+      modelMatrix: lift(zLinks + baseZ + 0.05),
       getPath: (d) => d.path,
       getColor: groundTone.rim,
       getWidth: 2,
@@ -1988,13 +1991,13 @@ function bootMap(place, model, ground) {
       layers.push(polys('plate-voids', [{ rings: [disc], h: PLATE, fill: groundTone.voids }], zVoids));
       layers.push(polys('plate-vol', [{ rings: [disc], h: PLATE, fill: groundTone.volumes }], zVolumes));
     }
-    layers.push(polys('halos', model.halos, zVoids + PLATE + 0.15));
-    layers.push(polys('greens', model.greens, zVoids + PLATE));
-    layers.push(polys('waters', model.waters, zVoids + PLATE));
-    layers.push(polys('squares', model.squares, zVoids + PLATE));
+    layers.push(polys('halos', model.halos, zVoids + baseZ + 0.05));
+    layers.push(polys('greens', model.greens, zVoids + baseZ));
+    layers.push(polys('waters', model.waters, zVoids + baseZ));
+    layers.push(polys('squares', model.squares, zVoids + baseZ));
     const lotList = model.infraLots || [];
     if (lotList.length) {
-      const lotZ = (showStack ? zUses : zLinks) + PLATE;
+      const lotZ = (showStack ? zUses : zLinks) + baseZ;
       const drawLots = heavy ? lotList.slice(0, INFRA_LOT_DRAW_CAP) : lotList;
       const byBase = new Map();
       drawLots.forEach((lot) => {
@@ -2039,10 +2042,10 @@ function bootMap(place, model, ground) {
         pickable: false
       })));
     }
-    const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
+    const openBloom = blooms('open-bloom', model.openBloom, zVoids + baseZ + 0.4);
     if (openBloom) layers.push(openBloom);
     if (k > 0.12) {
-      const access = blooms('access', model.access, zUses + PLATE + 0.3);
+      const access = blooms('access', model.access, zUses + baseZ + 0.2);
       if (access) layers.push(access);
       const byBlock = new Map();
       (model.blocks || []).forEach((v) => {
@@ -2052,14 +2055,14 @@ function bootMap(place, model, ground) {
       });
       let bi = 0;
       byBlock.forEach((data, z0) => {
-        layers.push(polys(bi ? `blocks-${bi}` : 'blocks', data, zUses + PLATE + z0));
+        layers.push(polys(bi ? `blocks-${bi}` : 'blocks', data, zUses + baseZ + z0));
         bi += 1;
       });
       layers.push(new deck.PathLayer(withMask({
         id: 'block-edge',
         data: (model.blocks || []).filter((d) => d.infra),
         coordinateSystem: CART,
-        modelMatrix: lift(zUses + PLATE + 0.45),
+        modelMatrix: lift(zUses + baseZ + 0.2),
         getPath: (d) => d.rings[0].map((pt) => [pt[0], pt[1], (d.z0 || 0) + d.h]),
         getColor: [15, 23, 42, 255],
         getWidth: 4.5,
@@ -2079,19 +2082,19 @@ function bootMap(place, model, ground) {
       return volumeColors(d.bin, floorTint).wall;
     };
     byBase.forEach((data, z0) => {
-      layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0, wallOf));
+      layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + baseZ + z0, wallOf));
       volI += 1;
     });
     const lightGeom = model.volumes.length <= EDGE_VOLUME_CAP && !heavy;
     if (lightGeom) {
-      const caps = roofCaps('roof-caps', model.volumes, zVolumes + PLATE);
+      const caps = roofCaps('roof-caps', model.volumes, zVolumes + baseZ);
       if (caps) layers.push(caps);
       if (!edgeMemo || edgeMemo.src !== model.volumes) edgeMemo = { src: model.volumes, paths: volumeEdgePaths(model.volumes) };
       layers.push(new deck.PathLayer(withMask({
         id: 'volume-edge',
         data: edgeMemo.paths,
         coordinateSystem: CART,
-        modelMatrix: lift(zVolumes + PLATE + 0.45),
+        modelMatrix: lift(zVolumes + baseZ + 0.2),
         getPath: (d) => d,
         getColor: volumeColors(0, floorTint).edge,
         getWidth: 1,
@@ -2101,7 +2104,7 @@ function bootMap(place, model, ground) {
     }
     const partTags = model.volumes.filter((v) => v.partLabel).map((v) => {
       const c = centroid(v.rings[0]);
-      return { t: v.partLabel, position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 3] };
+      return { t: v.partLabel, position: [c[0], c[1], baseZ + (v.z0 || 0) + v.h + 3] };
     });
     if (partTags.length) {
       try {
@@ -2128,7 +2131,7 @@ function bootMap(place, model, ground) {
       id: 'roads',
       data: model.roads,
       coordinateSystem: CART,
-      modelMatrix: lift(zLinks + PLATE + 0.8),
+      modelMatrix: lift(zLinks + baseZ + 0.3),
       getPath: (d) => d.path,
       getColor: (d) => d.color,
       getWidth: (d) => d.width,
@@ -2141,7 +2144,7 @@ function bootMap(place, model, ground) {
       id: 'arrow-stems',
       data: model.arrows,
       coordinateSystem: CART,
-      modelMatrix: lift(zLinks + PLATE + 1.4),
+      modelMatrix: lift(zLinks + baseZ + 0.5),
       getPath: (d) => d.stem,
       getColor: (d) => d.color,
       getWidth: 4.5,
@@ -2152,7 +2155,7 @@ function bootMap(place, model, ground) {
       id: 'arrow-heads',
       data: model.arrows,
       coordinateSystem: CART,
-      modelMatrix: lift(zLinks + PLATE + 1.6),
+      modelMatrix: lift(zLinks + baseZ + 0.6),
       extruded: true,
       filled: true,
       stroked: false,
@@ -2164,7 +2167,7 @@ function bootMap(place, model, ground) {
       id: 'nodes',
       data: model.nodes,
       coordinateSystem: CART,
-      modelMatrix: lift(zLinks + PLATE + 2),
+      modelMatrix: lift(zLinks + baseZ + 0.8),
       getPosition: (d) => d,
       getRadius: 8,
       radiusUnits: 'meters',
@@ -2179,7 +2182,7 @@ function bootMap(place, model, ground) {
       const seams = [['links', 'uses'], ['uses', 'voids'], ['voids', 'volumes']];
       model.corners.forEach((c) => {
         seams.forEach(([a, b]) => {
-          const z0 = planeZ(a) + PLATE;
+          const z0 = planeZ(a) + baseZ;
           const z1 = planeZ(b);
           if (z1 - z0 < 16) return;
           posts.push([[c[0], c[1], z0], [c[0], c[1], z1]]);
@@ -2240,7 +2243,7 @@ function bootMap(place, model, ground) {
           id: 'tower-pin',
           data: pins,
           coordinateSystem: CART,
-          modelMatrix: lift(planeZ('volumes')),
+          modelMatrix: lift(planeZ('volumes') + baseZ),
           getPosition: (d) => d.position,
           getIcon: () => ({ url: pinUrl, width: 64, height: 64, anchorY: 64 }),
           getSize: 28,
@@ -2252,11 +2255,11 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
     }
-    // Tán: khi Gộp, nâng trên mái phổ biến (nhà 2–4 tầng) kẻo depth-test nuốt hết hàng cây phố.
+    // Tán neo baseZ; khi Gộp tắt depth kẻo bị tường nhà che (không nâng ảo 14 m).
     if ((model.trees || []).length) {
-      const zTree = (showStack ? zVoids : zLinks) + PLATE;
-      const trunkH = showStack ? 5 : 12;
-      const canopyZ = zTree + (showStack ? 6.5 : 14);
+      const zTree = (showStack ? zVoids : zLinks) + baseZ;
+      const trunkH = 5;
+      const canopyZ = zTree + 6.5;
       try {
         if (typeof deck.ColumnLayer === 'function') {
           layers.push(new deck.ColumnLayer({
@@ -2287,7 +2290,6 @@ function bootMap(place, model, ground) {
           billboard: true,
           stroked: false,
           pickable: false,
-          // Billboards trên phố dễ bị khối nhà che — tắt depth khi Gộp.
           parameters: showStack ? undefined : { depthTest: false }
         }));
       } catch (err) {
@@ -2301,7 +2303,7 @@ function bootMap(place, model, ground) {
           id: 'street-names',
           data: streetLabels,
           coordinateSystem: CART,
-          modelMatrix: lift(zLinks + PLATE + 1.2),
+          modelMatrix: lift(zLinks + baseZ + 0.4),
           getPosition: (d) => d.position,
           getText: (d) => d.text,
           getColor: [255, 255, 255, 230],
