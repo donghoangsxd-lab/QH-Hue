@@ -35,12 +35,18 @@ const $ = (id) => document.getElementById(id);
 let submitInfraPoint = async () => {};
 let updateRadiusPreview = () => {};
 let preview = null;
+let previewHalo = null;
 let previewRenderer = null;
+
+/** Pane preview hồ sơ: trên lớp QH/lô (≤450), dưới marker/tooltip (600+). */
+const LOT_PREVIEW_Z = 580;
 
 function lotRenderer() {
   if (!map.getPane('lotPreview')) {
     const pane = map.createPane('lotPreview');
-    pane.style.zIndex = '460';
+    pane.style.zIndex = String(LOT_PREVIEW_Z);
+  } else {
+    map.getPane('lotPreview').style.zIndex = String(LOT_PREVIEW_Z);
   }
   if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
   return previewRenderer;
@@ -79,12 +85,40 @@ const signedIn = isEntrySignedIn;
 const allowedKeys = allowedEntryKeys;
 
 function clearPreview() {
+  if (previewHalo && map) map.removeLayer(previewHalo);
   if (preview && map) map.removeLayer(preview);
+  previewHalo = null;
   preview = null;
 }
 
-function showPreview(features, review) {
+/** Chừa panel đề xuất bên phải khi zoom tới tem / lô. */
+function previewFitOpts(pad = 40, maxZoom = 18) {
+  const opts = { maxZoom, animate: true, paddingTopLeft: [pad, pad], paddingBottomRight: [pad, pad] };
+  if (!map) return opts;
+  try {
+    const m = map.getContainer().getBoundingClientRect();
+    const panel = $('tabAdd') || $('rightPanel');
+    const r = panel && !panel.hidden && panel.offsetWidth ? panel.getBoundingClientRect() : null;
+    const cover = r && r.left < m.right && r.bottom > m.top
+      ? Math.min(Math.max(0, m.right - r.left), m.width * 0.6)
+      : 0;
+    opts.paddingBottomRight = [pad + cover, pad];
+  } catch (e) { /* bỏ padding panel */ }
+  return opts;
+}
+
+function focusStampOnMap(bag, id) {
+  if (!map || typeof L === 'undefined' || !bag || !id) return;
+  const s = (bag.stampView || []).find(x => x.id === id);
+  if (!s || !Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
+  try {
+    map.fitBounds(L.latLng(s.lat, s.lng).toBounds(120), previewFitOpts(48, 18));
+  } catch (e) { /* tem lệch CRS */ }
+}
+
+function showPreview(features, review, opts = {}) {
   clearPreview();
+  const fit = opts.fit !== false;
   const draw = [];
   (review || []).forEach(item => {
     if (!item || !item.geometry) return;
@@ -97,12 +131,23 @@ function showPreview(features, review) {
   (features || []).forEach(feature => draw.push(feature));
   if (!map || typeof L === 'undefined' || !draw.length) return;
   const fc = asCollection(draw);
+  const ranhNew = draw.filter(f => f.properties && f.properties._mau === 'ranh-moi');
+  lotRenderer();
+  // Viền trắng dưới nét đỏ — đọc được trên lớp QH nhiều màu.
+  if (ranhNew.length) {
+    previewHalo = L.geoJSON(asCollection(ranhNew), {
+      pane: 'lotPreview',
+      renderer: lotRenderer(),
+      interactive: false,
+      style: { color: '#ffffff', weight: 10, opacity: 0.95, fill: false }
+    }).addTo(map);
+  }
   preview = L.geoJSON(fc, {
     pane: 'lotPreview',
     renderer: lotRenderer(),
     style: (f) => {
       if (f.properties && f.properties._mau === 'ranh') {
-        return { color: '#0f172a', weight: 2, fillOpacity: 0 };
+        return { color: '#0f172a', weight: 2, dashArray: '6 4', fillOpacity: 0 };
       }
       if (f.properties && f.properties._mau === 'do') {
         const cut = f.properties._status === 'cat';
@@ -115,7 +160,23 @@ function showPreview(features, review) {
         };
       }
       if (f.properties && f.properties._mau === 'ranh-moi') {
-        return { color: '#0891b2', weight: 3, fillColor: '#22d3ee', fillOpacity: 0.18 };
+        return {
+          color: '#ef4444',
+          weight: 5,
+          opacity: 1,
+          fillColor: '#ef4444',
+          fillOpacity: 0.14
+        };
+      }
+      // Lô sử dụng đất preview — cam nổi trên lớp QHPK nền.
+      if (f.properties && f.properties._mau === 'lo') {
+        return {
+          color: '#ea580c',
+          weight: 2.5,
+          opacity: 1,
+          fillColor: '#fdba74',
+          fillOpacity: 0.42
+        };
       }
       return {
         color: f.geometry && f.geometry.type === 'LineString' ? '#2563eb' : '#7c3aed',
@@ -127,9 +188,12 @@ function showPreview(features, review) {
     pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#b45309', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.95 })
   });
   preview.addTo(map);
+  if (previewHalo && previewHalo.bringToFront) previewHalo.bringToFront();
+  if (preview.bringToFront) preview.bringToFront();
+  if (!fit) return;
   try {
     const b = preview.getBounds();
-    if (b.isValid()) map.fitBounds(b.pad(0.2));
+    if (b.isValid()) map.fitBounds(b, previewFitOpts(40, 17));
   } catch (e) { /* ranh rỗng */ }
 }
 
@@ -543,7 +607,7 @@ function rememberHoExtra() {
   if ($('hoDanSo')) hoExtra.danSo = $('hoDanSo').value || '';
 }
 
-function showStepPreview() {
+function showStepPreview(opts = {}) {
   const step = STEPS.find(s => s.id === stepId);
   const bag = step && held[step.id];
   if (!bag || ((!bag.features || !bag.features.length) && !(bag.review && bag.review.length))) {
@@ -551,52 +615,68 @@ function showStepPreview() {
     return;
   }
   const isRanh = step.draw === 'boundary';
+  const isLand = step.draw === 'land';
+  const focusStamp = !!(opts.focusStamp && bag.stampPick && bag.stampView?.length);
+  const fit = opts.fit != null ? opts.fit : !focusStamp;
   const draw = (bag.features || []).map((f, i) => ({
     type: 'Feature',
     geometry: f.geometry,
-    properties: { ...(f.properties || {}), _lotIdx: i, ...(isRanh ? { _mau: 'ranh-moi' } : {}) }
+    properties: {
+      ...(f.properties || {}),
+      _lotIdx: i,
+      ...(isRanh ? { _mau: 'ranh-moi' } : {}),
+      ...(isLand ? { _mau: 'lo' } : {})
+    }
   }));
-  if (step.draw === 'land' && held.ranh && held.ranh.source) {
-    held.ranh.source.forEach(feature => {
+  if (isLand && held.ranh && (held.ranh.features || held.ranh.source)) {
+    (held.ranh.features || held.ranh.source).forEach(feature => {
       if (!feature || !feature.geometry) return;
       draw.push({
         type: 'Feature',
         geometry: feature.geometry,
-        properties: { ...(feature.properties || {}), _mau: 'ranh' }
+        properties: { ...(feature.properties || {}), _mau: 'ranh-moi' }
       });
     });
   }
-  showPreview(draw, bag.review || []);
+  showPreview(draw, bag.review || [], { fit });
   paintStampMarkers(bag);
+  if (focusStamp) focusStampOnMap(bag, bag.stampPick);
 }
 
 function paintStampMarkers(bag) {
   if (!preview || !bag?.stampView?.length || typeof L === 'undefined') return;
   const pending = new Set((bag.stampMatch?.pending || []).map(s => s.id));
   bag.stampView.forEach(s => {
+    if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
     const on = pending.has(s.id);
     const cur = s.id === bag.stampPick;
     const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
     const mark = L.circleMarker([s.lat, s.lng], {
-      radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
+      pane: 'lotPreview',
+      radius: cur ? 11 : on ? 8 : 5,
+      color: '#fff',
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.95
     }).bindTooltip(stampLabel(s), { sticky: true });
     if (on) {
-      mark.on('click', () => {
+      mark.on('click', (e) => {
+        if (L.DomEvent) L.DomEvent.stop(e);
         bag.stampPick = s.id;
-        renderActive();
+        renderActive({ fit: false, focusStamp: true });
       });
     }
     mark.addTo(preview);
   });
   if (bag.stampPick) {
     preview.eachLayer(layer => {
-      if (!layer.feature || layer.feature.properties?._mau) return;
+      if (!layer.feature || layer.feature.properties?._mau === 'ranh-moi' || layer.feature.properties?._mau === 'ranh') return;
       const idx = layer.feature.properties?._lotIdx;
       if (idx == null) return;
       layer.on('click', () => {
         bag.stampAssign = { ...(bag.stampAssign || {}), [bag.stampPick]: String(idx) };
         applyKhToHeld(STEPS.find(s => s.id === stepId));
-        renderActive();
+        renderActive({ fit: false, focusStamp: true });
       });
     });
   }
@@ -1053,7 +1133,7 @@ function clearHeldKh(step) {
   clearStampProps(bag.features);
 }
 
-function renderActive() {
+function renderActive(previewOpts = {}) {
   const box = $('hoActive');
   const step = STEPS.find(s => s.id === stepId) || STEPS[0];
   if (!box) return;
@@ -1127,7 +1207,7 @@ function renderActive() {
       const bag = held[step.id];
       if (!bag) return;
       bag.stampPick = btn.getAttribute('data-ho-stamp');
-      renderActive();
+      renderActive({ fit: false, focusStamp: true });
     });
   });
   box.querySelectorAll('[data-ho-stamp-skip]').forEach(btn => {
@@ -1137,10 +1217,20 @@ function renderActive() {
       const id = btn.getAttribute('data-ho-stamp-skip');
       bag.stampSkip = [...(bag.stampSkip || []), id];
       applyKhToHeld(step);
-      renderActive();
+      const next = bag.stampMatch?.pending?.[0];
+      renderActive(next
+        ? { fit: false, focusStamp: true }
+        : { fit: true });
     });
   });
-  showStepPreview();
+  // Có tem chờ gán: phóng tới tem đang chọn (tránh fitBounds cả file nuốt zoom).
+  const opts = { ...previewOpts };
+  if (opts.focusStamp == null && opts.fit == null
+    && got?.stampPick && got?.stampMatch?.pending?.length) {
+    opts.fit = false;
+    opts.focusStamp = true;
+  }
+  showStepPreview(opts);
 }
 
 function pdfCap(step) {
@@ -1653,7 +1743,11 @@ function renderDuAn() {
         if (status) status.textContent = 'Không thấy vùng ranh trong file.';
         return;
       }
-      showPreview(parsed.features, []);
+      showPreview((parsed.features || []).map(f => ({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: { ...(f.properties || {}), _mau: 'ranh-moi' }
+      })), []);
       if (status) status.textContent = `${file.name} — đã đọc ranh.`;
     } catch (err) {
       daGeom = null;

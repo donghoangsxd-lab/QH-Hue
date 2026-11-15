@@ -28,7 +28,9 @@ let pdfUrl = '';
 function lotRenderer() {
   if (!map.getPane('lotPreview')) {
     const pane = map.createPane('lotPreview');
-    pane.style.zIndex = '460';
+    pane.style.zIndex = '580';
+  } else {
+    map.getPane('lotPreview').style.zIndex = '580';
   }
   if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
   return previewRenderer;
