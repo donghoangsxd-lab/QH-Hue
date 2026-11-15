@@ -52,8 +52,19 @@ if (landChunk.includes('point3dButton') || landChunk.includes('pp-3d') || landCh
 if (!landChunk.includes('metricGridHtml') || !landChunk.includes('landCardTabsHtml') || !landChunk.includes('regulationsPaneHtml')) {
   throw new Error('thẻ lô đất thiếu lưới 2×2 hoặc tab Chỉ tiêu/Quy định');
 }
+if (!landChunk.includes('landUseWithSymbol') || !landChunk.includes('lotSymbol')) {
+  throw new Error('thẻ lô đất chưa gộp ký hiệu vào Chức năng SDĐ');
+}
+if (landChunk.includes("metaRow('Đồ án'") || landChunk.includes('lp-project-row')) {
+  throw new Error('thẻ lô đất còn dòng Đồ án ở chân panel');
+}
 if (!landChunk.includes('facility') || !landChunk.includes('radiusLabel')) {
   throw new Error('thẻ lô đất chưa hỗ trợ lô hạ tầng / bán kính phục vụ');
+}
+const qhct = src('../public/js/qhctLayer.js');
+const qhctPop = qhct.slice(qhct.indexOf('function popupHtml'), qhct.indexOf('const drawn'));
+if (!qhctPop.includes('landUseWithSymbol') || qhctPop.includes('lp-project-row') || qhctPop.includes('lp-title-row')) {
+  throw new Error('thẻ lô QHCT chưa chuẩn hóa ký hiệu / bỏ Đồ án');
 }
 if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (nút chữ bán kính/3D)');
 const infraLand = engine.includes('openLandPopup(lot, m, { facility: item })')
@@ -89,5 +100,8 @@ if (!ui.includes('gạch chéo đỏ') || !ui.includes('không tính vào mật 
 }
 if (!ui.includes('hai tab «Chỉ tiêu» và «Quy định»') || !ui.includes('lưới 2×2')) {
   throw new Error('ui-spec thiếu mô tả tab và lưới chỉ tiêu thẻ lô');
+}
+if (!ui.includes('ký hiệu lô') || !ui.includes('không dòng «Đồ án»')) {
+  throw new Error('ui-spec thiếu chuẩn hóa thẻ lô QHPK/QHCT');
 }
 console.log('ok', vin);

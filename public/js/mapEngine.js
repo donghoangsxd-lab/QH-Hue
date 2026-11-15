@@ -35,7 +35,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { bindNotchZoom } from './wheelZoom.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitsHtml, projectValueHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, landUseWithSymbol, shortLandUse, limitsHtml, projectValueHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml, bindLandCardTabs,
   summarizeLotAreas, multiLandCardHtml,
   pointToken, landToken, parseLotToken
@@ -2270,22 +2270,16 @@ function landPopupHtml(p, opts) {
   const nhom = p.nhom || landLabel(p.layer);
   const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
   const type = shortLandUse(expandPlanWords(rawType));
-  const code = p.lotCode || facility?.lotCode || landCode(p);
+  const code = lotSymbol(facility ? (facility.name || p.name) : (p.name || landCode(p)), p.lotCode || facility?.lotCode);
   const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
   const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
   const phase = p.phase === 'QH' ? (stage || '') : 'Hiện trạng';
   const eyebrow = LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch';
-  const nameSrc = facility ? infraTitle(facility.name) : (p.name || p.layer || type);
-  const title = lotHeading(nameSrc, code, type) || type;
   const place = placeField(p.ward || facility?.ward);
   const projectFile = p.file || facility?.tenQH || '';
   const entry = opts?.hideProject ? null : catalogEntry(projectFile);
-  const projectName = opts?.hideProject ? '' : projectFullName(projectFile);
-  const project = projectName
-    ? `<span class="lp-project-name" title="${escapeHtml(projectName)}">${escapeHtml(projectName)}</span>`
-    : '';
   const areaM2 = Number(p.area) || Number(facility?.size) || 0;
   const areaText = areaM2 > 0 ? `${fmtNum(Math.round(areaM2))} m²` : '';
   const stamp = p.stampArea && areaM2 && Math.abs(p.stampArea - areaM2) / areaM2 > 0.1
@@ -2303,21 +2297,26 @@ function landPopupHtml(p, opts) {
     ? (noZone ? 'không quy định' : `${fmtNum(itemRadius)} m`)
     : '';
   const radiusTip = facility && radiusRef ? `${radiusLabel} theo QCVN 01:2026/BXD (${radiusRef})` : radiusLabel;
+  // Không dòng Đồ án: tên đã hiện ở brief phía trên.
   const rows = [
-    project ? metaRow('Đồ án', project, 'lp-project-row') : '',
     place.name ? metaRow(place.label, escapeHtml(place.name)) : '',
     facility && radiusText
       ? metaRow(radiusLabel, `<b class="c-cyan" title="${escapeHtml(radiusTip)}">${escapeHtml(radiusText)}</b>${radiusRef ? ` <span class="pp-sub">(${escapeHtml(radiusRef)})</span>` : ''}`)
       : ''
   ].filter(Boolean).join('');
   const swatchEl = `<i class="lp-swatch" style="${swatch}"></i>`;
-  const foldTitle = title.trim().toLowerCase();
-  const foldType = type.trim().toLowerCase();
-  const sameAsType = !!(type && (foldTitle === foldType || foldTitle === `${foldType} ${String(code || '').toLowerCase()}`.trim()));
-  // Trùng loại đất: không lặp tiêu đề; hatch nằm cuối dòng Chức năng SDĐ.
-  const titleRow = sameAsType ? '' : `<div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span></div>`;
-  const banner = landUseBannerHtml(type || title, swatchEl);
-  const tip = [facility?.name || p.name, p.layer].filter(Boolean).join(' · ');
+  // Lô đất: không tiêu đề mô tả; ký hiệu gộp vào Chức năng SDĐ. Lô hạ tầng: giữ tên công trình.
+  let titleRow = '';
+  if (facility) {
+    const nameSrc = infraTitle(facility.name);
+    const title = lotHeading(nameSrc, code, type) || type;
+    const foldTitle = title.trim().toLowerCase();
+    const foldType = type.trim().toLowerCase();
+    const sameAsType = !!(type && (foldTitle === foldType || foldTitle === `${foldType} ${String(code || '').toLowerCase()}`.trim()));
+    titleRow = sameAsType ? '' : `<div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span></div>`;
+  }
+  const banner = landUseBannerHtml(landUseWithSymbol(type, code), swatchEl);
+  const tip = [facility?.name || p.name, p.layer, code].filter(Boolean).join(' · ');
   const phaseHtml = phase
     ? `<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${escapeHtml(phase)}</span>`
     : '';

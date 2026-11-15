@@ -89,10 +89,26 @@ export function shortLandUse(label) {
     .trim();
 }
 
+/** Chỉ ký hiệu lô (CC.B-02, CX14); không lấy tên mô tả. */
+export function lotSymbol(name, lotCode) {
+  const code = String(lotCode || '').trim();
+  if (code) return code;
+  const t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
+  const m = t.match(/(?:^|[\s_])([A-Za-z]{1,8}\d[\w.-]{0,12})$/);
+  return m ? m[1] : '';
+}
+
+/** Nhãn Chức năng SDĐ: loại đất ngắn + ký hiệu (nếu có). */
+export function landUseWithSymbol(type, symbol) {
+  const t = shortLandUse(type);
+  const c = String(symbol || '').trim();
+  if (t && c && !fold(t).includes(fold(c))) return `${t} · ${c}`;
+  return t || c;
+}
+
 /**
- * Tiêu đề lô: loại đất ngắn + mã lô. kind là dòng cam (cấp công trình) để bỏ cụm trùng.
- * "Đất cây xanh công viên_thể dục thể thao" + CX14 + "Công viên khu vực…" → "Đất cây xanh CX14".
- * Tên CAD/layer còn dài sau khi rút → chỉ giữ loại đất ngắn + mã (hoặc mã).
+ * Tiêu đề lô hạ tầng / chọn nhiều: loại đất ngắn + mã. kind là dòng cam (cấp công trình) để bỏ cụm trùng.
+ * Thẻ lô QHPK/QHCT không dùng hàm này cho tiêu đề — ký hiệu gộp vào Chức năng SDĐ.
  */
 export function lotHeading(name, lotCode, kind) {
   let t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();

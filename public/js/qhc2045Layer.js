@@ -831,7 +831,6 @@ function qhcLotCardHtml(f, latlng, opts) {
   const tv = tvAt(latlng.lng, latlng.lat);
   const note = p.n != null ? data.land.notes[p.n] : '';
   const stage = STAGE_NAMES[p.t] || 'Quy hoạch';
-  const zoneLabel = ZONE_NAMES[zone] || zone || '—';
   const projects = opts?.hideProject ? [] : qhpkAt(latlng.lng, latlng.lat);
   const projectHtml = projects.length
     ? `<div class="lp-regs">${projects.map(x => `<button type="button" class="lp-reg-btn qhc-pop-link" data-qhc-open="${escapeHtml(x.tenQH)}">
@@ -843,7 +842,7 @@ function qhcLotCardHtml(f, latlng, opts) {
   const regsPane = opts?.hideProject
     ? regulationsPaneHtml(qhcLayerDossier())
     : projectHtml;
-  // Không lặp tên loại đất ở tiêu đề — chỉ eyebrow + badge; hatch nằm cuối dòng Chức năng SDĐ.
+  // Chỉ tiêu 1/10.000: Diện tích | Tiểu vùng + dải Chức năng SDĐ; không ô Khu/Giai đoạn, không dòng nguồn chân thẻ.
   return `<div class="pp land-popup land-popup-card qhc-pop">
     <div class="pp-title lp-head">
       <div class="lp-head-main">
@@ -857,8 +856,6 @@ function qhcLotCardHtml(f, latlng, opts) {
     <div class="lp-pane is-on" data-lp-pane="chi-tieu">
       ${metricCellsHtml([
         { tone: 'area', icon: 'ruler', label: 'Diện tích', value: `${fmtNum(p.a)} ha` },
-        { tone: 'cover', icon: 'layers', label: 'Khu', value: zoneLabel },
-        { tone: 'floors', icon: 'floors', label: 'Giai đoạn', value: stage },
         { tone: 'far', icon: 'map', label: 'Tiểu vùng', value: tv ? `${tv.tv}` : '—' }
       ])}
       ${landUseBannerHtml(land.label, swatchHtml(land))}
@@ -868,11 +865,9 @@ function qhcLotCardHtml(f, latlng, opts) {
         note ? escapeHtml(note) : ''
       ])}
       ${ward ? `<button type="button" class="bp-btn qhc-pop-ward" data-qhc-ward="${escapeHtml(ward)}">${ico('map')}Xem ${escapeHtml(ward)}</button>` : ''}
-      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
     <div class="lp-pane" data-lp-pane="quy-dinh" hidden>
       ${regsPane}
-      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>
   </div>`;
 }

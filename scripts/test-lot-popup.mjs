@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, shortLandUse, limitItems, limitsHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, landUseWithSymbol, shortLandUse, limitItems, limitsHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml,
   dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken,
   summarizeLotAreas, multiLandCardHtml
 } from '../public/js/lotPopup.js';
+
+assert.equal(lotSymbol('Trung tâm dịch vụ, thương mại CC.B-02', 'CC.B-02'), 'CC.B-02');
+assert.equal(lotSymbol('Đất cây xanh CX14 – QHPK Khu A #3', ''), 'CX14');
+assert.equal(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02'), 'Đất công cộng - dịch vụ · CC.B-02');
+assert.equal(landUseWithSymbol('Đất ở', ''), 'Đất ở');
+assert.match(landUseBannerHtml(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02')), /CC\.B-02/);
 
 const kind = 'Công viên khu vực cấp đô thị';
 assert.equal(
