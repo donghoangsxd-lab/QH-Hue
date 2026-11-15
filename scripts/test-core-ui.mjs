@@ -1152,6 +1152,12 @@ assert.match(read('public/js/entryFlows.js'), /syncPlanViewToEntryLevel|FACET_TO
 assert.match(read('public/js/entryFlows.js'), /QHPK:\s*'qhpk'|setLevel\(mapLv/);
 assert.match(read('public/js/entrySteps.js'), /requiredNew/);
 assert.match(read('docs/ui-spec.md'), /polyline hở|lệch hơn 1%|#ef4444/);
+assert.match(read('docs/ui-spec.md'), /\.entry-form|\.entry-help|lưới hai cột/);
+assert.match(css, /\.entry-form|\.entry-row|\.entry-help/);
+assert.match(read('public/js/entryFlows.js'), /function tipHtml|entry-form|entry-help/);
+assert.match(read('public/js/entryFlows.js'), /hoNewMetaHtml[\s\S]*entry-row[\s\S]*hoDanSo/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /entry-note">Đồ án mới:/);
+assert.match(html, /id="flowHtxh"[\s\S]*?class="entry-form"/);
 assert.match(read('public/js/adjustImport.js'), /prefillAdjustHandoff/);
 assert.match(read('public/js/localAdjust.js'), /handoffToAdjustImport|prefillAdjustHandoff/);
 assert.match(read('public/js/catalogTable.js'), /offerCatalogSchemeEntry/);

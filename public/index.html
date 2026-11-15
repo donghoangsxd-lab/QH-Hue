@@ -1149,33 +1149,49 @@
               <span class="cad-pair-count" id="adjProjectCount"></span>
               <select id="adjProject" class="cad-pair-list" size="6"><option value="">Chọn đồ án quy hoạch</option></select>
             </label>
-            <div class="form-grid">
-              <label for="adjCrs">Hệ tọa độ</label>
-              <select id="adjCrs">
-                <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
-                <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
-              </select>
-              <label for="adjTitle">Tóm tắt</label>
-              <input type="text" id="adjTitle" maxlength="300" placeholder="Tóm tắt nội dung điều chỉnh, dùng để tìm lại" />
-              <label for="adjExisting">Hồ sơ đã gửi</label>
-              <select id="adjExisting"><option value="">Hồ sơ mới</option></select>
-              <label for="adjExistingId">Mã hồ sơ</label>
-              <input type="text" id="adjExistingId" maxlength="16" placeholder="16 ký tự, nếu không thấy trong danh sách" autocomplete="off" />
+            <div class="entry-form">
+              <div class="entry-row">
+                <div class="entry-field">
+                  <label for="adjCrs">Hệ tọa độ</label>
+                  <select id="adjCrs">
+                    <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+                    <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+                  </select>
+                </div>
+                <div class="entry-field">
+                  <label for="adjExisting">Hồ sơ đã gửi</label>
+                  <select id="adjExisting"><option value="">Hồ sơ mới</option></select>
+                </div>
+              </div>
+              <div class="entry-field entry-field-full">
+                <label for="adjTitle">Tóm tắt</label>
+                <input type="text" id="adjTitle" maxlength="300" placeholder="Tóm tắt nội dung điều chỉnh" />
+              </div>
+              <div class="entry-field entry-field-full">
+                <label for="adjExistingId">Mã hồ sơ</label>
+                <input type="text" id="adjExistingId" maxlength="16" placeholder="16 ký tự nếu không thấy trong danh sách" autocomplete="off" />
+              </div>
             </div>
-            <label class="cad-drop" id="adjDrop" for="adjFiles">
+            <label class="cad-drop" id="adjDrop" for="adjFiles" title="Lần đầu chỉ cần PDF quyết định và tóm tắt. DXF (ranh lớp có chữ RANH, mẫu tô Thông tư 16) và ảnh scan gắn sau. Có thể kèm KH - ….dxf. PDF tối đa 2 MB; quản trị tối đa 10 MB. Không chấm QCVN.">
               <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
               <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
-              <span class="cad-drop-sub">Lần đầu chỉ cần PDF quyết định và tóm tắt. DXF (ranh lớp có chữ RANH, mẫu tô Thông tư 16) và ảnh scan gắn sau vào cùng hồ sơ. Có thể kèm <b>KH - ….dxf</b>. PDF tối đa 2 MB; quản trị viên tối đa 10 MB. Không chấm QCVN. Lô gốc của đồ án giữ nguyên.</span>
+              <span class="cad-drop-sub">PDF quyết định · DXF · ảnh scan</span>
               <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
             </label>
             <div id="adjFileList" class="adj-files"></div>
             <div class="cad-guest" id="adjGuest">
-              <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: hồ sơ vào hàng chờ. Quản trị viên kiểm tra trước khi đưa lên bản đồ quy hoạch.</div>
-              <div class="form-grid">
-                <label for="adjSender">Người gửi</label>
-                <input type="text" id="adjSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT" />
-                <label for="adjNote">Ghi chú</label>
-                <input type="text" id="adjNote" maxlength="300" placeholder="Số QĐ, nguồn bản vẽ... (không bắt buộc)" />
+              <div class="cad-guest-note" title="Chưa đăng nhập: hồ sơ vào hàng chờ. Quản trị viên kiểm tra trước khi đưa lên bản đồ quy hoạch."><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập — hồ sơ vào hàng chờ</div>
+              <div class="entry-form">
+                <div class="entry-row">
+                  <div class="entry-field">
+                    <label for="adjSender">Người gửi</label>
+                    <input type="text" id="adjSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT" />
+                  </div>
+                  <div class="entry-field">
+                    <label for="adjNote">Ghi chú</label>
+                    <input type="text" id="adjNote" maxlength="300" placeholder="Số QĐ, nguồn bản vẽ…" />
+                  </div>
+                </div>
               </div>
             </div>
             <button type="button" class="btn-submit" id="btnAdjSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>Gửi hồ sơ chờ phê duyệt</button>
@@ -1191,18 +1207,24 @@
 
         <div id="addBulk">
           <div class="cad-pending" id="cadPendingBox" hidden></div>
-          <div class="form-grid">
-            <label for="cadCrs">Hệ tọa độ</label>
-            <select id="cadCrs">
-              <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
-              <option value="HUE_107_45">VN-2000 KTT 107°45', múi 3°</option>
-              <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
-            </select>
-            <label for="cadPhase">Giai đoạn</label>
-            <select id="cadPhase" title="Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.">
-              <option value="HT" selected>Hiện trạng (QuyMo_HT)</option>
-              <option value="QH">Quy hoạch (QuyMo_QH)</option>
-            </select>
+          <div class="entry-form">
+            <div class="entry-row">
+              <div class="entry-field">
+                <label for="cadCrs">Hệ tọa độ</label>
+                <select id="cadCrs">
+                  <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+                  <option value="HUE_107_45">VN-2000 KTT 107°45', múi 3°</option>
+                  <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+                </select>
+              </div>
+              <div class="entry-field">
+                <label for="cadPhase">Giai đoạn</label>
+                <select id="cadPhase" title="Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.">
+                  <option value="HT" selected>Hiện trạng (QuyMo_HT)</option>
+                  <option value="QH">Quy hoạch (QuyMo_QH)</option>
+                </select>
+              </div>
+            </div>
           </div>
           <label class="cad-pair" for="cadPairSearch">Ghép vào đồ án
             <input type="search" id="cadPairSearch" class="cad-pair-search" placeholder="Tìm tên đồ án" autocomplete="off" aria-controls="cadPair" title="Gõ một phần tên, không phân biệt dấu. Để trống dòng đầu nếu tạo đồ án mới theo tên file.">
@@ -1456,56 +1478,73 @@
           <div id="htktPointBox" hidden></div>
         </div>
         <div id="flowHtxh" hidden>
-          <p class="entry-note">Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án.</p>
+          <div class="entry-head">
+            <button type="button" class="entry-help" title="Đề xuất điểm hạ tầng xã hội. Chung cư ghi ở trục Dự án." aria-label="Gợi ý"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+          </div>
           <div id="addSingle">
-        <div class="form-grid">
-        <label for="newType">Loại</label>
-        <select id="newType">
-          <option value="1-CV">1. Công viên, điểm xanh, vườn hoa</option>
-          <option value="2-BDX">2. Bãi đỗ xe, trạm sạc xe điện</option>
-          <option value="3-MN">3. Trường Mầm non</option>
-          <option value="4-TH">4. Trường Tiểu học</option>
-          <option value="5-THCS">5. Trường THCS</option>
-          <option value="6-THPT">6. Trường THPT</option>
-          <option value="7-YT">7. Bệnh viện, Trạm y tế</option>
-          <option value="8-VH">8. Nhà văn hóa, thể thao</option>
-          <option value="9-TM">9. Chợ, Trung tâm thương mại</option>
-          <option value="10-PCCC">10. Trụ sở cảnh sát PCCC</option>
-          <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
-          <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
-          <option value="13-BUS">13. Trạm dừng xe buýt</option>
-        </select>
-
-        <label for="newPhase">Giai đoạn</label>
-        <select id="newPhase">
-          <option value="HT" selected>Hiện trạng (bổ sung điểm)</option>
-          <option value="QH">Quy hoạch mới</option>
-        </select>
-
-        <label for="newNhomHaTang" title="Phân cấp hạ tầng (Cột D)">Phân cấp</label>
-        <select id="newNhomHaTang">
-          <option value="Cấp đô thị">Cấp đô thị</option>
-          <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
-        </select>
-
-        <label for="newName">Tên</label>
-        <input type="text" id="newName" placeholder="Tên khu đất / công trình..." />
-
-        <label for="newLat" title="Vĩ độ / Kinh độ">Tọa độ</label>
-        <div class="rp-coord-row">
-          <input type="text" id="newLat" placeholder="Vĩ độ" />
-          <input type="text" id="newLng" placeholder="Kinh độ" />
-          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
+        <div class="entry-form">
+        <div class="entry-row">
+          <div class="entry-field">
+            <label for="newType">Loại</label>
+            <select id="newType">
+              <option value="1-CV">1. Công viên, điểm xanh, vườn hoa</option>
+              <option value="2-BDX">2. Bãi đỗ xe, trạm sạc xe điện</option>
+              <option value="3-MN">3. Trường Mầm non</option>
+              <option value="4-TH">4. Trường Tiểu học</option>
+              <option value="5-THCS">5. Trường THCS</option>
+              <option value="6-THPT">6. Trường THPT</option>
+              <option value="7-YT">7. Bệnh viện, Trạm y tế</option>
+              <option value="8-VH">8. Nhà văn hóa, thể thao</option>
+              <option value="9-TM">9. Chợ, Trung tâm thương mại</option>
+              <option value="10-PCCC">10. Trụ sở cảnh sát PCCC</option>
+              <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
+              <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
+              <option value="13-BUS">13. Trạm dừng xe buýt</option>
+            </select>
+          </div>
+          <div class="entry-field">
+            <label for="newPhase">Giai đoạn</label>
+            <select id="newPhase">
+              <option value="HT" selected>Hiện trạng (bổ sung điểm)</option>
+              <option value="QH">Quy hoạch mới</option>
+            </select>
+          </div>
         </div>
-
-        <label for="newWard">Phường/Xã</label>
-        <input type="text" id="newWard" placeholder="Tự nhận diện theo tọa độ" />
-
-        <label for="newSize">Diện tích</label>
-        <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
-
-        <label for="newRadius" title="Bán kính phục vụ theo QCVN 01:2026/BXD. Giá trị chỉ để xem, không ghi vào bảng dữ liệu.">Bán kính</label>
-        <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
+        <div class="entry-row">
+          <div class="entry-field">
+            <label for="newNhomHaTang" title="Phân cấp hạ tầng (Cột D)">Phân cấp</label>
+            <select id="newNhomHaTang">
+              <option value="Cấp đô thị">Cấp đô thị</option>
+              <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
+            </select>
+          </div>
+          <div class="entry-field">
+            <label for="newName">Tên</label>
+            <input type="text" id="newName" placeholder="Tên khu đất / công trình..." />
+          </div>
+        </div>
+        <div class="entry-field entry-field-full">
+          <label for="newLat" title="Vĩ độ / Kinh độ">Tọa độ</label>
+          <div class="rp-coord-row">
+            <input type="text" id="newLat" placeholder="Vĩ độ" />
+            <input type="text" id="newLng" placeholder="Kinh độ" />
+            <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
+          </div>
+        </div>
+        <div class="entry-row">
+          <div class="entry-field">
+            <label for="newWard">Phường/Xã</label>
+            <input type="text" id="newWard" placeholder="Tự nhận diện theo tọa độ" />
+          </div>
+          <div class="entry-field">
+            <label for="newSize">Diện tích</label>
+            <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
+          </div>
+        </div>
+        <div class="entry-field entry-field-full">
+          <label for="newRadius" title="Bán kính phục vụ theo QCVN 01:2026/BXD. Giá trị chỉ để xem, không ghi vào bảng dữ liệu.">Bán kính</label>
+          <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
+        </div>
         </div>
 
         <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>

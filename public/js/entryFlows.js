@@ -43,6 +43,23 @@ function inHueBbox(lat, lng) {
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
 
+/** Tooltip gọn thay đoạn thuyết minh dài trên form Đề xuất. */
+function tipHtml(text, label = 'Gợi ý') {
+  const tip = String(text || '').trim();
+  if (!tip) return '';
+  return `<button type="button" class="entry-help" title="${escapeHtml(tip)}" aria-label="${escapeHtml(label)}"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>`;
+}
+
+function entryPairs(fields) {
+  const rows = [];
+  for (let i = 0; i < fields.length; i += 2) {
+    const a = fields[i] || '';
+    const b = fields[i + 1] || '';
+    rows.push(`<div class="entry-row">${a}${b}</div>`);
+  }
+  return rows.join('');
+}
+
 let submitInfraPoint = async () => {};
 let updateRadiusPreview = () => {};
 let preview = null;
@@ -262,13 +279,13 @@ function selectedArea(scopeId, unitId) {
 
 function officerBar() {
   if (isAdmin()) {
-    return `<p class="entry-note">Đang đăng nhập quản trị. Chỉ tiêu, công trình và bản vẽ ghi thẳng bản công bố. Đồ án đã có lớp sử dụng đất hoặc ranh thì không thêm bản sao.</p>`;
+    return `<div class="entry-officer-bar"><span class="entry-badge">Quản trị</span>${tipHtml('Đang đăng nhập quản trị. Chỉ tiêu, công trình và bản vẽ ghi thẳng bản công bố. Đồ án đã có lớp sử dụng đất hoặc ranh thì không thêm bản sao.')}</div>`;
   }
   if (signedIn()) {
     const who = state.authUser && (state.authUser.name || state.authUser.email) || '';
-    return `<p class="entry-note">Cán bộ ${escapeHtml(who)}. Danh sách đơn vị lấy từ tab CanBo. Bản gửi vào hàng chờ, chưa hiện trên bản đồ công khai.</p>`;
+    return `<div class="entry-officer-bar"><span class="entry-badge">Cán bộ · ${escapeHtml(who)}</span>${tipHtml('Danh sách đơn vị lấy từ tab CanBo. Bản gửi vào hàng chờ, chưa hiện trên bản đồ công khai.')}</div>`;
   }
-  return `<p class="entry-note">Đăng nhập Google. Email có trong tab CanBo và Trạng thái TRUE mới gửi được, đúng đơn vị được giao. Quản trị không bị khóa đơn vị.</p>`;
+  return `<div class="entry-officer-bar"><span class="entry-badge">Chưa đăng nhập</span>${tipHtml('Đăng nhập Google. Email có trong tab CanBo và Trạng thái TRUE mới gửi được, đúng đơn vị được giao. Quản trị không bị khóa đơn vị.')}</div>`;
 }
 
 function paintOfficer() {
@@ -320,16 +337,17 @@ function renderHanhChinh() {
     if (urban && scope === 'dothi' && !saved.hienTrangDoThi) {
       saved.hienTrangDoThi = urban.partial ? 'mot-phan' : (/mới/i.test(urban.name) ? 'moi' : 'hien-huu');
     }
-    const inputs = fieldsForScope(scope).map(f => fieldHtml(f, saved[f.key] || '')).join('');
+    const inputs = fieldsForScope(scope).map(f => fieldHtml(f, saved[f.key] || ''));
     const opts = choices.map(u => `<option value="${escapeHtml(u.key)}"${u.key === unit ? ' selected' : ''}>${escapeHtml(u.name)}</option>`).join('');
-    root.innerHTML = `<p class="entry-note">Cập nhật chỉ tiêu đô thị, hiện trạng đô thị và loại đô thị. Thời điểm cập nhật theo tháng.</p>
-      ${choices.length ? '' : '<p class="entry-note">Đơn vị được giao không phải đô thị. Nhập ở tab Đơn vị hành chính.</p>'}
-      <div class="form-grid">
-        <label for="hcUnit">Đô thị</label>
-        <select id="hcUnit"${locked && choices.length < 2 ? ' disabled' : ''}>${opts}</select>
+    root.innerHTML = `<div class="entry-head">${tipHtml('Cập nhật chỉ tiêu đô thị, hiện trạng đô thị và loại đô thị. Thời điểm cập nhật theo tháng.')}</div>
+      ${choices.length ? '' : '<p class="entry-note lot-flag">Đơn vị được giao không phải đô thị. Nhập ở tab Đơn vị hành chính.</p>'}
+      <div class="entry-form">
+        <div class="entry-field entry-field-full">
+          <label for="hcUnit">Đô thị${urban?.partial ? tipHtml(`Đô thị này là một phần xã ${urban.partial}. Dân số ước theo ranh hiện trạng; ô dân số để đính chính.`) : ''}</label>
+          <select id="hcUnit"${locked && choices.length < 2 ? ' disabled' : ''}>${opts}</select>
+        </div>
+        ${entryPairs(inputs)}
       </div>
-      ${urban?.partial ? `<p class="entry-note">Đô thị này là một phần xã ${escapeHtml(urban.partial)}. Dân số ước theo ranh hiện trạng; ô dân số để đính chính.</p>` : ''}
-      <div class="form-grid">${inputs}</div>
       <button type="button" class="btn-submit" id="hcSave">Lưu trên máy và gửi bảng</button>
       <button type="button" class="btn-submit btn-secondary" id="hcLoad">Nạp số đã gửi</button>
       <div id="hcStatus" class="rp-status" role="status"></div>
@@ -339,13 +357,15 @@ function renderHanhChinh() {
     const saved = readUnit(unit) || {};
     const phuong = isPhuongUnit(unit);
     const fields = fieldsForScope('xa').filter(f => (phuong ? f.key !== 'xaDatChuan' : f.key !== 'loaiPhuong'));
-    const inputs = fields.map(f => fieldHtml(f, saved[f.key] || '')).join('');
-    root.innerHTML = `<p class="entry-note">Cập nhật dân số và diện tích theo hiện trạng. Thời điểm cập nhật theo tháng. Phường: trình độ loại II hoặc III. Xã: mức đạt chuẩn.</p>
-      <div class="form-grid">
-        <label for="hcUnit">Đơn vị</label>
-        <select id="hcUnit"${locked ? ' disabled' : ''}>${optionsHtml('xa', unit)}</select>
+    const inputs = fields.map(f => fieldHtml(f, saved[f.key] || ''));
+    root.innerHTML = `<div class="entry-head">${tipHtml('Cập nhật dân số và diện tích theo hiện trạng. Thời điểm cập nhật theo tháng. Phường: trình độ loại II hoặc III. Xã: mức đạt chuẩn.')}</div>
+      <div class="entry-form">
+        <div class="entry-field entry-field-full">
+          <label for="hcUnit">Đơn vị</label>
+          <select id="hcUnit"${locked ? ' disabled' : ''}>${optionsHtml('xa', unit)}</select>
+        </div>
+        ${entryPairs(inputs)}
       </div>
-      <div class="form-grid">${inputs}</div>
       <button type="button" class="btn-submit" id="hcSave">Lưu trên máy và gửi bảng</button>
       <button type="button" class="btn-submit btn-secondary" id="hcLoad">Nạp số đã gửi</button>
       <div id="hcStatus" class="rp-status" role="status"></div>
@@ -364,16 +384,16 @@ function optionsFirst(scope) {
 function fieldHtml(f, value) {
   const id = `hc-${f.key}`;
   if (f.kind === 'month') {
-    return `<label for="${id}">${escapeHtml(f.label)}</label>
-      <input id="${id}" data-field="${f.key}" type="month" value="${escapeHtml(value)}">`;
+    return `<div class="entry-field"><label for="${id}">${escapeHtml(f.label)}</label>
+      <input id="${id}" data-field="${f.key}" type="month" value="${escapeHtml(value)}"></div>`;
   }
   if (f.kind === 'num') {
-    return `<label for="${id}">${escapeHtml(f.label)}${f.unit ? ` (${escapeHtml(f.unit)})` : ''}</label>
-      <input id="${id}" data-field="${f.key}" type="number" min="0" step="any" value="${escapeHtml(value)}" placeholder="${f.optional ? 'Không bắt buộc' : ''}">`;
+    return `<div class="entry-field"><label for="${id}">${escapeHtml(f.label)}${f.unit ? ` (${escapeHtml(f.unit)})` : ''}</label>
+      <input id="${id}" data-field="${f.key}" type="number" min="0" step="any" value="${escapeHtml(value)}" placeholder="${f.optional ? 'Không bắt buộc' : ''}"></div>`;
   }
   const opts = (f.options || []).map(o => `<option value="${o.value}"${value === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
-  return `<label for="${id}">${escapeHtml(f.label)}</label>
-    <select id="${id}" data-field="${f.key}"><option value="">Chưa nhập</option>${opts}</select>`;
+  return `<div class="entry-field"><label for="${id}">${escapeHtml(f.label)}</label>
+    <select id="${id}" data-field="${f.key}"><option value="">Chưa nhập</option>${opts}</select></div>`;
 }
 
 function missHtml(unitKey) {
@@ -960,17 +980,25 @@ function rememberHosoCapacity() {
 }
 
 function hoMetaHtml(locked, scope, unit, levels) {
-  return `<div class="form-grid">
-      <label for="hoLevel">Cấp <span class="entry-req">*</span></label>
-      <select id="hoLevel" required>${levels}</select>
-      <label for="hoScope">Đơn vị</label>
-      <select id="hoScope"${locked ? ' disabled' : ''}>
-        <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
-        <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
-        <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
-      </select>
-      <label for="hoUnit">Phạm vi</label>
-      <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+  return `<div class="entry-form">
+      <div class="entry-field entry-field-full">
+        <label for="hoLevel">Cấp <span class="entry-req">*</span></label>
+        <select id="hoLevel" required>${levels}</select>
+      </div>
+      <div class="entry-row">
+        <div class="entry-field">
+          <label for="hoScope">Đơn vị</label>
+          <select id="hoScope"${locked ? ' disabled' : ''}>
+            <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
+            <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
+            <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
+          </select>
+        </div>
+        <div class="entry-field">
+          <label for="hoUnit">Phạm vi</label>
+          <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -978,30 +1006,46 @@ function hoMetaHtml(locked, scope, unit, levels) {
 function hoNewMetaHtml(locked, scope, unit, levels, schemeNew) {
   const measured = ranhMeasuredHa();
   const measuredTxt = measured != null
-    ? `${fmtNum(Math.round(measured * 100) / 100)} ha (đo từ ranh)`
-    : 'Chưa có ranh — tải bước Ranh giới trước';
+    ? `${fmtNum(Math.round(measured * 100) / 100)} ha đo từ ranh`
+    : 'Chưa có ranh';
   const areaErr = areaInputError();
-  return `<div class="form-grid" id="hoSchemeNewRow">
-      <label for="hoSchemeNew">Tên đồ án <span class="entry-req">*</span></label>
-      <input id="hoSchemeNew" maxlength="120" required placeholder="Tên đồ án trên bản đồ / bucket" value="${escapeHtml(schemeNew)}">
-      <label for="hoLevel">Cấp quy hoạch <span class="entry-req">*</span></label>
-      <select id="hoLevel" required>${levels}</select>
-      <label for="hoAreaHa">Diện tích (ha)</label>
-      <input id="hoAreaHa" type="text" inputmode="decimal" placeholder="Tùy chọn — lệch ranh ≤ 1%" value="${escapeHtml(hoExtra.areaHa)}">
-      <label>Đo từ ranh</label>
-      <span id="hoAreaMeasured" class="entry-note">${escapeHtml(measuredTxt)}</span>
-      <label for="hoDanSo">Dân số</label>
-      <input id="hoDanSo" type="text" inputmode="numeric" placeholder="Tùy chọn" value="${escapeHtml(hoExtra.danSo)}">
-      <label for="hoScope">Đơn vị</label>
-      <select id="hoScope"${locked ? ' disabled' : ''}>
-        <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
-        <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
-        <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
-      </select>
-      <label for="hoUnit">Phạm vi</label>
-      <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
-    </div>
-    ${areaErr ? `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(areaErr)}</p>` : ''}`;
+  const areaTip = 'Diện tích nhập tùy chọn. Lệch hơn 1% so với diện tích đo từ ranh thì báo lỗi, không lưu.';
+  return `<div class="entry-form" id="hoSchemeNewRow">
+      <div class="entry-field entry-field-full">
+        <label for="hoSchemeNew">Tên đồ án <span class="entry-req">*</span></label>
+        <input id="hoSchemeNew" maxlength="120" required placeholder="Tên trên bản đồ / bucket" value="${escapeHtml(schemeNew)}">
+      </div>
+      <div class="entry-row">
+        <div class="entry-field">
+          <label for="hoLevel">Cấp <span class="entry-req">*</span></label>
+          <select id="hoLevel" required>${levels}</select>
+        </div>
+        <div class="entry-field">
+          <label for="hoDanSo">Dân số</label>
+          <input id="hoDanSo" type="text" inputmode="numeric" placeholder="Tùy chọn" value="${escapeHtml(hoExtra.danSo)}">
+        </div>
+      </div>
+      <div class="entry-field entry-field-full">
+        <label for="hoAreaHa">Diện tích (ha)${tipHtml(areaTip)}</label>
+        <input id="hoAreaHa" type="text" inputmode="decimal" placeholder="Tùy chọn" value="${escapeHtml(hoExtra.areaHa)}">
+        <span id="hoAreaMeasured" class="entry-sub" title="${escapeHtml(measuredTxt)}">${escapeHtml(measuredTxt)}</span>
+        ${areaErr ? `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(areaErr)}</p>` : ''}
+      </div>
+      <div class="entry-row">
+        <div class="entry-field">
+          <label for="hoScope">Đơn vị</label>
+          <select id="hoScope"${locked ? ' disabled' : ''}>
+            <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
+            <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
+            <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
+          </select>
+        </div>
+        <div class="entry-field">
+          <label for="hoUnit">Phạm vi</label>
+          <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+        </div>
+      </div>
+    </div>`;
 }
 
 function schemeSearchHtml() {
@@ -1019,33 +1063,40 @@ function renderHtktPoint() {
   if (!root) return;
   root.hidden = false;
   if ($('htktBox')) $('htktBox').hidden = true;
-  root.innerHTML = `<p class="entry-note">Đề xuất điểm hạ tầng kỹ thuật lẻ (nhà máy, trạm…). Khác form hạ tầng xã hội. Trạng thái chờ duyệt như điểm HTXH; quản trị duyệt trên popup hoặc hàng chờ.</p>
-    <div class="form-grid">
-      <label for="htktType">Loại</label>
-      <select id="htktType">${typeOptionsHtml('htkt', '16-CN')}</select>
-      <label for="htktPhase">Giai đoạn</label>
-      <select id="htktPhase">
-        <option value="HT" selected>Hiện trạng</option>
-        <option value="QH">Quy hoạch mới</option>
-      </select>
-      <label for="htktNhomHaTang">Phân cấp</label>
-      <select id="htktNhomHaTang" disabled>
-        <option value="Cấp đô thị" selected>Cấp đô thị</option>
-      </select>
-      <label for="htktName">Tên</label>
-      <input type="text" id="htktName" placeholder="Tên công trình / trạm…" maxlength="150">
-      <label for="htktLat">Tọa độ</label>
-      <div class="rp-coord-row">
-        <input type="text" id="htktLat" placeholder="Vĩ độ">
-        <input type="text" id="htktLng" placeholder="Kinh độ">
-        <button type="button" id="btnHtktPick" title="Ghim trên bản đồ" aria-label="Ghim tọa độ"><svg class="ico"><use href="#i-pin"/></svg></button>
+  root.innerHTML = `<div class="entry-head">${tipHtml('Đề xuất điểm hạ tầng kỹ thuật lẻ (nhà máy, trạm…). Khác form hạ tầng xã hội. Trạng thái chờ duyệt như điểm HTXH; quản trị duyệt trên popup hoặc hàng chờ.')}</div>
+    <div class="entry-form">
+      <div class="entry-row">
+        <div class="entry-field"><label for="htktType">Loại</label><select id="htktType">${typeOptionsHtml('htkt', '16-CN')}</select></div>
+        <div class="entry-field"><label for="htktPhase">Giai đoạn</label>
+          <select id="htktPhase"><option value="HT" selected>Hiện trạng</option><option value="QH">Quy hoạch mới</option></select>
+        </div>
       </div>
-      <label for="htktWard">Phường/Xã</label>
-      <input type="text" id="htktWard" placeholder="Tự nhận diện theo tọa độ">
-      <label for="htktSize">Diện tích</label>
-      <input type="number" id="htktSize" placeholder="m² (không bắt buộc)" min="0" step="1">
-      <label for="htktRadius">Bán kính</label>
-      <output id="htktRadius" class="rp-radius">—</output>
+      <div class="entry-row">
+        <div class="entry-field"><label for="htktNhomHaTang">Phân cấp</label>
+          <select id="htktNhomHaTang" disabled><option value="Cấp đô thị" selected>Cấp đô thị</option></select>
+        </div>
+        <div class="entry-field"><label for="htktName">Tên</label>
+          <input type="text" id="htktName" placeholder="Tên công trình / trạm…" maxlength="150">
+        </div>
+      </div>
+      <div class="entry-field entry-field-full"><label for="htktLat">Tọa độ</label>
+        <div class="rp-coord-row">
+          <input type="text" id="htktLat" placeholder="Vĩ độ">
+          <input type="text" id="htktLng" placeholder="Kinh độ">
+          <button type="button" id="btnHtktPick" title="Ghim trên bản đồ" aria-label="Ghim tọa độ"><svg class="ico"><use href="#i-pin"/></svg></button>
+        </div>
+      </div>
+      <div class="entry-row">
+        <div class="entry-field"><label for="htktWard">Phường/Xã</label>
+          <input type="text" id="htktWard" placeholder="Tự nhận diện theo tọa độ">
+        </div>
+        <div class="entry-field"><label for="htktSize">Diện tích</label>
+          <input type="number" id="htktSize" placeholder="m² (không bắt buộc)" min="0" step="1">
+        </div>
+      </div>
+      <div class="entry-field entry-field-full"><label for="htktRadius">Bán kính</label>
+        <output id="htktRadius" class="rp-radius">—</output>
+      </div>
     </div>
     <button type="button" class="btn-submit" id="btnSubmitHtktPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>
     <div id="htktStatus" class="rp-status" role="status" aria-live="polite"></div>`;
@@ -1099,26 +1150,28 @@ function renderHoSo() {
     <button type="button" class="btn-submit btn-secondary" id="hoDownload">Tải GeoJSON đã gắn trục</button>
     <div id="hoStatus" class="rp-status" role="status"></div>`;
   const clipNote = `Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.`;
+  const tipNew = `Đồ án mới: (1) tải ranh DXF/KML/KMZ — polyline hở tự khép, bản đồ phóng tới ranh; (2) nhập tên + cấp (bắt buộc). Tối thiểu tên + ranh để hiện trên bản đồ. PDF / sử dụng đất / dân số / diện tích là tùy chọn. ${clipNote}`;
+  const tipAdd = `Bổ sung quyết định, quy chế, thuyết minh, ranh hoặc sử dụng đất vào đồ án đã có. ${clipNote}`;
   let body = '';
   if (hoMode === 'adjust') {
-    body = `<p class="entry-note">Điều chỉnh cục bộ: chọn đồ án, gửi PDF quyết định / DXF / ảnh scan ở khung bên dưới. Không chấm QCVN; lô gốc đồ án giữ nguyên. Quản trị ghi thẳng, cán bộ vào hàng chờ.</p>`;
+    body = `<div class="entry-head">${tipHtml('Điều chỉnh cục bộ: chọn đồ án, gửi PDF quyết định / DXF / ảnh scan ở khung bên dưới. Không chấm QCVN; lô gốc đồ án giữ nguyên. Quản trị ghi thẳng, cán bộ vào hàng chờ.')}</div>`;
   } else if (hoMode === 'net') {
     const sectors = `<div class="add-mode-switch entry-sub" id="htktSectors" role="tablist" aria-label="Ngành hạ tầng kỹ thuật">${
       SECTORS.map(s => `<button type="button" class="entry-sub-btn${s.id === netSector ? ' active' : ''}" data-sector="${s.id}">${escapeHtml(s.label)}</button>`).join('')
     }</div>`;
-    body = `<p class="entry-note">Chọn đồ án đã có, rồi tải bản vẽ hiện trạng hoặc quy hoạch của ngành.</p>
+    body = `<div class="entry-head">${tipHtml('Chọn đồ án đã có, rồi tải bản vẽ hiện trạng hoặc quy hoạch của ngành.')}</div>
       ${sectors}
       ${schemeSearchHtml()}
       ${hoMetaHtml(locked, scope, unit, levels)}
       ${files}`;
   } else if (hoMode === 'add') {
-    body = `<p class="entry-note">Bổ sung quyết định, quy chế, thuyết minh, ranh hoặc sử dụng đất vào đồ án đã có. ${clipNote}</p>
+    body = `<div class="entry-head">${tipHtml(tipAdd)}</div>
       ${schemeSearchHtml()}
       ${hoMetaHtml(locked, scope, unit, levels)}
       ${hosoCapacityHtml(hoCs)}
       ${files}`;
   } else {
-    body = `<p class="entry-note">Đồ án mới: <b>1)</b> tải ranh (DXF/KML/KMZ) — polyline hở tự khép, bản đồ phóng tới ranh; <b>2)</b> nhập tên + cấp (bắt buộc). Tối thiểu tên + ranh để hiện trên bản đồ. PDF / sử dụng đất / dân số / diện tích là tùy chọn (diện tích lệch ranh &gt; 1% sẽ báo lỗi). ${clipNote}</p>
+    body = `<div class="entry-head">${tipHtml(tipNew)}</div>
       ${hoNewMetaHtml(locked, scope, unit, levels, schemeNew)}
       ${hosoCapacityHtml(hoCs)}
       ${files}`;
@@ -1142,10 +1195,11 @@ function renderHoSo() {
   $('hoAreaHa')?.addEventListener('input', () => {
     rememberHoExtra();
     const warn = $('hoAreaWarn');
+    const measured = $('hoAreaMeasured');
     const err = areaInputError();
     if (err) {
       if (warn) warn.textContent = err;
-      else $('hoAreaHa')?.insertAdjacentHTML('afterend', `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(err)}</p>`);
+      else measured?.insertAdjacentHTML('afterend', `<p class="entry-note lot-flag" id="hoAreaWarn">${escapeHtml(err)}</p>`);
     } else if (warn) warn.remove();
   });
   $('hoDanSo')?.addEventListener('input', rememberHoExtra);
@@ -1275,11 +1329,17 @@ function renderActive(previewOpts = {}) {
     ['UTM48_6', 'VN-2000 UTM 48, múi 6°'],
     ['custom', 'Kinh tuyến trục khác']
   ].map(([id, label]) => `<option value="${id}"${id === crsId ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
-  const crs = step.file === 'draw' ? `<div class="form-grid">
-      <label for="hoCrs">Hệ tọa độ</label>
-      <select id="hoCrs">${crsOpts}</select>
-      <label for="hoLon0">Kinh tuyến trục</label>
-      <input id="hoLon0" type="number" min="102" max="110" step="0.25" placeholder="Ví dụ 107.5" value="${escapeHtml(crsLon0)}"${crsId === 'custom' ? '' : ' disabled'}>
+  const crs = step.file === 'draw' ? `<div class="entry-form">
+      <div class="entry-row">
+        <div class="entry-field">
+          <label for="hoCrs">Hệ tọa độ${tipHtml('Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ. Quy ước tên: RG / HT / QH / KH - tên đồ án.')}</label>
+          <select id="hoCrs">${crsOpts}</select>
+        </div>
+        <div class="entry-field">
+          <label for="hoLon0">Kinh tuyến trục</label>
+          <input id="hoLon0" type="number" min="102" max="110" step="0.25" placeholder="Ví dụ 107.5" value="${escapeHtml(crsLon0)}"${crsId === 'custom' ? '' : ' disabled'}>
+        </div>
+      </div>
     </div>` : '';
   const clipHtml = got?.clipNote
     ? `<p class="entry-note">${escapeHtml(got.clipNote)}</p>`
@@ -1291,8 +1351,9 @@ function renderActive(previewOpts = {}) {
       <input type="file" id="hoFile" accept=".pdf" hidden>
     </label>
     ${got ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.error ? ` — ${escapeHtml(got.error)}` : ''}</p>` : ''}` : '';
-  box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}</h3>
-    <p class="entry-note">${limit}.${step.hint ? ` ${escapeHtml(step.hint)}` : ''} ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ. Quy ước tên: RG / HT / QH / KH - tên đồ án.' : ''}</p>
+  const stepTip = [limit, step.hint || '', step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục. Quy ước tên: RG / HT / QH / KH - tên đồ án.' : '']
+    .filter(Boolean).join(' ');
+  box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}${tipHtml(stepTip)}</h3>
     ${crs}
     ${pdfDrop}
     ${drawSlotsHtml(step, got)}
@@ -1683,7 +1744,7 @@ function urbanSelectHtml() {
   const selected = rows.some(u => u.key === current) ? current : (rows[0]?.key || '');
   const locked = rows.length < 2 && Array.isArray(allowedKeys());
   const opts = rows.map(u => `<option value="${escapeHtml(u.key)}"${u.key === selected ? ' selected' : ''}>${escapeHtml(u.name)}</option>`).join('');
-  return `<div class="form-grid">
+  return `<div class="entry-field entry-field-full">
       <label for="ktUrban">Đô thị</label>
       <select id="ktUrban"${locked ? ' disabled' : ''}>${opts}</select>
     </div>`;
@@ -1694,39 +1755,57 @@ function renderKienTruc() {
   if (!root) return;
   const urban = urbanSelectHtml();
   if (ktMode === 'congtrinh') {
-    root.innerHTML = `<p class="entry-note">Bổ sung danh mục công trình kiến trúc có giá trị. Ghi tab KienTruc.</p>
+    root.innerHTML = `<div class="entry-head">${tipHtml('Bổ sung danh mục công trình kiến trúc có giá trị. Ghi tab KienTruc.')}</div>
+      <div class="entry-form">
       ${urban}
-      <div class="form-grid">
-      <label for="ktType">Loại</label>
-      <select id="ktType">
-        <option value="KT-GT">Công trình kiến trúc có giá trị</option>
-        <option value="KT-PHAP">Kiến trúc Pháp</option>
-        <option value="KT-TG">Công trình tôn giáo, tín ngưỡng</option>
-        <option value="KT-CC">Công trình công cộng</option>
-        <option value="KT-KHAC">Khác</option>
-      </select>
-      <label for="ktPhase">Giai đoạn</label>
-      <select id="ktPhase"><option value="HT" selected>Hiện trạng</option><option value="QH">Đề xuất mới</option></select>
-      <label for="ktNhomHaTang">Phân cấp</label>
-      <select id="ktNhomHaTang"><option value="Cấp đô thị" selected>Cấp đô thị</option><option value="Cấp đơn vị ở">Cấp đơn vị ở</option></select>
-      <label for="ktName">Tên</label>
-      <input type="text" id="ktName" placeholder="Tên công trình">
-      <label for="ktLat">Tọa độ</label>
-      <div class="rp-coord-row">
-        <input type="text" id="ktLat" placeholder="Vĩ độ">
-        <input type="text" id="ktLng" placeholder="Kinh độ">
-        <button type="button" id="ktPick" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
+      <div class="entry-row">
+        <div class="entry-field"><label for="ktType">Loại</label>
+          <select id="ktType">
+            <option value="KT-GT">Công trình kiến trúc có giá trị</option>
+            <option value="KT-PHAP">Kiến trúc Pháp</option>
+            <option value="KT-TG">Công trình tôn giáo, tín ngưỡng</option>
+            <option value="KT-CC">Công trình công cộng</option>
+            <option value="KT-KHAC">Khác</option>
+          </select>
+        </div>
+        <div class="entry-field"><label for="ktPhase">Giai đoạn</label>
+          <select id="ktPhase"><option value="HT" selected>Hiện trạng</option><option value="QH">Đề xuất mới</option></select>
+        </div>
       </div>
-      <label for="ktWard">Phường/Xã</label>
-      <input type="text" id="ktWard" placeholder="Tự nhận diện theo tọa độ">
-      <label for="ktSize">Diện tích</label>
-      <input type="number" id="ktSize" placeholder="m²" min="0" step="1">
-      <label for="ktRadius">Bán kính</label>
-      <output id="ktRadius" class="rp-radius">—</output>
-      <label for="ktLinkAnh">Thư mục ảnh</label>
-      <input type="text" id="ktLinkAnh" maxlength="300" placeholder="Liên kết bucket, để trống nếu chưa có">
-      <label for="ktLink3d">Thư mục dữ liệu 3D</label>
-      <input type="text" id="ktLink3d" maxlength="300" placeholder="Liên kết bucket, để trống nếu chưa có">
+      <div class="entry-row">
+        <div class="entry-field"><label for="ktNhomHaTang">Phân cấp</label>
+          <select id="ktNhomHaTang"><option value="Cấp đô thị" selected>Cấp đô thị</option><option value="Cấp đơn vị ở">Cấp đơn vị ở</option></select>
+        </div>
+        <div class="entry-field"><label for="ktName">Tên</label>
+          <input type="text" id="ktName" placeholder="Tên công trình">
+        </div>
+      </div>
+      <div class="entry-field entry-field-full"><label for="ktLat">Tọa độ</label>
+        <div class="rp-coord-row">
+          <input type="text" id="ktLat" placeholder="Vĩ độ">
+          <input type="text" id="ktLng" placeholder="Kinh độ">
+          <button type="button" id="ktPick" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
+        </div>
+      </div>
+      <div class="entry-row">
+        <div class="entry-field"><label for="ktWard">Phường/Xã</label>
+          <input type="text" id="ktWard" placeholder="Tự nhận diện theo tọa độ">
+        </div>
+        <div class="entry-field"><label for="ktSize">Diện tích</label>
+          <input type="number" id="ktSize" placeholder="m²" min="0" step="1">
+        </div>
+      </div>
+      <div class="entry-field entry-field-full"><label for="ktRadius">Bán kính</label>
+        <output id="ktRadius" class="rp-radius">—</output>
+      </div>
+      <div class="entry-row">
+        <div class="entry-field"><label for="ktLinkAnh">Thư mục ảnh</label>
+          <input type="text" id="ktLinkAnh" maxlength="300" placeholder="Liên kết bucket">
+        </div>
+        <div class="entry-field"><label for="ktLink3d">Thư mục 3D</label>
+          <input type="text" id="ktLink3d" maxlength="300" placeholder="Liên kết bucket">
+        </div>
+      </div>
     </div>
     <button type="button" class="btn-submit" id="ktSubmit">Gửi công trình</button>
     <div id="ktStatus" class="rp-status" role="status"></div>`;
@@ -1760,11 +1839,11 @@ function renderKienTruc() {
     updateRadiusPreview('kt');
     return;
   }
-  root.innerHTML = `<p class="entry-note">Thêm quy chế quản lý kiến trúc. Chọn đô thị trong danh sách.</p>
-    ${urban}
-    <label class="cad-drop" for="ktPdf">
+  root.innerHTML = `<div class="entry-head">${tipHtml('Thêm quy chế quản lý kiến trúc. Chọn đô thị trong danh sách. Quản trị ghi thẳng tối đa 10 MB; cán bộ gửi chờ duyệt tối đa 2 MB.')}</div>
+    <div class="entry-form">${urban}</div>
+    <label class="cad-drop" for="ktPdf" title="Quản trị ghi thẳng, tối đa 10 MB. Cán bộ gửi chờ duyệt, tối đa 2 MB.">
       <span class="cad-drop-main"><b>Quy chế quản lý kiến trúc</b></span>
-      <span class="cad-drop-sub">Quản trị ghi thẳng, tối đa 10 MB. Cán bộ gửi chờ duyệt, tối đa 2 MB.</span>
+      <span class="cad-drop-sub">PDF</span>
       <input type="file" id="ktPdf" accept=".pdf" hidden>
     </label>
     <div id="ktPdfNote" class="entry-note"></div>
@@ -1855,20 +1934,24 @@ function renderDuAn() {
   const note = isAdmin()
     ? 'Quản trị ghi thẳng lớp dự án (tên và/hoặc ranh).'
     : 'Đăng nhập Google để đề xuất: cần tên dự án hoặc file ranh (hoặc cả hai). Quản trị duyệt trong hàng chờ.';
-  root.innerHTML = `<p class="entry-note">${note}</p>
-    <div class="form-grid">
-      <label for="daName">Tên dự án</label>
-      <input id="daName" maxlength="200" value="${escapeHtml(name)}" placeholder="Tên dự án">
-      <label for="daGroup">Nhóm dự án</label>
-      <select id="daGroup">${groups}</select>
-      <label for="daDecision">Quyết định pháp lý</label>
-      <input id="daDecision" maxlength="300" value="${escapeHtml(decision)}" placeholder="Số, ngày, cơ quan ban hành">
-      <label for="daCrs">Hệ tọa độ ranh</label>
-      <select id="daCrs">${crsOpts}</select>
+  root.innerHTML = `<div class="entry-head">${tipHtml(note)}</div>
+    <div class="entry-form">
+      <div class="entry-field entry-field-full">
+        <label for="daName">Tên dự án</label>
+        <input id="daName" maxlength="200" value="${escapeHtml(name)}" placeholder="Tên dự án">
+      </div>
+      <div class="entry-row">
+        <div class="entry-field"><label for="daGroup">Nhóm</label><select id="daGroup">${groups}</select></div>
+        <div class="entry-field"><label for="daCrs">Hệ tọa độ</label><select id="daCrs">${crsOpts}</select></div>
+      </div>
+      <div class="entry-field entry-field-full">
+        <label for="daDecision">Quyết định pháp lý</label>
+        <input id="daDecision" maxlength="300" value="${escapeHtml(decision)}" placeholder="Số, ngày, cơ quan ban hành">
+      </div>
     </div>
-    <label class="cad-drop" for="daFile">
+    <label class="cad-drop" for="daFile" title="DXF, KML hoặc KMZ. Vùng Polygon.">
       <span class="cad-drop-main"><b>Ranh giới</b></span>
-      <span class="cad-drop-sub">DXF, KML hoặc KMZ. Vùng Polygon.</span>
+      <span class="cad-drop-sub">DXF · KML · KMZ</span>
       <input type="file" id="daFile" accept=".dxf,.kml,.kmz" hidden>
     </label>
     <button type="button" class="btn-submit" id="daSave">${isAdmin() ? 'Lưu dự án' : 'Gửi đề xuất'}</button>

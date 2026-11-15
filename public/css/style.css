@@ -2839,9 +2839,55 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .plan-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; line-height: 1.5; white-space: nowrap; vertical-align: 1px; color: var(--tag); border: 1px solid var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); }
 .route-dot { position: absolute; left: 7px; top: 9px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 
-/* ĐỀ XUẤT MỚI: lưới 2 cột nhãn | ô nhập */
+/* ĐỀ XUẤT: form gọn — nhãn trên ô, cặp ô cùng hàng */
 .form-grid { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 5px 6px; align-items: center; }
+.entry-form { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.entry-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-items: start; }
+.entry-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.entry-field > label,
+.entry-field-label {
+  display: inline-flex; align-items: center; gap: 4px; margin: 0;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); line-height: 1.2; white-space: nowrap;
+}
+.entry-field > input,
+.entry-field > select,
+.entry-field > output,
+.entry-field .rp-coord-row,
+.entry-field .rp-radius {
+  width: 100%; min-width: 0;
+}
+.entry-field-full { width: 100%; }
+.entry-sub {
+  font-size: 10px; color: var(--text-muted); line-height: 1.25; margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.entry-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0;
+  border: 1px solid var(--border-color); border-radius: 50%;
+  background: transparent; color: var(--text-muted); cursor: help;
+}
+.entry-help .ico { width: 10px; height: 10px; }
+.entry-help:hover, .entry-help:focus-visible {
+  color: var(--accent-cyan); border-color: var(--accent-cyan); outline: none;
+}
+.entry-head {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  margin: 0 0 4px; min-height: 16px;
+}
+.entry-officer-bar {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 6px;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.entry-badge {
+  display: inline-flex; align-items: center; max-width: 100%;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  color: var(--text-main); font-weight: 600; line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .add-point-form label { font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+.add-point-form .entry-field > label { font-size: var(--fs-xs); }
 .add-point-form input, .add-point-form select {
   width: 100%; height: 26px; padding: 3px 6px; margin: 0; background: var(--bg-input);
   border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--r-md); box-sizing: border-box; font-size: var(--fs-md);
@@ -2882,17 +2928,29 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .entry-sub-btn.active { background: var(--accent-orange); color: var(--bg-panel); }
 .entry-officer { display: grid; gap: 6px; margin-bottom: 8px; font-size: var(--fs-sm); }
 .entry-officer label { display: grid; gap: 2px; }
-.entry-note { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; margin: 6px 0; }
+.entry-note { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; margin: 4px 0; }
+.entry-note.lot-flag { margin: 2px 0 0; }
 .entry-req { color: var(--accent-red); font-weight: 700; }
 .lot-flag { color: var(--accent-red); }
 .lot-keep { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
 .lot-keep label { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); }
-.entry-steps { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; margin: 6px 0; }
-.entry-step-btn { text-align: left; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); border-radius: var(--r-sm); padding: 4px 6px; font-size: var(--fs-xs); cursor: pointer; }
+.entry-steps {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px;
+  max-height: none; overflow: visible; margin: 6px 0 4px;
+}
+.entry-step-btn {
+  text-align: left; border: 1px solid var(--border-color); background: var(--bg-input);
+  color: var(--text-main); border-radius: var(--r-sm); padding: 4px 6px;
+  font-size: 10px; line-height: 1.25; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .entry-step-btn.on { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 .entry-step-btn.locked,
 .entry-step-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.entry-step-title { font-size: var(--fs-sm); margin: 8px 0 4px; }
+.entry-step-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); margin: 4px 0 6px;
+}
 .entry-miss { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
 .entry-miss th, .entry-miss td { border-bottom: 1px solid var(--border-color); padding: 3px 4px; text-align: left; vertical-align: top; }
 .entry-legacy { margin-top: 10px; }
@@ -8480,10 +8538,13 @@ body.project-review.la-page #projectReviewHost {
 .cn-capacity .is-ok { color: var(--accent-green); }
 .cn-capacity .is-over { color: #b91c1c; font-weight: 700; }
 .cn-capacity .is-gap { color: var(--axis-color-muted); }
-.cn-capacity summary { cursor: pointer; font-family: var(--axis-font); font-size: var(--axis-fs-chip); color: var(--axis-color-muted); }
+.cn-capacity summary { cursor: pointer; font-family: var(--axis-font); font-size: var(--axis-fs-chip); color: var(--axis-color-muted); display: inline-flex; align-items: center; gap: 6px; }
 .cn-capacity label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 2px 0; font-family: var(--axis-font); font-size: var(--axis-fs-row); }
+.cn-capacity .entry-field > label { display: inline-flex; margin: 0; }
 .cn-capacity input { width: 8.5rem; min-width: 0; }
+.cn-capacity .entry-field > input { width: 100%; }
 .cn-capacity button { margin-top: 2px; }
+.cn-capacity .entry-form { margin: 4px 0 0; }
 .axis-base { margin: 4px 6px; padding-top: 4px; border-top: 1px solid var(--axis-line); }
 .axis-base:empty { display: none; margin: 0; padding: 0; border: 0; }
 .axis-base-title, .axis-arch h3 { margin: 0 0 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color-muted); }

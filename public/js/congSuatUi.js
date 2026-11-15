@@ -121,17 +121,28 @@ export function hosoCapacityHtml(draft = {}) {
   const values = draft.values || {};
   const fields = CAPACITY_METRICS.map(metric => {
     const row = values[metric.sector] || {};
-    return `<label>${escapeHtml(metric.label)}
-      <input data-ho-cs="${escapeHtml(metric.sector)}" data-ho-chi="${escapeHtml(metric.chiTieu)}" inputmode="decimal" value="${escapeHtml(row.giaTri || '')}" aria-label="Giá trị ${escapeHtml(metric.label)}">
-      <input data-ho-unit="${escapeHtml(metric.sector)}" value="${escapeHtml(row.donVi || '')}" placeholder="Đơn vị" aria-label="Đơn vị ${escapeHtml(metric.label)}">
-    </label>`;
+    return `<div class="entry-row">
+      <div class="entry-field"><label>${escapeHtml(metric.label)}</label>
+        <input data-ho-cs="${escapeHtml(metric.sector)}" data-ho-chi="${escapeHtml(metric.chiTieu)}" inputmode="decimal" value="${escapeHtml(row.giaTri || '')}" aria-label="Giá trị ${escapeHtml(metric.label)}">
+      </div>
+      <div class="entry-field"><label>Đơn vị</label>
+        <input data-ho-unit="${escapeHtml(metric.sector)}" value="${escapeHtml(row.donVi || '')}" placeholder="Đơn vị" aria-label="Đơn vị ${escapeHtml(metric.label)}">
+      </div>
+    </div>`;
   }).join('');
   return `<details class="cn-capacity">
-    <summary>Quy mô hạ tầng của đồ án</summary>
-    <label>Mã đồ án<input id="hoCsId" value="${escapeHtml(draft.id || '')}" placeholder="Để trống thì lấy từ tên đồ án" aria-label="Mã đồ án"></label>
-    <label>Mã đồ án cha<input id="hoCsParent" value="${escapeHtml(draft.parent || '')}" placeholder="QHC 1/10.000 hoặc QHPK" aria-label="Mã đồ án cha"></label>
-    ${fields}
-    <p class="cn-empty">Khi ghi số, hệ thống đối chiếu trần cấp trên. Vượt trần thì chưa lưu. Thiếu số thì ghi «chưa đủ dữ liệu», không tính là đạt.</p>
+    <summary>Quy mô hạ tầng của đồ án <span class="entry-help" title="Khi ghi số, hệ thống đối chiếu trần cấp trên. Vượt trần thì chưa lưu. Thiếu số thì ghi «chưa đủ dữ liệu», không tính là đạt." role="img" aria-label="Gợi ý quy mô"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></span></summary>
+    <div class="entry-form">
+      <div class="entry-row">
+        <div class="entry-field"><label for="hoCsId">Mã đồ án</label>
+          <input id="hoCsId" value="${escapeHtml(draft.id || '')}" placeholder="Để trống thì lấy từ tên" aria-label="Mã đồ án">
+        </div>
+        <div class="entry-field"><label for="hoCsParent">Mã đồ án cha</label>
+          <input id="hoCsParent" value="${escapeHtml(draft.parent || '')}" placeholder="QHC 1/10.000 hoặc QHPK" aria-label="Mã đồ án cha">
+        </div>
+      </div>
+      ${fields}
+    </div>
   </details>`;
 }
 
