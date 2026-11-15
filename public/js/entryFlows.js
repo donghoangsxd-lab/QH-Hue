@@ -27,9 +27,18 @@ import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
 import { projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 import { stampPendingBoxHtml, stampStatusNoteHtml } from './stampUi.js';
+import { landColor } from './tt16Symbols.js';
 import { ensureSoTayItems } from './catalogTable.js';
 import { schemePickOptions } from './catalogTableCore.js';
 import { projectAreaOf } from './projectFiles.js';
+/** Phạm vi WGS84 quanh TP. Huế — tem chiếu ra ngoài coi là lệch CRS. */
+const HUE_LAT = [15.5, 17.2];
+const HUE_LNG = [106.5, 108.6];
+function inHueBbox(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && lat >= HUE_LAT[0] && lat <= HUE_LAT[1]
+    && lng >= HUE_LNG[0] && lng <= HUE_LNG[1];
+}
 
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
@@ -141,6 +150,8 @@ function showPreview(features, review, opts = {}) {
   const draw = [];
   (review || []).forEach(item => {
     if (!item || !item.geometry) return;
+    // Lô «bỏ» ngoài ranh không vẽ — dễ nhầm tem KH lệch / đám đỏ ngoài khung.
+    if (item.status === 'bo') return;
     draw.push({
       type: 'Feature',
       geometry: item.geometry,
@@ -188,14 +199,15 @@ function showPreview(features, review, opts = {}) {
           fillOpacity: 0.14
         };
       }
-      // Lô sử dụng đất preview — cam nổi trên lớp QHPK nền.
+      // Lô sử dụng đất: màu theo layer / TT16 (không cam đồng loạt).
       if (f.properties && f.properties._mau === 'lo') {
+        const hex = landColor(f.properties.layer || f.properties.nhan || '') || '#94a3b8';
         return {
-          color: '#ea580c',
-          weight: 2.5,
+          color: hex,
+          weight: 1.8,
           opacity: 1,
-          fillColor: '#fdba74',
-          fillOpacity: 0.42
+          fillColor: hex,
+          fillOpacity: 0.48
         };
       }
       return {
@@ -517,19 +529,51 @@ function writeStampProps(feature, stamp) {
   if (m2) p.stampArea = m2;
 }
 
-function stampProjector(stamps) {
-  const crs = CRS_PRESETS[crsId] || CRS_PRESETS.HUE_3;
-  if (crsId === 'WGS84' || (crs && crs.wgs84)) return (x, y) => [y, x];
-  const axes = detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] })));
-  const f = axes.valid ? axes.f : (x, y) => [x, y];
-  const use = crsId === 'custom'
-    ? { label: `VN-2000 KTT ${Number(crsLon0)}°`, lon0: Number(crsLon0), k0: Math.abs(Number(crsLon0) - 105) < 0.2 ? 0.9996 : 0.9999 }
-    : crs;
+function stampCrsList() {
+  if (crsId === 'WGS84') return [{ wgs84: true, label: 'WGS84' }];
+  if (crsId === 'custom') {
+    return [{
+      label: `VN-2000 KTT ${Number(crsLon0)}°`,
+      lon0: Number(crsLon0),
+      k0: Math.abs(Number(crsLon0) - 105) < 0.2 ? 0.9996 : 0.9999
+    }];
+  }
+  const picked = CRS_PRESETS[crsId] || CRS_PRESETS.HUE_3;
+  return [picked, CRS_PRESETS.HUE_3, CRS_PRESETS.HUE_107_45, CRS_PRESETS.UTM48_6]
+    .filter((c, i, arr) => c && arr.findIndex(q => q.lon0 === c.lon0 && q.k0 === c.k0) === i);
+}
+
+function stampProjectorFor(axes, crs) {
+  if (crs && crs.wgs84) return (x, y) => [y, x];
+  const f = axes && axes.valid ? axes.f : (x, y) => [x, y];
   return (x, y) => {
     const [E, N] = f(x, y);
-    if (!axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
-    return vn2000ToWgs84(E, N, use);
+    if ((!axes || !axes.valid) && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
+    return vn2000ToWgs84(E, N, crs || CRS_PRESETS.HUE_3);
   };
+}
+
+/** Thử nhiều CRS/trục; chọn phương án nhiều tem trong bbox Huế + nhiều lô khớp nhất. */
+function projectKhBest(stamps, lots) {
+  const axesTries = [
+    detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] }))),
+    { valid: true, note: 'đảo X/Y', f: (x, y) => [y, x] },
+    { valid: false, note: '', f: (x, y) => [x, y] }
+  ];
+  let best = null;
+  stampCrsList().forEach((crs) => {
+    axesTries.forEach((axes) => {
+      const all = projectStamps(stamps, stampProjectorFor(axes, crs));
+      const inHue = all.filter(s => inHueBbox(s.lat, s.lng));
+      const pool = inHue.length ? inHue : [];
+      const matched = pool.length ? matchStamps(pool, lots).assigned.length : 0;
+      const score = matched * 10000 + pool.length * 10 - (all.length - pool.length);
+      if (!best || score > best.score) {
+        best = { projected: pool, all, score, matched, note: `${crs.label || ''}${axes.note ? ` · ${axes.note}` : ''}` };
+      }
+    });
+  });
+  return best || { projected: [], all: [], score: 0, matched: 0, note: '' };
 }
 
 /** Gán tem KH vào lô đất đang giữ (sau cắt ranh). ≥ 2 tiêu chí tự khớp; còn lại hỏi tay trên bản đồ. */
@@ -541,6 +585,7 @@ function applyKhToHeld(step) {
   if (!stamps.length || !bag.features?.length) {
     bag.stampMatch = null;
     bag.stampView = null;
+    bag.stampCrsNote = '';
     return;
   }
   const lots = bag.features.map((f, i) => ({
@@ -550,7 +595,19 @@ function applyKhToHeld(step) {
     layer: String(f.properties?.layer || ''),
     name: String(f.properties?.nhan || f.properties?.lotCode || '')
   }));
-  const projected = projectStamps(stamps, stampProjector(stamps));
+  const best = projectKhBest(stamps, lots);
+  const projected = best.projected;
+  bag.stampCrsNote = best.note || '';
+  if (!projected.length) {
+    bag.stampMatch = null;
+    bag.stampView = [];
+    bag.stampPick = null;
+    bag.khWarn = `Tem KH không nằm trong phạm vi Huế sau khi chiếu (${stamps.length} tem). Kiểm tra hệ tọa độ / điểm INSERT — không vẽ ngoài bản đồ.`;
+    return;
+  }
+  bag.khWarn = projected.length < stamps.length
+    ? `Đã lọc ${stamps.length - projected.length}/${stamps.length} tem ngoài phạm vi Huế (${best.note}).`
+    : '';
   const match = matchStamps(projected, lots, {
     assign: bag.stampAssign || {},
     skip: bag.stampSkip || []
@@ -571,19 +628,25 @@ function stampBoxHtml(bag) {
   const match = bag && bag.stampMatch;
   const n = (bag && bag.khStamps && bag.khStamps.length) || 0;
   if (!bag?.khFile) return '';
+  const warn = bag.khWarn
+    ? `<p class="entry-note lot-flag">${escapeHtml(bag.khWarn)}</p>`
+    : '';
   if (!n) {
-    return stampStatusNoteHtml({ fileName: bag.khFile.name, n: 0, noStamps: true });
+    return warn + stampStatusNoteHtml({ fileName: bag.khFile.name, n: 0, noStamps: true });
   }
   if (!bag.features?.length) {
-    return stampStatusNoteHtml({ fileName: bag.khFile.name, n, noFeatures: true });
+    return warn + stampStatusNoteHtml({ fileName: bag.khFile.name, n, noFeatures: true });
+  }
+  if (bag.khWarn && !(bag.stampView && bag.stampView.length)) {
+    return warn + stampStatusNoteHtml({ fileName: bag.khFile.name, n, noFeatures: false, done: 0, left: n });
   }
   const pend = (match && match.pending) || [];
   const done = (match && match.assigned.length) || 0;
   const left = (match && match.unmatchedLots && match.unmatchedLots.length) || 0;
   if (!pend.length) {
-    return stampStatusNoteHtml({ fileName: bag.khFile.name, n, done, left });
+    return warn + stampStatusNoteHtml({ fileName: bag.khFile.name, n, done, left });
   }
-  return stampPendingBoxHtml({
+  return warn + stampPendingBoxHtml({
     pending: pend,
     pickId: bag.stampPick,
     pickAttr: 'data-ho-stamp',
@@ -1184,6 +1247,8 @@ function clearHeldKh(step) {
   delete bag.khFile;
   delete bag.khStamps;
   delete bag.khError;
+  delete bag.khWarn;
+  delete bag.stampCrsNote;
   bag.stampAssign = {};
   bag.stampSkip = [];
   bag.stampPick = null;
@@ -1456,53 +1521,63 @@ async function savePdf(step, tenQH, unitKey) {
 
 async function saveHoSo() {
   const status = $('hoStatus');
+  const btn = $('hoSave');
   rememberHoExtra();
   const tenQH = schemeName();
   const features = taggedCollections();
   const notes = [];
   const level = $('hoLevel')?.value || '';
+  const setStatus = (msg) => {
+    if (status) {
+      status.textContent = msg;
+      try { status.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* */ }
+    }
+    announceTool(msg);
+  };
   if (hoMode === 'new') {
     if (!tenQH) {
-      if (status) status.textContent = 'Nhập tên đồ án (bắt buộc).';
+      setStatus('Nhập tên đồ án (bắt buộc).');
       $('hoSchemeNew')?.focus();
       return;
     }
     if (!level) {
-      if (status) status.textContent = 'Chọn cấp quy hoạch (bắt buộc).';
+      setStatus('Chọn cấp quy hoạch (bắt buộc).');
       $('hoLevel')?.focus();
       return;
     }
     if (!hasRanhPolygon()) {
-      if (status) status.textContent = 'Tải ranh giới quy hoạch trước (DXF/KML/KMZ → vùng khép kín).';
+      setStatus('Tải ranh giới quy hoạch trước (DXF/KML/KMZ → vùng khép kín).');
       stepId = 'ranh';
       renderHoSo();
       return;
     }
     const areaErr = areaInputError();
     if (areaErr) {
-      if (status) status.textContent = areaErr;
+      setStatus(areaErr);
       $('hoAreaHa')?.focus();
       return;
     }
   } else if (!tenQH) {
-    if (status) status.textContent = features.length
+    setStatus(features.length
       ? 'Đã có bản vẽ trên máy. Chọn đồ án đã có hoặc nhập tên đồ án mới khi cần ghi bucket.'
-      : 'Chọn ít nhất một file.';
+      : 'Chọn ít nhất một file.');
     if (features.length) downloadHoSo();
     return;
   }
+  if (btn) btn.disabled = true;
+  setStatus('Đang lưu hồ sơ…');
   try {
     rememberHosoCapacity();
     const capacityOn = !!($('hoCsParent') || document.querySelector('[data-ho-cs]'));
     if (capacityOn) {
       const filled = String(hoCs.parent || '').trim() || Object.values(hoCs.values || {}).some(row => String(row && row.giaTri || '').trim());
       if (filled && !await loadCongSuat()) {
-        if (status) status.textContent = 'Chưa tải được sổ quy mô. Chưa ghi.';
+        setStatus('Chưa tải được sổ quy mô. Chưa ghi.');
         return;
       }
       const gate = gateHosoCapacity({ name: tenQH, cap: level || $('hoLevel')?.value || '', draft: hoCs });
       if (!gate.accept) {
-        if (status) status.textContent = gate.sentences.join(' ');
+        setStatus(gate.sentences.join(' '));
         return;
       }
       if (gate.entries.length) {
@@ -1524,8 +1599,13 @@ async function saveHoSo() {
       }
     }
     if (!officerCanEdit(unitKey)) {
-      notes.push('bản vẽ giữ trên máy — cần đăng nhập đúng đơn vị');
+      if (!signedIn()) {
+        notes.push('chưa đăng nhập — chưa ghi lên máy chủ (chỉ tải GeoJSON tạm)');
+      } else {
+        notes.push('đơn vị không được giao — chưa ghi lên máy chủ (chỉ tải GeoJSON tạm)');
+      }
     } else {
+      let wrote = 0;
       for (const step of visibleSteps()) {
         const bag = held[step.id];
         const hasDraw = bag?.features?.length || bag?.review?.length;
@@ -1535,6 +1615,10 @@ async function saveHoSo() {
         }
         const tagged = tagFeatures(bag.features || [], hoMeta(step));
         const rows = netPayload(tagged);
+        if (!rows.length) {
+          notes.push(`${step.label} (0 đối tượng sau gắn trục — không ghi)`);
+          continue;
+        }
         const kind = PUBLISH_KIND[step.id];
         const review = step.draw === 'land' ? reviewBody(step, bag, tagged) : [];
         const clipNote = bag.counts ? ` ${clipSentence(bag.counts)}` : '';
@@ -1553,21 +1637,28 @@ async function saveHoSo() {
             adminFn: () => postJson('publishSchemeDraw', { tenQH, kind, features: rows }),
             stageFn: () => postJson('submitChoDuyet', stageBody)
           });
+          wrote += 1;
           if (staged) notes.push(`${step.label} (chờ duyệt)${bag.counts ? ` — ${clipSentence(bag.counts)}` : ''}`);
-          else notes.push(data?.skipped ? `${step.label} (${data.note || 'đã có lớp'})` : `${step.label}.${clipNote}`.trim());
+          else notes.push(data?.skipped ? `${step.label} (${data.note || 'đã có lớp'})` : `${step.label} · ${rows.length} đối tượng.${clipNote}`.trim());
         } else if (step.role) {
           const { staged } = await stageOrPublish({
             adminFn: () => postJson('putProjectNet', { tenQH, role: step.role, features: rows }),
             stageFn: () => postJson('submitChoDuyet', stageBody)
           });
+          wrote += 1;
           notes.push(staged ? `${step.label} (chờ duyệt)` : step.label);
         }
       }
+      if (!wrote && !notes.some(n => /không ghi|chờ duyệt|đối tượng/.test(n))) {
+        notes.push('không có lớp bản vẽ nào để ghi (cần ranh và/hoặc sử dụng đất)');
+      }
     }
     if (features.length) downloadHoSo();
-    if (status) status.textContent = notes.length ? `Đã xử lý: ${notes.join('; ')}.` : 'Chưa có file hợp lệ.';
+    setStatus(notes.length ? `Đã xử lý: ${notes.join('; ')}.` : 'Chưa có file hợp lệ.');
   } catch (err) {
-    if (status) status.textContent = err.message;
+    setStatus(err.message || 'Lưu hồ sơ thất bại.');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

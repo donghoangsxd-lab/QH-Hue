@@ -574,4 +574,71 @@ assert.ok(localStamps[0].points.every(([x, y]) => Math.hypot(x - hueE, y - hueN)
 const localProj = projectStamps(localStamps, toWgs);
 assert.ok(localProj[0].lng > 106.5, `INSERT local-attr → Huế (${localProj[0].lng})`);
 
+// File kiểu Thủy Thanh: INSERT UCS local, ATTRIB đã VN-2000 WCS → neo theo ATTRIB.
+const mixedDxf = `0
+SECTION
+2
+BLOCKS
+0
+BLOCK
+2
+aaq
+10
+0
+20
+0
+0
+ENDBLK
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+0
+INSERT
+2
+aaq
+10
+79504.33
+20
+-80200.16
+41
+0.8
+0
+ATTRIB
+2
+KH
+1
+CXCD-B11
+10
+567764.41
+20
+1820726.73
+0
+ATTRIB
+2
+DTLD
+1
+4,97
+10
+567777.43
+20
+1820714.44
+0
+SEQEND
+0
+ENDSEC
+0
+EOF
+`;
+const mixed = parseLandStampDxf(mixedDxf);
+assert.equal(mixed.length, 1);
+assert.equal(mixed[0].code, 'CXCD-B11');
+assert.ok(mixed[0].x > 500000 && mixed[0].y > 1800000,
+  `neo ATTRIB VN-2000, không INSERT local (${mixed[0].x}, ${mixed[0].y})`);
+const mixedProj = projectStamps(mixed, toWgs);
+assert.ok(mixedProj[0].lng > 106.5 && mixedProj[0].lat > 15.5,
+  `Thủy Thanh-style → Huế (${mixedProj[0].lat}, ${mixedProj[0].lng})`);
+
 console.log('land-stamp: ok');

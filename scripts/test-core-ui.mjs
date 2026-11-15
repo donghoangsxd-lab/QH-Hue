@@ -1143,7 +1143,9 @@ assert.match(read('public/js/entryFlows.js'), /focusHoSoSupplement|ingestSchemeF
 assert.match(read('public/js/drawingReaders.js'), /normalizeBoundaryFeatures|closeLineToPolygon/);
 assert.match(read('public/js/entryFlows.js'), /hasRanhPolygon|areaInputError|AREA_TOL|hoAreaHa/);
 assert.match(read('public/js/entryFlows.js'), /ranh-moi|#ef4444|LOT_PREVIEW_Z|previewHalo/);
-assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|#ea580c|focusStamp/);
+assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|landColor|focusStamp|projectKhBest|inHueBbox/);
+assert.match(read('public/js/entryFlows.js'), /Đang lưu hồ sơ|setStatus|btn\.disabled/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /fillColor: '#fdba74'/);
 assert.match(read('public/js/entryFlows.js'), /function viewMap|getViewMode\(\) === 'QH'|planMap/);
 assert.match(read('public/js/entryFlows.js'), /LOT_PREVIEW_Z = 635|projectFocusPane/);
 assert.match(read('public/js/entryFlows.js'), /syncPlanViewToEntryLevel|FACET_TO_MAP_LEVEL|qh:axis-tab/);

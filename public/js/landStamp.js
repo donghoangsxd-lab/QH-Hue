@@ -140,8 +140,17 @@ function xform(x, y, tr) {
   return [tr.x + lx * c - ly * s, tr.y + lx * s + ly * c];
 }
 
-/** Bán kính (đơn vị bản vẽ) quanh điểm INSERT: bỏ điểm local gốc block (E≈0 → nhảy Lào khi chiếu VN-2000). */
+/** Bán kính (đơn vị bản vẽ) quanh neo tem. */
 const STAMP_NEAR_INSERT_M = 200;
+/** Đông/Bắc VN-2000 miền Trung — ATTRIB trong file KH Thủy Thanh đã WCS dù INSERT còn local UCS. */
+const VN_E_RANGE = [350000, 900000];
+const VN_N_RANGE = [1650000, 1950000];
+
+function looksVn2000(x, y) {
+  return Number.isFinite(x) && Number.isFinite(y)
+    && x >= VN_E_RANGE[0] && x <= VN_E_RANGE[1]
+    && y >= VN_N_RANGE[0] && y <= VN_N_RANGE[1];
+}
 
 function nearInsert(x, y, ix, iy, maxD = STAMP_NEAR_INSERT_M) {
   return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(ix) && Number.isFinite(iy)
@@ -149,45 +158,63 @@ function nearInsert(x, y, ix, iy, maxD = STAMP_NEAR_INSERT_M) {
 }
 
 /**
- * ATTRIB sau INSERT: đã WCS (gần điểm chèn) giữ nguyên; còn lại là local trong định nghĩa block → xform.
- * Tránh đẩy (0..vài chục, …) hoặc gốc block lên bản đồ như thể Đông/Bắc tuyệt đối.
+ * ATTRIB sau INSERT: nếu đã là VN-2000 WCS thì giữ nguyên (không xform theo INSERT local).
+ * Gần INSERT hoặc local trong định nghĩa block → xform khi cần.
  */
 function worldAttrXY(a, tr) {
   if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return null;
-  const dIns = Math.hypot(a.x - tr.x, a.y - tr.y);
-  const dBase = Math.hypot(a.x - tr.bx, a.y - tr.by);
-  if (dIns <= STAMP_NEAR_INSERT_M || (Number.isFinite(dIns) && dIns <= dBase + 1e-6)) {
-    return [a.x, a.y];
-  }
+  if (looksVn2000(a.x, a.y)) return [a.x, a.y];
+  if (looksVn2000(tr.x, tr.y) && nearInsert(a.x, a.y, tr.x, tr.y)) return [a.x, a.y];
+  if (nearInsert(a.x, a.y, tr.x, tr.y)) return [a.x, a.y];
   return xform(a.x, a.y, tr);
+}
+
+function keepStampPt(x, y, tr) {
+  return looksVn2000(x, y) || nearInsert(x, y, tr.x, tr.y);
+}
+
+/** Neo tem: ưu tiên INSERT nếu đã VN-2000; không thì tâm ATTRIB/điểm WCS. */
+function stampAnchor(insert, attrs, pts) {
+  if (looksVn2000(insert[0], insert[1])) return insert;
+  const world = [];
+  (attrs || []).forEach((a) => {
+    if (looksVn2000(a.x, a.y)) world.push([a.x, a.y]);
+  });
+  (pts || []).forEach((p) => {
+    if (p && looksVn2000(p[0], p[1])) world.push(p);
+  });
+  if (!world.length) return insert;
+  return [
+    world.reduce((s, p) => s + p[0], 0) / world.length,
+    world.reduce((s, p) => s + p[1], 0) / world.length
+  ];
 }
 
 function expandBlock(defs, name, tr, depth, attribs) {
   const texts = [];
   const attrs = [];
   const pts = [];
-  if (Number.isFinite(tr.x) && Number.isFinite(tr.y)) pts.push([tr.x, tr.y]);
+  if (Number.isFinite(tr.x) && Number.isFinite(tr.y) && keepStampPt(tr.x, tr.y, tr)) pts.push([tr.x, tr.y]);
   (attribs || []).forEach(a => {
     const xy = worldAttrXY(a, tr);
     const row = { tag: a.tag, text: a.text, x: xy ? xy[0] : a.x, y: xy ? xy[1] : a.y };
     attrs.push(row);
-    if (xy && nearInsert(xy[0], xy[1], tr.x, tr.y)) pts.push(xy);
+    if (xy && keepStampPt(xy[0], xy[1], tr)) pts.push(xy);
   });
   const def = defs.get(String(name || '').toLowerCase());
   if (!def || depth > 4) return { texts, attrs, pts };
   def.texts.forEach(t => {
     const [x, y] = xform(t.x, t.y, tr);
     texts.push({ text: t.text, x, y, h: (t.h > 0 ? t.h : 2) * Math.max(Math.abs(tr.sx), Math.abs(tr.sy), 1) });
-    if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
+    if (keepStampPt(x, y, tr)) pts.push([x, y]);
   });
   const taken = new Set(attrs.map(a => normTag(a.tag)));
   def.attdefs.forEach(a => {
     const [x, y] = xform(a.x, a.y, tr);
-    if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
+    if (keepStampPt(x, y, tr)) pts.push([x, y]);
     if (taken.has(normTag(a.tag))) return;
     attrs.push({ tag: a.tag, text: a.text, x, y });
   });
-  // Không đưa mọi đỉnh hình học block vào pts — dễ lẫn tọa độ gốc định nghĩa.
   def.inserts.forEach(ch => {
     const child = defs.get(String(ch.name || '').toLowerCase());
     const sub = expandBlock(defs, ch.name, {
@@ -198,36 +225,37 @@ function expandBlock(defs, name, tr, depth, attribs) {
     sub.texts.forEach(t => {
       const [x, y] = place(t.x, t.y);
       texts.push({ ...t, x, y });
-      if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
+      if (keepStampPt(x, y, tr)) pts.push([x, y]);
     });
     sub.attrs.forEach(a => {
       if (taken.has(normTag(a.tag))) return;
       const [x, y] = place(a.x, a.y);
       attrs.push({ ...a, x, y });
       taken.add(normTag(a.tag));
-      if (nearInsert(x, y, tr.x, tr.y)) pts.push([x, y]);
+      if (keepStampPt(x, y, tr)) pts.push([x, y]);
     });
     sub.pts.forEach(([x, y]) => {
       const [wx, wy] = place(x, y);
-      if (nearInsert(wx, wy, tr.x, tr.y)) pts.push([wx, wy]);
+      if (keepStampPt(wx, wy, tr)) pts.push([wx, wy]);
     });
   });
   return { texts, attrs, pts };
 }
 
-/** Neo bản đồ = điểm INSERT; chỉ giữ điểm phụ gần INSERT (không dùng gốc block). */
-function candidatePoints(insert, pts) {
+/** Neo bản đồ = stampAnchor; điểm phụ gần neo hoặc đã VN-2000. */
+function candidatePoints(anchor, pts) {
   const out = [];
   const push = (p) => {
     if (!p || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) return;
-    if (!nearInsert(p[0], p[1], insert[0], insert[1])) return;
+    const ok = looksVn2000(p[0], p[1]) || nearInsert(p[0], p[1], anchor[0], anchor[1]);
+    if (!ok) return;
     const eps = Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 180 ? 1e-7 : 0.05;
     if (out.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < eps)) return;
     out.push(p);
   };
-  push(insert);
+  push(anchor);
   (pts || []).forEach(push);
-  return out.length ? out : (Number.isFinite(insert[0]) && Number.isFinite(insert[1]) ? [insert] : []);
+  return out.length ? out : (Number.isFinite(anchor[0]) && Number.isFinite(anchor[1]) ? [anchor] : []);
 }
 
 /** TEXT / MTEXT / CIRCLE / INSERT trong ENTITIES. Block lồng và chữ trong định nghĩa block được bung ra. */
@@ -311,9 +339,10 @@ export function readStampEntities(text) {
         x: ent.x, y: ent.y, bx: def ? def.bx : 0, by: def ? def.by : 0,
         sx, sy: Number.isFinite(ent.sy) && ent.sy !== 0 ? ent.sy : sx, rot: ent.rot || 0
       }, 0, attrs);
+      const anchor = stampAnchor([ent.x, ent.y], blown.attrs, blown.pts);
       blocks.push({
-        x: ent.x, y: ent.y, attrs: blown.attrs, texts: blown.texts,
-        points: candidatePoints([ent.x, ent.y], blown.pts)
+        x: anchor[0], y: anchor[1], attrs: blown.attrs, texts: blown.texts,
+        points: candidatePoints(anchor, blown.pts)
       });
       continue;
     }
