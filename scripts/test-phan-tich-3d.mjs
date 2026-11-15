@@ -210,7 +210,7 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   if ((short135[0].radius || 0) < 9) throw new Error(`bán kính tán quá nhỏ khi camera xa (${short135[0].radius})`);
   const short36 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 36 }]);
   if (short36.length < 4) throw new Error(`đoạn 36m × 80m phải có ≥4 tán (got ${short36.length})`);
-  if (!js.includes('radiusMinPixels: 4') || !js.includes('Math.max(9, d.radius')) {
+  if (!js.includes('radiusMinPixels: 5') || !js.includes('Math.max(9, d.radius')) {
     throw new Error('tree-canopy chưa kẹp pixel / bán kính đủ lớn trên màn hình');
   }
   const sides = short135.filter((t) => Math.abs(t.position[1]) > 1);
@@ -224,7 +224,10 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   const bigPark = [[-120, -120], [120, -120], [120, 120], [-120, 120], [-120, -120]];
   const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 13.5 }]);
   const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 18 && Math.abs(t.position[0]) > 130);
-  if (nearRoad.length < 6) throw new Error(`giữ budget ven đường khi có công viên lớn (ven đường ${nearRoad.length})`);
+  if (nearRoad.length < 20) throw new Error(`ưu tiên ven đường trước công viên (ven đường ${nearRoad.length})`);
+  if (!js.includes('depthTest: false') || !js.includes('canopyZ')) {
+    throw new Error('tán khi Gộp chưa nâng / tắt depth — sẽ bị nhà che');
+  }
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
   throw new Error('thiếu đếm tán / tán billboard (sphere-like)');

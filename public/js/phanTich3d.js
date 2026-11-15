@@ -849,8 +849,8 @@ function treeDot(x, y, salt) {
 }
 
 /**
- * Tán cây: công viên trước (≤ 55% budget), giữ phần còn lại cho ven đường ≥ STREET_TREE_MIN_W.
- * Trồng hai bên lề. treeRows OSM gieo trên tâm hàng.
+ * Tán cây: ưu tiên ven đường ≥ STREET_TREE_MIN_W (trồng trước), rồi công viên phần còn lại.
+ * Lề ≈ nửa lộ giới (mép đường). treeRows OSM trên tâm hàng.
  */
 export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const out = [];
@@ -865,11 +865,51 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
     salt += 1;
     return true;
   };
-  // Giữ chỗ cho hàng cây ven đường — công viên không được nuốt hết trần.
-  const streetReserve = Math.min(limit, Math.max(20, Math.floor(limit * 0.4)));
-  const parkBudget = Math.max(0, limit - streetReserve);
+  const plantAlong = (path, width, stepM, sideM, budget, bothSides) => {
+    if (!path || path.length < 2) return;
+    let acc = 0;
+    // Mép lộ giới + vỉa hè hẹp — không đẩy vào giữa lô nhà.
+    const side = sideM != null ? sideM : Math.max(4, (width || 4) * 0.5 + 1.2);
+    const sides = bothSides === false ? [1] : (side === 0 ? [0] : [1, -1]);
+    for (let i = 1; i < path.length && out.length < budget; i++) {
+      const a = path[i - 1];
+      const b = path[i];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const px = -uy;
+      const py = ux;
+      let t = acc > 0 ? stepM - acc : stepM * 0.3;
+      while (t < len && out.length < budget) {
+        for (const s of sides) {
+          if (out.length >= budget) break;
+          push(a[0] + ux * t + px * side * s, a[1] + uy * t + py * side * s);
+        }
+        t += stepM;
+      }
+      acc = (acc + len) % stepM;
+    }
+  };
+  // 1) Ven đường trước — tối thiểu ~55% trần khi có đường đủ rộng.
+  const wideRoads = (roads || []).filter((road) => (road.width || 0) >= STREET_TREE_MIN_W);
+  const streetBudget = wideRoads.length
+    ? Math.min(limit, Math.max(28, Math.floor(limit * 0.55)))
+    : 0;
+  for (const row of treeRows || []) {
+    if (out.length >= streetBudget) break;
+    plantAlong(row.path, STREET_TREE_MIN_W, 14, 0, streetBudget, false);
+  }
+  for (const road of wideRoads) {
+    if (out.length >= streetBudget) break;
+    const w = road.width || STREET_TREE_MIN_W;
+    const stepM = w >= 30 ? 18 : w >= 20 ? 16 : 14;
+    plantAlong(road.path, w, stepM, null, streetBudget, true);
+  }
+  // 2) Công viên / vùng xanh — phần budget còn lại (không nuốt hàng cây phố).
   for (const ring of rings || []) {
-    if (out.length >= parkBudget) break;
+    if (out.length >= limit) break;
     if (!ring || ring.length < 3) continue;
     const c = centroid(ring);
     if (pointInRing(c, ring)) push(c[0], c[1]);
@@ -884,9 +924,9 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       if (p[1] > maxY) maxY = p[1];
     }
     const span = Math.sqrt(Math.max(1, (maxX - minX) * (maxY - minY)));
-    const step = Math.max(10, Math.min(22, span / 6));
-    for (let y = minY; y <= maxY && out.length < parkBudget; y += step) {
-      for (let x = minX; x <= maxX && out.length < parkBudget; x += step) {
+    const step = Math.max(12, Math.min(26, span / 5));
+    for (let y = minY; y <= maxY && out.length < limit; y += step) {
+      for (let x = minX; x <= maxX && out.length < limit; x += step) {
         salt += 1;
         const jx = x + Math.sin(salt * 12.989) * (step * 0.22);
         const jy = y + Math.cos(salt * 78.233) * (step * 0.22);
@@ -894,44 +934,6 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
         push(jx, jy);
       }
     }
-  }
-  const plantAlong = (path, width, stepM, sideM, budget, bothSides) => {
-    if (!path || path.length < 2) return;
-    let acc = 0;
-    const side = sideM != null ? sideM : Math.max(3.5, (width || 4) * 0.45 + 2.5);
-    const sides = bothSides === false ? [1] : (side === 0 ? [0] : [1, -1]);
-    for (let i = 1; i < path.length && out.length < budget; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len;
-      const uy = dy / len;
-      const px = -uy;
-      const py = ux;
-      let t = acc > 0 ? stepM - acc : stepM * 0.35;
-      while (t < len && out.length < budget) {
-        for (const s of sides) {
-          if (out.length >= budget) break;
-          push(a[0] + ux * t + px * side * s, a[1] + uy * t + py * side * s);
-        }
-        t += stepM;
-      }
-      acc = (acc + len) % stepM;
-    }
-  };
-  for (const row of treeRows || []) {
-    if (out.length >= limit) break;
-    plantAlong(row.path, STREET_TREE_MIN_W, 16, 0, limit, false);
-  }
-  // Bước thưa theo bề rộng: đường hẹp (nội bộ) thưa hơn trục.
-  for (const road of roads || []) {
-    if (out.length >= limit) break;
-    const w = road.width || 0;
-    if (w < STREET_TREE_MIN_W) continue;
-    const stepM = w >= 13 ? 22 : w >= 7 ? 26 : 32;
-    plantAlong(road.path, w, stepM, null, limit, true);
   }
   return out;
 }
@@ -2250,9 +2252,11 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
     }
-    // Tán: thân cột mỏng + tán billboard (đĩa nhìn như cầu, rẻ hơn mesh sphere).
+    // Tán: khi Gộp, nâng trên mái phổ biến (nhà 2–4 tầng) kẻo depth-test nuốt hết hàng cây phố.
     if ((model.trees || []).length) {
       const zTree = (showStack ? zVoids : zLinks) + PLATE;
+      const trunkH = showStack ? 5 : 12;
+      const canopyZ = zTree + (showStack ? 6.5 : 14);
       try {
         if (typeof deck.ColumnLayer === 'function') {
           layers.push(new deck.ColumnLayer({
@@ -2264,7 +2268,7 @@ function bootMap(place, model, ground) {
             radius: 0.55,
             extruded: true,
             getPosition: (d) => d.position,
-            getElevation: 4.5,
+            getElevation: trunkH,
             getFillColor: [88, 58, 34, 255],
             pickable: false
           }));
@@ -2273,16 +2277,18 @@ function bootMap(place, model, ground) {
           id: 'tree-canopy',
           data: model.trees,
           coordinateSystem: CART,
-          modelMatrix: lift(zTree + 6.5),
+          modelMatrix: lift(canopyZ),
           getPosition: (d) => d.position,
           getRadius: (d) => Math.max(9, d.radius || 10),
           radiusUnits: 'meters',
-          radiusMinPixels: 4,
-          radiusMaxPixels: 28,
+          radiusMinPixels: 5,
+          radiusMaxPixels: 32,
           getFillColor: (d) => d.color,
           billboard: true,
           stroked: false,
-          pickable: false
+          pickable: false,
+          // Billboards trên phố dễ bị khối nhà che — tắt depth khi Gộp.
+          parameters: showStack ? undefined : { depthTest: false }
         }));
       } catch (err) {
         console.warn('Tán cây:', err);
