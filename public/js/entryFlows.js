@@ -937,11 +937,13 @@ function paintStampMarkers(bag) {
     }).addTo(preview);
   });
 
+  // Chỉ vẽ tem còn chờ gán (cam) / đang chọn (hồng + nhấp nháy) — không chấm cyan tem đã khớp.
   (bag.stampView || []).forEach(s => {
     if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
     const on = pending.has(s.id);
+    if (!on) return;
     const cur = s.id === bag.stampPick;
-    const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+    const color = cur ? '#f472b6' : '#fb923c';
     if (cur) {
       L.marker([s.lat, s.lng], {
         pane: 'lotPreview',
@@ -957,19 +959,17 @@ function paintStampMarkers(bag) {
     const mark = L.circleMarker([s.lat, s.lng], {
       pane: 'lotPreview',
       renderer,
-      radius: cur ? 11 : on ? 8 : 5,
+      radius: cur ? 11 : 8,
       color: '#fff',
       weight: 2,
       fillColor: color,
       fillOpacity: 0.95
     }).bindTooltip(stampLabel(s), { sticky: true });
-    if (on) {
-      mark.on('click', (e) => {
-        if (L.DomEvent) L.DomEvent.stop(e);
-        bag.stampPick = s.id;
-        renderActive({ fit: false, focusStamp: true });
-      });
-    }
+    mark.on('click', (e) => {
+      if (L.DomEvent) L.DomEvent.stop(e);
+      bag.stampPick = s.id;
+      renderActive({ fit: false, focusStamp: true });
+    });
     mark.addTo(preview);
   });
   if (bag.stampPick) {

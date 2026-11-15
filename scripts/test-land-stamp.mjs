@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
-  stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf
+  stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf
 } from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
@@ -663,5 +663,26 @@ assert.equal(lotMissingStampAttrs({ lotCode: 'A', floors: '1', coverage: '50', f
 assert.deepEqual(assignKeysOf('a'), ['a']);
 assert.deepEqual(assignKeysOf(['a', 'b']), ['a', 'b']);
 assert.ok(stampPendingWhy(posOnly.pending[0], [{ key: 'solo', area: 5000, layer: '', rings: shared }]).length > 10);
+
+// Tem ghi ha: 0.9 / 0,9 / 0.90 / …ha → 9000 m² (không cần 3 thập phân).
+assert.equal(stampAreaM2('0.9', 9015), 9000);
+assert.equal(stampAreaM2('0,9', 9015), 9000);
+assert.equal(stampAreaM2('0.90', 9015), 9000);
+assert.equal(stampAreaM2('0,90', 9015), 9000);
+assert.equal(stampAreaM2('0.9ha', 9015), 9000);
+assert.equal(stampAreaM2('0,9 ha'.replace(/\s/g, ''), 9015), 9000);
+assert.equal(stampAreaM2('0.9'), 9000);
+const octLot = { key: 'oct', area: 9015, layer: 'DAT_O_Nhomnhao', rings: shared };
+const octStamp = {
+  id: 'oct-b6', code: 'OCT-B6', areaRaw: '0.90', floors: '4', coverage: '90', far: '4',
+  lat: ambLat + d / 2, lng: ambLng + d / 2,
+  cands: [{ lat: ambLat + d / 2, lng: ambLng + d / 2 }]
+};
+assert.ok(stampAreaMatch(octStamp, octLot));
+assert.ok(stampNameMatch(octStamp, octLot));
+const octMatch = matchStamps([octStamp], [octLot]);
+assert.equal(octMatch.assigned.length, 1);
+assert.equal(octMatch.assigned[0].key, 'oct');
+assert.ok(octMatch.assigned[0].how.split('+').length >= 2);
 
 console.log('land-stamp: ok');
