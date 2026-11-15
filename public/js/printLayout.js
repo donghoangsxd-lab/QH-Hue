@@ -1,5 +1,6 @@
 // Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A3–4A0,
 // lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật và cấp quy hoạch đang chọn.
+// Mở xem trước: thu panel trái + ẩn #axisDock (print-preview-on); khung trắng nới tới ranh đỏ #printMaxGuide.
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ô vệ tinh / canvas đường phố, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
 // Cột ghi chú giữ chromeScale theo khổ (không nới rộng trên A0+). Khung chọn trên bản đồ phải theo
@@ -95,6 +96,8 @@ let frameUser = null;
 let dockBound = false;
 let frameObserver = null;
 let classObserver = null;
+/** null = chưa nhớ; true/false = trạng thái right-collapsed trước khi mở xuất bản đồ */
+let heldRightCollapsed = null;
 /** Tùy chọn dock: lưới VN-2000, tiêu đề lớn giữa map, hoa văn TT16 (mặc định tắt = màu đặc) */
 let showGrid = true;
 let showMapBanner = false;
@@ -929,16 +932,12 @@ function paperFrameScale() {
   return Math.min(1, a3.wMm / paper.wMm);
 }
 
-function placeFrame() {
-  if (!previewOn || busy) return;
-  const area = $('mapArea');
-  const frame = $('printFrame');
-  const right = $('printFrameRight');
-  const dock = document.querySelector('.print-dock');
-  if (!area || !frame) return;
-  syncLayoutFromView();
+/** Lề vùng nới khung: khi print-preview-on đã ẩn panel + sáu nút trái → padL nhỏ. */
+function framePads(area) {
   const areaRect = area.getBoundingClientRect();
+  const dock = document.querySelector('.print-dock');
   const panel = $('rightPanel');
+  const wide = document.body.classList.contains('print-preview-on');
   let padR = 16;
   if (dock) {
     const dr = dock.getBoundingClientRect();
@@ -948,24 +947,60 @@ function placeFrame() {
     const pr = panel.getBoundingClientRect();
     if (pr.width > 20 && pr.left < areaRect.right) padR = Math.max(padR, areaRect.right - pr.left + 10);
   }
-  const padT = 72;
-  const padL = 64;
   if (document.body.classList.contains('bottom-collapsed')) padR = Math.max(padR, 72);
-  const padB = 20;
+  return {
+    padT: wide ? 56 : 72,
+    padL: wide ? 12 : 64,
+    padR,
+    padB: 20,
+    areaRect
+  };
+}
+
+/** Thu panel trái + ẩn axis-dock; nhớ trạng thái để trả lại khi đóng. */
+function applyPrintChrome(on) {
+  const body = document.body.classList;
+  if (on) {
+    if (heldRightCollapsed == null) heldRightCollapsed = body.contains('right-collapsed');
+    body.add('right-collapsed');
+    body.add('print-preview-on');
+    return;
+  }
+  body.remove('print-preview-on');
+  if (heldRightCollapsed != null) {
+    body.toggle('right-collapsed', heldRightCollapsed);
+    heldRightCollapsed = null;
+  }
+}
+
+function placeFrame() {
+  if (!previewOn || busy) return;
+  const area = $('mapArea');
+  const frame = $('printFrame');
+  const right = $('printFrameRight');
+  const guide = $('printMaxGuide');
+  const dock = document.querySelector('.print-dock');
+  if (!area || !frame) return;
+  syncLayoutFromView();
   if (dock) {
     dock.style.left = '';
     dock.style.width = '';
     dock.style.right = '';
     dock.style.transform = '';
   }
+  const { padT, padL, padR, padB, areaRect } = framePads(area);
   const paperScale = paperFrameScale();
   const availH = Math.max(120, area.clientHeight - padT - padB);
+  const availW = Math.max(120, area.clientWidth - padL - padR);
   const setBox = (el, x, y, w, h) => {
+    if (!el) return;
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.style.width = `${w}px`;
     el.style.height = `${h}px`;
   };
+  // Ranh đỏ: giới hạn nới khung (sau khi đã ẩn chrome trái).
+  setBox(guide, padL, padT, availW, availH);
   if (dualLayout() && right) {
     const divider = $('swipeDivider');
     const splitX = divider
@@ -988,7 +1023,6 @@ function placeFrame() {
     setBox(frame, padL + (leftW - w) / 2, top, w, h);
     setBox(right, rightX + (rightW - w) / 2, top, w, h);
   } else {
-    const availW = Math.max(120, area.clientWidth - padL - padR);
     const aspect = previewAspect();
     const defW = Math.max(160, Math.min(availW, availW * paperScale));
     let w = frameUser ? frameUser.w : defW;
@@ -1067,22 +1101,25 @@ function bindFrameResize() {
       const anchorY = id.includes('t') ? start.bottom - areaRect.top : start.top - areaRect.top;
       const aspect = previewAspect();
       const move = (e) => {
+        const { padT, padL, padR, padB } = framePads(area);
+        const maxW = Math.max(140, area.clientWidth - padL - padR);
+        const maxH = Math.max(100, area.clientHeight - padT - padB);
         const px = e.clientX - areaRect.left;
         const py = e.clientY - areaRect.top;
         let w = Math.max(1, Math.abs(px - anchorX));
         const hPtr = Math.max(1, Math.abs(py - anchorY));
         if (hPtr * aspect > w) w = hPtr * aspect;
         let h = w / aspect;
-        const maxW = area.clientWidth - 80;
-        const maxH = area.clientHeight - 80;
         if (w > maxW) { w = maxW; h = w / aspect; }
         if (h > maxH) { h = maxH; w = h * aspect; }
         if (w < 140) return;
         const leftBox = left.getBoundingClientRect();
-        const x = frame === left
+        let x = frame === left
           ? (id.includes('l') ? anchorX - w : anchorX)
           : leftBox.left - areaRect.left;
-        const y = id.includes('t') ? anchorY - h : anchorY;
+        let y = id.includes('t') ? anchorY - h : anchorY;
+        x = Math.min(Math.max(padL, x), padL + Math.max(0, maxW - w));
+        y = Math.min(Math.max(padT, y), padT + Math.max(0, maxH - h));
         frameUser = { x, y, w, h };
         placeFrame();
       };
@@ -1145,6 +1182,7 @@ function openPreview() {
   const root = $('printPreview');
   if (!root) return;
   previewOn = true;
+  applyPrintChrome(true);
   root.hidden = false;
   announceFloat('print');
   const btn = $('btnPrintA3');
@@ -1171,7 +1209,11 @@ function openPreview() {
   if (panel) frameObserver.observe(panel);
   classObserver = new MutationObserver(() => placeFrame());
   classObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  placeFrame();
+  // Đợi layout sau khi thu panel / ẩn axis-dock rồi đặt khung + ranh đỏ.
+  requestAnimationFrame(() => {
+    map?.invalidateSize({ pan: false });
+    placeFrame();
+  });
 }
 
 function closePreview() {
@@ -1191,6 +1233,8 @@ function closePreview() {
   frameObserver = null;
   classObserver?.disconnect();
   classObserver = null;
+  applyPrintChrome(false);
+  requestAnimationFrame(() => map?.invalidateSize({ pan: false }));
 }
 
 /** Nét SVG phác thảo / đo vẽ sau ảnh icon: chữ phác thảo là marker, nằm trong ảnh đó */

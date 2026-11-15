@@ -6,7 +6,10 @@
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
-import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import {
+  parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel, STAMP_AREA_TOL,
+  lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy
+} from './landStamp.js';
 import { stampPendingBoxHtml } from './stampUi.js';
 import { adjustRecordFromDxf } from './localAdjust.js';
 import { sendAdjustment, sendAdjustDraw, attachAdjustPdfFile, schemeAdjustments, putScan, pdfProblem, adjustLotStyle, setSatelliteClip } from './adjustLayer.js';
@@ -48,8 +51,10 @@ let overrides = {};
 let khParsed = null;
 let stampAssign = {};
 let stampSkip = [];
+let stampDraft = {};
 let stampPick = null;
 let khMatch = null;
+let stampLots = [];
 
 const kindOn = () => {
   const box = $('adjImportBox');
@@ -148,31 +153,118 @@ function applyKhToRecord() {
   }));
   const match = matchStamps(projected, lots, { assign: stampAssign, skip: stampSkip });
   khMatch = { ...match, view: projected };
-  const byKey = new Map(match.assigned.map(a => [a.key, a.stamp]));
-  record.payload.lots.forEach((l, i) => {
-    const s = byKey.get(String(i));
-    if (!s) return;
-    if (s.code) {
-      l.lotCode = s.code;
-      if (!l.name) l.name = s.code;
-    }
-    const plan = {};
-    if (s.floors) plan.floors = String(s.floors);
-    if (s.coverage) plan.coverage = String(s.coverage);
-    if (s.far) plan.far = String(s.far);
-    if (Object.keys(plan).length) l.plan = plan;
-    const m2 = stampAreaM2(s.areaRaw, l.area);
-    if (m2) l.stampArea = m2;
+  stampLots = lots;
+  Object.keys(stampDraft).forEach(id => {
+    if (!match.pending.some(s => s.id === id)) delete stampDraft[id];
+  });
+  match.assigned.forEach(a => {
+    const keys = a.keys || [a.key];
+    keys.forEach(k => {
+      const l = record.payload.lots[Number(k)];
+      if (!l) return;
+      const s = a.stamp;
+      if (s.code) {
+        l.lotCode = s.code;
+        if (!l.name) l.name = s.code;
+      }
+      const plan = {};
+      if (s.floors) plan.floors = String(s.floors);
+      if (s.coverage) plan.coverage = String(s.coverage);
+      if (s.far) plan.far = String(s.far);
+      if (Object.keys(plan).length) l.plan = plan;
+      const m2 = stampAreaM2(s.areaRaw, l.area);
+      if (m2) l.stampArea = m2;
+    });
   });
   if (!stampPick || !match.pending.some(s => s.id === stampPick)) stampPick = match.pending[0] ? match.pending[0].id : null;
 }
 
-function assignKh(idx) {
-  if (!stampPick) return;
-  stampAssign[stampPick] = String(idx);
+function lotMetaAt(idx) {
+  const l = record?.payload?.lots?.[idx];
+  if (!l) return null;
+  return { key: String(idx), area: l.area, layer: String(l.layer || ''), name: String(l.name || l.lotCode || '') };
+}
+
+function commitKhAssign(stampId, keys, { warn = true } = {}) {
+  const stamp = khMatch?.view?.find(s => s.id === stampId);
+  const metas = keys.map(k => lotMetaAt(Number(k))).filter(Boolean);
+  const cmp = stamp ? stampAreaVsLots(stamp, metas, keys) : null;
+  stampAssign[stampId] = keys.length === 1 ? keys[0] : keys;
+  delete stampDraft[stampId];
   applyKhToRecord();
+  if (warn && cmp && cmp.ratio != null && cmp.ratio > STAMP_AREA_TOL) {
+    showToast(`Cảnh báo: diện tích lô lệch ${Math.round(cmp.ratio * 1000) / 10}% so với tem (≤ 1%).`);
+  }
   render();
   drawPreview();
+}
+
+function assignKh(idx) {
+  if (!stampPick || !record) return;
+  const lot = record.payload.lots[idx];
+  if (!lot) return;
+  const props = {
+    lotCode: lot.lotCode, kyHieu: lot.lotCode, name: lot.name,
+    floors: lot.plan?.floors, TangCao: lot.plan?.floors,
+    coverage: lot.plan?.coverage, MatDoXD: lot.plan?.coverage,
+    far: lot.plan?.far, HeSoSDD: lot.plan?.far
+  };
+  if (!lotMissingStampAttrs(props)) {
+    showToast('Lô đã có thuộc tính tem — chọn lô chấm đỏ.');
+    return;
+  }
+  const stamp = khMatch?.view?.find(s => s.id === stampPick);
+  if (!stamp) return;
+  const key = String(idx);
+  const draft = [...(stampDraft[stampPick] || [])];
+  const at = draft.indexOf(key);
+  if (at >= 0) draft.splice(at, 1);
+  else {
+    if (draft.length) {
+      const first = lotMetaAt(Number(draft[0]));
+      const next = lotMetaAt(idx);
+      if (!lotsSameLandType(first, next)) {
+        showToast('Chỉ chọn các lô cùng loại.');
+        return;
+      }
+    }
+    const trial = [...draft, key];
+    const metas = trial.map(k => lotMetaAt(Number(k))).filter(Boolean);
+    const cmp = stampAreaVsLots(stamp, metas, trial);
+    if (draft.length >= 1 && cmp.stampM2 > 0 && cmp.lotM2 > cmp.stampM2 * (1 + STAMP_AREA_TOL)) {
+      showToast('Tổng diện tích các lô vượt tem hơn 1%.');
+      return;
+    }
+    draft.push(key);
+  }
+  stampDraft[stampPick] = draft;
+  if (!draft.length) { render(); drawPreview(); return; }
+  const metas = draft.map(k => lotMetaAt(Number(k))).filter(Boolean);
+  const cmp = stampAreaVsLots(stamp, metas, draft);
+  if (cmp.ok) {
+    commitKhAssign(stampPick, draft, { warn: false });
+    return;
+  }
+  if (draft.length === 1) showToast('Diện tích lệch > 1%. Bấm + (xanh) để gán, hoặc chọn thêm lô.');
+  else showToast(`Đã chọn ${draft.length} lô — cần tổng khớp tem ± 1%.`);
+  render();
+  drawPreview();
+}
+
+function confirmKhPlus(stampId) {
+  stampPick = stampId;
+  const draft = stampDraft[stampId] || [];
+  if (!draft.length) { render(); drawPreview(); return; }
+  const stamp = khMatch?.view?.find(s => s.id === stampId);
+  const metas = draft.map(k => lotMetaAt(Number(k))).filter(Boolean);
+  const cmp = stamp ? stampAreaVsLots(stamp, metas, draft) : null;
+  if (draft.length > 1 && !(cmp && cmp.ok)) {
+    showToast('Nhiều lô: tổng diện tích phải khớp tem ± 1%.');
+    render();
+    drawPreview();
+    return;
+  }
+  commitKhAssign(stampId, draft, { warn: true });
 }
 
 function drawPreview(fit = false) {
@@ -186,10 +278,27 @@ function drawPreview(fit = false) {
   previewDetailed = map.getZoom() >= TT16_PATTERN_ZOOM;
   preview = L.layerGroup().addTo(map);
   setSatelliteClip(map, SAT_PANE, 446, p.boundary ? [p.boundary] : []);
+  const draftKeys = new Set((stampPick && stampDraft[stampPick]) || []);
   p.lots.forEach((l, idx) => {
     const layer = L.geoJSON(l.geometry, { interactive: !!stampPick, renderer: fillRenderer, style: adjustLotStyle(l, previewDetailed) });
     if (stampPick) layer.on('click', () => assignKh(idx));
     layer.addTo(preview);
+    try {
+      if (typeof turf !== 'undefined' && turf.centroid) {
+        const c = turf.centroid({ type: 'Feature', properties: {}, geometry: l.geometry }).geometry.coordinates;
+        const props = {
+          lotCode: l.lotCode, name: l.name,
+          floors: l.plan?.floors, coverage: l.plan?.coverage, far: l.plan?.far
+        };
+        const missing = lotMissingStampAttrs(props);
+        const inDraft = draftKeys.has(String(idx));
+        L.circleMarker([c[1], c[0]], {
+          radius: inDraft ? 7 : 5, color: '#fff', weight: 1.5,
+          fillColor: missing ? (inDraft ? '#fbbf24' : '#ef4444') : '#22c55e',
+          fillOpacity: 0.95, interactive: false
+        }).addTo(preview);
+      }
+    } catch (_) { /* bỏ qua tâm lô */ }
   });
   if (khMatch && khMatch.view) {
     const pending = new Set(khMatch.pending.map(s => s.id));
@@ -197,6 +306,17 @@ function drawPreview(fit = false) {
       const on = pending.has(s.id);
       const cur = s.id === stampPick;
       const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+      if (cur) {
+        L.marker([s.lat, s.lng], {
+          interactive: false,
+          icon: L.divIcon({
+            className: 'stamp-pick-pulse',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            html: '<span class="stamp-pick-ring"></span>'
+          })
+        }).addTo(preview);
+      }
       const mark = L.circleMarker([s.lat, s.lng], {
         radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
       }).bindTooltip(stampLabel(s), { sticky: true });
@@ -390,12 +510,16 @@ function khExtra() {
   return stampPendingBoxHtml({
     pending: pend,
     pickId: stampPick,
-    tip: 'Có lô chứa từ 2 tem, hoặc tem chưa nằm trong lô.',
-    hint: 'Chọn lần lượt từng tem rồi bấm polygon tương ứng trên bản đồ.',
+    draft: stampDraft,
+    lots: stampLots,
     extraClass: 'adj-stamp',
     pickAttr: 'data-adj-imp="stamp" data-stamp',
     skipAttr: 'data-stamp',
-    skipExtra: 'data-adj-imp="stamp-skip"'
+    skipExtra: 'data-adj-imp="stamp-skip"',
+    whyAttr: 'data-stamp',
+    whyExtra: 'data-adj-imp="stamp-why"',
+    plusAttr: 'data-stamp',
+    plusExtra: 'data-adj-imp="stamp-plus"'
   });
 }
 
@@ -530,6 +654,7 @@ async function addFiles(list) {
   if (khFile) {
     stampAssign = {};
     stampSkip = [];
+    stampDraft = {};
     stampPick = null;
     try { khParsed = { name: khFile.name, stamps: parseLandStampDxf(await khFile.text()) }; }
     catch (err) { khParsed = { name: khFile.name, stamps: [] }; showToast(`Không đọc được file ký hiệu: ${err.message}`, 'error'); }
@@ -545,7 +670,7 @@ function removeFile(kind) {
   if (kind === 'dxf' || kind === 'kh') {
     readSeq++;
     if (kind === 'dxf') { record = null; overrides = {}; recordError = ''; }
-    else { khParsed = null; stampAssign = {}; stampSkip = []; stampPick = null; khMatch = null; if (record) applyKhToRecord(); }
+    else { khParsed = null; stampAssign = {}; stampSkip = []; stampDraft = {}; stampPick = null; khMatch = null; stampLots = []; if (record) applyKhToRecord(); }
     reading = false;
     clearPreview();
   }
@@ -573,8 +698,10 @@ function reset() {
   khParsed = null;
   stampAssign = {};
   stampSkip = [];
+  stampDraft = {};
   stampPick = null;
   khMatch = null;
+  stampLots = [];
   recordError = '';
   reading = preparing = false;
   ['adjTitle', 'adjNote'].forEach(id => { const el = $(id); if (el) el.value = ''; });
@@ -616,10 +743,18 @@ async function submit() {
     const note = $('adjNote')?.value.trim() || '';
     const name = $('adjProject')?.value || '';
     let out;
+    let soTayMa = '';
+    try {
+      const { ensureSoTayItems } = await import('./catalogTable.js');
+      const { soTayMaForTenQH } = await import('./catalogTableCore.js');
+      const items = await ensureSoTayItems();
+      soTayMa = soTayMaForTenQH(name, items);
+    } catch (e) { /* sổ tay chưa tải */ }
+    const link = soTayMa ? { soTayMa } : {};
     if (!record) {
-      out = await sendAdjustment({ tenQH: name, title, note, sender, pdfOnly: true }, files.pdf, null);
+      out = await sendAdjustment({ tenQH: name, title, note, sender, pdfOnly: true, ...link }, files.pdf, null);
     } else {
-      const payload = { ...record.payload, ...(title ? { title } : {}), sender, note };
+      const payload = { ...record.payload, ...(title ? { title } : {}), sender, note, ...link };
       out = await sendAdjustment(payload, files.pdf, scanPart);
     }
     const savedId = out.item && out.item.id;
@@ -719,11 +854,27 @@ export function initAdjustImport() {
     if (!el) return;
     if (el.dataset.adjImp === 'del') removeFile(el.dataset.kind);
     else if (el.dataset.adjImp === 'georef') georef();
-    else if (el.dataset.adjImp === 'stamp') { stampPick = el.dataset.stamp; render(); drawPreview(); }
+    else if (el.dataset.adjImp === 'stamp') {
+      if (e.target.closest('[data-adj-imp="stamp-why"],[data-adj-imp="stamp-skip"],[data-adj-imp="stamp-plus"]')) return;
+      stampPick = el.dataset.stamp;
+      render();
+      drawPreview();
+    }
+    else if (el.dataset.adjImp === 'stamp-why') {
+      const id = el.dataset.stamp;
+      const stamp = khMatch?.view?.find(s => s.id === id) || khMatch?.pending?.find(s => s.id === id);
+      showToast(stampPendingWhy(stamp, stampLots));
+    }
+    else if (el.dataset.adjImp === 'stamp-plus') {
+      confirmKhPlus(el.dataset.stamp);
+    }
     else if (el.dataset.adjImp === 'stamp-skip') {
       const id = el.dataset.stamp;
       if (id && !stampSkip.includes(id)) stampSkip.push(id);
-      if (id) delete stampAssign[id];
+      if (id) {
+        delete stampAssign[id];
+        delete stampDraft[id];
+      }
       applyKhToRecord();
       render();
       drawPreview();

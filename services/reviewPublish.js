@@ -139,6 +139,30 @@ function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, 
     if (geom) stored.geometry = geom;
     return stored;
   }
+  // Meta ĐCCB text từ bảng danh mục — không kèm file bản vẽ.
+  if (key === 'so-tay-dccb') {
+    const packet = fields && typeof fields === 'object' && !Array.isArray(fields) ? fields : {};
+    const ma = String(packet.ma || '').trim().slice(0, 32);
+    const ten = String(packet.ten || '').trim().slice(0, 240);
+    if (!ma || !ten) throw fail(400, 'Thiếu mã đồ án hoặc tên ĐCCB');
+    const adjustId = String(packet.adjustId || '').trim().toLowerCase().slice(0, 16);
+    const dccbFields = {
+      ma,
+      ten,
+      quyetDinh: String(packet.quyetDinh || '').trim().slice(0, 80),
+      ngay: String(packet.ngay || '').trim().slice(0, 20),
+      coQuan: String(packet.coQuan || '').trim().slice(0, 80),
+      id: String(packet.id || '').trim().slice(0, 40)
+    };
+    if (/^[a-f0-9]{16}$/.test(adjustId)) dccbFields.adjustId = adjustId;
+    return {
+      kind: key,
+      unit: unitKey || 'tp:TP',
+      tenQH: name || ma,
+      summary: line || ten,
+      fields: dccbFields
+    };
+  }
   if (!DRAW_KINDS.has(key)) throw fail(400, 'Loại hồ sơ không hợp lệ');
   if (!name) throw fail(400, 'Thiếu tên đồ án');
   const landKind = key === 'su-dung-dat' || key === 'hien-trang';
@@ -156,8 +180,15 @@ function stageSpec({ kind, unit, tenQH, role, summary, features, fields, point, 
   return stored;
 }
 
-async function applyPublication(obj, { projects, callAppsScript, publishKienTruc, publishInvest, readPendingPdf }) {
+async function applyPublication(obj, {
+  projects, callAppsScript, publishKienTruc, publishInvest, readPendingPdf, publishSoTayDccb
+}) {
   const kind = obj && obj.kind;
+  if (kind === 'so-tay-dccb') {
+    if (typeof publishSoTayDccb !== 'function') throw fail(500, 'Thiếu bước ghi ĐCCB sổ tay');
+    await publishSoTayDccb(obj);
+    return { published: true, note: 'Đã ghi ĐCCB vào sổ tay.' };
+  }
   if (kind === 'quy-che' || kind === 'van-ban') {
     const object = obj.pdf && obj.pdf.object;
     const id = PDF_OBJECT_RE.exec(String(object || ''));

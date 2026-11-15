@@ -4778,7 +4778,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map, opt
   html += `</div>`;
 
   const inspectPopup = openDockPopup(targetMap, 'inspect-popup', html);
-  nudgeOffDock(targetMap, L.latLng(clickLat, clickLng).toBounds(12));
+  focusServiceRadius(targetMap, clickLat, clickLng, ringRadius);
   addPopupCollapseToggle(inspectPopup, 'các tuyến kết nối');
   inspectPopup.on('remove', () => { if (singleIsoSeq === routeSeq) clearSingleIsochrone(); });
   showAccessRoutes(clickLat, clickLng, targetMap, routeCands, inspectPopup, routeSeq, hiKeys);

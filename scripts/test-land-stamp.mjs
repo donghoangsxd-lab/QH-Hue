@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch } from '../public/js/landStamp.js';
+import {
+  parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
+  stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf
+} from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
 const dxf = `0
@@ -640,5 +643,25 @@ assert.ok(mixed[0].x > 500000 && mixed[0].y > 1800000,
 const mixedProj = projectStamps(mixed, toWgs);
 assert.ok(mixedProj[0].lng > 106.5 && mixedProj[0].lat > 15.5,
   `Thủy Thanh-style → Huế (${mixedProj[0].lat}, ${mixedProj[0].lng})`);
+
+// Gán tay một tem → nhiều lô.
+const multiA = { key: 'ma', area: 500, layer: 'TMDV', rings: shared };
+const multiB = { key: 'mb', area: 500, layer: 'TMDV', rings: shared };
+const multiStamp = {
+  id: 'multi', code: 'TM-X', areaRaw: '1000', floors: '5', coverage: '60', far: '3',
+  lat: ambLat, lng: ambLng, cands: [{ lat: ambLat, lng: ambLng }]
+};
+const multi = matchStamps([multiStamp], [multiA, multiB], { assign: { multi: ['ma', 'mb'] } });
+assert.equal(multi.assigned.length, 1);
+assert.deepEqual(multi.assigned[0].keys, ['ma', 'mb']);
+assert.equal(multi.pending.length, 0);
+assert.equal(multi.unmatchedLots.length, 0);
+const vs = stampAreaVsLots(multiStamp, [multiA, multiB], ['ma', 'mb']);
+assert.equal(vs.ok, true);
+assert.ok(lotMissingStampAttrs({}));
+assert.equal(lotMissingStampAttrs({ lotCode: 'A', floors: '1', coverage: '50', far: '2' }), false);
+assert.deepEqual(assignKeysOf('a'), ['a']);
+assert.deepEqual(assignKeysOf(['a', 'b']), ['a', 'b']);
+assert.ok(stampPendingWhy(posOnly.pending[0], [{ key: 'solo', area: 5000, layer: '', rings: shared }]).length > 10);
 
 console.log('land-stamp: ok');

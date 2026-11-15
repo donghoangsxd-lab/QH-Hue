@@ -313,17 +313,46 @@ export function areaTextOf(item) {
 
 function mapChildren(list) {
   if (!Array.isArray(list)) return [];
-  return list.map((c, i) => ({
-    id: c.id || `child-${i}`,
-    loaiDong: c.loaiDong || 'dccb',
-    ten: c.ten || '',
-    quyetDinh: c.quyetDinh || '',
-    ngay: c.ngay || '',
-    coQuan: c.coQuan || '',
-    dienTichText: c.dienTichText || '',
-    danSo: c.danSo || '',
-    ghiChu: c.ghiChu || ''
-  }));
+  return list.map((c, i) => {
+    const row = {
+      id: c.id || `child-${i}`,
+      loaiDong: c.loaiDong || 'dccb',
+      ten: c.ten || '',
+      quyetDinh: c.quyetDinh || '',
+      ngay: c.ngay || '',
+      coQuan: c.coQuan || '',
+      dienTichText: c.dienTichText || '',
+      danSo: c.danSo || '',
+      ghiChu: c.ghiChu || ''
+    };
+    const adjustId = String(c.adjustId || '').trim().toLowerCase();
+    if (/^[a-f0-9]{16}$/.test(adjustId)) row.adjustId = adjustId;
+    return row;
+  });
+}
+
+/** Mã hồ sơ điều chỉnh (khớp adjustments.json). */
+export function newAdjustId() {
+  const bytes = new Uint8Array(8);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(bytes);
+  else for (let i = 0; i < 8; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Tìm mã sổ tay theo tenQH (mapTenQH hoặc tên). */
+export function soTayMaForTenQH(tenQH, items) {
+  const name = String(tenQH || '').trim();
+  if (!name) return '';
+  const list = Array.isArray(items) ? items : [];
+  const hit = list.find((it) => String(it?.mapTenQH || '').trim() === name)
+    || list.find((it) => String(it?.ten || '').trim() === name);
+  return hit ? String(hit.ma || '').trim() : '';
+}
+
+/** tenQH dùng mở Đề xuất › Điều chỉnh từ dòng sổ tay. */
+export function tenQHOfSoTayItem(item) {
+  if (!item) return '';
+  return String(item.mapTenQH || item.ten || '').trim();
 }
 
 /** Ghép sổ tay + catalog webapp thành hàng bảng danh mục trục B. */
@@ -819,16 +848,16 @@ export function mergeSoTayEdits(items, edits) {
       byMa.set(ma, next);
     }
   }
-  for (const row of pack.dccb || []) {
-    const ma = String(row?.ma || '').trim();
-    const child = row?.child;
+  for (const entry of pack.dccb || []) {
+    const ma = String(entry?.ma || '').trim();
+    const child = entry?.child;
     if (!ma || !child) continue;
     const parent = byMa.get(ma);
     if (!parent) continue;
     if (!Array.isArray(parent.children)) parent.children = [];
     const id = String(child.id || '').trim();
-    if (id && parent.children.some((c) => c.id === id)) continue;
-    parent.children.push({
+    const adjustId = String(child.adjustId || '').trim().toLowerCase();
+    const next = {
       id: id || `${ma}.${String(parent.children.length + 1).padStart(2, '0')}`,
       loaiDong: child.loaiDong === 'dinh_chinh' ? 'dinh_chinh' : 'dccb',
       ten: String(child.ten || '').trim(),
@@ -838,7 +867,13 @@ export function mergeSoTayEdits(items, edits) {
       dienTichText: String(child.dienTichText || '').trim(),
       danSo: String(child.danSo || '').trim(),
       ghiChu: String(child.ghiChu || 'Thêm bởi admin').trim()
-    });
+    };
+    if (/^[a-f0-9]{16}$/.test(adjustId)) next.adjustId = adjustId;
+    const byAdj = adjustId ? parent.children.findIndex((c) => String(c.adjustId || '') === adjustId) : -1;
+    const byId = id ? parent.children.findIndex((c) => c.id === id) : -1;
+    if (byAdj >= 0) parent.children[byAdj] = { ...parent.children[byAdj], ...next };
+    else if (byId >= 0) parent.children[byId] = { ...parent.children[byId], ...next };
+    else parent.children.push(next);
     parent.soDccb = parent.children.filter((c) => c.loaiDong === 'dccb').length;
     parent.soDinhChinh = parent.children.filter((c) => c.loaiDong === 'dinh_chinh').length;
   }
