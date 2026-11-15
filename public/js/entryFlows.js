@@ -25,7 +25,10 @@ import { setAdjustPanelVisible } from './adjustImport.js';
 import { planLevelOf } from './generalPlan.js';
 import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
-import { projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import {
+  projectStamps, matchStamps, stampAreaM2, stampLabel, STAMP_AREA_TOL,
+  lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy
+} from './landStamp.js';
 import { stampPendingBoxHtml, stampStatusNoteHtml } from './stampUi.js';
 import { landColor } from './tt16Symbols.js';
 import { ensureSoTayItems } from './catalogTable.js';
@@ -654,10 +657,17 @@ function applyKhToHeld(step) {
   });
   bag.stampMatch = match;
   bag.stampView = projected;
-  const byKey = new Map(match.assigned.map(a => [a.key, a.stamp]));
-  bag.features.forEach((f, i) => {
-    const s = byKey.get(String(i));
-    if (s) writeStampProps(f, s);
+  bag.stampLots = lots;
+  match.assigned.forEach(a => {
+    const keys = a.keys || [a.key];
+    keys.forEach(k => {
+      const f = bag.features[Number(k)];
+      if (f) writeStampProps(f, a.stamp);
+    });
+  });
+  if (!bag.stampDraft) bag.stampDraft = {};
+  Object.keys(bag.stampDraft).forEach(id => {
+    if (!match.pending.some(s => s.id === id)) delete bag.stampDraft[id];
   });
   if (!bag.stampPick || !match.pending.some(s => s.id === bag.stampPick)) {
     bag.stampPick = match.pending[0] ? match.pending[0].id : null;
@@ -689,8 +699,12 @@ function stampBoxHtml(bag) {
   return warn + stampPendingBoxHtml({
     pending: pend,
     pickId: bag.stampPick,
+    draft: bag.stampDraft || {},
+    lots: bag.stampLots || [],
     pickAttr: 'data-ho-stamp',
-    skipAttr: 'data-ho-stamp-skip'
+    skipAttr: 'data-ho-stamp-skip',
+    whyAttr: 'data-ho-stamp-why',
+    plusAttr: 'data-ho-stamp-plus'
   });
 }
 
@@ -774,15 +788,172 @@ function showStepPreview(opts = {}) {
   if (focusStamp) focusStampOnMap(bag, bag.stampPick);
 }
 
+function lotCentroidLatLng(feature) {
+  if (!feature?.geometry) return null;
+  try {
+    if (typeof turf !== 'undefined' && turf.centroid) {
+      const c = turf.centroid(feature).geometry.coordinates;
+      return [c[1], c[0]];
+    }
+  } catch (_) { /* fallback */ }
+  const rings = featureRings(feature);
+  const ring = rings[0] && rings[0][0];
+  if (!ring || ring.length < 3) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  ring.forEach(pt => {
+    if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) return;
+    sx += pt[0];
+    sy += pt[1];
+    n += 1;
+  });
+  if (!n) return null;
+  return [sy / n, sx / n];
+}
+
+function stampLotMeta(bag, idx) {
+  const f = bag.features[idx];
+  if (!f) return null;
+  return {
+    key: String(idx),
+    area: featureAreaM2(f),
+    rings: featureRings(f),
+    layer: String(f.properties?.layer || ''),
+    name: String(f.properties?.nhan || f.properties?.lotCode || '')
+  };
+}
+
+function commitStampAssign(bag, stampId, keys, { warn = true } = {}) {
+  const stamp = (bag.stampView || []).find(s => s.id === stampId);
+  const lots = keys.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
+  const cmp = stamp ? stampAreaVsLots(stamp, lots, keys) : null;
+  bag.stampAssign = { ...(bag.stampAssign || {}), [stampId]: keys.length === 1 ? keys[0] : keys };
+  if (bag.stampDraft) delete bag.stampDraft[stampId];
+  applyKhToHeld(STEPS.find(s => s.id === stepId));
+  if (warn && cmp && cmp.ratio != null && cmp.ratio > STAMP_AREA_TOL) {
+    const pct = Math.round(cmp.ratio * 1000) / 10;
+    announceTool(`Cảnh báo: diện tích lô lệch ${pct}% so với tem (cho phép ≤ 1%).`);
+  }
+}
+
+/** Bấm lô khi đang chọn tem: gán 1 hoặc nhiều lô cùng loại (tổng DT ± 1%). */
+function toggleStampLot(bag, lotIdx) {
+  const id = bag.stampPick;
+  if (!id) return;
+  const stamp = (bag.stampView || []).find(s => s.id === id);
+  if (!stamp) return;
+  const feat = bag.features[lotIdx];
+  if (!feat) return;
+  if (!lotMissingStampAttrs(feat.properties)) {
+    announceTool('Lô đã có thuộc tính tem — chọn lô chấm đỏ.');
+    return;
+  }
+  const key = String(lotIdx);
+  const draft = [...((bag.stampDraft && bag.stampDraft[id]) || [])];
+  const at = draft.indexOf(key);
+  if (at >= 0) {
+    draft.splice(at, 1);
+  } else {
+    if (draft.length) {
+      const first = stampLotMeta(bag, Number(draft[0]));
+      const next = stampLotMeta(bag, lotIdx);
+      if (!lotsSameLandType(first, next)) {
+        announceTool('Chỉ chọn các lô cùng loại (chấm đỏ).');
+        return;
+      }
+    }
+    const trial = [...draft, key];
+    const metas = trial.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
+    const cmp = stampAreaVsLots(stamp, metas, trial);
+    if (draft.length >= 1 && cmp.stampM2 > 0 && cmp.lotM2 > cmp.stampM2 * (1 + STAMP_AREA_TOL)) {
+      announceTool('Tổng diện tích các lô vượt tem hơn 1% — bỏ chọn bớt hoặc chọn lô khác.');
+      return;
+    }
+    draft.push(key);
+  }
+  bag.stampDraft = { ...(bag.stampDraft || {}), [id]: draft };
+  if (!draft.length) {
+    renderActive({ fit: false, focusStamp: true });
+    return;
+  }
+  const metas = draft.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
+  const cmp = stampAreaVsLots(stamp, metas, draft);
+  if (cmp.ok) {
+    commitStampAssign(bag, id, draft, { warn: false });
+    renderActive({ fit: false, focusStamp: true });
+    return;
+  }
+  if (draft.length === 1) {
+    // Một lô lệch > 1%: giữ nháp, + xanh — bấm + để gán kèm cảnh báo.
+    announceTool('Diện tích lô lệch hơn 1% so với tem. Bấm + (xanh) để gán thủ công, hoặc chọn thêm lô cùng loại.');
+  } else {
+    const pct = cmp.ratio != null ? Math.round(cmp.ratio * 1000) / 10 : '?';
+    announceTool(`Đã chọn ${draft.length} lô — tổng lệch ${pct}% so với tem (cần ≤ 1%).`);
+  }
+  renderActive({ fit: false, focusStamp: true });
+}
+
+function confirmStampPlus(bag, stampId) {
+  bag.stampPick = stampId;
+  const draft = (bag.stampDraft && bag.stampDraft[stampId]) || [];
+  if (!draft.length) {
+    renderActive({ fit: false, focusStamp: true });
+    return;
+  }
+  const stamp = (bag.stampView || []).find(s => s.id === stampId);
+  const metas = draft.map(k => stampLotMeta(bag, Number(k))).filter(Boolean);
+  const cmp = stamp ? stampAreaVsLots(stamp, metas, draft) : null;
+  if (draft.length > 1 && !(cmp && cmp.ok)) {
+    announceTool('Nhiều lô: tổng diện tích phải khớp tem trong ± 1% trước khi gán.');
+    renderActive({ fit: false, focusStamp: true });
+    return;
+  }
+  commitStampAssign(bag, stampId, draft, { warn: true });
+  renderActive({ fit: false, focusStamp: true });
+}
+
 function paintStampMarkers(bag) {
-  if (!preview || !bag?.stampView?.length || typeof L === 'undefined') return;
+  if (!preview || typeof L === 'undefined') return;
   const renderer = lotRenderer();
   const pending = new Set((bag.stampMatch?.pending || []).map(s => s.id));
-  bag.stampView.forEach(s => {
+  const draftKeys = new Set((bag.stampDraft && bag.stampPick && bag.stampDraft[bag.stampPick]) || []);
+
+  (bag.features || []).forEach((f, i) => {
+    const ll = lotCentroidLatLng(f);
+    if (!ll) return;
+    const missing = lotMissingStampAttrs(f.properties);
+    const inDraft = draftKeys.has(String(i));
+    const color = missing ? (inDraft ? '#fbbf24' : '#ef4444') : '#22c55e';
+    L.circleMarker(ll, {
+      pane: 'lotPreview',
+      renderer,
+      radius: inDraft ? 7 : 5,
+      color: '#fff',
+      weight: 1.5,
+      fillColor: color,
+      fillOpacity: 0.95,
+      interactive: false
+    }).addTo(preview);
+  });
+
+  (bag.stampView || []).forEach(s => {
     if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
     const on = pending.has(s.id);
     const cur = s.id === bag.stampPick;
     const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+    if (cur) {
+      L.marker([s.lat, s.lng], {
+        pane: 'lotPreview',
+        interactive: false,
+        icon: L.divIcon({
+          className: 'stamp-pick-pulse',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+          html: '<span class="stamp-pick-ring"></span>'
+        })
+      }).addTo(preview);
+    }
     const mark = L.circleMarker([s.lat, s.lng], {
       pane: 'lotPreview',
       renderer,
@@ -806,11 +977,7 @@ function paintStampMarkers(bag) {
       if (!layer.feature || layer.feature.properties?._mau === 'ranh-moi' || layer.feature.properties?._mau === 'ranh') return;
       const idx = layer.feature.properties?._lotIdx;
       if (idx == null) return;
-      layer.on('click', () => {
-        bag.stampAssign = { ...(bag.stampAssign || {}), [bag.stampPick]: String(idx) };
-        applyKhToHeld(STEPS.find(s => s.id === stepId));
-        renderActive({ fit: false, focusStamp: true });
-      });
+      layer.on('click', () => toggleStampLot(bag, idx));
     });
   }
 }
@@ -1348,9 +1515,11 @@ function clearHeldKh(step) {
   delete bag.stampCrsNote;
   bag.stampAssign = {};
   bag.stampSkip = [];
+  bag.stampDraft = {};
   bag.stampPick = null;
   bag.stampMatch = null;
   bag.stampView = null;
+  bag.stampLots = null;
   held[step.id] = bag;
   clearStampProps(bag.features);
 }
@@ -1435,20 +1604,42 @@ function renderActive(previewOpts = {}) {
     clearHeldKh(step);
     renderActive();
   });
-  box.querySelectorAll('[data-ho-stamp]').forEach(btn => {
-    btn.addEventListener('click', () => {
+  box.querySelectorAll('[data-ho-stamp]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-ho-stamp-why],[data-ho-stamp-skip],[data-ho-stamp-plus]')) return;
       const bag = held[step.id];
       if (!bag) return;
-      bag.stampPick = btn.getAttribute('data-ho-stamp');
+      bag.stampPick = el.getAttribute('data-ho-stamp');
       renderActive({ fit: false, focusStamp: true });
     });
   });
+  box.querySelectorAll('[data-ho-stamp-why]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bag = held[step.id];
+      if (!bag) return;
+      const id = btn.getAttribute('data-ho-stamp-why');
+      const stamp = (bag.stampView || bag.stampMatch?.pending || []).find(s => s.id === id);
+      announceTool(stampPendingWhy(stamp, bag.stampLots || []));
+    });
+  });
+  box.querySelectorAll('[data-ho-stamp-plus]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bag = held[step.id];
+      if (!bag) return;
+      confirmStampPlus(bag, btn.getAttribute('data-ho-stamp-plus'));
+    });
+  });
   box.querySelectorAll('[data-ho-stamp-skip]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const bag = held[step.id];
       if (!bag) return;
       const id = btn.getAttribute('data-ho-stamp-skip');
       bag.stampSkip = [...(bag.stampSkip || []), id];
+      if (bag.stampDraft) delete bag.stampDraft[id];
+      if (bag.stampAssign) delete bag.stampAssign[id];
       applyKhToHeld(step);
       const next = bag.stampMatch?.pending?.[0];
       renderActive(next
@@ -1543,6 +1734,7 @@ async function takeKh(step, file) {
     khError: error,
     stampAssign: {},
     stampSkip: [],
+    stampDraft: {},
     stampPick: null
   };
   if (!error && stamps.length) applyKhToHeld(step);

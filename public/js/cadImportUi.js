@@ -21,7 +21,7 @@ import { boundaryFromLines } from './boundaryLines.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
 import { lotKeysOf, projectAreaOf } from './projectFiles.js';
-import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel, stampPendingWhy } from './landStamp.js';
 import { stampPendingBoxHtml } from './stampUi.js';
 import { openEntryFlow } from './entryFlows.js';
 import { groupInfraParcels } from './touchGroups.js';
@@ -743,10 +743,12 @@ function stampBoxHtml() {
   return stampPendingBoxHtml({
     pending: match.pending,
     pickId: current.stampPick,
-    tip: 'Tem chưa tự khớp (cần ≥ 2/3 tiêu chí: vị trí, ký hiệu, diện tích &lt; 1%).',
-    hint: 'Chọn lần lượt từng tem (đang gán màu hồng trên bản đồ) rồi bấm polygon tương ứng. Mỗi lô chỉ nhận một tem.',
+    draft: (current.stampDraft) || {},
+    lots: (current.stampLots) || [],
     pickAttr: 'data-stamp',
-    skipAttr: 'data-stamp-skip'
+    skipAttr: 'data-stamp-skip',
+    whyAttr: 'data-stamp-why',
+    plusAttr: 'data-stamp-plus'
   });
 }
 
@@ -1015,13 +1017,28 @@ function renderReport() {
     current.points = null;
     analyse({ fit: false });
   });
-  box.querySelectorAll('[data-stamp]').forEach(btn => btn.addEventListener('click', () => {
-    khState.pick = btn.dataset.stamp;
+  box.querySelectorAll('[data-stamp]').forEach(el => el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-stamp-why],[data-stamp-skip],[data-stamp-plus]')) return;
+    khState.pick = el.dataset.stamp;
     current.stampPick = khState.pick;
     renderReport();
     drawPreview(current.result.parcels, false);
   }));
-  box.querySelectorAll('[data-stamp-skip]').forEach(btn => btn.addEventListener('click', () => {
+  box.querySelectorAll('[data-stamp-why]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const id = btn.dataset.stampWhy;
+    const stamp = (current.stampMatch?.pending || []).find(s => s.id === id);
+    setStatus(stampPendingWhy(stamp, current.stampLots || []));
+  }));
+  box.querySelectorAll('[data-stamp-plus]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    khState.pick = btn.dataset.stampPlus;
+    current.stampPick = khState.pick;
+    renderReport();
+    drawPreview(current.result.parcels, false);
+  }));
+  box.querySelectorAll('[data-stamp-skip]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
     const id = btn.dataset.stampSkip;
     if (id && !khState.skip.includes(id)) khState.skip.push(id);
     if (id) delete khState.assign[id];
@@ -1379,12 +1396,16 @@ function applyStamps(parcels) {
     return true;
   });
   current.stampView = projected;
+  current.stampLots = lots;
   const byKey = new Map(parcels.map(p => [String(p.src), p]));
   const match = matchStamps(projected, lots, { assign: khState.assign, skip: khState.skip });
   current.stampMatch = match;
-  match.assigned.forEach(({ stamp, key }) => {
-    const p = byKey.get(key);
-    if (p) writeStamp(p, stamp);
+  match.assigned.forEach(a => {
+    const keys = a.keys || [a.key];
+    keys.forEach(k => {
+      const p = byKey.get(k);
+      if (p) writeStamp(p, a.stamp);
+    });
   });
   if (!khState.pick || !match.pending.some(s => s.id === khState.pick)) khState.pick = match.pending[0] ? match.pending[0].id : null;
   current.stampPick = khState.pick;

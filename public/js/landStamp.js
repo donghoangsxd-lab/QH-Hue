@@ -810,10 +810,79 @@ function preferLot(stamp, openLots, tol, areaTol) {
   return { lot: best.lot, how: best.how };
 }
 
+/** Chuẩn hóa gán tay: một khóa hoặc mảng khóa lô. */
+export function assignKeysOf(val) {
+  if (val == null || val === '') return [];
+  if (Array.isArray(val)) return val.map(String).filter(Boolean);
+  return [String(val)];
+}
+
+/** Lô thiếu toàn bộ thuộc tính tem (ký hiệu lô, tầng, mật độ, HSSD) — không tính tên layer hatch. */
+export function lotMissingStampAttrs(props) {
+  const p = props || {};
+  const code = String(p.lotCode || p.kyHieu || '').trim();
+  const floors = String(p.TangCao || p.floors || '').trim();
+  const cov = String(p.MatDoXD || p.coverage || '').trim();
+  const far = String(p.HeSoSDD || p.far || '').trim();
+  return !code && !floors && !cov && !far;
+}
+
+/** Hai lô cùng nhóm loại đất (để gán một tem cho nhiều lô). */
+export function lotsSameLandType(a, b) {
+  if (!a || !b) return false;
+  const ka = lotTypeKey(a);
+  const kb = lotTypeKey(b);
+  if (ka && kb) {
+    if (ka === kb) return true;
+    if (TYPE_FAMILY[ka] && TYPE_FAMILY[ka] === TYPE_FAMILY[kb]) return true;
+  }
+  const la = foldCompact(a.layer || '');
+  const lb = foldCompact(b.layer || '');
+  return !!(la && lb && la === lb);
+}
+
+/**
+ * So diện tích tem với tổng diện tích các lô (m²).
+ * @returns {{ stampM2: number|null, lotM2: number, ratio: number|null, ok: boolean }}
+ */
+export function stampAreaVsLots(stamp, lots, keys, tol = STAMP_AREA_TOL) {
+  const list = (lots || []).filter(l => keys.includes(String(l.key)));
+  const lotM2 = list.reduce((s, l) => s + (Number(l.area) || 0), 0);
+  const stampM2 = stampAreaM2(stamp && stamp.areaRaw, lotM2);
+  if (!(stampM2 > 0) || !(lotM2 > 0)) {
+    return { stampM2: stampM2 || null, lotM2, ratio: null, ok: false };
+  }
+  const ratio = Math.abs(stampM2 - lotM2) / stampM2;
+  return { stampM2, lotM2, ratio, ok: ratio <= tol };
+}
+
+/** Giải thích vì sao tem không tự khớp (≥ 2/3 tiêu chí). */
+export function stampPendingWhy(stamp, lots, opt = {}) {
+  const tol = Number.isFinite(opt.tolM) ? opt.tolM : STAMP_TOL_M;
+  const areaTol = Number.isFinite(opt.areaTol) ? opt.areaTol : STAMP_AREA_TOL;
+  if (!stamp) return 'Không có tem.';
+  if (!(lots || []).length) return 'Chưa có lô đất để ghép.';
+  const scored = lots.map(l => scoreLot(stamp, l, tol, areaTol)).sort((a, b) => b.n - a.n);
+  const best = scored[0];
+  if (!best || best.n === 0) {
+    return 'Không tìm thấy lô khớp vị trí / ký hiệu / diện tích gần tem.';
+  }
+  if (best.n === 1) {
+    const only = best.pos ? 'chỉ khớp vị trí' : best.name ? 'chỉ khớp ký hiệu' : 'chỉ khớp diện tích';
+    return `Chưa đủ ≥ 2/3 tiêu chí (${only}). Cần gán thủ công.`;
+  }
+  const ties = scored.filter(s => s.n === best.n && s.n >= 2);
+  if (ties.length > 1) {
+    return `Có ${ties.length} lô cùng ${best.n}/3 tiêu chí — không đoán được, chọn tay trên bản đồ.`;
+  }
+  return 'Không tự ghép được (xung đột hoặc thiếu tiêu chí). Cần gán thủ công.';
+}
+
 /**
  * lots: { key, area, rings, layer?, name?, lotCode?, typeKey? }.
- * assign / skip: gán tay. areaTol: sai số diện tích (mặc định 1%).
+ * assign / skip: gán tay (assign[id] = key | key[]). areaTol: sai số diện tích (mặc định 1%).
  * Một lô một bộ chỉ tiêu; nhiều tem cùng lô không mâu thuẫn thì gộp.
+ * Một tem có thể gán nhiều lô (keys) khi người dùng chọn tay.
  */
 export function matchStamps(stamps, lots, opt = {}) {
   const assign = opt.assign || {};
@@ -824,17 +893,22 @@ export function matchStamps(stamps, lots, opt = {}) {
   const taken = new Set();
   const assigned = [];
   const pending = [];
-  const claim = (stamp, key, how) => {
-    if (!stamp || !key || used.has(key) || skip.has(stamp.id)) return false;
+  const claim = (stamp, keysIn, how) => {
+    const keys = assignKeysOf(keysIn);
+    if (!stamp || !keys.length || skip.has(stamp.id)) return false;
+    if (keys.some(k => used.has(k))) return false;
     const ids = stamp.members || [stamp.id];
     if (ids.some(id => taken.has(id) || skip.has(id))) return false;
-    if (!(lots || []).some(l => l.key === key)) return false;
-    used.add(key);
+    if (!keys.every(k => (lots || []).some(l => l.key === k))) return false;
+    keys.forEach(k => used.add(k));
     ids.forEach(id => taken.add(id));
-    assigned.push({ stamp, key, how });
+    assigned.push({ stamp, key: keys[0], keys, how });
     return true;
   };
-  (stamps || []).forEach(s => { if (assign[s.id]) claim(s, assign[s.id], 'user'); });
+  (stamps || []).forEach(s => {
+    const a = assign[s.id];
+    if (a != null && a !== '' && !(Array.isArray(a) && !a.length)) claim(s, a, 'user');
+  });
 
   const free = () => (lots || []).filter(l => !used.has(l.key));
   const openStamps = () => (stamps || []).filter(s => !taken.has(s.id) && !skip.has(s.id));
