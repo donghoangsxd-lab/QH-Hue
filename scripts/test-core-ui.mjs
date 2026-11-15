@@ -1165,6 +1165,7 @@ assert.match(read('public/js/drawingReaders.js'), /normalizeBoundaryFeatures|clo
 assert.match(read('public/js/entryFlows.js'), /hasRanhPolygon|areaInputError|AREA_TOL|hoAreaHa/);
 assert.match(read('public/js/entryFlows.js'), /ranh-moi|#ef4444|LOT_PREVIEW_Z|previewHalo/);
 assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|landColor|focusStamp|projectKhBest|inHueBbox/);
+assert.match(read('public/js/entryFlows.js'), /bindStampLotPick|lotIndexAt|booleanPointInPolygon/);
 assert.match(read('public/js/entryFlows.js'), /Đang lưu hồ sơ|setStatus|btn\.disabled/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /fillColor: '#fdba74'/);
 assert.match(read('public/js/entryFlows.js'), /function viewMap|getViewMode\(\) === 'QH'|planMap/);

@@ -88,6 +88,8 @@ let preview = null;
 let previewHalo = null;
 let previewRenderer = null;
 let previewHost = null;
+/** Click bản đồ khi đang gán tem → chọn lô preview (tránh ranh/canvas chặn layer.click). */
+let stampLotClick = null;
 
 /** Cùng cadImportUi: đang xem QH thì planMap phủ kín — preview phải vẽ lên đó, không phải map hiện trạng ẩn. */
 function viewMap() {
@@ -147,7 +149,16 @@ const isAdmin = isAdminEntry;
 const signedIn = isEntrySignedIn;
 const allowedKeys = allowedEntryKeys;
 
+function unbindStampLotClick() {
+  if (!stampLotClick) return;
+  [previewHost, map, planMap].filter(Boolean).forEach((m) => {
+    try { m.off('click', stampLotClick); } catch (e) { /* khác host */ }
+  });
+  stampLotClick = null;
+}
+
 function clearPreview() {
+  unbindStampLotClick();
   [previewHost, map, planMap].filter(Boolean).forEach((m) => {
     if (previewHalo) try { m.removeLayer(previewHalo); } catch (e) { /* khác host */ }
     if (preview) try { m.removeLayer(preview); } catch (e) { /* khác host */ }
@@ -255,6 +266,17 @@ function showPreview(features, review, opts = {}) {
         fillColor: '#c4b5fd',
         fillOpacity: 0.28
       };
+    },
+    // Ranh / lô cắt chỉ xem — không chặn click chọn lô gán tem.
+    onEachFeature: (f, layer) => {
+      const mau = f.properties && f.properties._mau;
+      const block = mau === 'ranh-moi' || mau === 'ranh' || mau === 'do';
+      const setOff = (ly) => {
+        if (!ly || !ly.options) return;
+        if (block) ly.options.interactive = false;
+      };
+      setOff(layer);
+      if (layer.eachLayer) layer.eachLayer(setOff);
     },
     pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
       pane: 'lotPreview',
@@ -913,6 +935,65 @@ function confirmStampPlus(bag, stampId) {
   renderActive({ fit: false, focusStamp: true });
 }
 
+function pointInLotRings(lng, lat, rings) {
+  if (!rings?.length) return false;
+  const inRing = (ring) => {
+    if (!ring || ring.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0];
+      const yi = ring[i][1];
+      const xj = ring[j][0];
+      const yj = ring[j][1];
+      if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  };
+  for (const poly of rings) {
+    if (!poly?.[0] || !inRing(poly[0])) continue;
+    let hole = false;
+    for (let k = 1; k < poly.length; k++) if (inRing(poly[k])) { hole = true; break; }
+    if (!hole) return true;
+  }
+  return false;
+}
+
+/** Chỉ số lô trong bag.features chứa điểm click (lô tạm / đã cắt ranh vẫn chọn được). */
+function lotIndexAt(bag, lat, lng) {
+  const feats = bag && bag.features;
+  if (!feats?.length || !Number.isFinite(lat) || !Number.isFinite(lng)) return -1;
+  if (typeof turf !== 'undefined' && turf.booleanPointInPolygon && turf.point) {
+    const pt = turf.point([lng, lat]);
+    for (let i = 0; i < feats.length; i++) {
+      const f = feats[i];
+      if (!f?.geometry) continue;
+      const t = f.geometry.type;
+      if (t !== 'Polygon' && t !== 'MultiPolygon') continue;
+      try {
+        if (turf.booleanPointInPolygon(pt, f)) return i;
+      } catch (_) { /* geom lỗi */ }
+    }
+    return -1;
+  }
+  for (let i = 0; i < feats.length; i++) {
+    if (pointInLotRings(lng, lat, featureRings(feats[i]))) return i;
+  }
+  return -1;
+}
+
+function bindStampLotPick(bag) {
+  unbindStampLotClick();
+  const host = viewMap();
+  if (!host || !bag?.stampPick || !(bag.features || []).length) return;
+  stampLotClick = (e) => {
+    if (!e?.latlng) return;
+    const idx = lotIndexAt(bag, e.latlng.lat, e.latlng.lng);
+    if (idx < 0) return;
+    toggleStampLot(bag, idx);
+  };
+  host.on('click', stampLotClick);
+}
+
 function paintStampMarkers(bag) {
   if (!preview || typeof L === 'undefined') return;
   const renderer = lotRenderer();
@@ -972,14 +1053,8 @@ function paintStampMarkers(bag) {
     });
     mark.addTo(preview);
   });
-  if (bag.stampPick) {
-    preview.eachLayer(layer => {
-      if (!layer.feature || layer.feature.properties?._mau === 'ranh-moi' || layer.feature.properties?._mau === 'ranh') return;
-      const idx = layer.feature.properties?._lotIdx;
-      if (idx == null) return;
-      layer.on('click', () => toggleStampLot(bag, idx));
-    });
-  }
+  // Chọn lô qua click bản đồ (point-in-polygon trên bag.features) — lô tạm sau cắt ranh vẫn pair được.
+  bindStampLotPick(bag);
 }
 
 function reviewBody(step, bag, tagged) {
