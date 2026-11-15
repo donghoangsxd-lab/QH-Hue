@@ -154,8 +154,14 @@ if (js.includes('0.91, 0.933, 0.953') || js.includes('#e8eef3') || !js.includes(
 if (js.includes('new deck.LightingEffect') || js.includes('new deck.DirectionalLight') || js.includes('material: SOFT') || js.includes('ROOF_MAT')) {
   throw new Error('vẫn còn giả lập ánh sáng / material nặng');
 }
-if (!js.includes('composeGoogleGround') || !js.includes('google-sat') || !js.includes('google-labels') || !js.includes('filterMassing')) {
-  throw new Error('thiếu nền Google hoặc lọc nhà cao theo bán kính');
+if (!js.includes('composeGoogleGround') || !js.includes('google-sat') || !js.includes('street-names') || !js.includes('filterMassing')) {
+  throw new Error('thiếu nền Google hoặc tên đường OSM');
+}
+if (js.includes('GOOGLE_LBL(') && js.includes('loadTileImage(GOOGLE_LBL')) {
+  throw new Error('vẫn tải nhãn Google POI — chỉ giữ sat + tên đường OSM');
+}
+if (!js.includes('lot.wall') || !js.includes('contextmenu') || !html.includes('id="orbitHint"') || !html.includes('orbit-hint')) {
+  throw new Error('thiếu tô lô hạ tầng / chặn menu chuột phải / tooltip quỹ đạo');
 }
 if (js.includes('groundPack.sat && !showStack')) {
   throw new Error('sat vẫn ẩn khi tách lớp');
@@ -196,8 +202,17 @@ if (treeCap(200) !== 50 || treeCap(800) !== 120 || treeCap(100) !== 25 || treeCa
   const empty = scatterTrees([], 200, 40, []);
   if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
 }
-if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('ColumnLayer')) {
-  throw new Error('thiếu đếm tán / ColumnLayer tán cây');
+if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
+  throw new Error('thiếu đếm tán / tán billboard (sphere-like)');
+}
+{
+  const roadFirst = scatterTrees(
+    [[[-30, -30], [30, -30], [30, 30], [-30, 30], [-30, -30]]],
+    200,
+    40,
+    [{ path: [[-90, 0], [90, 0]], width: 4.2 }]
+  );
+  if (roadFirst.length < 4) throw new Error(`ưu tiên cây ven đường ${roadFirst.length}`);
 }
 if (!js.includes('raw.osm && Array.isArray(raw.osm.elements)')) {
   throw new Error('buildModel chưa chịu osm=null khi tải dần');

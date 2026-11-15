@@ -46,7 +46,6 @@ export const LIGHT_PRESETS = {
   }
 };
 const GOOGLE_SAT = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
-const GOOGLE_LBL = (s, z, x, y) => `https://mt${s}.google.com/vt/lyrs=h&hl=vi&x=${x}&y=${y}&z=${z}`;
 const EDGE_VOLUME_CAP = 900;
 /** Từ bán kính này (hoặc pointer coarse): bỏ mái/cạnh khối, giản PathLayer lô. */
 const LOD_RADIUS_M = 500;
@@ -422,7 +421,7 @@ function loadTileImage(url) {
   });
 }
 
-/** Ghép vệ tinh Google + lớp tem (tên đường, công trình) thành hai ảnh nền phẳng. */
+/** Ghép vệ tinh Google (lyrs=s, không nhãn POI). Tên đường lấy từ OSM TextLayer. */
 export async function composeGoogleGround(lat, lng, r, origin) {
   const z = r <= 250 ? 18 : r <= 500 ? 17 : 16;
   const tiles = tilesFor(lat, lng, r * 1.08, z);
@@ -456,31 +455,23 @@ export async function composeGoogleGround(lat, lng, r, origin) {
   const w = Math.max(2, Math.round(spanX * scale));
   const h = Math.max(2, Math.round(spanY * scale));
   const sat = document.createElement('canvas');
-  const lbl = document.createElement('canvas');
-  sat.width = lbl.width = w;
-  sat.height = lbl.height = h;
+  sat.width = w;
+  sat.height = h;
   const cs = sat.getContext('2d');
-  const cl = lbl.getContext('2d');
-  if (!cs || !cl) return null;
+  if (!cs) return null;
   await Promise.all(cells.map(async (cell) => {
     try {
-      const [imgS, imgL] = await Promise.all([
-        loadTileImage(GOOGLE_SAT(cell.sub, cell.tz, cell.tx, cell.ty)),
-        loadTileImage(GOOGLE_LBL(cell.sub, cell.tz, cell.tx, cell.ty))
-      ]);
+      const imgS = await loadTileImage(GOOGLE_SAT(cell.sub, cell.tz, cell.tx, cell.ty));
       const x0 = (toLocal(cell.west, cell.south, origin)[0] - minX) * scale;
       const y0 = (maxY - toLocal(cell.west, cell.north, origin)[1]) * scale;
       const x1 = (toLocal(cell.east, cell.south, origin)[0] - minX) * scale;
       const y1 = (maxY - toLocal(cell.west, cell.south, origin)[1]) * scale;
-      const tw = Math.max(1, x1 - x0);
-      const th = Math.max(1, y1 - y0);
-      cs.drawImage(imgS, x0, y0, tw, th);
-      cl.drawImage(imgL, x0, y0, tw, th);
+      cs.drawImage(imgS, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
     } catch (err) { /* bỏ ô lỗi */ }
   }));
   return {
     sat,
-    labels: lbl,
+    labels: null,
     bounds: [minX, minY, maxX, maxY]
   };
 }
@@ -805,8 +796,8 @@ function treeDot(x, y, salt) {
 }
 
 /**
- * Tán cây: chỉ vùng xanh OSM + ven đường (kể cả nội bộ 4.2 m).
- * Không vòng dự phòng trên cả đĩa — lần trước phủ màng xanh toàn khung.
+ * Tán cây: ưu tiên ven đường trước (tránh công viên chiếm hết trần), rồi vùng xanh OSM.
+ * Không vòng dự phòng trên cả đĩa.
  */
 export function scatterTrees(rings, r, cap, roads = []) {
   const out = [];
@@ -821,6 +812,33 @@ export function scatterTrees(rings, r, cap, roads = []) {
     salt += 1;
     return true;
   };
+  const roadBudget = Math.max(24, Math.floor(limit * 0.65));
+  const roadStep = 32;
+  for (const road of roads || []) {
+    if (out.length >= roadBudget) break;
+    const path = road.path;
+    if (!path || path.length < 2) continue;
+    if ((road.width || 0) < 3.5) continue;
+    let acc = 0;
+    const side = Math.max(5, (road.width || 4) * 0.55 + 3);
+    for (let i = 1; i < path.length && out.length < roadBudget; i++) {
+      const a = path[i - 1];
+      const b = path[i];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const px = -uy;
+      const py = ux;
+      let t = acc > 0 ? roadStep - acc : roadStep * 0.4;
+      while (t < len && out.length < roadBudget) {
+        push(a[0] + ux * t + px * side, a[1] + uy * t + py * side);
+        t += roadStep;
+      }
+      acc = (acc + len) % roadStep;
+    }
+  }
   for (const ring of rings || []) {
     if (out.length >= limit) break;
     if (!ring || ring.length < 3) continue;
@@ -845,32 +863,6 @@ export function scatterTrees(rings, r, cap, roads = []) {
         if (!pointInRing([jx, jy], ring)) continue;
         push(jx, jy);
       }
-    }
-  }
-  const roadStep = 42;
-  for (const road of roads || []) {
-    if (out.length >= limit) break;
-    const path = road.path;
-    if (!path || path.length < 2) continue;
-    if ((road.width || 0) < 3.5) continue;
-    let acc = 0;
-    const side = Math.max(5, (road.width || 4) * 0.55 + 3);
-    for (let i = 1; i < path.length && out.length < limit; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len;
-      const uy = dy / len;
-      const px = -uy;
-      const py = ux;
-      let t = acc > 0 ? roadStep - acc : roadStep * 0.45;
-      while (t < len && out.length < limit) {
-        push(a[0] + ux * t + px * side, a[1] + uy * t + py * side);
-        t += roadStep;
-      }
-      acc = (acc + len) % roadStep;
     }
   }
   return out;
@@ -1273,8 +1265,9 @@ function buildModel(raw, origin, r, heights, floorPack) {
           const clipped = clipPolylineDisc(local, r);
           roadM[rank] += lineLength(clipped.parts);
           const color = ROAD_COLOR[rank];
+          const roadName = String(tags.name || '').trim();
           for (const part of clipped.parts) {
-            roads.push({ path: part, color, width: ROAD_WIDTH[rank] });
+            roads.push({ path: part, color, width: ROAD_WIDTH[rank], name: roadName, rank });
             if (rank === 'truc' || rank === 'khuvuc') majorLines.push(part);
           }
           if (ARROW_RANK.has(rank)) {
@@ -1365,6 +1358,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
         h: 0.55,
         z0: 0,
         fill: [rgb[0], rgb[1], rgb[2], 90],
+        wall: [rgb[0], rgb[1], rgb[2], 248],
         glow: [soft[0], soft[1], soft[2], 130],
         edge: [soft[0], soft[1], soft[2], 240],
         path,
@@ -1403,6 +1397,16 @@ function buildModel(raw, origin, r, heights, floorPack) {
       volumes[i].infra = true;
     }
   };
+  // Mọi khối có tâm trong ranh lô hạ tầng → cùng màu lô (không chỉ 1 điểm OSM gần nhất).
+  for (const lot of infraLots) {
+    const ring = lot.rings && lot.rings[0];
+    if (!ring || !lot.wall) continue;
+    volumes.forEach((v, i) => {
+      if (!pointInRing(centroid(v.rings[0]), ring)) return;
+      claimed.add(i);
+      paintInfra(i, lot.wall);
+    });
+  }
   facilities.slice().sort((a, b) => FACILITY[a.id].rank - FACILITY[b.id].rank).forEach((f) => {
     const meta = FACILITY[f.id];
     if (!meta) return;
@@ -1451,6 +1455,19 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const nodes = collectNodes(majorLines, r);
   const corners = discPosts(r);
   const trees = scatterTrees(greenRings, r, treeCap(r), roads);
+  const streetLabels = [];
+  const seenStreet = new Set();
+  for (const road of roads) {
+    const name = String(road.name || '').trim();
+    if (!name || (road.width || 0) < 4 || seenStreet.has(name)) continue;
+    const path = road.path;
+    if (!path || path.length < 2) continue;
+    const mid = path[Math.floor(path.length / 2)];
+    if (mid[0] * mid[0] + mid[1] * mid[1] > r * r) continue;
+    seenStreet.add(name);
+    streetLabels.push({ text: name, position: [mid[0], mid[1], 2] });
+    if (streetLabels.length >= 36) break;
+  }
   const area = Math.PI * r * r;
   const mix = shannon(groupArea);
   const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
@@ -1458,7 +1475,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const meanH = matchedFp > 0 ? hSum / matchedFp : null;
   for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
   return {
-    volumes, blocks, greens, waters, squares, trees, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
+    volumes, blocks, greens, waters, squares, trees, streetLabels, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
     infraLots,
     roadM, driveM, squareArea: area, area, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
     groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
@@ -1640,7 +1657,7 @@ function paintPanel(model, place) {
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
   const demNote = model.dem ? ' Cao độ nền Terrarium (FABDEM/SRTM).' : '';
   const lotNote = (model.infraLots || []).length ? ` Ranh lô hạ tầng ${fmt0(model.infraLots.length)} (màu hatch TT16).` : '';
-  $('src').textContent = `Nền vệ tinh và tem tên © Google.${demNote}${lotNote} Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Hạ tầng nội bộ Sở XD; đường/công viên OSM ODbL.${when}`;
+  $('src').textContent = `Nền vệ tinh © Google (không nhãn POI); tên đường OSM.${demNote}${lotNote} Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Hạ tầng nội bộ Sở XD; đường/công viên OSM ODbL.${when}`;
   paintMassing(model.massing || [], place.r);
 }
 
@@ -1828,18 +1845,9 @@ function bootMap(place, model, ground) {
             image: groundPack.sat,
             pickable: false
           });
-          labelLayer = groundPack.labels ? new deck.BitmapLayer({
-            id: 'google-labels',
-            coordinateSystem: CART,
-            modelMatrix: lift(0.15),
-            bounds: groundPack.bounds,
-            image: groundPack.labels,
-            pickable: false
-          }) : null;
+          labelLayer = null;
         }
         layers.push(satLayer);
-        // Tem chữ chỉ khi gộp — giảm overdraw khi tách lớp.
-        if (labelLayer && !showStack) layers.push(labelLayer);
       } catch (err) { groundPack = null; satLayer = null; labelLayer = null; boundSat = null; }
     }
     if (groundPack && groundPack.sat) {
@@ -2127,39 +2135,63 @@ function bootMap(place, model, ground) {
         }));
       } catch (err) { /* bỏ ghim nếu IconLayer lỗi */ }
     }
-    // Tán nhỏ, không mask, không vòng phủ cả đĩa (tránh màng xanh).
-    if ((model.trees || []).length && typeof deck.ColumnLayer === 'function') {
+    // Tán: thân cột mỏng + tán billboard (đĩa nhìn như cầu, rẻ hơn mesh sphere).
+    if ((model.trees || []).length) {
       const zTree = (showStack ? zVoids : zLinks) + PLATE;
       try {
-        layers.push(new deck.ColumnLayer({
-          id: 'tree-trunk',
-          data: model.trees,
-          coordinateSystem: CART,
-          modelMatrix: lift(zTree),
-          diskResolution: 4,
-          radius: 0.7,
-          extruded: true,
-          getPosition: (d) => d.position,
-          getElevation: 5,
-          getFillColor: [88, 58, 34, 255],
-          pickable: false
-        }));
-        layers.push(new deck.ColumnLayer({
+        if (typeof deck.ColumnLayer === 'function') {
+          layers.push(new deck.ColumnLayer({
+            id: 'tree-trunk',
+            data: model.trees,
+            coordinateSystem: CART,
+            modelMatrix: lift(zTree),
+            diskResolution: 4,
+            radius: 0.55,
+            extruded: true,
+            getPosition: (d) => d.position,
+            getElevation: 4.5,
+            getFillColor: [88, 58, 34, 255],
+            pickable: false
+          }));
+        }
+        layers.push(new deck.ScatterplotLayer({
           id: 'tree-canopy',
           data: model.trees,
           coordinateSystem: CART,
-          modelMatrix: lift(zTree + 4.2),
-          diskResolution: 5,
-          radius: 3.4,
-          extruded: true,
+          modelMatrix: lift(zTree + 5.2),
           getPosition: (d) => d.position,
-          getElevation: 3.2,
+          getRadius: (d) => d.radius || 3.5,
+          radiusUnits: 'meters',
           getFillColor: (d) => d.color,
+          billboard: true,
+          stroked: false,
           pickable: false
         }));
       } catch (err) {
         console.warn('Tán cây:', err);
       }
+    }
+    const streetLabels = model.streetLabels || [];
+    if (streetLabels.length && typeof deck.TextLayer === 'function') {
+      try {
+        layers.push(new deck.TextLayer({
+          id: 'street-names',
+          data: streetLabels,
+          coordinateSystem: CART,
+          modelMatrix: lift(zLinks + PLATE + 1.2),
+          getPosition: (d) => d.position,
+          getText: (d) => d.text,
+          getColor: [255, 255, 255, 230],
+          getSize: 13,
+          sizeUnits: 'pixels',
+          fontFamily: 'sans-serif',
+          fontSettings: { sdf: true },
+          billboard: true,
+          outlineWidth: 3,
+          outlineColor: [15, 23, 42, 220],
+          pickable: false
+        }));
+      } catch (err) { /* tên đường chỉ phụ */ }
     }
     try {
       deckgl.setProps({ layers });
@@ -2189,6 +2221,8 @@ function bootMap(place, model, ground) {
     const st = $('status');
     if (st) st.textContent = 'Hết bộ nhớ đồ họa. Đóng khung 3D rồi mở lại.';
   });
+  // Chuột phải = pan OrbitView: chặn menu Save/Copy image của trình duyệt.
+  parent.addEventListener('contextmenu', (e) => e.preventDefault());
 
   let job = 0;
   function animateTo(target) {
