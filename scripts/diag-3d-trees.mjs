@@ -1,172 +1,118 @@
 /**
- * Chẩn đoán tán cây 3D trên OSM thật (Overpass) — in highway/width và phân bố tán.
- * Usage: node scripts/diag-3d-trees.mjs [lat] [lng] [r]
+ * Chẩn đoán tán cây 3D qua đúng buildModel (không Overpass song song).
+ * Usage: node scripts/diag-3d-trees.mjs [fixture.json] [lat] [lng] [r]
  */
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
-  scatterTrees, treeCap, roadWidthMeters, STREET_TREE_MIN_W, circleRing, clipRing, ringArea
+  buildModel,
+  treeStats,
+  treeCap,
+  roadWidthMeters,
+  STREET_TREE_MIN_W,
+  pathLengthMeters
 } from '../public/js/phanTich3d.js';
 
-// Phường Thuận Hóa — gần cầu / sông (khớp ảnh lỗi gần đây).
-const lat = Number(process.argv[2]) || 16.4705;
-const lng = Number(process.argv[3]) || 107.579;
-const r = Number(process.argv[4]) || 800;
+const here = path.dirname(fileURLToPath(import.meta.url));
+const fixturePath = path.resolve(process.argv[2] || path.join(here, 'fixtures/osm-3d-thuanhoa.json'));
+const lat = Number(process.argv[3]) || 16.4705;
+const lng = Number(process.argv[4]) || 107.579;
+const r = Number(process.argv[5]) || 500;
 const mLat = 110540;
 const mLng = 111320 * Math.cos((lat * Math.PI) / 180);
 const origin = { lat, lng, mLat, mLng };
-const toLocal = (lon, la) => [(lon - lng) * mLng, (la - lat) * mLat];
 
-const ROAD_RANK = {
-  motorway: 'truc', motorway_link: 'truc', trunk: 'truc', trunk_link: 'truc',
-  primary: 'truc', primary_link: 'truc',
-  secondary: 'khuvuc', secondary_link: 'khuvuc',
-  tertiary: 'tertiary', tertiary_link: 'tertiary',
-  unclassified: 'noibo', residential: 'noibo', living_street: 'noibo', service: 'noibo',
-  cycleway: 'xedap', pedestrian: 'dibo', footway: 'dibo', path: 'dibo', steps: 'dibo'
-};
-
-const q = `
-[out:json][timeout:60];
-(
-  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service)$"](around:${r},${lat},${lng});
-  way["leisure"~"^(park|garden)$"](around:${r},${lat},${lng});
-  way["landuse"~"^(grass|forest)$"](around:${r},${lat},${lng});
-  relation["type"="multipolygon"]["leisure"~"^(park|garden)$"](around:${r},${lat},${lng});
-);
-out geom;
-`;
-
-const endpoints = [
-  'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-];
-
-async function fetchOsm() {
-  let last = null;
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(q)}`,
-        signal: AbortSignal.timeout(55000)
-      });
-      if (!res.ok) throw new Error(`${url} ${res.status}`);
-      return res.json();
-    } catch (e) {
-      last = e;
-      console.warn('overpass fail', url, e.message);
-    }
-  }
-  throw last || new Error('overpass');
+if (!fs.existsSync(fixturePath)) {
+  console.error('Thiếu fixture:', fixturePath);
+  console.error('Chạy: node scripts/fetch-osm-3d-fixture.mjs');
+  process.exit(2);
 }
 
-function ringFromGeom(geom) {
-  if (!Array.isArray(geom) || geom.length < 3) return null;
-  return geom.map((p) => toLocal(p.lon, p.lat));
-}
-
-const data = await fetchOsm();
-const els = data.elements || [];
+const osm = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+const els = osm.elements || [];
 const byHw = new Map();
-const roads = [];
-const greenRings = [];
-const clip = circleRing(r, 64);
-
+const widthOverride = [];
 for (const el of els) {
   const tags = el.tags || {};
-  if (el.type === 'way' && tags.highway && Array.isArray(el.geometry)) {
-    const hw = tags.highway;
-    const rank = ROAD_RANK[hw] || null;
-    const w = roadWidthMeters(tags, rank);
-    byHw.set(hw, (byHw.get(hw) || 0) + 1);
-    if (!rank) continue;
-    const local = ringFromGeom(el.geometry);
-    if (!local || local.length < 2) continue;
-    // clip đơn giản: giữ đoạn có điểm trong vòng
-    const inside = local.filter((p) => p[0] * p[0] + p[1] * p[1] <= r * r);
-    if (inside.length < 2) continue;
-    roads.push({ path: local, width: w, rank, highway: hw, name: tags.name || '' });
-  }
-  const leisure = tags.leisure || '';
-  const lu = tags.landuse || '';
-  const isGreen = ['park', 'garden'].includes(leisure) || ['grass', 'forest'].includes(lu);
-  if (isGreen) {
-    if (el.type === 'way' && Array.isArray(el.geometry)) {
-      const local = ringFromGeom(el.geometry);
-      if (local) {
-        const cut = clipRing(local, clip);
-        if (cut && ringArea(cut) > 20) greenRings.push(cut);
-      }
-    }
-    if (el.type === 'relation' && Array.isArray(el.members)) {
-      for (const m of el.members) {
-        if ((m.role === 'outer' || !m.role) && Array.isArray(m.geometry)) {
-          const local = ringFromGeom(m.geometry);
-          if (!local) continue;
-          const cut = clipRing(local, clip);
-          if (cut && ringArea(cut) > 20) greenRings.push(cut);
-        }
-      }
-    }
+  if (!tags.highway) continue;
+  byHw.set(tags.highway, (byHw.get(tags.highway) || 0) + 1);
+  const rawW = tags.width != null ? tags.width : tags['width:carriageway'];
+  if (rawW != null) {
+    const w = roadWidthMeters(tags, null);
+    widthOverride.push({
+      highway: tags.highway,
+      tag: String(rawW),
+      computed: w,
+      belowMin: w < STREET_TREE_MIN_W
+    });
   }
 }
 
-const wide = roads.filter((x) => x.width >= STREET_TREE_MIN_W);
-const narrow = roads.filter((x) => x.width < STREET_TREE_MIN_W);
-const cap = treeCap(r);
-const trees = scatterTrees(greenRings, r, cap, roads);
+const model = buildModel(
+  { gba: [], osm, cadastre: [], localInfra: [], osmError: '', gbaError: '', cadError: 'bỏ qua' },
+  origin,
+  r,
+  null,
+  null
+);
 
-// Phân loại tán: gần đường rộng vs trong green ring
-function nearWideRoad(t) {
-  const [x, y] = t.position;
-  for (const road of wide) {
-    const path = road.path;
-    for (let i = 1; i < path.length; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const len2 = dx * dx + dy * dy || 1;
-      let u = ((x - a[0]) * dx + (y - a[1]) * dy) / len2;
-      u = Math.max(0, Math.min(1, u));
-      const px = a[0] + dx * u;
-      const py = a[1] + dy * u;
-      const dist = Math.hypot(x - px, y - py);
-      const curb = Math.max(4, (road.width || 4) * 0.55 + 4);
-      if (dist <= curb + 6) return true;
-    }
-  }
-  return false;
-}
+const stats = treeStats(model.trees || []);
+const roads = model.roads || [];
+const wide = roads.filter((road) => (road.width || 0) >= STREET_TREE_MIN_W);
+const plantedLen = wide.reduce((s, road) => s + pathLengthMeters(road.path), 0);
+const gapsTree = (model.gaps || []).filter((g) => /đường|cây phố|cây xanh/i.test(g));
 
-const streetTrees = trees.filter(nearWideRoad);
-const otherTrees = trees.length - streetTrees.length;
+const cause =
+  model.osmError || !(osm.elements || []).length ? 'OSM'
+    : roads.length === 0 ? 'OSM_NO_ROADS'
+      : wide.length === 0 ? 'WIDTH_FILTER'
+        : stats.street > 0 ? 'HAS_STREET_TREES'
+          : stats.total > 0 ? 'PARK_ONLY'
+            : 'NO_TREES';
 
-console.log(JSON.stringify({
+const report = {
+  fixture: fixturePath,
   place: { lat, lng, r },
   STREET_TREE_MIN_W,
+  osmDate: model.osmDate || '',
+  remark: osm.remark || '',
   elements: els.length,
   highways: Object.fromEntries([...byHw.entries()].sort((a, b) => b[1] - a[1])),
+  widthOverrideBelowMin: widthOverride.filter((x) => x.belowMin).slice(0, 12),
+  widthOverrideCount: widthOverride.length,
   roads: roads.length,
-  wideRoads: wide.length,
-  narrowRoads: narrow.length,
-  widthSamples: {
-    residential: roadWidthMeters({ highway: 'residential' }),
-    primary: roadWidthMeters({ highway: 'primary' }),
-    service: roadWidthMeters({ highway: 'service' })
-  },
-  wideByHw: wide.reduce((m, x) => { m[x.highway] = (m[x.highway] || 0) + 1; return m; }, {}),
-  greenRings: greenRings.length,
-  treeCap: cap,
-  trees: trees.length,
-  streetTrees: streetTrees.length,
-  parkishTrees: otherTrees,
-  namedWide: wide.filter((x) => x.name).slice(0, 8).map((x) => ({ name: x.name, w: x.width, hw: x.highway }))
-}, null, 2));
+  wideRoads: model.wideRoads,
+  treeCap: treeCap(r),
+  trees: stats.total,
+  streetTrees: model.streetTrees,
+  parkTrees: model.parkTrees,
+  plantedWideRoadM: Math.round(plantedLen),
+  gapsTree,
+  cause,
+  topWide: wide
+    .map((road) => ({
+      name: road.name || '',
+      rank: road.rank,
+      width: road.width,
+      len: Math.round(pathLengthMeters(road.path))
+    }))
+    .sort((a, b) => b.width - a.width || b.len - a.len)
+    .slice(0, 10)
+};
 
-if (streetTrees.length < 20) {
-  console.error('FAIL: quá ít tán ven đường trên OSM thật (<20)');
+console.log(JSON.stringify(report, null, 2));
+
+if (cause === 'OSM' || cause === 'OSM_NO_ROADS') {
+  console.error('LOCK: OSM — không có đường vào buildModel');
   process.exit(1);
 }
-console.log('OK: có đủ tán ven đường trên dữ liệu OSM thật');
+if (cause === 'WIDTH_FILTER') {
+  console.error('LOCK: WIDTH_FILTER — có đường nhưng wideRoads=0 (tag width / loại hẹp)');
+  process.exit(1);
+}
+if (cause === 'PARK_ONLY' || cause === 'NO_TREES') {
+  console.error(`LOCK: ${cause} — streetTrees=0`);
+  process.exit(1);
+}
+console.log('LOCK: HAS_STREET_TREES — dữ liệu có cây phố; nếu UI không thấy → budget phân bố hoặc draw');

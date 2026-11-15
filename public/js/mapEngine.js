@@ -2408,10 +2408,13 @@ function landLotShape(p, m, detailed) {
 
 // ——— Chọn nhiều lô cùng một cấp quy hoạch (giữ Shift) ———
 // pickLevel: qhc25 | qhc10 | qhpk | qhct — không trộn lô khác cấp trong một lần chọn.
+// Không trần số lô. Mỗi lần Shift+click tăng lotPickEpoch để thẻ multi cũ (đóng khi thay thẻ)
+// không xóa nhầm tập chọn đang mở.
 let selectedLandLots = []; // [{ key, p, openSingle }]
 let selectedLandMap = null;
 let selectedPickLevel = null;
 let landSelSeq = 0;
+let lotPickEpoch = 0;
 let shiftKeyHeld = false;
 let shiftKeyTrackBound = false;
 
@@ -2443,6 +2446,7 @@ function bindShiftKeyTrack() {
   // Đổi cấp bản đồ: bỏ chọn nhiều lô (chỉ gom trong cùng cấp).
   document.addEventListener(LEVEL_EVENT, () => {
     if (!selectedLandLots.length) return;
+    lotPickEpoch++;
     clearLandLotSelection();
     landSelSeq++;
     map?.closePopup();
@@ -2458,8 +2462,26 @@ function isShiftClick(e) {
     || (typeof window !== 'undefined' && window.event?.shiftKey));
 }
 
+/** Khóa ổn định: id/file + tâm hình học + diện tích — tránh hai lô cùng layer/tên bị coi là một (Shift+click lô 3 xóa nhầm lô 2 → còn lô 1). */
 function landLotKey(p) {
-  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || ''].join('|');
+  let geo = '';
+  try {
+    const c = p?.geometry && typeof turf !== 'undefined'
+      ? turf.centroid(p.geometry)?.geometry?.coordinates
+      : null;
+    if (Array.isArray(c) && c.length >= 2) geo = `${Number(c[0]).toFixed(6)},${Number(c[1]).toFixed(6)}`;
+  } catch (e) { /* geometry lỗi thì chỉ dùng id/meta */ }
+  if (!geo && p?._latlng) {
+    const la = Number(p._latlng.lat);
+    const ln = Number(p._latlng.lng);
+    if (Number.isFinite(la) && Number.isFinite(ln)) geo = `${ln.toFixed(6)},${la.toFixed(6)}`;
+  }
+  const area = Number(p?.area);
+  const areaPart = Number.isFinite(area) && area > 0 ? area.toFixed(2) : '';
+  return [
+    p?.phase || '', p?.file || '', p?.id || '', p?.layer || '',
+    p?.lotCode || p?.name || '', geo, areaPart, p?.pickLevel || ''
+  ].join('|');
 }
 
 function landLotAreaM2(p) {
@@ -2523,8 +2545,9 @@ function attachMultiSelectionOutlines(m, lots, popup) {
   popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
 }
 
-function openMultiLandPopup(m) {
+function openMultiLandPopup(m, epoch) {
   const sel = ++landSelSeq;
+  const myEpoch = epoch || lotPickEpoch;
   ensureQuyHoachPane();
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
@@ -2544,13 +2567,17 @@ function openMultiLandPopup(m) {
   attachMultiSelectionOutlines(m, selectedLandLots.map(x => x.p), popup);
   addPopupCollapseToggle(popup, 'viền các lô đã chọn', 'Giữ Shift và bấm lô cùng cấp để thêm hoặc bỏ chọn');
   popup.on('remove', () => {
-    if (landSelSeq === sel) clearLandLotSelection();
+    // Microtask + epoch: đóng thẻ multi cũ khi thay bằng thẻ mới (lô 2→3) không được xóa tập chọn.
+    queueMicrotask(() => {
+      if (lotPickEpoch !== myEpoch) return;
+      if (landSelSeq === sel) clearLandLotSelection();
+    });
     if (openLandInfo?.popup === popup) openLandInfo = null;
   });
   openLandInfo = { popup, key: `multi:${selectedLandLots.map(x => x.key).sort().join('+')}`, map: m };
 }
 
-function openLandSelectionPopup(m) {
+function openLandSelectionPopup(m, epoch) {
   if (!selectedLandLots.length) {
     clearLandLotSelection();
     m?.closePopup();
@@ -2563,7 +2590,7 @@ function openLandSelectionPopup(m) {
     (item.openSingle || defaultLandOpenSingle)(item.p, m);
     return;
   }
-  openMultiLandPopup(m);
+  openMultiLandPopup(m, epoch);
 }
 
 // Viền sáng lô / vùng đang chọn. Cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ.
@@ -2860,11 +2887,14 @@ export function clickLandLot(p, m, e, opts = {}) {
   if (!p.pickLevel) p.pickLevel = lotPickLevel(p);
   const openSingle = opts.openSingle || defaultLandOpenSingle;
   if (e && isShiftClick(e)) {
+    const epoch = ++lotPickEpoch;
     e.originalEvent?.preventDefault?.();
+    e.originalEvent?.stopPropagation?.();
     toggleLandLotSelection(p, m, openSingle);
-    openLandSelectionPopup(m);
+    openLandSelectionPopup(m, epoch);
     return;
   }
+  lotPickEpoch++;
   selectedLandLots = [{ key: landLotKey(p), p, openSingle }];
   selectedLandMap = m;
   selectedPickLevel = lotPickLevel(p);

@@ -196,20 +196,35 @@ const HIGHWAY_WIDTH = {
 };
 const ARROW_RANK = new Set(['truc', 'khuvuc', 'tertiary']);
 
-/** Lộ giới (m): ưu tiên tag width → lanes → HIGHWAY_WIDTH → ROAD_WIDTH[rank]. */
+/** highway xe chạy đô thị — không để tag width OSM hẹp kéo dưới ngưỡng trồng cây phố. */
+const DRIVE_FLOOR_HW = new Set([
+  'motorway', 'motorway_link', 'trunk', 'trunk_link',
+  'primary', 'primary_link', 'secondary', 'secondary_link',
+  'tertiary', 'unclassified', 'residential'
+]);
+
+/** Lộ giới (m): ưu tiên tag width → lanes → HIGHWAY_WIDTH → ROAD_WIDTH[rank]; sàn 13,5 m cho đường xe chạy Huế. */
 export function roadWidthMeters(tags = {}, rank = null) {
+  const hw = String(tags.highway || '');
   const raw = tags.width != null ? String(tags.width) : (tags['width:carriageway'] != null ? String(tags['width:carriageway']) : '');
   const fromTag = Number(String(raw).replace(',', '.').replace(/[^\d.]/g, ''));
-  if (Number.isFinite(fromTag) && fromTag >= 2 && fromTag <= 80) return fromTag;
-  const lanes = Number(tags.lanes);
-  if (Number.isFinite(lanes) && lanes >= 1 && lanes <= 12) {
-    // Làn ~3,5 m + vỉa hè hai bên tối thiểu ~3 m (đường đô thị VN).
-    return Math.max(STREET_TREE_MIN_W, lanes * 3.5 + 6);
+  let w = 0;
+  if (Number.isFinite(fromTag) && fromTag >= 2 && fromTag <= 80) w = fromTag;
+  else {
+    const lanes = Number(tags.lanes);
+    if (Number.isFinite(lanes) && lanes >= 1 && lanes <= 12) {
+      // Làn ~3,5 m + vỉa hè hai bên tối thiểu ~3 m (đường đô thị VN).
+      w = Math.max(STREET_TREE_MIN_W, lanes * 3.5 + 6);
+    } else if (hw && HIGHWAY_WIDTH[hw] != null) w = HIGHWAY_WIDTH[hw];
+    else if (rank && ROAD_WIDTH[rank] != null) w = ROAD_WIDTH[rank];
   }
-  const hw = String(tags.highway || '');
-  if (hw && HIGHWAY_WIDTH[hw] != null) return HIGHWAY_WIDTH[hw];
-  if (rank && ROAD_WIDTH[rank] != null) return ROAD_WIDTH[rank];
-  return 0;
+  // Tag width OSM thường ghi lòng đường hẹp (6–9 m) — không ghi đè lộ giới mặc định Huế.
+  // Giữ living_street / service / tertiary_link / đi bộ dưới ngưỡng trồng cây.
+  if (DRIVE_FLOOR_HW.has(hw) && w > 0 && w < STREET_TREE_MIN_W) {
+    const def = HIGHWAY_WIDTH[hw] != null ? HIGHWAY_WIDTH[hw] : STREET_TREE_MIN_W;
+    return Math.max(def, STREET_TREE_MIN_W);
+  }
+  return w;
 }
 
 const $ = (id) => document.getElementById(id);
@@ -541,9 +556,22 @@ function directTiles() {
   return (host === 'localhost' || host === '127.0.0.1') && (port === '5500' || port === '5501' || port === '8080' || port === '8000');
 }
 
-function osmDated(data) {
-  return data && Array.isArray(data.elements) && /^\d{4}-\d{2}-\d{2}/.test(String((data.osm3s || {}).timestamp_osm_base || ''));
+function osmHasMapFeatures(data) {
+  return (data.elements || []).some((el) => {
+    const t = el && el.tags;
+    return t && (t.highway || t.railway || t.waterway || t.leisure || t.landuse || t.natural || t.amenity || t.place);
+  });
 }
+
+function osmDated(data) {
+  if (!data || !Array.isArray(data.elements)) return false;
+  // Overpass hay trả 200 + remark timeout + elements rỗng — không coi là bản đồ hợp lệ.
+  if (data.remark) return false;
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String((data.osm3s || {}).timestamp_osm_base || ''))) return false;
+  return osmHasMapFeatures(data);
+}
+
+export { osmDated, osmHasMapFeatures };
 
 function byteSource(url) {
   let whole = null;
@@ -840,13 +868,33 @@ export function treeCap(r) {
 
 export { STREET_TREE_MIN_W };
 
-function treeDot(x, y, salt) {
+function treeDot(x, y, salt, source) {
   // Bán kính tán đủ lớn để thấy khi camera vòng 500–800 m (3–4 m gần như chấm).
   return {
     position: [x, y],
     radius: 9.5 + (salt % 4) * 1.6,
-    color: salt % 2 ? [46, 178, 72, 250] : [28, 150, 58, 250]
+    color: salt % 2 ? [46, 178, 72, 250] : [28, 150, 58, 250],
+    source: source === 'street' ? 'street' : 'park'
   };
+}
+
+export function treeStats(trees = []) {
+  let street = 0;
+  let park = 0;
+  for (const t of trees || []) {
+    if (t && t.source === 'street') street += 1;
+    else park += 1;
+  }
+  return { street, park, total: street + park };
+}
+
+export function pathLengthMeters(path) {
+  if (!path || path.length < 2) return 0;
+  let n = 0;
+  for (let i = 1; i < path.length; i++) {
+    n += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  }
+  return n;
 }
 
 /**
@@ -859,14 +907,14 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   if (limit < 1) return out;
   const rMax2 = (r - 6) * (r - 6);
   let salt = 1;
-  const push = (x, y) => {
+  const push = (x, y, source) => {
     if (out.length >= limit) return false;
     if (x * x + y * y > rMax2) return true;
-    out.push(treeDot(x, y, salt));
+    out.push(treeDot(x, y, salt, source));
     salt += 1;
     return true;
   };
-  const plantAlong = (path, width, stepM, sideM, budget, bothSides) => {
+  const plantAlong = (path, width, stepM, sideM, budget, bothSides, source) => {
     if (!path || path.length < 2) return;
     let acc = 0;
     // Mép lộ giới + vỉa hè hẹp — không đẩy vào giữa lô nhà.
@@ -886,7 +934,7 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       while (t < len && out.length < budget) {
         for (const s of sides) {
           if (out.length >= budget) break;
-          push(a[0] + ux * t + px * side * s, a[1] + uy * t + py * side * s);
+          push(a[0] + ux * t + px * side * s, a[1] + uy * t + py * side * s, source);
         }
         t += stepM;
       }
@@ -894,26 +942,31 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
     }
   };
   // 1) Ven đường trước — tối thiểu ~55% trần khi có đường đủ rộng.
-  const wideRoads = (roads || []).filter((road) => (road.width || 0) >= STREET_TREE_MIN_W);
+  // Ưu tiên đường rộng rồi dài để không dồn hết budget vào vài way đầu Overpass.
+  const wideRoads = (roads || [])
+    .filter((road) => (road.width || 0) >= STREET_TREE_MIN_W)
+    .map((road) => ({ road, len: pathLengthMeters(road.path) }))
+    .sort((a, b) => (b.road.width - a.road.width) || (b.len - a.len))
+    .map((row) => row.road);
   const streetBudget = wideRoads.length
     ? Math.min(limit, Math.max(28, Math.floor(limit * 0.55)))
     : 0;
   for (const row of treeRows || []) {
     if (out.length >= streetBudget) break;
-    plantAlong(row.path, STREET_TREE_MIN_W, 14, 0, streetBudget, false);
+    plantAlong(row.path, STREET_TREE_MIN_W, 14, 0, streetBudget, false, 'street');
   }
   for (const road of wideRoads) {
     if (out.length >= streetBudget) break;
     const w = road.width || STREET_TREE_MIN_W;
     const stepM = w >= 30 ? 18 : w >= 20 ? 16 : 14;
-    plantAlong(road.path, w, stepM, null, streetBudget, true);
+    plantAlong(road.path, w, stepM, null, streetBudget, true, 'street');
   }
   // 2) Công viên / vùng xanh — phần budget còn lại (không nuốt hàng cây phố).
   for (const ring of rings || []) {
     if (out.length >= limit) break;
     if (!ring || ring.length < 3) continue;
     const c = centroid(ring);
-    if (pointInRing(c, ring)) push(c[0], c[1]);
+    if (pointInRing(c, ring)) push(c[0], c[1], 'park');
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -932,7 +985,7 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
         const jx = x + Math.sin(salt * 12.989) * (step * 0.22);
         const jy = y + Math.cos(salt * 78.233) * (step * 0.22);
         if (!pointInRing([jx, jy], ring)) continue;
-        push(jx, jy);
+        push(jx, jy, 'park');
       }
     }
   }
@@ -1219,7 +1272,7 @@ export function parseHeightIndex(buf) {
   };
 }
 
-function buildModel(raw, origin, r, heights, floorPack) {
+export function buildModel(raw, origin, r, heights, floorPack) {
   const clip = circleRing(r, 48);
   const gaps = [];
   const volumes = [];
@@ -1432,6 +1485,11 @@ function buildModel(raw, origin, r, heights, floorPack) {
     if (!greenRings.length) gaps.push('OpenStreetMap không có vùng cây xanh hoặc công viên trong vòng tròn.');
     if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước trong vòng tròn.');
     if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong vòng tròn.');
+    if (!roads.length) gaps.push('OpenStreetMap không có đường giao thông trong vòng tròn.');
+    else {
+      const wideN = roads.filter((road) => (road.width || 0) >= STREET_TREE_MIN_W).length;
+      if (!wideN) gaps.push(`OpenStreetMap không có đường ≥ ${STREET_TREE_MIN_W} m để trồng cây phố.`);
+    }
     if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong vòng tròn.');
     if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong vòng tròn.');
   }
@@ -1575,7 +1633,9 @@ function buildModel(raw, origin, r, heights, floorPack) {
 
   const nodes = collectNodes(majorLines, r);
   const corners = discPosts(r);
+  const wideRoads = roads.filter((road) => (road.width || 0) >= STREET_TREE_MIN_W).length;
   const trees = scatterTrees(greenRings, r, treeCap(r), roads, treeRows);
+  const stats = treeStats(trees);
   const streetLabels = [];
   const seenStreet = new Set();
   for (const road of roads) {
@@ -1598,6 +1658,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   return {
     volumes, blocks, greens, waters, squares, trees, streetLabels, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
     infraLots,
+    wideRoads, streetTrees: stats.street, parkTrees: stats.park,
     roadM, driveM, squareArea: area, area, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
     groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
     green: coverRatio(greenRings, r),
@@ -2587,9 +2648,13 @@ function showBuilt() {
   model.towerPins = towerPinsOf(model.volumes);
   paintPanel(model, built.place, built.ward);
   const treeN = (model.trees || []).length;
+  const streetN = model.streetTrees || 0;
+  const treeNote = treeN
+    ? ` Tán cây ${fmt0(treeN)} (phố ${fmt0(streetN)}, công viên ${fmt0(model.parkTrees || 0)}).`
+    : '';
   $('status').textContent = model.meanF == null
-    ? `Chưa có chiều cao mét trong ô.${treeN ? ` Tán cây ${fmt0(treeN)}.` : ''}`
-    : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m². Tán cây ${fmt0(treeN)}.`;
+    ? `Chưa có chiều cao mét trong ô.${treeNote}`
+    : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².${treeNote}`;
   $('status').classList.add('done');
   if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
   const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);
@@ -2602,8 +2667,12 @@ function showBuilt() {
   document.body.dataset.shape = 'circle';
   document.body.dataset.area = String(Math.round(model.area));
   document.body.dataset.roads = String(model.roads.length);
+  document.body.dataset.wideRoads = String(model.wideRoads || 0);
   document.body.dataset.greens = String(model.greens.length);
   document.body.dataset.trees = String((model.trees || []).length);
+  document.body.dataset.streetTrees = String(model.streetTrees || 0);
+  document.body.dataset.parkTrees = String(model.parkTrees || 0);
+  document.body.dataset.osmError = String(model.osmError || '');
   document.body.dataset.waters = String(model.waters.length);
   document.body.dataset.arrows = String(model.arrows.length);
   document.body.dataset.greenPct = String(model.green);

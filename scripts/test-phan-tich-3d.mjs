@@ -3,7 +3,8 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch, treeCap, scatterTrees, STREET_TREE_MIN_W, roadWidthMeters
+  filterMassing, namesMatch, treeCap, scatterTrees, treeStats, STREET_TREE_MIN_W, roadWidthMeters,
+  buildModel, osmDated
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -200,14 +201,28 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   if (roadWidthMeters({ highway: 'service' }, 'noibo') >= 13.5) throw new Error('service phải là ngõ hẹp');
   if (roadWidthMeters({ highway: 'residential', width: '36' }, 'noibo') !== 36) throw new Error('tag width=36');
   if (roadWidthMeters({ highway: 'residential', lanes: '4' }, 'noibo') < 13.5) throw new Error('lanes=4');
+  // Tag width OSM hẹp không được kéo residential/primary dưới ngưỡng Huế.
+  if (roadWidthMeters({ highway: 'residential', width: '6' }, 'noibo') < 13.5) {
+    throw new Error('residential width=6 phải sàn ≥ 13.5m');
+  }
+  if (roadWidthMeters({ highway: 'primary', width: '6' }, 'truc') < 30) {
+    throw new Error('primary width=6 phải về bảng Huế ~36m');
+  }
+  if (roadWidthMeters({ highway: 'service', width: '4' }, 'noibo') >= 13.5) {
+    throw new Error('service vẫn là ngõ hẹp dù có width tag');
+  }
 
   const park = [[-40, -40], [40, -40], [40, 40], [-40, 40], [-40, -40]];
   const fromPark = scatterTrees([park], 200, 40, []);
   if (fromPark.length < 3) throw new Error(`cây trong công viên ${fromPark.length}`);
+  if (treeStats(fromPark).park < 3 || treeStats(fromPark).street !== 0) {
+    throw new Error('cây công viên phải gắn source=park');
+  }
   // Cổng cứng: đoạn 80m lộ giới 13,5 / 36 — phải ra cây hai bên trước khi đưa lên web.
   const short135 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 13.5 }]);
   if (short135.length < 4) throw new Error(`đoạn 13.5m × 80m phải có ≥4 tán (got ${short135.length})`);
   if ((short135[0].radius || 0) < 9) throw new Error(`bán kính tán quá nhỏ khi camera xa (${short135[0].radius})`);
+  if (treeStats(short135).street < 4) throw new Error('cây phố phải gắn source=street');
   const short36 = scatterTrees([], 200, 40, [{ path: [[-40, 0], [40, 0]], width: 36 }]);
   if (short36.length < 4) throw new Error(`đoạn 36m × 80m phải có ≥4 tán (got ${short36.length})`);
   if (!js.includes('radiusMinPixels: 5') || !js.includes('Math.max(9, d.radius')) {
@@ -225,12 +240,72 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 13.5 }]);
   const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 18 && Math.abs(t.position[0]) > 130);
   if (nearRoad.length < 20) throw new Error(`ưu tiên ven đường trước công viên (ven đường ${nearRoad.length})`);
+  // Nhiều đường tranh budget: ưu tiên đường rộng hơn (sort), vẫn ra cây phố.
+  const multi = scatterTrees([], 500, 80, [
+    { path: [[-200, -40], [200, -40]], width: 13.5 },
+    { path: [[-200, 0], [200, 0]], width: 36 },
+    { path: [[-200, 40], [200, 40]], width: 22.5 },
+    { path: [[-200, 80], [200, 80]], width: 5.5 }
+  ]);
+  const multiStats = treeStats(multi);
+  if (multiStats.street < 28) throw new Error(`đa đường phải có cây phố (got ${multiStats.street})`);
+  const near36 = multi.filter((t) => Math.abs(t.position[1]) < 25);
+  if (near36.length < 8) throw new Error('budget phải ưu tiên đường rộng (36m) trước');
   if (!js.includes('depthTest: false') || !js.includes('canopyZ')) {
     throw new Error('tán khi Gộp chưa tắt depth — sẽ bị nhà che');
   }
   if (!js.includes('baseZ') || !js.includes('groundPack && groundPack.sat ? 0.15')) {
     throw new Error('khối chưa neo sát nền sat (baseZ) — sẽ lơ lửng PLATE 3m');
   }
+  if (!js.includes('dataset.streetTrees') || !js.includes('dataset.wideRoads') || !js.includes('DRIVE_FLOOR_HW')) {
+    throw new Error('thiếu đếm streetTrees/wideRoads hoặc sàn width Huế');
+  }
+  if (!osmDated({ osm3s: { timestamp_osm_base: '2026-01-01T00:00:00Z' }, elements: [{ tags: { highway: 'residential' } }] })) {
+    throw new Error('osmDated phải nhận bản có highway');
+  }
+  if (osmDated({ remark: 'timeout', osm3s: { timestamp_osm_base: '2026-01-01T00:00:00Z' }, elements: [] })) {
+    throw new Error('osmDated phải từ chối remark/timeout');
+  }
+  if (osmDated({ osm3s: { timestamp_osm_base: '2026-01-01T00:00:00Z' }, elements: [] })) {
+    throw new Error('osmDated phải từ chối elements rỗng');
+  }
+  {
+    const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/osm-3d-thuanhoa.json', import.meta.url), 'utf8'));
+    const origin = { lat: 16.4705, lng: 107.579, mLat: 110540, mLng: 111320 * Math.cos((16.4705 * Math.PI) / 180) };
+    const model = buildModel(
+      { gba: [], osm: fixture, cadastre: [], localInfra: [], osmError: '', gbaError: '', cadError: 'bỏ qua' },
+      origin,
+      500,
+      null,
+      null
+    );
+    if (!(model.wideRoads >= 4) || !(model.streetTrees >= 20)) {
+      throw new Error(`fixture width-tag phải ra cây phố (wide=${model.wideRoads} street=${model.streetTrees})`);
+    }
+  }
+  {
+    const bare = buildModel(
+      {
+        gba: [],
+        osm: { osm3s: { timestamp_osm_base: '2026-01-01T00:00:00Z' }, elements: [{ type: 'way', tags: { leisure: 'park' }, geometry: [] }] },
+        cadastre: [],
+        localInfra: [],
+        osmError: '',
+        gbaError: '',
+        cadError: 'bỏ qua'
+      },
+      { lat: 16.47, lng: 107.58, mLat: 110540, mLng: 106000 },
+      300,
+      null,
+      null
+    );
+    if (!(bare.gaps || []).some((g) => /đường giao thông|≥ 13\.5/i.test(g))) {
+      throw new Error('thiếu gap khi OSM không có đường trồng cây');
+    }
+  }
+}
+if (!osm.includes('hasMapFeatures') || !osm.includes('highwayN < 1')) {
+  throw new Error('api/osmClip chưa từ chối/cache ngắn bản OSM rỗng');
 }
 if (!js.includes('dataset.trees') || !js.includes('tree-canopy') || !js.includes('billboard: true')) {
   throw new Error('thiếu đếm tán / tán billboard (sphere-like)');
