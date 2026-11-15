@@ -51,8 +51,10 @@ const EDGE_VOLUME_CAP = 900;
 const LOD_RADIUS_M = 500;
 /** Trần tán cây procedural (ScatterplotLayer), không mesh. */
 const TREE_CAP_MAX = 220;
-/** Gieo tán khi lộ giới ≥ 13,5 m (đường phân khu vực trở lên theo QH đô thị Huế). */
+/** Lộ giới «đủ rộng» theo QH Huế (residential trở lên sau sàn width). */
 const STREET_TREE_MIN_W = 13.5;
+/** Ngưỡng trồng ven đường (m): living_street 7,5 trở lên — khớp hàng cây trên ảnh vệ tinh. */
+const STREET_TREE_PLANT_W = 7.5;
 const INFRA_LOT_DRAW_CAP = 40;
 const GLOW_STEPS = 4;
 const USE_FILL = {
@@ -866,7 +868,19 @@ export function treeCap(r) {
   return Math.min(TREE_CAP_MAX, Number.isFinite(n) && n > 0 ? n : 0);
 }
 
-export { STREET_TREE_MIN_W };
+export { STREET_TREE_MIN_W, STREET_TREE_PLANT_W };
+
+const SKIP_TREE_RANK = new Set(['xedap', 'dibo', 'rail', 'water']);
+
+/** Đường được trồng cây phố: bỏ đi bộ/xe đạp/rail/sông; noibo/living_street khi ≥ PLANT_W; service hẹp loại. */
+export function isPlantableStreet(road) {
+  if (!road || !road.path || road.path.length < 2) return false;
+  const rank = road.rank;
+  if (rank && SKIP_TREE_RANK.has(rank)) return false;
+  const w = Number(road.width) || 0;
+  if (rank === 'truc' || rank === 'khuvuc' || rank === 'tertiary') return true;
+  return w >= STREET_TREE_PLANT_W;
+}
 
 function treeDot(x, y, salt, source) {
   // Bán kính tán đủ lớn để thấy khi camera vòng 500–800 m (3–4 m gần như chấm).
@@ -898,8 +912,8 @@ export function pathLengthMeters(path) {
 }
 
 /**
- * Tán cây: ưu tiên ven đường ≥ STREET_TREE_MIN_W (trồng trước), rồi công viên phần còn lại.
- * Lề ≈ nửa lộ giới (mép đường). treeRows OSM trên tâm hàng.
+ * Tán cây: đường xe trước (khớp hàng cây vệ tinh), rồi tree_row OSM, rồi công viên.
+ * Lề sát mép lòng đường — không đẩy nửa lộ giới vào giữa lô.
  */
 export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const out = [];
@@ -917,8 +931,8 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
   const plantAlong = (path, width, stepM, sideM, budget, bothSides, source) => {
     if (!path || path.length < 2) return;
     let acc = 0;
-    // Mép lộ giới + vỉa hè hẹp — không đẩy vào giữa lô nhà.
-    const side = sideM != null ? sideM : Math.max(4, (width || 4) * 0.5 + 1.2);
+    // Vỉa hè / hàng cây: ~0,28×lộ giới + đệm, kẹp 3–12 m (trước đây 0,5× đẩy vào lô nhà).
+    const side = sideM != null ? sideM : Math.min(12, Math.max(3.2, (width || 8) * 0.28 + 1.5));
     const sides = bothSides === false ? [1] : (side === 0 ? [0] : [1, -1]);
     for (let i = 1; i < path.length && out.length < budget; i++) {
       const a = path[i - 1];
@@ -930,7 +944,8 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       const uy = dy / len;
       const px = -uy;
       const py = ux;
-      let t = acc > 0 ? stepM - acc : stepM * 0.3;
+      // Đoạn ngắn: điểm đầu 1,5 m — trước đây 0,3×step khiến part < 4 m không có cây.
+      let t = acc > 0 ? stepM - acc : Math.min(stepM * 0.3, 1.5);
       while (t < len && out.length < budget) {
         for (const s of sides) {
           if (out.length >= budget) break;
@@ -941,27 +956,27 @@ export function scatterTrees(rings, r, cap, roads = [], treeRows = []) {
       acc = (acc + len) % stepM;
     }
   };
-  // 1) Ven đường trước — tối thiểu ~55% trần khi có đường đủ rộng.
-  // Ưu tiên đường rộng rồi dài để không dồn hết budget vào vài way đầu Overpass.
-  const wideRoads = (roads || [])
-    .filter((road) => (road.width || 0) >= STREET_TREE_MIN_W)
+  // 1) Ven đường trước — ~72% trần; living_street trở lên (không chờ tree_row công viên ăn budget).
+  const plantRoads = (roads || [])
+    .filter(isPlantableStreet)
     .map((road) => ({ road, len: pathLengthMeters(road.path) }))
     .sort((a, b) => (b.road.width - a.road.width) || (b.len - a.len))
     .map((row) => row.road);
-  const streetBudget = wideRoads.length
-    ? Math.min(limit, Math.max(28, Math.floor(limit * 0.55)))
+  const streetBudget = plantRoads.length
+    ? Math.min(limit, Math.max(40, Math.floor(limit * 0.72)))
     : 0;
-  for (const row of treeRows || []) {
+  for (const road of plantRoads) {
     if (out.length >= streetBudget) break;
-    plantAlong(row.path, STREET_TREE_MIN_W, 14, 0, streetBudget, false, 'street');
-  }
-  for (const road of wideRoads) {
-    if (out.length >= streetBudget) break;
-    const w = road.width || STREET_TREE_MIN_W;
-    const stepM = w >= 30 ? 18 : w >= 20 ? 16 : 14;
+    const w = Math.max(road.width || STREET_TREE_PLANT_W, STREET_TREE_PLANT_W);
+    const stepM = w >= 30 ? 14 : w >= 20 ? 12 : 10;
     plantAlong(road.path, w, stepM, null, streetBudget, true, 'street');
   }
-  // 2) Công viên / vùng xanh — phần budget còn lại (không nuốt hàng cây phố).
+  // 2) tree_row OSM — phần budget phố còn lại (không trồng trước đường).
+  for (const row of treeRows || []) {
+    if (out.length >= streetBudget) break;
+    plantAlong(row.path, STREET_TREE_PLANT_W, 12, 0, streetBudget, false, 'street');
+  }
+  // 3) Công viên / vùng xanh — phần còn lại.
   for (const ring of rings || []) {
     if (out.length >= limit) break;
     if (!ring || ring.length < 3) continue;
@@ -1486,9 +1501,8 @@ export function buildModel(raw, origin, r, heights, floorPack) {
     if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước trong vòng tròn.');
     if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong vòng tròn.');
     if (!roads.length) gaps.push('OpenStreetMap không có đường giao thông trong vòng tròn.');
-    else {
-      const wideN = roads.filter((road) => (road.width || 0) >= STREET_TREE_MIN_W).length;
-      if (!wideN) gaps.push(`OpenStreetMap không có đường ≥ ${STREET_TREE_MIN_W} m để trồng cây phố.`);
+    else if (!roads.some(isPlantableStreet)) {
+      gaps.push(`OpenStreetMap không có đường ≥ ${STREET_TREE_PLANT_W} m (hoặc trục/phân khu) để trồng cây phố.`);
     }
     if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong vòng tròn.');
     if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong vòng tròn.');
@@ -1633,7 +1647,7 @@ export function buildModel(raw, origin, r, heights, floorPack) {
 
   const nodes = collectNodes(majorLines, r);
   const corners = discPosts(r);
-  const wideRoads = roads.filter((road) => (road.width || 0) >= STREET_TREE_MIN_W).length;
+  const wideRoads = roads.filter(isPlantableStreet).length;
   const trees = scatterTrees(greenRings, r, treeCap(r), roads, treeRows);
   const stats = treeStats(trees);
   const streetLabels = [];
@@ -2000,8 +2014,8 @@ function bootMap(place, model, ground) {
     const zVolumes = planeZ('volumes');
     const showStack = k > 0.08;
     const heavy = coarse || place.r >= LOD_RADIUS_M;
-    // Có vệ tinh ở z≈0: neo khối/cây sát nền. Không sat: tấm PLATE làm mặt đất.
-    const baseZ = groundPack && groundPack.sat ? 0.15 : PLATE;
+    // Có vệ tinh ở z≈0: neo khối/cây sát nền (0.02 — 0.15 vẫn thấy khe). Không sat: tấm PLATE.
+    const baseZ = groundPack && groundPack.sat ? 0.02 : PLATE;
     const disc = plateRing(place.r);
     const groundTone = LIGHT_PRESETS[moodName].ground;
     const layers = [

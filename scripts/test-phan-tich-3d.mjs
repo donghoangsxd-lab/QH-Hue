@@ -3,8 +3,8 @@ import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
   floorsFromHeight, floorBin, parseHeightIndex,
   hexToClear, volumeColors, volumeEdgePaths, OPEN_CAMERA, DEFAULT_LIGHT, LIGHT_PRESETS, WALL, ROOF,
-  filterMassing, namesMatch, treeCap, scatterTrees, treeStats, STREET_TREE_MIN_W, roadWidthMeters,
-  buildModel, osmDated
+  filterMassing, namesMatch, treeCap, scatterTrees, treeStats, STREET_TREE_MIN_W, STREET_TREE_PLANT_W,
+  isPlantableStreet, roadWidthMeters, buildModel, osmDated
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -232,20 +232,34 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   const pos = sides.filter((t) => t.position[1] > 0).length;
   const neg = sides.filter((t) => t.position[1] < 0).length;
   if (pos < 1 || neg < 1) throw new Error(`phải trồng hai bên lề (pos=${pos} neg=${neg})`);
-  const alley = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 5.5 }]);
+  const alley = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 5.5, rank: 'noibo' }]);
   if (alley.length !== 0) throw new Error(`ngõ 5.5m không được có cây hàng lộ giới (${alley.length})`);
+  if (isPlantableStreet({ path: [[0, 0], [10, 0]], width: 7.5, rank: 'noibo' }) !== true) {
+    throw new Error('living_street 7.5m phải trồng được');
+  }
+  if (isPlantableStreet({ path: [[0, 0], [10, 0]], width: 5.5, rank: 'noibo' }) !== false) {
+    throw new Error('service 5.5m không trồng');
+  }
+  const living = scatterTrees([], 200, 40, [{ path: [[-80, 0], [80, 0]], width: 7.5, rank: 'noibo' }]);
+  if (living.length < 4) throw new Error(`living_street 7.5m phải có cây phố (got ${living.length})`);
+  // tree_row không được chiếm budget trước đường.
+  const parkRow = [[-20, -20], [20, -20], [20, 20], [-20, 20], [-20, -20]];
+  const rowFirst = scatterTrees([parkRow], 300, 60, [
+    { path: [[-120, 0], [120, 0]], width: 22.5, rank: 'khuvuc' }
+  ], [{ path: [[0, -15], [0, 15]] }]);
+  const alongRoad = rowFirst.filter((t) => t.source === 'street' && Math.abs(t.position[1]) < 12);
+  if (alongRoad.length < 8) throw new Error(`đường phải trồng trước tree_row (ven đường ${alongRoad.length})`);
   const empty = scatterTrees([], 200, 40, []);
   if (empty.length !== 0) throw new Error(`không được phủ vòng dự phòng cả đĩa (${empty.length})`);
   const bigPark = [[-120, -120], [120, -120], [120, 120], [-120, 120], [-120, -120]];
-  const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 13.5 }]);
+  const mix = scatterTrees([bigPark], 800, 200, [{ path: [[-300, 0], [300, 0]], width: 13.5, rank: 'tertiary' }]);
   const nearRoad = mix.filter((t) => Math.abs(t.position[1]) < 18 && Math.abs(t.position[0]) > 130);
   if (nearRoad.length < 20) throw new Error(`ưu tiên ven đường trước công viên (ven đường ${nearRoad.length})`);
-  // Nhiều đường tranh budget: ưu tiên đường rộng hơn (sort), vẫn ra cây phố.
   const multi = scatterTrees([], 500, 80, [
-    { path: [[-200, -40], [200, -40]], width: 13.5 },
-    { path: [[-200, 0], [200, 0]], width: 36 },
-    { path: [[-200, 40], [200, 40]], width: 22.5 },
-    { path: [[-200, 80], [200, 80]], width: 5.5 }
+    { path: [[-200, -40], [200, -40]], width: 13.5, rank: 'tertiary' },
+    { path: [[-200, 0], [200, 0]], width: 36, rank: 'truc' },
+    { path: [[-200, 40], [200, 40]], width: 22.5, rank: 'khuvuc' },
+    { path: [[-200, 80], [200, 80]], width: 5.5, rank: 'noibo' }
   ]);
   const multiStats = treeStats(multi);
   if (multiStats.street < 28) throw new Error(`đa đường phải có cây phố (got ${multiStats.street})`);
@@ -254,12 +268,13 @@ if (STREET_TREE_MIN_W !== 13.5) throw new Error(`STREET_TREE_MIN_W ${STREET_TREE
   if (!js.includes('depthTest: false') || !js.includes('canopyZ')) {
     throw new Error('tán khi Gộp chưa tắt depth — sẽ bị nhà che');
   }
-  if (!js.includes('baseZ') || !js.includes('groundPack && groundPack.sat ? 0.15')) {
-    throw new Error('khối chưa neo sát nền sat (baseZ) — sẽ lơ lửng PLATE 3m');
+  if (!js.includes('baseZ') || !js.includes('groundPack && groundPack.sat ? 0.02')) {
+    throw new Error('khối chưa neo sát nền sat (baseZ 0.02)');
   }
-  if (!js.includes('dataset.streetTrees') || !js.includes('dataset.wideRoads') || !js.includes('DRIVE_FLOOR_HW')) {
-    throw new Error('thiếu đếm streetTrees/wideRoads hoặc sàn width Huế');
+  if (!js.includes('dataset.streetTrees') || !js.includes('STREET_TREE_PLANT_W') || !js.includes('DRIVE_FLOOR_HW')) {
+    throw new Error('thiếu đếm streetTrees / PLANT_W / sàn width Huế');
   }
+  if (STREET_TREE_PLANT_W !== 7.5) throw new Error(`STREET_TREE_PLANT_W ${STREET_TREE_PLANT_W}`);
   if (!osmDated({ osm3s: { timestamp_osm_base: '2026-01-01T00:00:00Z' }, elements: [{ tags: { highway: 'residential' } }] })) {
     throw new Error('osmDated phải nhận bản có highway');
   }
