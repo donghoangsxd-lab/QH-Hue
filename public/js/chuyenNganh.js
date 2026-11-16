@@ -1852,8 +1852,8 @@ function showDauTuTab(id) {
 }
 
 function initDauTuTabs() {
-  // Mặc định hiện pane nhóm đầu; sync từ #dtGroupPick nếu HTML đổi selected.
-  const start = document.getElementById('dtGroupPick')?.value || 'dvtm';
+  // Mặc định «Toàn bộ dự án» (value=all); sync từ #dtGroupPick nếu HTML đổi selected.
+  const start = document.getElementById('dtGroupPick')?.value || 'all';
   document.querySelectorAll('#axisDauTu [data-dt-pane]').forEach(pane => {
     pane.hidden = pane.dataset.dtPane !== start;
   });

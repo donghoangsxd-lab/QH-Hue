@@ -7,7 +7,7 @@ import {
 import { loadCatalog, projectAreaOf } from './projectFiles.js';
 import { zoomToProjectBoundary, openProjectDocByName } from './projectLayer.js';
 import {
-  listInvestCatalogItems, focusInvest, primeInvestLoad, ensureInvestCatalogLoaded
+  listInvestCatalogItems, focusInvest, ensureInvestCatalogLoaded
 } from './investLayer.js';
 import { postAdmin } from './wardRoads.js';
 import { gcsUrl } from './api.js';
@@ -976,7 +976,6 @@ async function ensureData() {
     rowsCache = planRowsFromSoTay(sheet, state.projectCatalog, { areaHaOf: areaHaOfProject });
     return;
   }
-  primeInvestLoad();
   await ensureInvestCatalogLoaded();
   rowsCache = investRowsFromItems(listInvestCatalogItems());
 }

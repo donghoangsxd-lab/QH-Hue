@@ -286,6 +286,7 @@ assert.match(html, /id="dtGroupPick"/);
 assert.match(html, /id="dtScopePick"/);
 let dtAt = 0;
 for (const [id, label] of [
+  ['all', 'Toàn bộ dự án'],
   ['dvtm', 'Dịch vụ, thương mại'],
   ['congnghiep', 'Công nghiệp, năng lượng'],
   ['khudothi', 'Đô thị, nhà ở'],
@@ -299,6 +300,8 @@ for (const [id, label] of [
   dtAt = at;
   assert.ok(dtPick.slice(at, at + 320).includes(label), `thiếu nhãn ${label}`);
 }
+assert.match(dtPick, /value="all"[^>]*selected|value="all" selected/);
+assert.match(dauTu, /data-dt-pane="all"/);
 assert.doesNotMatch(dtPick, /value="nangluong"|value="chungcu"|data-dt-tab=/);
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
@@ -432,13 +435,18 @@ assert.match(read('docs/ui-spec.md'), /catalogCharts|qh-so-tay|Trạng thái/);
 assert.match(read('docs/ui-spec.md'), /chỉ ở chế độ.*Dự án đầu tư|không tab Đồ án quy hoạch/);
 assert.match(read('docs/ui-spec.md'), /không có tab chuyển sang dự án đầu tư/);
 assert.match(dauTu, /id="investInfoSlot"/);
-assert.match(dauTu, /id="investLoad"/);
-assert.match(read('public/js/investLayer.js'), /startLoadMeter|showInvestLoad|primeInvestLoad/);
+assert.doesNotMatch(dauTu, /id="investLoad"/);
+assert.doesNotMatch(read('public/js/investLayer.js'), /startLoadMeter|showInvestLoad|primeInvestLoad/);
+assert.doesNotMatch(read('public/js/app.js'), /primeInvestLoad/);
+assert.doesNotMatch(read('public/css/style.css'), /\.invest-load|body\.invest-loading/);
+assert.match(read('public/js/investLayer.js'), /INVEST_TAB_ALL|isAllTab|paintAllList/);
+assert.match(read('public/js/investClassify.js'), /INVEST_TAB_ALL/);
+assert.match(read('docs/ui-spec.md'), /Toàn bộ dự án|value="all"/);
+assert.match(read('docs/ui-spec.md'), /Không thanh `#investLoad`/);
 assert.match(read('public/js/investLayer.js'), /pickFinestInvestTab|qhct.*qhpk/);
 assert.match(read('public/js/planLandStats.js'), /attachLotPicks|byLot|landGeomsOf/);
 assert.match(read('docs/ui-spec.md'), /cấp chi tiết nhất còn lô|tô sáng viền ranh/);
 assert.match(read('public/js/loadProgress.js'), /export function startLoadMeter/);
-assert.match(read('public/js/app.js'), /primeInvestLoad/);
 assert.match(read('public/js/apartmentLayer.js'), /data-apt-expand/);
 assert.match(read('public/js/investLayer.js'), /data-invest-expand/);
 assert.match(read('public/js/investLayer.js'), /invest-info-open|qh-invest-info/);

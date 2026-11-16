@@ -727,7 +727,8 @@
               <div id="dtPicks" class="cn-picks dt-picks">
                 <label><span>Nhóm dự án</span>
                   <select id="dtGroupPick" data-dt-group-pick aria-label="Nhóm dự án">
-                    <option value="dvtm" selected>Dịch vụ, thương mại</option>
+                    <option value="all" selected>Toàn bộ dự án</option>
+                    <option value="dvtm">Dịch vụ, thương mại</option>
                     <option value="congnghiep">Công nghiệp, năng lượng</option>
                     <option value="khudothi">Đô thị, nhà ở</option>
                     <option value="nongnghiep">Nông nghiệp</option>
@@ -743,18 +744,12 @@
                 </label>
               </div>
               <input type="checkbox" id="chk_invest" class="dt-invest-check" hidden aria-hidden="true" tabindex="-1">
-              <div id="investLoad" class="invest-load" hidden role="status" aria-live="polite" aria-atomic="true">
-                <div class="invest-load-top">
-                  <span class="invest-load-label" id="investLoadLabel">Đang tải dự án đầu tư…</span>
-                  <span class="invest-load-pct" id="investLoadPct">0%</span>
-                </div>
-                <div class="invest-load-track" aria-hidden="true"><i id="investLoadFill"></i></div>
-              </div>
               <!-- Vùng danh sách: bảng thông tin dự án (#investInfoSlot) phủ lên vùng này khi mở — cùng logic #planInfoSlot -->
               <div id="dtListPane" class="dt-list-pane">
                 <div id="investInfoSlot" class="invest-info-slot" hidden></div>
                 <div id="dtList" class="project-list">
-                  <div data-dt-pane="dvtm"><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="all"><div id="investList-all" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="dvtm" hidden><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="khudothi" hidden>
                     <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
