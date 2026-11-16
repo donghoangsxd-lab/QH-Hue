@@ -1,4 +1,4 @@
-// UI tem đất dùng chung cho hoso / Batch TT16 / ĐCCB — khớp ≥ 2/3 tiêu chí (landStamp).
+// UI tem đất dùng chung cho hoso / Batch TT16 / ĐCCB — tự pair trên-hatch+tên / gần 50m; một tem → nhiều hatch.
 import { escapeHtml, fmtNum } from './utils.js';
 import { stampLabel, stampPendingWhy } from './landStamp.js';
 

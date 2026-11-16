@@ -1183,7 +1183,13 @@ assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|landCo
 assert.match(read('public/js/entryFlows.js'), /bindStampLotPick|lotIndexAt|booleanPointInPolygon|setStampLotPickCursor/);
 assert.match(read('public/js/entryFlows.js'), /reuseProject|patchStampAssignChrome|replaceStampBox/);
 assert.match(read('public/js/landStamp.js'), /suggestStampLotKeys|suggestPendingStampHints|STAMP_HINT_GAP_M/);
-assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6/);
+assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6|cad-slot-pair|suggestStampLotKeys/);
+assert.match(read('public/js/entryFlows.js'), /userOnly:\s*true|paintStampMarkers\(bag,\s*\{\s*light:\s*true/);
+assert.match(read('public/js/landStamp.js'), /stampInLotBbox|centroidDistM|STAMP_AUTO_AREA_TOL|STAMP_NEAR_AUTO_M|growKeysFromSeed|preferAssign/);
+assert.match(read('public/js/entryFlows.js'), /requestAnimationFrame|featBboxRough|rebuildLotLayerIndex/);
+assert.match(css, /\.cad-slot-pair[\s\S]*?2fr[\s\S]*?1fr/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /label for="hoCrs">Hệ tọa độ\$\{tipHtml/);
+assert.match(css, /\.entry-help[\s\S]*?width:\s*14px/);
 assert.match(read('public/js/entryFlows.js'), /Đang lưu hồ sơ|setStatus|btn\.disabled/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /fillColor: '#fdba74'/);
 assert.match(read('public/js/entryFlows.js'), /function viewMap|getViewMode\(\) === 'QH'|planMap/);
@@ -1199,6 +1205,9 @@ assert.match(css, /#tabAdd\.propose-sheet[\s\S]*?font-size:\s*var\(--axis-fs-row
 assert.doesNotMatch(css, /#tabAdd\.propose-sheet[^{]*\{[^}]*440px/);
 assert.match(read('public/js/entryFlows.js'), /function tipHtml|entry-help-q|hoDanSoHt|hoCapacityInlineHtml/);
 assert.match(read('public/js/entryFlows.js'), /hoNewMetaHtml[\s\S]*entry-row-name-level[\s\S]*hoDanSoQh/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /label for="hoAreaHa">Diện tích \(ha\)\$\{tipHtml/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /hoAreaMeasured|areaTip/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /hoAreaHa[\s\S]{0,200}Chưa có ranh/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /entry-note">Đồ án mới:/);
 assert.match(html, /CHỌN LOẠI DỮ LIỆU ĐỀ XUẤT/);
 assert.match(html, /id="entryOfficer"/);

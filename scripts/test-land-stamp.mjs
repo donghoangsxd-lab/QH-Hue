@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
   stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf,
-  suggestStampLotKeys, suggestPendingStampHints
+  suggestStampLotKeys, suggestPendingStampHints, STAMP_AUTO_AREA_TOL, STAMP_NEAR_AUTO_M
 } from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
@@ -269,7 +269,7 @@ const lots = [
   { key: 'empty', area: 500, layer: 'ODT', rings: [[ring(107.64, 16.44)]] },
   { key: 'hole', area: 2000, layer: 'CAY', rings: [[outer, inner]] }
 ];
-// Lỗ + tên + diện tích (≥ 2 tiêu chí) mới tự gán.
+// Lỗ + tên (+ DT nếu có) → tự gán theo luật trên-hatch.
 const holeStamp = {
   code: 'CX', areaRaw: '2000', floors: '2', coverage: '', far: '',
   x: 107.6506, y: 16.4506, id: 'hole',
@@ -288,12 +288,12 @@ assert.equal(byKey.a.stamp.coverage, '40');
 assert.equal(byKey.a.stamp.code, 'OD.1');
 assert.equal(byKey.a.how, 'merge');
 assert.ok(byKey.b && byKey.b.stamp.floors === '5', 'block lồng rơi vào lô B');
-assert.ok(byKey.hole, 'tem trong lỗ được gán khi đủ ≥ 2 tiêu chí');
+assert.ok(byKey.hole, 'tem trong lỗ + tên được gán');
 assert.ok(String(byKey.hole.how).includes('hole') || String(byKey.hole.how).includes('pos'), 'có tiêu chí vị trí lỗ');
 assert.ok(byKey.empty == null, 'lô trống không nhận tem');
 assert.ok(match.unmatchedLots.includes('empty'));
 assert.ok(match.pending.some(s => s.floors === '3'), 'tem xa không gán');
-assert.ok(match.pending.some(s => s.id === 'near'), 'tem chỉ gần mép (1 tiêu chí) → hỏi tay');
+assert.ok(match.pending.some(s => s.id === 'near'), 'tem gần mép thiếu tên+DT → hỏi tay');
 
 const conflict = matchStamps([
   { id: '1', code: '', floors: '5', coverage: '40', far: '', lat: 16.4302, lng: 107.6202, cands: [{ lat: 16.4302, lng: 107.6202 }] },
@@ -415,7 +415,7 @@ assert.equal(kh[0].floors, '1');
 assert.equal(kh[0].coverage, '5');
 assert.equal(kh[0].far, '');
 
-// Cùng điểm trong hai hatch: chỉ small đạt ≥ 2 (pos+name+area); big chỉ pos+name.
+// Cùng điểm trong hai hatch: ưu tiên hatch khớp DT hơn (small).
 const ambLng = 107.8;
 const ambLat = 16.5;
 const shared = [[ring(ambLng, ambLat)]];
@@ -460,11 +460,11 @@ const byFarArea = matchStamps([farStamp], [tm, farOther]);
 assert.equal(byFarArea.assigned.length, 0);
 assert.equal(byFarArea.pending.length, 1);
 
-// Tên + diện tích (không vị trí) → tự gán.
+// Tên + diện tích nhưng xa > 50 m → không tự gán (cần trên hatch hoặc gần bao).
 const farNamed = { ...farStamp, id: 'far-named', code: 'TMDV' };
 const byNameArea = matchStamps([farNamed], [tm, farOther]);
-assert.equal(byNameArea.assigned[0].key, 'tm');
-assert.equal(byNameArea.assigned[0].how, 'name+area');
+assert.equal(byNameArea.assigned.length, 0);
+assert.equal(byNameArea.pending.length, 1);
 
 // Chỉ vị trí → hỏi tay.
 const posOnly = matchStamps([{
@@ -707,5 +707,46 @@ const hintKeys = suggestStampLotKeys(hintStamp, [hintA, hintB]);
 assert.deepEqual(hintKeys.sort(), ['ha', 'hb']);
 const hintMap = suggestPendingStampHints([hintStamp], [hintA, hintB]);
 assert.deepEqual(hintMap['hint-oct'].sort(), ['ha', 'hb']);
+
+// Tự pair: tem trên hatch A (DT lệch > 5%) → gộp hatch B cạnh cùng loại đến ±5%.
+const growA = { key: 'ga', area: 5000, layer: 'DAT_O_Nhomnhao', rings: [ringA] };
+const growB = { key: 'gb', area: 4000, layer: 'DAT_O_Nhomnhao', rings: [ringB] };
+const growStamp = {
+  id: 'grow-oct', code: 'OCT-G1', areaRaw: '0.90', floors: '4', coverage: '80', far: '3',
+  lat: ambLat + dLon / 2, lng: ambLng + dLon / 2,
+  cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon / 2 }]
+};
+assert.ok(stampNameMatch(growStamp, growA));
+assert.ok(!stampAreaMatch(growStamp, growA, STAMP_AUTO_AREA_TOL), 'một hatch lệch > 5%');
+const growMatch = matchStamps([growStamp], [growA, growB]);
+assert.equal(growMatch.assigned.length, 1);
+assert.deepEqual(growMatch.assigned[0].keys.sort(), ['ga', 'gb']);
+assert.ok(String(growMatch.assigned[0].how).includes('multi'));
+assert.equal(growMatch.unmatchedLots.length, 0);
+
+// Gần bao ≤ 50 m + tên + DT → tự pair (không cần nằm trong hatch).
+const nearD = 0.00035; // ~39 m vĩ độ
+const nearRing = [[
+  [ambLng + 0.01, ambLat + 0.01],
+  [ambLng + 0.01 + dLon, ambLat + 0.01],
+  [ambLng + 0.01 + dLon, ambLat + 0.01 + dLon],
+  [ambLng + 0.01, ambLat + 0.01 + dLon],
+  [ambLng + 0.01, ambLat + 0.01]
+]];
+const nearLot = { key: 'nl', area: 2500, layer: 'Cong cong', rings: [nearRing] };
+const nearEdgeStamp = {
+  id: 'near50', code: 'TM-N1', areaRaw: '2500', floors: '3', coverage: '40', far: '1.5',
+  lat: ambLat + 0.01 - nearD, lng: ambLng + 0.01 + dLon / 2,
+  cands: [{ lat: ambLat + 0.01 - nearD, lng: ambLng + 0.01 + dLon / 2 }]
+};
+assert.ok(stampNameMatch(nearEdgeStamp, nearLot));
+assert.ok(stampAreaMatch(nearEdgeStamp, nearLot, STAMP_AUTO_AREA_TOL));
+const nearEdge = matchStamps([nearEdgeStamp], [nearLot], { tolM: STAMP_NEAR_AUTO_M });
+assert.equal(nearEdge.assigned.length, 1);
+assert.equal(nearEdge.assigned[0].key, 'nl');
+assert.ok(String(nearEdge.assigned[0].how).includes('near'));
+
+assert.equal(STAMP_AUTO_AREA_TOL, 0.05);
+assert.equal(STAMP_NEAR_AUTO_M, 50);
 
 console.log('land-stamp: ok');
