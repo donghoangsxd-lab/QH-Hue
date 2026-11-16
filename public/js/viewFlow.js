@@ -109,25 +109,28 @@ function onLevelChange({ level, prev, keepView }) {
   if (prev !== level && !keepFocus && (level === 'qhpk' || level === 'qhct' || level === 'qhc10')) {
     state.lotProjects.clear();
   }
+  // Tab kiểm tra (thửa / vùng đo / ranh dự án F): applyInspectLevel tự hiện lô; không openLotsAtView
+  // (shareOpenProject → revealInList bấm trục B, đóng thẻ dự án đang xem).
   if (level === 'qhpk') {
     setQhcPlaceMode(false);
-    if (!state.focusedProject) revealWardProjects(ward);
-    // Zoom lớn / đang xem địa điểm: mở lô tại tâm khung, bỏ bước chỉ-ranh.
-    if (viewingPlace()) openLotsAtView('QHPK');
+    if (!inspectSync) {
+      if (!state.focusedProject) revealWardProjects(ward);
+      if (viewingPlace()) openLotsAtView('QHPK');
+    }
     syncEscHint();
     return;
   }
-  revealWardProjects(ward, { show: false });
+  if (!inspectSync) revealWardProjects(ward, { show: false });
   const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
   setQhcPlaceMode(place);
   if (level === 'qhc10') {
     setCoreOpen(place);
-    if (place) openLotsAtView('QHC');
+    if (place && !inspectSync) openLotsAtView('QHC');
   }
-  if (level === 'qhct' && viewingPlace()) openLotsAtView('QHCT');
+  if (level === 'qhct' && viewingPlace() && !inspectSync) openLotsAtView('QHCT');
   // keepView (bấm QHC 1/25.000 hoặc 1/10.000): giữ nguyên khung nhìn, không phóng ra toàn thành phố.
   // Địa điểm cụ thể: giữ khung. Bấm đô thị trung tâm (không keepView) vẫn phóng tới vùng trung tâm.
-  if (place || level !== 'qhc10' || state.focusedProject || keepView) {
+  if (place || level !== 'qhc10' || state.focusedProject || keepView || inspectSync) {
     syncEscHint();
     return;
   }

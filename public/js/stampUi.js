@@ -2,7 +2,7 @@
 import { escapeHtml, fmtNum } from './utils.js';
 import { stampLabel, stampPendingWhy } from './landStamp.js';
 
-const HINT_DEFAULT = 'Bấm + → con trỏ đổi dấu cộng, chọn lần lượt lô chấm đỏ (viền sáng khi rê chuột). Xong bấm OK để ghi. ? xem lỗi · × xóa tem.';
+const HINT_DEFAULT = 'Đường xanh đứt = gợi ý hatch cùng loại cạnh nhau, tổng DT ≈ tem. Bấm + (nạp gợi ý), chỉnh lô đỏ rồi OK. ? xem lỗi · × xóa tem.';
 
 /**
  * Khung danh sách tem chờ gán tay — bảng thẳng cột, 3 nút ? / × / +, OK ghi nháp.

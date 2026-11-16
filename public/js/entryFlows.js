@@ -27,7 +27,8 @@ import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
 import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
 import {
   projectStamps, matchStamps, stampAreaM2, stampLabel, STAMP_AREA_TOL,
-  lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy
+  lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy,
+  suggestPendingStampHints, lotCentroidLngLat
 } from './landStamp.js';
 import { stampPendingBoxHtml, stampStatusNoteHtml } from './stampUi.js';
 import { landColor } from './tt16Symbols.js';
@@ -717,6 +718,8 @@ function applyKhToHeld(step, opt = {}) {
       if (f) writeStampProps(f, a.stamp);
     });
   });
+  const freeLots = lots.filter(l => (match.unmatchedLots || []).includes(l.key));
+  bag.stampHints = suggestPendingStampHints(match.pending, freeLots);
   if (!bag.stampDraft) bag.stampDraft = {};
   Object.keys(bag.stampDraft).forEach(id => {
     if (!match.pending.some(s => s.id === id)) delete bag.stampDraft[id];
@@ -970,6 +973,8 @@ function applyLotOutline(layer, kind) {
     if (!ly || !ly.setStyle) return;
     if (kind === 'hover') {
       ly.setStyle({ color: '#fde047', weight: 3.5, opacity: 1, fillOpacity: 0.55 });
+    } else if (kind === 'hint') {
+      ly.setStyle({ color: '#3b82f6', weight: 2.8, opacity: 1, fillOpacity: 0.5 });
     } else if (kind === 'draft') {
       ly.setStyle({ color: '#fbbf24', weight: 3, opacity: 1, fillOpacity: 0.52 });
     } else if (kind === 'base' && ly.feature) {
@@ -993,11 +998,13 @@ function findLotLayer(idx) {
 function refreshStampLotOutlines(bag) {
   if (!preview || !bag) return;
   const draft = new Set((bag.stampDraft && bag.stampPick && bag.stampDraft[bag.stampPick]) || []);
+  const hints = new Set((bag.stampHints && bag.stampPick && bag.stampHints[bag.stampPick]) || []);
   preview.eachLayer((layer) => {
     const idx = layer.feature?.properties?._lotIdx;
     if (idx == null) return;
     if (draft.has(String(idx))) applyLotOutline(layer, 'draft');
     else if (stampHoverIdx === idx) applyLotOutline(layer, 'hover');
+    else if (hints.has(String(idx))) applyLotOutline(layer, 'hint');
     else applyLotOutline(layer, 'base');
   });
 }
@@ -1045,11 +1052,18 @@ function toggleStampLot(bag, lotIdx) {
 function startStampAssignMode(bag, stampId) {
   bag.stampPick = stampId;
   bag.stampAssignMode = true;
-  announceTool('Đang chọn lô: bấm các lô chấm đỏ, rồi OK để ghi.');
+  const hint = (bag.stampHints && bag.stampHints[stampId]) || [];
+  if (hint.length && !((bag.stampDraft || {})[stampId] || []).length) {
+    bag.stampDraft = { ...(bag.stampDraft || {}), [stampId]: hint.slice() };
+    announceTool(`Gợi ý ${hint.length} lô cùng loại (đường xanh đứt) — chỉnh rồi OK, hoặc chọn lại.`);
+  } else {
+    announceTool('Đang chọn lô: bấm các lô chấm đỏ, rồi OK để ghi.');
+  }
   if (!preview) {
     renderActive({ fit: false, focusStamp: true });
     return;
   }
+  paintStampMarkers(bag);
   bindStampLotPick(bag);
   patchStampAssignChrome(bag);
   focusStampOnMap(bag, stampId);
@@ -1241,6 +1255,31 @@ function paintStampMarkers(bag) {
     });
     mark.addTo(preview);
   });
+
+  // Gợi ý pair: đường xanh đứt từ tem (hồng/đang chọn) → tâm hatch cùng loại khớp DT.
+  const hintId = bag.stampPick;
+  const hintKeys = (hintId && bag.stampHints && bag.stampHints[hintId]) || [];
+  const hintStamp = hintId && (bag.stampView || []).find(s => s.id === hintId);
+  if (hintStamp && Number.isFinite(hintStamp.lat) && Number.isFinite(hintStamp.lng) && hintKeys.length) {
+    const lotsByKey = new Map((bag.stampLots || []).map(l => [String(l.key), l]));
+    hintKeys.forEach(key => {
+      const lot = lotsByKey.get(String(key));
+      const c = lot ? lotCentroidLngLat(lot) : null;
+      const ll = c
+        ? [c[1], c[0]]
+        : lotCentroidLatLng(bag.features[Number(key)]);
+      if (!ll) return;
+      L.polyline([[hintStamp.lat, hintStamp.lng], ll], {
+        pane: 'lotPreview',
+        interactive: false,
+        _stampMark: true,
+        color: '#3b82f6',
+        weight: 2,
+        opacity: 0.9,
+        dashArray: '6 5'
+      }).addTo(preview);
+    });
+  }
   bindStampLotPick(bag);
 }
 
@@ -1783,6 +1822,7 @@ function clearHeldKh(step) {
   bag.stampMatch = null;
   bag.stampView = null;
   bag.stampLots = null;
+  bag.stampHints = null;
   bag.stampCrsNote = '';
   held[step.id] = bag;
   clearStampProps(bag.features);
@@ -1891,8 +1931,11 @@ function wireStampBoxHandlers(step) {
       bag.stampAssignMode = false;
       setStampLotPickCursor(false);
       unbindStampLotClick();
+      if (preview) {
+        paintStampMarkers(bag);
+        focusStampOnMap(bag, bag.stampPick);
+      }
       patchStampAssignChrome(bag);
-      if (preview) focusStampOnMap(bag, bag.stampPick);
     });
   });
   box.querySelectorAll('[data-ho-stamp-why]').forEach(btn => {

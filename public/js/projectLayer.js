@@ -1289,7 +1289,10 @@ function markPicked(name) {
 // cuộn tới và làm nổi tên đồ án; từ khóa tìm đang lọc mất đồ án thì xóa từ khóa.
 function revealInList(p) {
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: false } }));
-  document.querySelector('[data-main-tab="quyhoach"]')?.click();
+  // Đang kiểm tra QH theo ranh dự án (F, mọi cấp QHCT/QHPK/QHC): không bấm sang B.
+  const invest = document.getElementById('investCard');
+  const holdAxis = !!(invest && !invest.hidden && invest.querySelector('.invest-plan:not([hidden])'));
+  if (!holdAxis) document.querySelector('[data-main-tab="quyhoach"]')?.click();
   const q = foldText(query.trim());
   if (q && !dossierSearchText(p).includes(q)) {
     query = '';
