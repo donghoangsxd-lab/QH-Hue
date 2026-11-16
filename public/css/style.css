@@ -2784,10 +2784,16 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .entry-help {
   display: inline-flex; align-items: center; justify-content: center;
   box-sizing: border-box;
-  width: var(--axis-chip-h); height: var(--axis-chip-h); padding: 0; flex-shrink: 0;
+  width: 14px; height: 14px; padding: 0; flex-shrink: 0; align-self: center;
   border: 1px solid var(--axis-chip-border); border-radius: 50%;
   background: var(--bg-input); color: var(--axis-color-muted); cursor: help;
-  line-height: 1; font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 700;
+  line-height: 1; font-family: var(--axis-font); font-size: 9px; font-weight: 700;
+  vertical-align: middle;
+}
+.entry-step-title .entry-help,
+.entry-head .entry-help,
+.entry-officer-bar .entry-help {
+  width: 14px; height: 14px; font-size: 9px;
 }
 .entry-help-q { display: block; transform: translateY(-0.5px); }
 .entry-help .ico { display: none; }
@@ -2905,11 +2911,21 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 }
 .add-point-form select:disabled { opacity: 0.45; cursor: not-allowed; }
 .cad-dxf-slots { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.cad-slot-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 6px; align-items: stretch; }
+.cad-slot-pair .cad-slot-row { min-width: 0; }
 .cad-slot-row { display: flex; align-items: stretch; gap: 4px; }
-.cad-slot-row .cad-slot { flex: 1; margin-top: 0; }
+.cad-slot-row .cad-slot { flex: 1; margin-top: 0; min-width: 0; }
 .cad-slot-row.has-file .cad-slot { border-style: solid; }
 .cad-slot-name { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; word-break: break-all; }
 .cad-slot-row.has-file .cad-slot-name { color: var(--accent-cyan); }
+.entry-field > label {
+  display: flex; align-items: center; gap: 4px;
+  min-height: var(--axis-chip-h, 22px); line-height: 1.2;
+}
+.entry-field > label .entry-help {
+  width: 14px; height: 14px; font-size: 9px;
+  margin: 0; flex-shrink: 0; align-self: center;
+}
 .cad-slot-clear {
   flex: none; width: 26px; border: 1px solid var(--border-color); border-radius: var(--r-md);
   background: var(--bg-input); color: var(--text-muted); font-size: 16px; line-height: 1; cursor: pointer;
