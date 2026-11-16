@@ -856,6 +856,151 @@ export function stampAreaVsLots(stamp, lots, keys, tol = STAMP_AREA_TOL) {
   return { stampM2, lotM2, ratio, ok: ratio <= tol };
 }
 
+/** Tem → hatch gợi ý: bán kính tìm lô gần (m). */
+export const STAMP_HINT_NEAR_M = 150;
+/** Hai hatch coi là cạnh nhau nếu khe bbox ≤ (m). */
+export const STAMP_HINT_GAP_M = 15;
+
+function lotLngLatBbox(lot) {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  for (const poly of lot.rings || []) {
+    for (const ring of poly || []) {
+      for (const pt of ring || []) {
+        if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) continue;
+        if (pt[0] < minLng) minLng = pt[0];
+        if (pt[1] < minLat) minLat = pt[1];
+        if (pt[0] > maxLng) maxLng = pt[0];
+        if (pt[1] > maxLat) maxLat = pt[1];
+      }
+    }
+  }
+  if (!Number.isFinite(minLng)) return null;
+  return [minLng, minLat, maxLng, maxLat];
+}
+
+function bboxGapM(a, b) {
+  if (!a || !b) return Infinity;
+  const midLat = ((a[1] + a[3]) + (b[1] + b[3])) / 4;
+  const k = 111320;
+  const cos = Math.cos(midLat * Math.PI / 180);
+  const gapX = Math.max(0, Math.max(b[0] - a[2], a[0] - b[2])) * k * cos;
+  const gapY = Math.max(0, Math.max(b[1] - a[3], a[1] - b[3])) * k;
+  return Math.hypot(gapX, gapY);
+}
+
+/** Tâm gần đúng của hatch (trung bình đỉnh vòng ngoài) → [lng, lat]. */
+export function lotCentroidLngLat(lot) {
+  const ring = lot?.rings?.[0]?.[0];
+  if (!ring || ring.length < 3) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  ring.forEach(pt => {
+    if (!pt || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) return;
+    sx += pt[0];
+    sy += pt[1];
+    n += 1;
+  });
+  if (!n) return null;
+  return [sx / n, sy / n];
+}
+
+function pickKeysMatchingArea(stamp, pool, tol) {
+  if (!pool.length) return [];
+  const n = pool.length;
+  if (n <= 10) {
+    let best = null;
+    for (let mask = 1; mask < (1 << n); mask++) {
+      const keys = [];
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) keys.push(String(pool[i].key));
+      const cmp = stampAreaVsLots(stamp, pool, keys, tol);
+      if (!cmp.ok) continue;
+      if (!best
+        || keys.length < best.keys.length
+        || (keys.length === best.keys.length && cmp.ratio < best.ratio)) {
+        best = { keys, ratio: cmp.ratio };
+      }
+    }
+    return best ? best.keys : [];
+  }
+  const keys = [];
+  for (const lot of pool) {
+    keys.push(String(lot.key));
+    const cmp = stampAreaVsLots(stamp, pool, keys, tol);
+    if (cmp.ok) return keys.slice();
+    if (cmp.stampM2 > 0 && cmp.lotM2 > cmp.stampM2 * (1 + tol)) keys.pop();
+  }
+  return [];
+}
+
+/**
+ * Gợi ý ghép tem → 1+ hatch chưa gán: cùng loại, cạnh nhau, tổng DT ≈ tem (±1%).
+ * @returns {string[]} khóa lô
+ */
+export function suggestStampLotKeys(stamp, lots, opt = {}) {
+  const areaTol = Number.isFinite(opt.areaTol) ? opt.areaTol : STAMP_AREA_TOL;
+  const nearM = Number.isFinite(opt.nearM) ? opt.nearM : STAMP_HINT_NEAR_M;
+  const gapM = Number.isFinite(opt.gapM) ? opt.gapM : STAMP_HINT_GAP_M;
+  if (!stamp || !(lots || []).length) return [];
+  const named = lots.filter(l => stampNameMatch(stamp, l)).map(l => ({
+    ...l,
+    _bbox: lotLngLatBbox(l),
+    _dist: minDistToLot(stamp, l)
+  }));
+  if (!named.length) return [];
+  const seeds = named.filter(l => l._dist <= nearM).sort((a, b) => a._dist - b._dist);
+  if (!seeds.length) {
+    // Một lô khớp diện tích dù hơi xa hơn nearM (≤ 2×).
+    const solo = named
+      .filter(l => l._dist <= nearM * 2 && stampAreaMatch(stamp, l, areaTol))
+      .sort((a, b) => a._dist - b._dist);
+    return solo[0] ? [String(solo[0].key)] : [];
+  }
+  const seen = new Set();
+  for (const seed of seeds) {
+    if (seen.has(seed.key)) continue;
+    const comp = [];
+    const q = [seed];
+    const vis = new Set([seed.key]);
+    while (q.length) {
+      const u = q.shift();
+      comp.push(u);
+      named.forEach(v => {
+        if (vis.has(v.key) || !u._bbox || !v._bbox) return;
+        if (bboxGapM(u._bbox, v._bbox) > gapM) return;
+        vis.add(v.key);
+        q.push(v);
+      });
+    }
+    comp.forEach(l => seen.add(l.key));
+    comp.sort((a, b) => a._dist - b._dist);
+    const keys = pickKeysMatchingArea(stamp, comp, areaTol);
+    if (keys.length) return keys;
+  }
+  return [];
+}
+
+/**
+ * Gợi ý cho từng tem pending; mỗi lô chỉ thuộc một gợi ý.
+ * @returns {Record<string, string[]>} stampId → keys
+ */
+export function suggestPendingStampHints(pending, freeLots, opt = {}) {
+  const hints = {};
+  const claimed = new Set();
+  (pending || []).forEach(stamp => {
+    if (!stamp?.id) return;
+    const avail = (freeLots || []).filter(l => !claimed.has(String(l.key)));
+    const keys = suggestStampLotKeys(stamp, avail, opt);
+    if (!keys.length) return;
+    hints[stamp.id] = keys;
+    keys.forEach(k => claimed.add(String(k)));
+  });
+  return hints;
+}
+
 /** Giải thích vì sao tem không tự khớp (≥ 2/3 tiêu chí). */
 export function stampPendingWhy(stamp, lots, opt = {}) {
   const tol = Number.isFinite(opt.tolM) ? opt.tolM : STAMP_TOL_M;

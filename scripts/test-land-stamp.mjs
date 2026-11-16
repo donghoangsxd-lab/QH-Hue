@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {
   parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
-  stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf
+  stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf,
+  suggestStampLotKeys, suggestPendingStampHints
 } from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
@@ -684,5 +685,27 @@ const octMatch = matchStamps([octStamp], [octLot]);
 assert.equal(octMatch.assigned.length, 1);
 assert.equal(octMatch.assigned[0].key, 'oct');
 assert.ok(octMatch.assigned[0].how.split('+').length >= 2);
+
+// Gợi ý nhiều hatch cạnh nhau, cùng loại, tổng DT = tem.
+const dLon = 0.00008;
+const ringA = [[
+  [ambLng, ambLat], [ambLng + dLon, ambLat], [ambLng + dLon, ambLat + dLon],
+  [ambLng, ambLat + dLon], [ambLng, ambLat]
+]];
+const ringB = [[
+  [ambLng + dLon, ambLat], [ambLng + 2 * dLon, ambLat], [ambLng + 2 * dLon, ambLat + dLon],
+  [ambLng + dLon, ambLat + dLon], [ambLng + dLon, ambLat]
+]];
+const hintA = { key: 'ha', area: 5000, layer: 'DAT_O_Nhomnhao', rings: [ringA] };
+const hintB = { key: 'hb', area: 4000, layer: 'DAT_O_Nhomnhao', rings: [ringB] };
+const hintStamp = {
+  id: 'hint-oct', code: 'OCT-Z1', areaRaw: '0.90', floors: '4', coverage: '80', far: '3',
+  lat: ambLat + dLon / 2, lng: ambLng + dLon / 2,
+  cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon / 2 }]
+};
+const hintKeys = suggestStampLotKeys(hintStamp, [hintA, hintB]);
+assert.deepEqual(hintKeys.sort(), ['ha', 'hb']);
+const hintMap = suggestPendingStampHints([hintStamp], [hintA, hintB]);
+assert.deepEqual(hintMap['hint-oct'].sort(), ['ha', 'hb']);
 
 console.log('land-stamp: ok');
