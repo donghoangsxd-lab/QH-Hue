@@ -753,4 +753,87 @@ assert.ok(String(nearEdge.assigned[0].how).includes('near'));
 assert.equal(STAMP_AUTO_AREA_TOL, 0.05);
 assert.equal(STAMP_NEAR_AUTO_M, 50);
 
+// Tem giữa lô to: ưu tiên lô chứa tem + DT — không nhảy sang lô cùng loại cách ~500 m.
+const bigHalf = 0.002;
+const bigRing = [[
+  [ambLng - bigHalf, ambLat - bigHalf],
+  [ambLng + bigHalf, ambLat - bigHalf],
+  [ambLng + bigHalf, ambLat + bigHalf],
+  [ambLng - bigHalf, ambLat + bigHalf],
+  [ambLng - bigHalf, ambLat - bigHalf]
+]];
+const farOff = 0.005;
+function farRingAt(dx, dy) {
+  return [[
+    [ambLng + dx, ambLat + dy],
+    [ambLng + dx + dLon, ambLat + dy],
+    [ambLng + dx + dLon, ambLat + dy + dLon],
+    [ambLng + dx, ambLat + dy + dLon],
+    [ambLng + dx, ambLat + dy]
+  ]];
+}
+const bigLot = { key: 'big', area: 9000, layer: 'DAT_O_Nhomnhao', rings: [bigRing] };
+const far1 = { key: 'f1', area: 4000, layer: 'DAT_O_Nhomnhao', rings: farRingAt(farOff, 0) };
+const far2 = { key: 'f2', area: 3500, layer: 'DAT_O_Nhomnhao', rings: farRingAt(farOff, farOff) };
+const far3 = { key: 'f3', area: 3000, layer: 'DAT_O_Nhomnhao', rings: farRingAt(0, farOff) };
+const midStamp = {
+  id: 'mid-big', code: 'OCT-MID', areaRaw: '0.90', floors: '4', coverage: '80', far: '3',
+  lat: ambLat, lng: ambLng, cands: [{ lat: ambLat, lng: ambLng }]
+};
+assert.ok(stampNameMatch(midStamp, bigLot));
+assert.ok(stampAreaMatch(midStamp, bigLot, STAMP_AUTO_AREA_TOL));
+assert.deepEqual(suggestStampLotKeys(midStamp, [bigLot, far1, far2, far3]), ['big']);
+assert.deepEqual(suggestStampLotKeys(midStamp, [far1, far2, far3, bigLot]), ['big']);
+const midAuto = matchStamps([midStamp], [bigLot, far1, far2, far3]);
+assert.equal(midAuto.assigned.length, 1);
+assert.equal(midAuto.assigned[0].key, 'big');
+assert.ok(String(midAuto.assigned[0].how).includes('pos'));
+assert.ok(String(midAuto.assigned[0].how).includes('area'));
+// Trên lô + DT khớp, không cần tên layer → vẫn tự ghép.
+const bigBare = { key: 'bigx', area: 9000, layer: 'San_nen_khac', rings: [bigRing] };
+assert.ok(!stampNameMatch(midStamp, bigBare));
+assert.deepEqual(suggestStampLotKeys(midStamp, [bigBare, far1, far2, far3]), ['bigx']);
+const bareArea = matchStamps([midStamp], [bigBare, far1, far2, far3]);
+assert.equal(bareArea.assigned.length, 1);
+assert.equal(bareArea.assigned[0].key, 'bigx');
+assert.equal(bareArea.assigned[0].how, 'pos+area');
+// Không có hatch chứa tem, chỉ lô cách ~500 m → không gợi ý xa.
+assert.deepEqual(suggestStampLotKeys(midStamp, [far1, far2, far3]), []);
+// Tem trên hatch DT lệch + lô bên cạnh có tên+DT → không nhảy pair.
+const bareHalf = 0.0002;
+const bareLot = {
+  key: 'bare', area: 100, layer: 'San_nen_khac',
+  rings: [[
+    [
+      [ambLng - bareHalf, ambLat - bareHalf],
+      [ambLng + bareHalf, ambLat - bareHalf],
+      [ambLng + bareHalf, ambLat + bareHalf],
+      [ambLng - bareHalf, ambLat + bareHalf],
+      [ambLng - bareHalf, ambLat - bareHalf]
+    ]
+  ]]
+};
+const namedBeside = {
+  key: 'beside', area: 2500, layer: 'Cong cong',
+  rings: [[
+    [
+      [ambLng + bareHalf * 2, ambLat - bareHalf],
+      [ambLng + bareHalf * 4, ambLat - bareHalf],
+      [ambLng + bareHalf * 4, ambLat + bareHalf],
+      [ambLng + bareHalf * 2, ambLat + bareHalf],
+      [ambLng + bareHalf * 2, ambLat - bareHalf]
+    ]
+  ]]
+};
+const onBareStamp = {
+  id: 'on-bare', code: 'TM-BARE', areaRaw: '2500', floors: '3', coverage: '40', far: '1.5',
+  lat: ambLat, lng: ambLng, cands: [{ lat: ambLat, lng: ambLng }]
+};
+assert.ok(!stampNameMatch(onBareStamp, bareLot));
+assert.ok(stampNameMatch(onBareStamp, namedBeside));
+const noJump = matchStamps([onBareStamp], [bareLot, namedBeside], { tolM: STAMP_NEAR_AUTO_M });
+assert.equal(noJump.assigned.length, 0, 'tem trên hatch không được pair lô bên cạnh');
+assert.equal(noJump.pending.length, 1);
+assert.deepEqual(suggestStampLotKeys(onBareStamp, [bareLot, namedBeside]), ['bare']);
+
 console.log('land-stamp: ok');
