@@ -658,6 +658,13 @@ assert.match(read('public/js/cadastreLayer.js'), /geomTask/);
 assert.match(read('public/js/planLandStats.js'), /pieHtml\(res/);
 assert.match(read('public/js/viewFlow.js'), /skipProjects/);
 assert.match(read('public/js/viewFlow.js'), /revealLotsCovering/);
+// Kiểm tra QH từ ranh dự án (F): đang inspectSync thì không openLotsAtView → revealInList → nhảy trục B.
+assert.match(read('public/js/viewFlow.js'), /if \(viewingPlace\(\)\) openLotsAtView\('QHPK'\)/);
+assert.match(read('public/js/viewFlow.js'), /if \(!inspectSync\) \{\s*if \(!state\.focusedProject\) revealWardProjects/);
+assert.match(read('public/js/viewFlow.js'), /place && !inspectSync\) openLotsAtView\('QHC'\)/);
+assert.match(read('public/js/viewFlow.js'), /level === 'qhct' && viewingPlace\(\) && !inspectSync\) openLotsAtView\('QHCT'\)/);
+assert.match(read('public/js/projectLayer.js'), /invest-plan:not\(\[hidden\]\)/);
+assert.match(read('public/js/investLayer.js'), /ensureDauTuPane\(\)/);
 assert.match(read('public/js/projectLayer.js'), /export function revealLotsCovering/);
 assert.match(read('public/js/planLandStats.js'), /planLotsTable\(res\.parts, res\.area\)\}\$\{pieHtml/);
 assert.match(read('public/js/planLandStats.js'), /pls-mark-hatch/);
@@ -1167,6 +1174,8 @@ assert.match(read('public/js/entryFlows.js'), /ranh-moi|#ef4444|LOT_PREVIEW_Z|pr
 assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|landColor|focusStamp|projectKhBest|inHueBbox/);
 assert.match(read('public/js/entryFlows.js'), /bindStampLotPick|lotIndexAt|booleanPointInPolygon|setStampLotPickCursor/);
 assert.match(read('public/js/entryFlows.js'), /reuseProject|patchStampAssignChrome|replaceStampBox/);
+assert.match(read('public/js/landStamp.js'), /suggestStampLotKeys|suggestPendingStampHints|STAMP_HINT_GAP_M/);
+assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6/);
 assert.match(read('public/js/entryFlows.js'), /Đang lưu hồ sơ|setStatus|btn\.disabled/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /fillColor: '#fdba74'/);
 assert.match(read('public/js/entryFlows.js'), /function viewMap|getViewMode\(\) === 'QH'|planMap/);

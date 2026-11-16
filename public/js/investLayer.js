@@ -2313,6 +2313,12 @@ export function initInvestLayer() {
       ensureInvestList();
       return;
     }
+    // Đang kiểm tra QH (QHCT/QHPK/QHC): giữ thẻ dự án, kéo lại trục F nếu bị kéo sang B.
+    const planBox = $('investCard')?.querySelector('.invest-plan');
+    if (card && planBox && !planBox.hidden) {
+      ensureDauTuPane();
+      return;
+    }
     // Bảng thông tin chỉ gắn panel F — đổi trục thì đóng.
     if (card) closeCard();
   });
