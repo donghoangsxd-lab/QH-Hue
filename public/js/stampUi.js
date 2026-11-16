@@ -1,8 +1,54 @@
 // UI tem đất dùng chung cho hoso / Batch TT16 / ĐCCB — tự pair trên-hatch+tên / gần 50m; một tem → nhiều hatch.
 import { escapeHtml, fmtNum } from './utils.js';
-import { stampLabel, stampPendingWhy } from './landStamp.js';
+import { stampLabel, stampPendingWhy, stampAreaM2, stampAreaVsLots } from './landStamp.js';
 
 const HINT_DEFAULT = 'Đường xanh đứt = gợi ý hatch cùng loại cạnh nhau, tổng DT ≈ tem. Bấm + (nạp gợi ý), chỉnh lô đỏ rồi OK. ? xem lỗi · × xóa tem.';
+
+function fmtHaFromM2(m2) {
+  if (!(m2 > 0)) return '—';
+  const ha = m2 / 10000;
+  const rounded = ha >= 0.1 ? Math.round(ha * 100) / 100 : Math.round(ha * 1000) / 1000;
+  return fmtNum(rounded);
+}
+
+/**
+ * So sánh DT tem ↔ hatch đang chọn (ha) để người dùng quyết định OK.
+ * @returns {string} HTML ba dòng
+ */
+export function stampHatchCompareHtml(stamp, lots, keys) {
+  const keyList = (keys || []).map(String).filter(Boolean);
+  const list = (lots || []).filter(l => keyList.includes(String(l.key)));
+  const lotM2 = list.reduce((s, l) => s + (Number(l.area) || 0), 0);
+  const stampM2 = stampAreaM2(stamp && stamp.areaRaw, lotM2 || undefined);
+  const temLine = `Diện tích tem: ${stampM2 > 0 ? `${fmtHaFromM2(stampM2)} ha` : '— (thiếu trên tem)'}.`;
+  if (!keyList.length) {
+    return `<div class="cad-stamp-cmp">
+      <div>${escapeHtml(temLine)}</div>
+      <div>Diện tích hatch: — (chưa chọn lô).</div>
+      <div>Đánh giá: —</div>
+    </div>`;
+  }
+  const parts = list.map(l => fmtHaFromM2(Number(l.area) || 0));
+  const hatchDetail = list.length > 1
+    ? ` (gồm ${fmtNum(list.length)} lô: ${parts.map(p => `${p} ha`).join(', ')})`
+    : '';
+  const hatchLine = `Diện tích hatch: ${fmtHaFromM2(lotM2)} ha${hatchDetail}.`;
+  let verdict = 'Đánh giá: —';
+  if (stampM2 > 0 && lotM2 > 0) {
+    const cmp = stampAreaVsLots(stamp, list, keyList);
+    if (cmp.ratio != null) {
+      const pct = Math.max(0, Math.min(100, Math.round((1 - cmp.ratio) * 1000) / 10));
+      verdict = `Đánh giá: khớp ${fmtNum(pct)}%.`;
+    }
+  } else if (!(stampM2 > 0)) {
+    verdict = 'Đánh giá: tem thiếu diện tích — không so được.';
+  }
+  return `<div class="cad-stamp-cmp">
+    <div>${escapeHtml(temLine)}</div>
+    <div>${escapeHtml(hatchLine)}</div>
+    <div class="cad-stamp-verdict">${escapeHtml(verdict)}</div>
+  </div>`;
+}
 
 /**
  * Khung danh sách tem chờ gán tay — bảng thẳng cột, 3 nút ? / × / +, OK ghi nháp.
@@ -73,6 +119,7 @@ export function stampPendingBoxHtml(opts = {}) {
   } else {
     now += ' — bấm + để chọn lô trên bản đồ';
   }
+  const cmpHtml = stampHatchCompareHtml(cur, lots, draftKeys);
 
   const okDisabled = !(assignMode && draftKeys.length);
   const cls = opts.extraClass ? `cad-stamp ${opts.extraClass}` : 'cad-stamp';
@@ -91,6 +138,7 @@ export function stampPendingBoxHtml(opts = {}) {
       <span>${now}</span>
       <button type="button" class="cad-stamp-ok"${okDisabled ? ' disabled' : ''} title="Ghi gán tem vào lô đã chọn" ${okExtra} ${okAttr}="${escapeHtml(cur.id)}">OK</button>
     </div>
+    ${cmpHtml}
   </div>`;
 }
 

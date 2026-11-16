@@ -30,7 +30,7 @@ import {
   lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy,
   suggestStampLotKeys, lotCentroidLngLat
 } from './landStamp.js';
-import { stampPendingBoxHtml, stampStatusNoteHtml } from './stampUi.js';
+import { stampPendingBoxHtml, stampStatusNoteHtml, stampHatchCompareHtml } from './stampUi.js';
 import { landColor } from './tt16Symbols.js';
 import { ensureSoTayItems } from './catalogTable.js';
 import { schemePickOptions } from './catalogTableCore.js';
@@ -975,6 +975,12 @@ function patchStampAssignChrome(bag) {
       text += ' — bấm + để chọn lô trên bản đồ';
     }
     now.textContent = text;
+  }
+  const cmp = box.querySelector('.cad-stamp-cmp');
+  if (stamp) {
+    const html = stampHatchCompareHtml(stamp, bag.stampLots || [], draft);
+    if (cmp) cmp.outerHTML = html;
+    else box.querySelector('.cad-stamp-now')?.insertAdjacentHTML('afterend', html);
   }
   box.querySelectorAll('[data-ho-stamp-plus]').forEach(btn => {
     const id = btn.getAttribute('data-ho-stamp-plus');
