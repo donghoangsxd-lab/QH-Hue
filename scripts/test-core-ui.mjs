@@ -1171,6 +1171,9 @@ assert.match(read('docs/entry-architecture.md'), /PR2\+|funnel P|submitInfraPoin
 assert.match(read('public/js/schemeIngest.js'), /ingestSchemeFile|ingestKhFile/);
 assert.match(read('public/js/stampUi.js'), /stampPendingBoxHtml|cad-stamp-table|cad-stamp-plus|Cần ghép thủ công/);
 assert.match(read('public/js/stampUi.js'), /data-stamp-why|data-stamp-plus|cad-stamp-why|cad-stamp-ok|data-stamp-ok/);
+assert.match(read('public/js/stampUi.js'), /stampHatchCompareHtml|Diện tích tem:|Diện tích hatch:|Đánh giá: khớp/);
+assert.match(read('public/js/entryFlows.js'), /stampHatchCompareHtml|cad-stamp-cmp/);
+assert.match(css, /\.cad-stamp-cmp|\.cad-stamp-verdict/);
 assert.match(read('public/js/landStamp.js'), /assignKeysOf|stampPendingWhy|stampAreaVsLots|lotMissingStampAttrs/);
 assert.match(read('public/js/entryFlows.js'), /toggleStampLot|startStampAssignMode|confirmStampOk|stamp-pick-pulse|lotMissingStampAttrs/);
 assert.match(css, /cad-stamp-table|cad-stamp-plus\.is-on|stamp-pick-blink|stamp-lot-pick|cad-stamp-ok/);
@@ -1186,6 +1189,8 @@ assert.match(read('public/js/landStamp.js'), /suggestStampLotKeys|suggestPending
 assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6|cad-slot-pair|suggestStampLotKeys/);
 assert.match(read('public/js/entryFlows.js'), /userOnly:\s*true|paintStampMarkers\(bag,\s*\{\s*light:\s*true/);
 assert.match(read('public/js/landStamp.js'), /stampInLotBbox|centroidDistM|STAMP_AUTO_AREA_TOL|STAMP_NEAR_AUTO_M|growKeysFromSeed|preferAssign/);
+assert.match(read('public/js/landStamp.js'), /plan\.floors|plan\.coverage|plan\.far/);
+assert.match(read('public/js/mapEngine.js'), /qh-admin-changed|landNeedsStampDot|stampGapDot|#ef4444|lotMissingStampAttrs/);
 assert.match(read('public/js/entryFlows.js'), /requestAnimationFrame|featBboxRough|rebuildLotLayerIndex/);
 assert.match(css, /\.cad-slot-pair[\s\S]*?2fr[\s\S]*?1fr/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /label for="hoCrs">Hệ tọa độ\$\{tipHtml/);

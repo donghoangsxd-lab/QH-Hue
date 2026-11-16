@@ -968,13 +968,15 @@ export function assignKeysOf(val) {
   return [String(val)];
 }
 
-/** Lô thiếu toàn bộ thuộc tính tem (ký hiệu lô, tầng, mật độ, HSSD) — không tính tên layer hatch. */
+/** Lô thiếu toàn bộ thuộc tính tem (ký hiệu lô, tầng, mật độ, HSSD) — không tính tên layer hatch.
+ * Nhận props phẳng (GeoJSON / form nhập) hoặc lô đã chuẩn hóa (`plan.floors|coverage|far`). */
 export function lotMissingStampAttrs(props) {
   const p = props || {};
-  const code = String(p.lotCode || p.kyHieu || '').trim();
-  const floors = String(p.TangCao || p.floors || '').trim();
-  const cov = String(p.MatDoXD || p.coverage || '').trim();
-  const far = String(p.HeSoSDD || p.far || '').trim();
+  const plan = p.plan && typeof p.plan === 'object' ? p.plan : {};
+  const code = String(p.lotCode || p.kyHieu || p.KyHieu || '').trim();
+  const floors = String(p.TangCao || p.floors || plan.floors || '').trim();
+  const cov = String(p.MatDoXD || p.coverage || plan.coverage || '').trim();
+  const far = String(p.HeSoSDD || p.far || plan.far || '').trim();
   return !code && !floors && !cov && !far;
 }
 

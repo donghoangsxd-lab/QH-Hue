@@ -28,6 +28,7 @@ import {
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
+import { lotMissingStampAttrs } from './landStamp.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { touchPrimary } from './touchGroups.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
@@ -295,6 +296,8 @@ export function initMap() {
     try { planRenderer.refreshPoints(); } catch (e) { /* chưa mở QH */ }
     redrawLands();
   });
+  // Đăng nhập / thoát Admin: bật/tắt chấm đỏ lô QHPK·QHCT thiếu thuộc tính tem.
+  document.addEventListener('qh-admin-changed', () => { redrawLands(); });
 
   return map;
 }
@@ -2982,6 +2985,41 @@ const LOT_RANK_TRAFFIC = 0;
 const LOT_RANK_LAND = 1;
 const LOT_RANK_INFRA = 2;
 
+/** Admin: lô đất QH (QHPK/QHCT) chưa có ký hiệu/tầng/mật độ/HSSD → chấm đỏ giữa lô. */
+function isAdminUser() {
+  return state.currentUserRole === 'ADMIN' && !!state.authToken;
+}
+
+function landNeedsStampDot(p) {
+  if (!p || p.phase !== 'QH') return false;
+  if (p.kind && p.kind !== 'DXF') return false;
+  // Đất giao thông không ghép tem → bỏ qua.
+  if (landPatternKey(p.layer, p.name) === 'GT') return false;
+  const lv = planLevelOf(p.file);
+  if (lv !== 'QHPK' && lv !== 'QHCT') return false;
+  return lotMissingStampAttrs(p);
+}
+
+function stampGapDot(p, m) {
+  const a = lotAnchor(p);
+  if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return null;
+  const mark = L.circleMarker([a.lat, a.lng], {
+    radius: 5,
+    color: '#fff',
+    weight: 1.5,
+    fillColor: '#ef4444',
+    fillOpacity: 0.95,
+    interactive: true,
+    bubblingMouseEvents: false
+  });
+  mark.bindTooltip('Lô chưa có thuộc tính tem — bấm để sửa', { sticky: true, direction: 'top' });
+  mark.on('click', (e) => {
+    if (L.DomEvent) L.DomEvent.stop(e);
+    openLandPopup(p, m);
+  });
+  return mark;
+}
+
 function drawLandsOn(m, list, infra = []) {
   const old = landGroups.get(m);
   if (old) {
@@ -2999,9 +3037,14 @@ function drawLandsOn(m, list, infra = []) {
   // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
   const byId = infra.length ? new Map([...state.rawDataList, ...state.planDataList].map(it => [it.id, it])) : null;
   const qhById = infra.length && m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
+  const showGaps = isAdminUser();
   ordered.forEach(({ p, rank }) => {
     if (rank !== LOT_RANK_INFRA) {
       group.addLayer(landLotShape(p, m, detailed));
+      if (showGaps && landNeedsStampDot(p)) {
+        const dot = stampGapDot(p, m);
+        if (dot) group.addLayer(dot);
+      }
       return;
     }
     const facilityId = touchPrimary(p.id) || p.id;
