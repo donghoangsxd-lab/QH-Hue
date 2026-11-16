@@ -1205,6 +1205,9 @@ assert.match(css, /#tabAdd\.propose-sheet[\s\S]*?font-size:\s*var\(--axis-fs-row
 assert.doesNotMatch(css, /#tabAdd\.propose-sheet[^{]*\{[^}]*440px/);
 assert.match(read('public/js/entryFlows.js'), /function tipHtml|entry-help-q|hoDanSoHt|hoCapacityInlineHtml/);
 assert.match(read('public/js/entryFlows.js'), /hoNewMetaHtml[\s\S]*entry-row-name-level[\s\S]*hoDanSoQh/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /label for="hoAreaHa">Diện tích \(ha\)\$\{tipHtml/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /hoAreaMeasured|areaTip/);
+assert.doesNotMatch(read('public/js/entryFlows.js'), /hoAreaHa[\s\S]{0,200}Chưa có ranh/);
 assert.doesNotMatch(read('public/js/entryFlows.js'), /entry-note">Đồ án mới:/);
 assert.match(html, /CHỌN LOẠI DỮ LIỆU ĐỀ XUẤT/);
 assert.match(html, /id="entryOfficer"/);
