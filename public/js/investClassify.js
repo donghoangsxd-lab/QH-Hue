@@ -1,7 +1,10 @@
 // Phân nhóm dự án kêu gọi đầu tư (sheet 15-DA) theo lĩnh vực / tên.
 // groupId admin (override) luôn thắng quy tắc tự động.
-// Sáu tab UI; id cũ nangluong/chungcu map về congnghiep/khudothi.
-// Trong DVTM chia nhóm con để danh sách và lớp bản đồ nhẹ hơn.
+// Droplist F: «Toàn bộ dự án» (all) rồi từng nhóm; id cũ nangluong/chungcu map về congnghiep/khudothi.
+// Trong DVTM chia nhóm con để thu/xổ danh sách và tắt/bật từng nhóm trên bản đồ.
+
+/** Tab droplist: hiện mọi dự án / mọi ranh (không phải nhóm admin). */
+export const INVEST_TAB_ALL = 'all';
 
 export const INVEST_GROUPS = [
   { id: 'dvtm', label: 'Dịch vụ, thương mại', title: 'Dịch vụ, thương mại' },
@@ -20,7 +23,7 @@ export const INVEST_GROUP_LEGACY = {
   chungcu: 'khudothi'
 };
 
-/** Nhóm con trong tab Dịch vụ, thương mại. Mặc định chỉ bật nhóm 1 (sân gôn) trên bản đồ. */
+/** Nhóm con trong tab Dịch vụ, thương mại. */
 export const DVTM_SUBGROUPS = [
   { id: 'sangon', label: 'Sân gôn', title: 'Dự án sân gôn', icon: 'terrain' },
   { id: 'khachsan', label: 'Khách sạn', title: 'Dự án khách sạn', icon: 'tour' },

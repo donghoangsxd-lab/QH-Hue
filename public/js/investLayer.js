@@ -13,7 +13,7 @@ import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatc
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import {
   classifyInvestGroup, classifyDvtmSub, INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT,
-  isInvestGroupId, investGroupLabel
+  INVEST_TAB_ALL, isInvestGroupId, investGroupLabel
 } from './investClassify.js';
 import {
   sheetSig, parseInvestEditsStore, applyInvestEditsClient, editsWorthApplying
@@ -24,7 +24,6 @@ import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearPar
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
-import { startLoadMeter } from './loadProgress.js';
 import { WARD_NAMES } from './facetStore.js';
 
 const INVEST_SHEET_URL = './data/invest-sheet.json';
@@ -130,7 +129,7 @@ let sheetRows = [];
 let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
-/** Nhóm con DVTM đang mở danh sách (mặc định chỉ nhóm sân gôn). */
+/** Nhóm con DVTM đang mở danh sách (tab DVTM; mặc định xổ sân gôn). */
 const dvtmFoldOpen = new Set([DVTM_SUB_DEFAULT]);
 let dvtmMapDefaultDone = false;
 let investPicked = '';
@@ -150,114 +149,16 @@ let groups = [];
 /** Ranh KML gốc (chưa ghép sheet) — dùng lại khi soft-refresh. */
 let boundBase = null;
 let softRefreshStarted = false;
-/** Meter thanh tiêu đề + panel F khi nạp lần đầu / vẽ lớp. */
-let loadMeter = null;
-let loadGen = 0;
-let loadHideTimer = 0;
-let loadStartedAt = 0;
-const LOAD_MIN_MS = 200;
-const LOAD_DONE_HOLD_MS = 300;
-
-const yieldUi = () => new Promise((resolve) => {
-  requestAnimationFrame(() => { requestAnimationFrame(() => setTimeout(resolve, 0)); });
-});
-
-function showInvestLoad(pct, label) {
-  const box = $('investLoad');
-  if (!box) return;
-  const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
-  box.hidden = false;
-  document.body.classList.add('invest-loading');
-  const lab = $('investLoadLabel');
-  const pctEl = $('investLoadPct');
-  const fill = $('investLoadFill');
-  if (lab && label) lab.textContent = label;
-  if (pctEl) pctEl.textContent = `${n}%`;
-  if (fill) fill.style.width = `${n}%`;
-  box.setAttribute('aria-busy', n < 100 ? 'true' : 'false');
-  // Ép layout để trình duyệt vẽ thanh trước khi JS nặng chặn luồng.
-  void box.offsetWidth;
-  loadMeter?.set(n < 100 ? n : 99);
-}
-
-function hideInvestLoad() {
-  clearTimeout(loadHideTimer);
-  loadHideTimer = 0;
-  const box = $('investLoad');
-  if (box) {
-    box.hidden = true;
-    box.setAttribute('aria-busy', 'false');
-  }
-  document.body.classList.remove('invest-loading');
-  const fill = $('investLoadFill');
-  if (fill) fill.style.width = '0%';
-}
-
-function finishInvestLoad(ok, gen = loadGen) {
-  if (gen !== loadGen) return;
-  clearTimeout(loadHideTimer);
-  if (ok) {
-    showInvestLoad(100, 'Đã tải xong');
-    loadMeter?.done();
-    loadMeter = null;
-    const wait = Math.max(
-      LOAD_DONE_HOLD_MS,
-      LOAD_MIN_MS - (Date.now() - (loadStartedAt || Date.now()))
-    );
-    loadHideTimer = setTimeout(() => {
-      if (gen === loadGen) hideInvestLoad();
-    }, wait);
-    return;
-  }
-  loadMeter?.fail();
-  loadMeter = null;
-  hideInvestLoad();
-}
-
-function beginInvestLoad() {
-  clearTimeout(loadHideTimer);
-  loadHideTimer = 0;
-  const gen = ++loadGen;
-  loadStartedAt = Date.now();
-  if (loadMeter) {
-    try { loadMeter.cancel(); } catch { /* meter cũ */ }
-    loadMeter = null;
-  }
-  loadMeter = startLoadMeter('Dự án đầu tư');
-  showInvestLoad(2, 'Đang tải dự án đầu tư…');
-  return {
-    gen,
-    async step(pct, label) {
-      if (gen !== loadGen) return;
-      showInvestLoad(pct, label);
-      await yieldUi();
-    },
-    finish(ok) { finishInvestLoad(ok, gen); }
-  };
-}
-
-function ensureLoadMeter() {
-  if (loadMeter) return;
-  if (!loadStartedAt) loadStartedAt = Date.now();
-  loadMeter = startLoadMeter('Dự án đầu tư');
-}
-
-/** Hiện thanh ngay khi chọn trục F (trước fetch) — tránh panel mở mà chưa có % vì loadPack chưa chạy. */
-export function primeInvestLoad() {
-  if (pack && leftGroup) return;
-  if (loadMeter) {
-    showInvestLoad(Math.max(2, Number(($('investLoadPct')?.textContent || '2').replace(/\D/g, '')) || 2), 'Đang tải dự án đầu tư…');
-    return;
-  }
-  beginInvestLoad();
-}
-
 let dtScopeWard = '';
 
 const foldPlace = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
 function activeDtTab() {
-  return document.getElementById('dtGroupPick')?.value || 'dvtm';
+  return document.getElementById('dtGroupPick')?.value || INVEST_TAB_ALL;
+}
+
+function isAllTab(tab) {
+  return (tab || activeDtTab()) === INVEST_TAB_ALL;
 }
 
 function activeDtScope() {
@@ -302,14 +203,9 @@ function rowDvtmSub(row, title, groupId) {
   return classifyDvtmSub(row, title);
 }
 
-/** Lần đầu có pack: ẩn mọi dự án DVTM không thuộc nhóm 1 để bớt lag khi mở tab. */
+/** Trước đây ẩn DVTM trừ sân gôn; mặc định «Toàn bộ» hiện mọi ranh — không ẩn nữa. */
 function applyDvtmMapDefault() {
-  if (dvtmMapDefaultDone || !pack) return;
   dvtmMapDefaultDone = true;
-  projectList().forEach(p => {
-    if (p.dtGroup !== 'dvtm') return;
-    if (p.dvtmSub !== DVTM_SUB_DEFAULT) investHidden.add(projectKey(p));
-  });
 }
 
 function setDvtmSubMap(subId, on) {
@@ -338,9 +234,10 @@ export function investAxisAllOn() {
 }
 
 export function investAxisAllTip() {
+  const scope = isAllTab() ? 'toàn bộ dự án' : 'nhóm đang xem';
   return investAxisAllOn()
-    ? 'Tắt mọi dự án của nhóm đang xem trên bản đồ'
-    : 'Bật mọi dự án của nhóm đang xem trên bản đồ';
+    ? `Tắt ${scope} trên bản đồ`
+    : `Bật ${scope} trên bản đồ`;
 }
 
 export function toggleInvestAxisAll() {
@@ -574,7 +471,9 @@ function projectList(features) {
 function projectsForTab(tab) {
   const id = tab || activeDtTab();
   const ward = activeDtScope();
-  return projectList().filter(p => p.dtGroup === id && placeMatchesScope(p, ward));
+  const all = projectList();
+  if (isAllTab(id)) return all.filter(p => placeMatchesScope(p, ward));
+  return all.filter(p => p.dtGroup === id && placeMatchesScope(p, ward));
 }
 
 function planMapLive() {
@@ -861,6 +760,8 @@ function paintDtCounts() {
     const opt = document.querySelector(`#dtGroupPick option[value="${g.id}"]`);
     if (opt) opt.textContent = `${g.label} (${n})`;
   });
+  const allOpt = document.querySelector(`#dtGroupPick option[value="${INVEST_TAB_ALL}"]`);
+  if (allOpt) allOpt.textContent = total ? `Toàn bộ dự án (${total})` : 'Toàn bộ dự án';
   const mag = $('dtMagLabel');
   const magBtn = document.querySelector('#layerMagTrack [data-main-tab="dautu"]');
   const title = total ? `F. Dự án đầu tư (${total} dự án)` : 'F. Dự án đầu tư';
@@ -1062,29 +963,18 @@ async function softRefreshInvest() {
 
 async function loadPack() {
   if (!ready) {
-    const ui = beginInvestLoad();
     ready = (async () => {
-      try {
-        await ui.step(8, 'Đang tải ranh dự án…');
-        const boundP = fetch(INVEST_BOUND_URL)
-          .then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh'))));
-        await ui.step(18, 'Đang tải danh sách dự án…');
-        const [fc, loaded] = await Promise.all([boundP, loadRows()]);
-        await ui.step(48, 'Đang ghép ranh với danh sách…');
-        const features = (fc && fc.features) || [];
-        snapshotBoundBase(features);
-        await ui.step(62, 'Đang phân nhóm dự án…');
-        bindPack(features, loaded.rows || [], loaded);
-        if (isAdmin()) {
-          try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
-        }
-        await ui.step(72, 'Đang dựng danh sách…');
-        queueMicrotask(() => { void softRefreshInvest(); });
-        return features;
-      } catch (err) {
-        ui.finish(false);
-        throw err;
+      const boundP = fetch(INVEST_BOUND_URL)
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh'))));
+      const [fc, loaded] = await Promise.all([boundP, loadRows()]);
+      const features = (fc && fc.features) || [];
+      snapshotBoundBase(features);
+      bindPack(features, loaded.rows || [], loaded);
+      if (isAdmin()) {
+        try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
       }
+      queueMicrotask(() => { void softRefreshInvest(); });
+      return features;
     })();
     ready.catch(err => {
       ready = null;
@@ -1126,7 +1016,8 @@ function shownPack(features) {
   const ward = activeDtScope();
   const drop = new Set();
   projectList(features).forEach(p => {
-    if (p.dtGroup !== tab || !placeMatchesScope(p, ward) || investHidden.has(projectKey(p))) {
+    const wrongGroup = !isAllTab(tab) && p.dtGroup !== tab;
+    if (wrongGroup || !placeMatchesScope(p, ward) || investHidden.has(projectKey(p))) {
       p.members.forEach(f => drop.add(f));
     }
   });
@@ -2016,17 +1907,49 @@ function paintDvtmList(host, items) {
   }).join('');
 }
 
+function paintAllList(host) {
+  const ward = activeDtScope();
+  const empty = pack || sheetRows.length
+    ? `<div class="project-empty">${ward ? `Không có dự án tại ${escapeHtml(ward)}.` : 'Chưa có đồ án.'}</div>`
+    : '';
+  const all = projectList().filter(p => placeMatchesScope(p, ward));
+  if (!all.length) {
+    host.innerHTML = empty;
+    return;
+  }
+  let n = 0;
+  const parts = INVEST_GROUPS.map(g => {
+    const items = all
+      .filter(p => p.dtGroup === g.id)
+      .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
+    if (!items.length) return '';
+    const rows = items.map(p => investRow(p, ++n)).join('');
+    return `<div class="pl-group open" data-dt-all-group="${escapeHtml(g.id)}">
+      <div class="pl-hrow"><span class="pl-head"><span>${escapeHtml(g.label)}</span><small>${items.length}</small></span></div>
+      <div class="pl-body">${rows}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+  host.innerHTML = parts || empty;
+}
+
 function paintInvestList(opts = {}) {
   const onlyTab = opts.tab || '';
   const scroller = $('dtList');
   const y = scroller?.scrollTop || 0;
   applyDvtmMapDefault();
   const all = projectList();
-  const groups = onlyTab ? INVEST_GROUPS.filter(g => g.id === onlyTab) : INVEST_GROUPS;
+  const ward = activeDtScope();
+  if (!onlyTab || onlyTab === INVEST_TAB_ALL) {
+    const hostAll = $('investList-all');
+    if (hostAll && (!onlyTab || onlyTab === INVEST_TAB_ALL)) paintAllList(hostAll);
+  }
+  const groups = onlyTab && onlyTab !== INVEST_TAB_ALL
+    ? INVEST_GROUPS.filter(g => g.id === onlyTab)
+    : INVEST_GROUPS;
   groups.forEach(g => {
     const host = $(`investList-${g.id}`);
     if (!host) return;
-    const ward = activeDtScope();
+    if (onlyTab === INVEST_TAB_ALL) return;
     const items = all
       .filter(p => p.dtGroup === g.id && placeMatchesScope(p, ward))
       .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
@@ -2054,23 +1977,16 @@ function queueInvestDraw() {
 }
 
 async function ensureInvestList() {
-  INVEST_GROUPS.forEach(g => {
-    const host = $(`investList-${g.id}`);
+  const hosts = [$(`investList-${INVEST_TAB_ALL}`), ...INVEST_GROUPS.map(g => $(`investList-${g.id}`))];
+  hosts.forEach(host => {
     if (host && !pack) host.innerHTML = '<div class="project-empty">Đang tải danh sách.</div>';
   });
-  const cold = !pack;
   try { await loadPack(); } catch { /* loadPack đã báo */ }
   if (!pack) {
-    INVEST_GROUPS.forEach(g => {
-      const host = $(`investList-${g.id}`);
+    hosts.forEach(host => {
       if (host) host.innerHTML = '<div class="project-empty">Chưa có đồ án.</div>';
     });
     return;
-  }
-  // Chỉ cập nhật % khi meter còn mở (setVisible sẽ đóng sau khi vẽ bản đồ).
-  if (cold && loadMeter) {
-    showInvestLoad(78, 'Đang dựng danh sách…');
-    await yieldUi();
   }
   paintInvestList();
 }
@@ -2145,7 +2061,8 @@ export async function focusInvest(id) {
   const p = projectList(features).find(item => projectKey(item) === id);
   paintInvestList();
   if (!p) return;
-  if (p.dtGroup && p.dtGroup !== activeDtTab()) {
+  // Đang xem «Toàn bộ»: giữ tab; chỉ nhảy nhóm khi đang lọc một nhóm cụ thể.
+  if (p.dtGroup && !isAllTab() && p.dtGroup !== activeDtTab()) {
     const sel = $('dtGroupPick');
     if (sel) {
       sel.value = p.dtGroup;
@@ -2176,29 +2093,18 @@ async function setVisible(on) {
     rightGroup = null;
     return;
   }
-  const cold = !pack;
   const needDraw = !leftGroup;
   let features;
   try { features = await loadPack(); } catch { return; }
   if (!visible || token !== drawToken || !features) return;
-  if (cold || needDraw) {
-    ensureLoadMeter();
-    showInvestLoad(80, 'Đang dựng danh sách…');
-    await yieldUi();
-  }
   paintInvestList();
   if (!visible || token !== drawToken) return;
   if (needDraw) {
-    ensureLoadMeter();
-    showInvestLoad(88, 'Đang vẽ ranh trên bản đồ…');
-    await yieldUi();
-    if (!visible || token !== drawToken) return;
     if (!leftGroup) leftGroup = drawOn(map, features);
     if (planMapLive() && !rightGroup) rightGroup = drawOn(planMap, features);
   } else if (planMapLive() && !rightGroup) {
     rightGroup = drawOn(planMap, features);
   }
-  if (cold || needDraw) finishInvestLoad(true);
 }
 
 export function initInvestLayer() {
@@ -2307,8 +2213,6 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id === 'dautu') {
-      // Hiện % ngay khi chọn F, trước khi fetch/vẽ (tránh “không thấy gì” vì UI bị đóng băng).
-      primeInvestLoad();
       ensureInvestOn();
       ensureInvestList();
       return;
