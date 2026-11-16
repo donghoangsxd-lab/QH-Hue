@@ -903,25 +903,44 @@ function growKeysFromSeed(stamp, seed, openLots, areaTol, gapM = 15) {
 
 /**
  * Chọn 1+ hatch cho tem (phủ thuộc tính hatch, không bắt buộc hết tem).
+ * Ưu tiên: (1) tem trên lô + DT ±5% → ghép trước; (2) trên lô + tên → gộp cạnh;
+ * (3) gần bao ≤ 50 m + tên + DT. Tem đã trên hatch thì không nhảy sang lô khác.
  * @returns {{ keys: string[], how: string, lot: object|null }}
  */
 function preferAssign(stamp, openLots, nearM, areaTol) {
   if (!stamp || !(openLots || []).length) return { keys: [], how: '', lot: null };
   const scored = openLots.map(l => scoreLot(stamp, l, nearM, areaTol));
+  const onHits = scored.filter(s => s.hit === 'in' || s.hit === 'hole');
 
-  // (A) Tem nằm trên hatch + ký hiệu ↔ layer → gộp cạnh nếu DT lệch > 5%.
-  const onNamed = scored
-    .filter(s => (s.hit === 'in' || s.hit === 'hole') && s.name)
+  const byAreaFit = (a, b) => {
+    const ca = stampAreaVsLots(stamp, [a.lot], [String(a.lot.key)], areaTol);
+    const cb = stampAreaVsLots(stamp, [b.lot], [String(b.lot.key)], areaTol);
+    const oa = ca.ok ? 0 : 1;
+    const ob = cb.ok ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    const ra = ca.ratio == null ? 99 : ca.ratio;
+    const rb = cb.ratio == null ? 99 : cb.ratio;
+    return ra - rb || (a.lot.area || 0) - (b.lot.area || 0);
+  };
+
+  // (1) Tem nằm trên hatch + diện tích tương đương (±5%) — không bắt buộc khớp tên.
+  const onArea = onHits
+    .filter(s => stampAreaMatch(stamp, s.lot, areaTol))
     .sort((a, b) => {
-      const ca = stampAreaVsLots(stamp, [a.lot], [String(a.lot.key)], areaTol);
-      const cb = stampAreaVsLots(stamp, [b.lot], [String(b.lot.key)], areaTol);
-      const oa = ca.ok ? 0 : 1;
-      const ob = cb.ok ? 0 : 1;
-      if (oa !== ob) return oa - ob;
-      const ra = ca.ratio == null ? 99 : ca.ratio;
-      const rb = cb.ratio == null ? 99 : cb.ratio;
-      return ra - rb || (a.lot.area || 0) - (b.lot.area || 0);
+      const na = a.name ? 0 : 1;
+      const nb = b.name ? 0 : 1;
+      if (na !== nb) return na - nb;
+      return byAreaFit(a, b);
     });
+  if (onArea.length) {
+    const best = onArea[0];
+    const parts = [best.hit === 'hole' ? 'hole' : 'pos', 'area'];
+    if (best.name) parts.push('name');
+    return { keys: [String(best.lot.key)], how: parts.join('+'), lot: best.lot };
+  }
+
+  // (2) Tem trên hatch + khớp loại → gộp hatch cạnh cùng loại đến khi DT ±5%.
+  const onNamed = onHits.filter(s => s.name).sort(byAreaFit);
   if (onNamed.length) {
     const seed = onNamed[0].lot;
     const keys = growKeysFromSeed(stamp, seed, openLots, areaTol);
@@ -930,13 +949,15 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
     const parts = [onNamed[0].hit === 'hole' ? 'hole' : 'pos', 'name'];
     if (cmp.ok) parts.push('area');
     if (keys.length > 1) parts.push('multi');
-    // Có DT trên tem mà không khớp ±5% sau gộp → không chốt.
     const stampM2 = stampAreaM2(stamp.areaRaw, seed.area);
     if (stampM2 > 0 && !cmp.ok) return { keys: [], how: '', lot: null };
     return { keys, how: parts.join('+'), lot: seed };
   }
 
-  // (B) ≤ 50 m tới bao + khớp loại + DT → một hatch.
+  // Tem đã nằm trên hatch (chưa đủ DT/tên) → không nhảy sang lô «gần» khác.
+  if (onHits.length) return { keys: [], how: '', lot: null };
+
+  // (3) ≤ 50 m tới bao + khớp loại + DT → một hatch.
   const nearTrio = scored
     .filter(s => s.near && s.name && s.area && s.hit !== 'in' && s.hit !== 'hole')
     .sort((a, b) => {
@@ -1090,7 +1111,9 @@ function pickKeysMatchingArea(stamp, pool, tol) {
 }
 
 /**
- * Gợi ý ghép tem → 1+ hatch chưa gán: cùng loại, cạnh nhau, tổng DT ≈ tem (±5%).
+ * Gợi ý ghép tem → 1+ hatch chưa gán.
+ * Luật cứng: tem đang nằm trên hatch nào thì chỉ gợi ý hatch đó (và hatch cạnh
+ * cùng loại nếu cần gộp DT) — tuyệt đối không nhảy sang lô cách hàng trăm mét.
  * @returns {string[]} khóa lô
  */
 export function suggestStampLotKeys(stamp, lots, opt = {}) {
@@ -1098,75 +1121,94 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
   const nearM = Number.isFinite(opt.nearM) ? opt.nearM : STAMP_HINT_NEAR_M;
   const gapM = Number.isFinite(opt.gapM) ? opt.gapM : STAMP_HINT_GAP_M;
   if (!stamp || !(lots || []).length) return [];
-  // Chỉ dùng khoảng cách tâm (O(1)/lô) — không minDistToLot trên mọi hatch.
+
   const enriched = (lots || []).map(l => {
     const bbox = lotBboxOf(l);
+    let on = false;
+    // PIP chỉ khi tem gần bbox — tránh quét đỉnh mọi hatch.
+    if (stampInLotBbox(stamp, l, 30)) {
+      const hit = bestHit(stamp, l);
+      on = hit === 'in' || hit === 'hole';
+    }
     return {
       ...l,
       _bbox: bbox,
       _dist: centroidDistM(stamp, l),
-      _named: stampNameMatch(stamp, l)
+      _named: stampNameMatch(stamp, l),
+      _on: on
     };
   });
-  // Ưu tiên cùng loại; nếu layer DXF không nhận tên thì vẫn gợi ý theo vị trí gần tem.
-  let pool = enriched.filter(l => l._named);
-  if (!pool.length) pool = enriched.filter(l => l._dist <= nearM);
-  if (!pool.length) {
-    return enriched
-      .slice()
+
+  const growFrom = (seed, pool) => {
+    const keys = growKeysFromSeed(stamp, seed, pool, areaTol, gapM);
+    if (keys.length) return keys;
+    const soft = [String(seed.key)];
+    pool
+      .filter(v => String(v.key) !== String(seed.key)
+        && seed._bbox && v._bbox && bboxGapM(seed._bbox, v._bbox) <= gapM
+        && (!seed._named || v._named))
       .sort((a, b) => a._dist - b._dist)
-      .filter(l => Number.isFinite(l._dist) && l._dist < Infinity)
-      .slice(0, 3)
-      .map(l => String(l.key));
+      .slice(0, 5)
+      .forEach(v => soft.push(String(v.key)));
+    return soft;
+  };
+
+  // (1) Tem nằm trên hatch → ưu tiên DT tương đương, rồi cùng loại; không nhảy lô xa.
+  const onLots = enriched
+    .filter(l => l._on)
+    .sort((a, b) => {
+      const ca = stampAreaVsLots(stamp, [a], [String(a.key)], areaTol);
+      const cb = stampAreaVsLots(stamp, [b], [String(b.key)], areaTol);
+      const oa = ca.ok ? 0 : 1;
+      const ob = cb.ok ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      const na = a._named ? 0 : 1;
+      const nb = b._named ? 0 : 1;
+      if (na !== nb) return na - nb;
+      const ra = ca.ratio == null ? 99 : ca.ratio;
+      const rb = cb.ratio == null ? 99 : cb.ratio;
+      return ra - rb || (a.area || 0) - (b.area || 0);
+    });
+  if (onLots.length) {
+    const seed = onLots[0];
+    // Solo DT đã khớp → chỉ gợi ý đúng lô chứa tem.
+    if (stampAreaMatch(stamp, seed, areaTol)) return [String(seed.key)];
+    const pool = seed._named
+      ? enriched.filter(l => String(l.key) === String(seed.key) || l._named)
+      : enriched.filter(l => l._on);
+    return growFrom(seed, pool);
   }
-  const seeds = pool.filter(l => l._dist <= nearM).sort((a, b) => a._dist - b._dist);
-  if (!seeds.length) {
-    const solo = pool
-      .filter(l => l._dist <= nearM * 2 && stampAreaMatch(stamp, l, areaTol))
-      .sort((a, b) => a._dist - b._dist);
-    if (solo[0]) return [String(solo[0].key)];
-    return pool
-      .slice()
-      .sort((a, b) => a._dist - b._dist)
-      .filter(l => Number.isFinite(l._dist) && l._dist < Infinity)
-      .slice(0, 3)
-      .map(l => String(l.key));
-  }
+
+  // (2) Không nằm trên hatch nào: chỉ lô gần (bbox/tâm ≤ nearM), ưu tiên cùng loại.
+  const nearOk = (l) => l._dist <= nearM || stampInLotBbox(stamp, l, nearM);
+  let pool = enriched.filter(l => l._named && nearOk(l));
+  if (!pool.length) pool = enriched.filter(nearOk);
+  if (!pool.length) return [];
+
+  const seeds = pool.slice().sort((a, b) => a._dist - b._dist);
   const seen = new Set();
   for (const seed of seeds) {
-    if (seen.has(seed.key)) continue;
+    if (seen.has(String(seed.key))) continue;
     const comp = [];
     const q = [seed];
-    const vis = new Set([seed.key]);
+    const vis = new Set([String(seed.key)]);
     while (q.length) {
       const u = q.shift();
       comp.push(u);
       pool.forEach(v => {
-        if (vis.has(v.key) || !u._bbox || !v._bbox) return;
+        const vk = String(v.key);
+        if (vis.has(vk) || !u._bbox || !v._bbox) return;
         if (bboxGapM(u._bbox, v._bbox) > gapM) return;
-        if (seed._named && v._named === false) return;
-        if (!seed._named && v._dist > nearM) return;
-        vis.add(v.key);
+        if (seed._named && !v._named) return;
+        vis.add(vk);
         q.push(v);
       });
     }
-    comp.forEach(l => seen.add(l.key));
-    comp.sort((a, b) => a._dist - b._dist);
-    const keys = pickKeysMatchingArea(stamp, comp, areaTol);
+    comp.forEach(l => seen.add(String(l.key)));
+    const keys = pickKeysMatchingArea(stamp, comp.sort((a, b) => a._dist - b._dist), areaTol);
     if (keys.length) return keys;
   }
-  const soft = seeds.slice(0, 1);
-  if (soft.length) {
-    const seed = soft[0];
-    const keys = [String(seed.key)];
-    pool
-      .filter(v => v.key !== seed.key && seed._bbox && v._bbox && bboxGapM(seed._bbox, v._bbox) <= gapM)
-      .sort((a, b) => a._dist - b._dist)
-      .slice(0, 5)
-      .forEach(v => keys.push(String(v.key)));
-    return keys;
-  }
-  return [];
+  return growFrom(seeds[0], pool);
 }
 
 /**
@@ -1187,7 +1229,7 @@ export function suggestPendingStampHints(pending, freeLots, opt = {}) {
   return hints;
 }
 
-/** Giải thích vì sao tem không tự khớp (luật trên-hatch+tên / gần 50m+DT+tên). */
+/** Giải thích vì sao tem không tự khớp (ưu tiên trên-hatch+DT / trên-hatch+tên / gần 50m). */
 export function stampPendingWhy(stamp, lots, opt = {}) {
   const nearM = Number.isFinite(opt.tolM) ? opt.tolM : STAMP_NEAR_AUTO_M;
   const areaTol = Number.isFinite(opt.areaTol) ? opt.areaTol : STAMP_AUTO_AREA_TOL;
@@ -1202,10 +1244,12 @@ export function stampPendingWhy(stamp, lots, opt = {}) {
   const scored = pool.map(l => scoreLot(stamp, l, nearM, areaTol)).sort((a, b) => b.n - a.n);
   const best = scored[0];
   if (!best || best.n === 0) {
-    return 'Không có hatch cùng loại gần tem (trên hatch / ≤ 50 m) để gán thuộc tính.';
+    return 'Không có hatch chứa tem hoặc gần tem (≤ 50 m) để gán thuộc tính.';
   }
-  if ((best.hit === 'in' || best.hit === 'hole') && best.name) {
-    return 'Tem trên hatch cùng loại nhưng tổng diện tích các hatch cạnh chưa khớp tem trong ± 5% — chọn thêm/bớt lô tay.';
+  if ((best.hit === 'in' || best.hit === 'hole') && !best.area) {
+    return best.name
+      ? 'Tem trên hatch cùng loại nhưng tổng diện tích các hatch cạnh chưa khớp tem trong ± 5% — chọn thêm/bớt lô tay.'
+      : 'Tem đang nằm trên hatch nhưng diện tích lệch > 5% — gán tay hoặc chọn thêm hatch cạnh.';
   }
   if (best.near && best.name && !best.area) {
     return 'Tem gần hatch cùng loại nhưng diện tích lệch > 5% — gán tay hoặc chọn thêm hatch cạnh.';

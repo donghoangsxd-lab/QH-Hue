@@ -1186,6 +1186,9 @@ assert.match(read('public/js/entryFlows.js'), /_mau: 'lo'|focusStampOnMap|landCo
 assert.match(read('public/js/entryFlows.js'), /bindStampLotPick|lotIndexAt|booleanPointInPolygon|setStampLotPickCursor/);
 assert.match(read('public/js/entryFlows.js'), /reuseProject|patchStampAssignChrome|replaceStampBox/);
 assert.match(read('public/js/landStamp.js'), /suggestStampLotKeys|suggestPendingStampHints|STAMP_HINT_GAP_M/);
+assert.match(read('public/js/landStamp.js'), /_on:\s*on|Tem nằm trên hatch|không nhảy sang lô/);
+assert.match(read('public/js/landStamp.js'), /diện tích tương đương|pos\+area|onArea/);
+assert.match(read('public/js/landStamp.js'), /if \(onHits\.length\) return \{ keys: \[\], how: '', lot: null \}/);
 assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6|cad-slot-pair|suggestStampLotKeys/);
 assert.match(read('public/js/entryFlows.js'), /userOnly:\s*true|paintStampMarkers\(bag,\s*\{\s*light:\s*true/);
 assert.match(read('public/js/landStamp.js'), /stampInLotBbox|centroidDistM|STAMP_AUTO_AREA_TOL|STAMP_NEAR_AUTO_M|growKeysFromSeed|preferAssign/);
