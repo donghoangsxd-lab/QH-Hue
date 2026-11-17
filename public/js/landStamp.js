@@ -838,17 +838,68 @@ function scoreLot(stamp, lot, tol, areaTol) {
   return { lot, pos, name, area, n, hit, near, how: parts.join('+') };
 }
 
+/** Trọng số khoảng cách trong điểm Q3: score = |ΔDT| + ε·dist(m). */
+export const Q3_DIST_WEIGHT = 0.01;
+/** Hatch «quanh tem» khi gộp multi (m, bbox/tâm). */
+export const STAMP_MULTI_AROUND_M = 150;
+
+function layerKeyOf(lot) {
+  return foldCompact(lot && lot.layer || '');
+}
+
+/** Cùng một layer hatch (ràng buộc chặt multi — không gom họ loại lỏng). */
+export function lotsSameLayer(a, b) {
+  const ka = layerKeyOf(a);
+  const kb = layerKeyOf(b);
+  return !!(ka && kb && ka === kb);
+}
+
+/** Tem nằm trên hatch? PIP chỉ khi gần bbox. */
+function stampOnLotHit(stamp, lot, padM = 60) {
+  if (!stampInLotBbox(stamp, lot, padM)) return '';
+  const hit = bestHit(stamp, lot);
+  return (hit === 'in' || hit === 'hole') ? hit : '';
+}
+
+function areaDiffM2(stamp, lot) {
+  if (!lot || !(lot.area > 0)) return Infinity;
+  const stampM2 = stampAreaM2(stamp && stamp.areaRaw, lot.area);
+  if (!(stampM2 > 0)) return Infinity;
+  return Math.abs(lot.area - stampM2);
+}
+
+/** Điểm Q3: lệch diện tích (m²) + 0.01 × khoảng cách tâm. */
+export function q3PairScore(stamp, lot) {
+  return areaDiffM2(stamp, lot) + Q3_DIST_WEIGHT * centroidDistM(stamp, lot);
+}
+
+/** Hatch quanh vị trí tem (bbox pad hoặc tâm ≤ aroundM). */
+function lotAroundStamp(stamp, lot, aroundM) {
+  if (!stamp || !lot) return false;
+  if (stampInLotBbox(stamp, lot, aroundM)) return true;
+  return centroidDistM(stamp, lot) <= aroundM;
+}
+
 /**
- * Một tem → nhiều hatch chỉ khi: mỗi hatch khớp ký hiệu tem, cạnh nhau,
- * và tổng DT ≈ diện tích tem (lệch ≤ areaTol, mặc định 5%).
- * Không có DT trên tem → chỉ seed. Không đạt ±tol → [] (không multi lung tung).
+ * Một tem → nhiều hatch (chặt):
+ * (1) cùng một layer với seed, (2) biên cạnh nhau (gap ≤ gapM),
+ * (3) mọi hatch quanh vị trí tem, (4) tổng DT ≈ tem (± areaTol).
+ * Không có DT trên tem → chỉ seed. Không đạt → [].
  */
-function growKeysFromSeed(stamp, seed, openLots, areaTol, gapM = 15) {
+function growKeysFromSeed(stamp, seed, openLots, areaTol, gapM = 15, aroundM = STAMP_MULTI_AROUND_M) {
   if (!stamp || !seed) return [];
   const seedKey = String(seed.key);
-  // Chỉ hatch cùng loại với ký hiệu tem (không gom theo họ layer lỏng).
-  const same = (openLots || []).filter(l =>
-    String(l.key) === seedKey || stampNameMatch(stamp, l));
+  const layer = layerKeyOf(seed);
+  if (!layer) {
+    const stampM2 = stampAreaM2(stamp.areaRaw, seed.area);
+    if (!(stampM2 > 0)) return [seedKey];
+    return stampAreaVsLots(stamp, [seed], [seedKey], areaTol).ok ? [seedKey] : [];
+  }
+  const same = (openLots || []).filter(l => {
+    if (String(l.key) === seedKey) return true;
+    if (!lotsSameLayer(seed, l)) return false;
+    return lotAroundStamp(stamp, l, aroundM);
+  });
   const comp = [];
   const q = [seed];
   const vis = new Set([seedKey]);
@@ -864,21 +915,20 @@ function growKeysFromSeed(stamp, seed, openLots, areaTol, gapM = 15) {
     });
   }
   const stampM2 = stampAreaM2(stamp.areaRaw, seed.area);
-  // Thiếu DT trên tem: không suy multi — chỉ hatch đang chứa tem.
   if (!(stampM2 > 0)) return [seedKey];
   const solo = stampAreaVsLots(stamp, [seed], [seedKey], areaTol);
   if (solo.ok) return [seedKey];
 
   const others = comp
     .filter(l => String(l.key) !== seedKey)
-    .sort((a, b) => centroidDistM(stamp, a) - centroidDistM(stamp, b));
+    .sort((a, b) => q3PairScore(stamp, a) - q3PairScore(stamp, b));
   const pool = [seed, ...others];
   const n = pool.length;
   if (n <= 12) {
     let best = null;
     const total = 1 << n;
     for (let mask = 1; mask < total; mask++) {
-      if (!(mask & 1)) continue; // luôn gồm seed
+      if (!(mask & 1)) continue;
       const keys = [];
       for (let i = 0; i < n; i++) if (mask & (1 << i)) keys.push(String(pool[i].key));
       const cmp = stampAreaVsLots(stamp, pool, keys, areaTol);
@@ -902,9 +952,8 @@ function growKeysFromSeed(stamp, seed, openLots, areaTol, gapM = 15) {
 }
 
 /**
- * Chọn 1+ hatch cho tem (phủ thuộc tính hatch, không bắt buộc hết tem).
- * Ưu tiên: (1) tem trên lô + DT ±5% → ghép trước; (2) trên lô + tên → gộp cạnh;
- * (3) gần bao ≤ 50 m + tên + DT. Tem đã trên hatch thì không nhảy sang lô khác.
+ * Chọn 1+ hatch cho một tem (dùng giải thích / gợi ý).
+ * Q3: trên hatch + DT → score ΔDT+dist; multi cùng layer cạnh quanh tem; rồi gần 50 m.
  * @returns {{ keys: string[], how: string, lot: object|null }}
  */
 function preferAssign(stamp, openLots, nearM, areaTol) {
@@ -912,26 +961,10 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
   const scored = openLots.map(l => scoreLot(stamp, l, nearM, areaTol));
   const onHits = scored.filter(s => s.hit === 'in' || s.hit === 'hole');
 
-  const byAreaFit = (a, b) => {
-    const ca = stampAreaVsLots(stamp, [a.lot], [String(a.lot.key)], areaTol);
-    const cb = stampAreaVsLots(stamp, [b.lot], [String(b.lot.key)], areaTol);
-    const oa = ca.ok ? 0 : 1;
-    const ob = cb.ok ? 0 : 1;
-    if (oa !== ob) return oa - ob;
-    const ra = ca.ratio == null ? 99 : ca.ratio;
-    const rb = cb.ratio == null ? 99 : cb.ratio;
-    return ra - rb || (a.lot.area || 0) - (b.lot.area || 0);
-  };
-
-  // (1) Tem nằm trên hatch + diện tích tương đương (±5%) — không bắt buộc khớp tên.
+  // (1) Q3 solo: tem trên hatch + DT ±5% — chọn score nhỏ nhất.
   const onArea = onHits
     .filter(s => stampAreaMatch(stamp, s.lot, areaTol))
-    .sort((a, b) => {
-      const na = a.name ? 0 : 1;
-      const nb = b.name ? 0 : 1;
-      if (na !== nb) return na - nb;
-      return byAreaFit(a, b);
-    });
+    .sort((a, b) => q3PairScore(stamp, a.lot) - q3PairScore(stamp, b.lot));
   if (onArea.length) {
     const best = onArea[0];
     const parts = [best.hit === 'hole' ? 'hole' : 'pos', 'area'];
@@ -939,23 +972,44 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
     return { keys: [String(best.lot.key)], how: parts.join('+'), lot: best.lot };
   }
 
-  // (2) Tem trên hatch + khớp loại → gộp hatch cạnh cùng loại đến khi DT ±5%.
-  const onNamed = onHits.filter(s => s.name).sort(byAreaFit);
-  if (onNamed.length) {
-    const seed = onNamed[0].lot;
-    const keys = growKeysFromSeed(stamp, seed, openLots, areaTol);
-    if (!keys.length) return { keys: [], how: '', lot: null };
-    const cmp = stampAreaVsLots(stamp, openLots, keys, areaTol);
-    const parts = [onNamed[0].hit === 'hole' ? 'hole' : 'pos', 'name'];
-    if (cmp.ok) parts.push('area');
-    if (keys.length > 1) parts.push('multi');
-    const stampM2 = stampAreaM2(stamp.areaRaw, seed.area);
-    if (stampM2 > 0 && !cmp.ok) return { keys: [], how: '', lot: null };
-    return { keys, how: parts.join('+'), lot: seed };
+  // (2) Multi: seed = hatch chứa tem, gộp cạnh cùng layer quanh tem đến ± DT.
+  if (onHits.length) {
+    const seeds = onHits
+      .slice()
+      .sort((a, b) => {
+        const la = layerKeyOf(a.lot) ? 0 : 1;
+        const lb = layerKeyOf(b.lot) ? 0 : 1;
+        if (la !== lb) return la - lb;
+        return q3PairScore(stamp, a.lot) - q3PairScore(stamp, b.lot);
+      });
+    for (const s of seeds) {
+      const seed = s.lot;
+      const stampM2 = stampAreaM2(stamp.areaRaw, seed.area);
+      if (!(stampM2 > 0)) continue;
+      const keys = growKeysFromSeed(stamp, seed, openLots, areaTol);
+      if (keys.length < 2) continue;
+      const cmp = stampAreaVsLots(stamp, openLots, keys, areaTol);
+      if (!cmp.ok) continue;
+      return {
+        keys,
+        how: (s.hit === 'hole' ? 'hole' : 'pos') + '+area+multi',
+        lot: seed
+      };
+    }
+    // (2b) Tem trên hatch + khớp loại, không có DT trên tem → một hatch.
+    const onNamed = onHits
+      .filter(s => s.name && !(stampAreaM2(stamp.areaRaw, s.lot.area) > 0))
+      .sort((a, b) => centroidDistM(stamp, a.lot) - centroidDistM(stamp, b.lot));
+    if (onNamed.length) {
+      const best = onNamed[0];
+      return {
+        keys: [String(best.lot.key)],
+        how: (best.hit === 'hole' ? 'hole' : 'pos') + '+name',
+        lot: best.lot
+      };
+    }
+    return { keys: [], how: '', lot: null };
   }
-
-  // Tem đã nằm trên hatch (chưa đủ DT/tên) → không nhảy sang lô «gần» khác.
-  if (onHits.length) return { keys: [], how: '', lot: null };
 
   // (3) ≤ 50 m tới bao + khớp loại + DT → một hatch.
   const nearTrio = scored
@@ -963,7 +1017,7 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
     .sort((a, b) => {
       const da = minDistToLot(stamp, a.lot);
       const db = minDistToLot(stamp, b.lot);
-      return da - db || (a.lot.area || 0) - (b.lot.area || 0);
+      return da - db || q3PairScore(stamp, a.lot) - q3PairScore(stamp, b.lot);
     });
   if (nearTrio.length === 1) {
     return { keys: [String(nearTrio[0].lot.key)], how: 'near+name+area', lot: nearTrio[0].lot };
@@ -973,8 +1027,7 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
     const second = nearTrio[1];
     const d0 = minDistToLot(stamp, best.lot);
     const d1 = minDistToLot(stamp, second.lot);
-    if (d0 + 1 < d1 || (best.lot.area && second.lot.area && best.lot.area !== second.lot.area
-      && stampAreaMatch(stamp, best.lot, areaTol) && !stampAreaMatch(stamp, second.lot, areaTol))) {
+    if (d0 + 1 < d1 || q3PairScore(stamp, best.lot) + 1 < q3PairScore(stamp, second.lot)) {
       return { keys: [String(best.lot.key)], how: 'near+name+area', lot: best.lot };
     }
     return { keys: [], how: '', lot: null };
@@ -1145,8 +1198,9 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
     const soft = [String(seed.key)];
     pool
       .filter(v => String(v.key) !== String(seed.key)
-        && seed._bbox && v._bbox && bboxGapM(seed._bbox, v._bbox) <= gapM
-        && (!seed._named || v._named))
+        && lotsSameLayer(seed, v)
+        && lotAroundStamp(stamp, v, STAMP_MULTI_AROUND_M)
+        && seed._bbox && v._bbox && bboxGapM(seed._bbox, v._bbox) <= gapM)
       .sort((a, b) => a._dist - b._dist)
       .slice(0, 5)
       .forEach(v => soft.push(String(v.key)));
@@ -1173,9 +1227,10 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
     const seed = onLots[0];
     // Solo DT đã khớp → chỉ gợi ý đúng lô chứa tem.
     if (stampAreaMatch(stamp, seed, areaTol)) return [String(seed.key)];
-    const pool = seed._named
-      ? enriched.filter(l => String(l.key) === String(seed.key) || l._named)
-      : enriched.filter(l => l._on);
+    // Multi chặt: cùng layer seed, quanh tem (growKeysFromSeed tự lọc layer + cạnh).
+    const pool = enriched.filter(l =>
+      String(l.key) === String(seed.key)
+      || (lotsSameLayer(seed, l) && lotAroundStamp(stamp, l, STAMP_MULTI_AROUND_M)));
     return growFrom(seed, pool);
   }
 
@@ -1229,7 +1284,7 @@ export function suggestPendingStampHints(pending, freeLots, opt = {}) {
   return hints;
 }
 
-/** Giải thích vì sao tem không tự khớp (ưu tiên trên-hatch+DT / trên-hatch+tên / gần 50m). */
+/** Giải thích vì sao tem không tự khớp (Q3 trên-hatch+DT / multi cùng layer / gần 50m). */
 export function stampPendingWhy(stamp, lots, opt = {}) {
   const nearM = Number.isFinite(opt.tolM) ? opt.tolM : STAMP_NEAR_AUTO_M;
   const areaTol = Number.isFinite(opt.areaTol) ? opt.areaTol : STAMP_AUTO_AREA_TOL;
@@ -1247,9 +1302,7 @@ export function stampPendingWhy(stamp, lots, opt = {}) {
     return 'Không có hatch chứa tem hoặc gần tem (≤ 50 m) để gán thuộc tính.';
   }
   if ((best.hit === 'in' || best.hit === 'hole') && !best.area) {
-    return best.name
-      ? 'Tem trên hatch cùng loại nhưng tổng diện tích các hatch cạnh chưa khớp tem trong ± 5% — chọn thêm/bớt lô tay.'
-      : 'Tem đang nằm trên hatch nhưng diện tích lệch > 5% — gán tay hoặc chọn thêm hatch cạnh.';
+    return 'Tem đang nằm trên hatch nhưng diện tích lệch > 5% và chưa gộp được hatch cùng layer cạnh quanh tem — chọn thêm/bớt lô tay.';
   }
   if (best.near && best.name && !best.area) {
     return 'Tem gần hatch cùng loại nhưng diện tích lệch > 5% — gán tay hoặc chọn thêm hatch cạnh.';
@@ -1271,8 +1324,8 @@ export function stampPendingWhy(stamp, lots, opt = {}) {
 /**
  * lots: { key, area, rings, layer?, name?, lotCode?, typeKey? }.
  * assign / skip: gán tay (assign[id] = key | key[]).
- * areaTol mặc định 5% (tự pair); tolM mặc định 50 m (gần bao).
- * Một tem → nhiều hatch (keys); mục tiêu phủ thuộc tính mọi hatch.
+ * Ghép: (1) greedy Q3 tem-trên-hatch + DT, (2) multi cùng layer cạnh quanh tem,
+ * (3) gần bao ≤ 50 m + tên + DT.
  */
 export function matchStamps(stamps, lots, opt = {}) {
   const assign = opt.assign || {};
@@ -1302,80 +1355,167 @@ export function matchStamps(stamps, lots, opt = {}) {
 
   const free = () => (lots || []).filter(l => !used.has(String(l.key)));
   const openStamps = () => (stamps || []).filter(s => !taken.has(s.id) && !skip.has(s.id));
+  const pad = Math.max(nearM * 3, 60);
 
-  const rankHow = (how) => {
-    const p = String(how || '').split('+').filter(Boolean);
-    // multi = phủ nhiều hatch — ưu tiên hơn pair đơn cùng số tiêu chí.
-    return (p.includes('multi') ? -1 : 0) + (3 - p.filter(x => x !== 'multi').length);
-  };
-
-  let guard = 0;
-  while (guard++ < 1000) {
-    const open = free();
-    const left = openStamps();
-    if (!left.length) break;
-    const props = left.map(s => {
-      const pref = preferAssign(s, open, nearM, areaTol);
-      return {
-        stamp: s,
-        keys: pref.keys || [],
-        lot: pref.lot,
-        how: pref.how
-      };
-    }).filter(p => p.keys.length && p.lot);
-    if (!props.length) {
-      left.forEach(s => pending.push(s));
-      break;
-    }
-    // Xung đột theo hatch seed (lô đầu); tem multi khóa mọi keys khi chốt.
-    const byLot = new Map();
-    props.forEach(p => {
-      const k = String(p.lot.key);
-      const g = byLot.get(k) || [];
-      g.push(p);
-      byLot.set(k, g);
-    });
-    let progressed = false;
-    const singles = [];
-    const conflicts = [];
-    byLot.forEach((group, key) => {
-      if (group.length === 1) singles.push(group[0]);
-      else conflicts.push({ key, group });
-    });
-    singles.sort((a, b) => rankHow(a.how) - rankHow(b.how));
-    singles.forEach(p => {
-      if (taken.has(p.stamp.id)) return;
-      if (p.keys.some(k => used.has(String(k)))) return;
-      if (claim(p.stamp, p.keys, p.how || 'auto')) progressed = true;
-    });
-    conflicts.forEach(({ key, group }) => {
-      if (used.has(String(key))) return;
-      const merged = mergeGroup(group);
-      if (merged && claim(merged, key, 'merge')) {
-        progressed = true;
-        return;
-      }
-      const scored = group.slice().sort((a, b) => rankHow(a.how) - rankHow(b.how));
-      const best = scored[0];
-      const bestN = String(best.how || '').split('+').filter(x => x && x !== 'multi').length;
-      const secondN = scored[1]
-        ? String(scored[1].how || '').split('+').filter(x => x && x !== 'multi').length
-        : 0;
-      if (bestN >= 2 && bestN > secondN && claim(best.stamp, best.keys?.length ? best.keys : key, best.how)) {
-        progressed = true;
-        return;
-      }
-      group.forEach(p => {
-        if (!taken.has(p.stamp.id)) pending.push(p.stamp);
-        taken.add(p.stamp.id);
+  // —— Pass 1 (Q3): ứng viên tem ∈ hatch + DT ±tol → greedy min(|ΔDT| + 0.01·dist) ——
+  {
+    let table = [];
+    openStamps().forEach(stamp => {
+      free().forEach(lot => {
+        const hit = stampOnLotHit(stamp, lot, pad);
+        if (!hit) return;
+        if (!stampAreaMatch(stamp, lot, areaTol)) return;
+        table.push({ stamp, lot, hit, score: q3PairScore(stamp, lot) });
       });
-      progressed = true;
     });
-    if (!progressed) {
-      left.forEach(s => { if (!taken.has(s.id)) pending.push(s); });
-      break;
+    while (table.length) {
+      let best = null;
+      for (const item of table) {
+        if (!best || item.score < best.score) best = item;
+      }
+      if (!best) break;
+      const how = (best.hit === 'hole' ? 'hole' : 'pos') + '+area'
+        + (stampNameMatch(best.stamp, best.lot) ? '+name' : '');
+      claim(best.stamp, [String(best.lot.key)], how);
+      const sid = best.stamp.id;
+      const lk = String(best.lot.key);
+      table = table.filter(x => x.stamp.id !== sid && String(x.lot.key) !== lk
+        && !taken.has(x.stamp.id) && !used.has(String(x.lot.key)));
     }
   }
+
+  // —— Pass 1b: gộp nhiều block tem cùng nằm trên một hatch (ATTRIB tách) ——
+  {
+    let guard = 0;
+    while (guard++ < 200) {
+      let progressed = false;
+      for (const row of assigned) {
+        const lot = (lots || []).find(l => String(l.key) === String(row.key));
+        if (!lot) continue;
+        const extras = openStamps().filter(s => stampOnLotHit(s, lot, pad));
+        if (!extras.length) continue;
+        const tryMerge = (extraList) => {
+          const merged = mergeGroup([{ stamp: row.stamp }, ...extraList.map(s => ({ stamp: s }))]);
+          if (!merged) return false;
+          extraList.forEach(s => {
+            (s.members || [s.id]).forEach(id => taken.add(id));
+            taken.add(s.id);
+          });
+          row.stamp = merged;
+          row.how = 'merge';
+          return true;
+        };
+        if (tryMerge(extras)) {
+          progressed = true;
+          continue;
+        }
+        for (const ex of extras) {
+          if (tryMerge([ex])) {
+            progressed = true;
+            break;
+          }
+        }
+      }
+      // Hatch trống: nhiều tem trên đó gộp được + DT khớp → nhận luôn.
+      free().forEach(lot => {
+        const on = openStamps().filter(s => stampOnLotHit(s, lot, pad));
+        if (on.length < 2) return;
+        const merged = mergeGroup(on.map(s => ({ stamp: s })));
+        if (!merged) return;
+        if (!stampAreaMatch(merged, lot, areaTol) && stampAreaM2(merged.areaRaw, lot.area) > 0) return;
+        // Có DT thì phải khớp; không DT vẫn gộp nếu mọi tem trên hatch (legacy hole/name).
+        if (stampAreaM2(merged.areaRaw, lot.area) > 0 && !stampAreaMatch(merged, lot, areaTol)) return;
+        if (claim(merged, [String(lot.key)], 'merge')) progressed = true;
+      });
+      if (!progressed) break;
+    }
+  }
+
+  // —— Pass 2: multi — 1 tem thừa + nhiều hatch thừa cùng layer cạnh quanh tem ——
+  {
+    let guard = 0;
+    while (guard++ < 500) {
+      const left = openStamps();
+      if (!left.length) break;
+      let progressed = false;
+      for (const stamp of left) {
+        const open = free();
+        const seeds = open
+          .map(lot => ({ lot, hit: stampOnLotHit(stamp, lot, pad) }))
+          .filter(x => x.hit)
+          .sort((a, b) => {
+            const la = layerKeyOf(a.lot) ? 0 : 1;
+            const lb = layerKeyOf(b.lot) ? 0 : 1;
+            if (la !== lb) return la - lb;
+            return q3PairScore(stamp, a.lot) - q3PairScore(stamp, b.lot);
+          });
+        for (const { lot: seed, hit } of seeds) {
+          const keys = growKeysFromSeed(stamp, seed, open, areaTol);
+          if (keys.length < 2) continue;
+          const cmp = stampAreaVsLots(stamp, open, keys, areaTol);
+          if (!cmp.ok) continue;
+          if (claim(stamp, keys, (hit === 'hole' ? 'hole' : 'pos') + '+area+multi')) {
+            progressed = true;
+            break;
+          }
+        }
+        if (progressed) break;
+      }
+      if (!progressed) break;
+    }
+  }
+
+  // —— Pass 2.5: tem trên hatch + khớp loại, không có DT → greedy theo khoảng cách ——
+  {
+    let table = [];
+    openStamps().forEach(stamp => {
+      free().forEach(lot => {
+        const hit = stampOnLotHit(stamp, lot, pad);
+        if (!hit) return;
+        if (!stampNameMatch(stamp, lot)) return;
+        if (stampAreaM2(stamp.areaRaw, lot.area) > 0) return;
+        table.push({ stamp, lot, hit, score: centroidDistM(stamp, lot) });
+      });
+    });
+    while (table.length) {
+      let best = null;
+      for (const item of table) {
+        if (!best || item.score < best.score) best = item;
+      }
+      if (!best) break;
+      claim(best.stamp, [String(best.lot.key)], (best.hit === 'hole' ? 'hole' : 'pos') + '+name');
+      const sid = best.stamp.id;
+      const lk = String(best.lot.key);
+      table = table.filter(x => x.stamp.id !== sid && String(x.lot.key) !== lk
+        && !taken.has(x.stamp.id) && !used.has(String(x.lot.key)));
+    }
+  }
+
+  // —— Pass 3: gần bao ≤ 50 m + tên + DT (tem không nằm trên hatch nào còn trống) ——
+  {
+    let guard = 0;
+    while (guard++ < 500) {
+      const open = free();
+      const left = openStamps();
+      if (!left.length) break;
+      const cands = [];
+      left.forEach(stamp => {
+        const onAny = open.some(lot => stampOnLotHit(stamp, lot, pad));
+        if (onAny) return; // còn trên hatch trống → để pending / không near-jump
+        open.forEach(lot => {
+          const sc = scoreLot(stamp, lot, nearM, areaTol);
+          if (sc.near && sc.name && sc.area && sc.hit !== 'in' && sc.hit !== 'hole') {
+            cands.push({ stamp, lot, score: q3PairScore(stamp, lot) });
+          }
+        });
+      });
+      if (!cands.length) break;
+      cands.sort((a, b) => a.score - b.score);
+      const best = cands[0];
+      if (!claim(best.stamp, [String(best.lot.key)], 'near+name+area')) break;
+    }
+  }
+
   openStamps().forEach(s => pending.push(s));
   const seenPend = new Set();
   const pendingUnique = pending.filter(s => {
