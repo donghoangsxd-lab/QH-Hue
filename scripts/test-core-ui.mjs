@@ -1192,6 +1192,7 @@ assert.match(read('public/js/landStamp.js'), /suggestStampLotKeys|suggestPending
 assert.match(read('public/js/landStamp.js'), /_on:\s*on|Tem nằm trên hatch|không nhảy/);
 assert.match(read('public/js/landStamp.js'), /q3PairScore|Q3_DIST_WEIGHT|lotsSameLayer|STAMP_MULTI_AROUND_M|Pass 1 \(Q3\)/);
 assert.match(read('public/js/landStamp.js'), /cùng một layer|lotAroundStamp|area\+multi/);
+assert.match(read('public/js/landStamp.js'), /stampTyped|không fallback lệch loại|pref\.length >= 3/);
 assert.match(read('public/js/entryFlows.js'), /stampHints|dashArray: '6 5'|#3b82f6|cad-slot-pair|suggestStampLotKeys/);
 assert.match(read('public/js/entryFlows.js'), /userOnly:\s*true|paintStampMarkers\(bag,\s*\{\s*light:\s*true/);
 assert.match(read('public/js/landStamp.js'), /stampInLotBbox|centroidDistM|STAMP_AUTO_AREA_TOL|STAMP_NEAR_AUTO_M|growKeysFromSeed|preferAssign/);
