@@ -766,6 +766,7 @@ export function stampCodePrefix(code) {
 
 /**
  * Rút nguyên tắc tem↔layer từ các cặp đã ghép: tiền tố ký hiệu → tập layer (foldCompact).
+ * Chỉ học cặp đã khớp loại (TT16/tên/user) — không học thuần pos+area lệch loại.
  * Giữ layer xuất hiện ≥ 2 lần hoặc ≥ 50% trong cùng tiền tố.
  * @returns {Map<string, Set<string>>}
  */
@@ -773,13 +774,18 @@ export function learnStampLayerMap(assigned, lots) {
   const byKey = new Map((lots || []).map(l => [String(l.key), l]));
   const counts = new Map();
   (assigned || []).forEach(row => {
-    const pref = stampCodePrefix(row?.stamp?.code);
+    const stamp = row?.stamp;
+    const pref = stampCodePrefix(stamp?.code);
     if (pref.length < 2) return;
+    const how = String(row.how || '');
     const keys = assignKeysOf(row.keys != null ? row.keys : row.key);
     keys.forEach(k => {
       const lot = byKey.get(String(k));
       const lk = layerKeyOf(lot);
       if (!lk) return;
+      // Bỏ cặp chỉ khớp vị trí+DT mà ký hiệu≠layer (tránh OCT học sang tôn giáo).
+      const typedOk = stampNameMatch(stamp, lot) || how.includes('name') || how === 'user' || how === 'merge';
+      if (!typedOk) return;
       if (!counts.has(pref)) counts.set(pref, new Map());
       const m = counts.get(pref);
       m.set(lk, (m.get(lk) || 0) + 1);
@@ -1295,8 +1301,8 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
       || (lotsSameLayer(onSeed, l) && lotAroundStamp(stamp, l, STAMP_MULTI_AROUND_M)));
     return growFrom(onSeed, pool);
   }
-  // Tem đang nằm trên hatch (kể cả layer chưa khớp tên) + DT solo khớp → gợi ý đúng lô đó, không multi lệch loại.
-  const onSolo = onLots.find(l => stampAreaMatch(stamp, l, areaTol));
+  // Tem trên hatch + DT solo: chỉ gợi ý khi cùng loại (tem có ký hiệu thì bắt buộc _named).
+  const onSolo = onLots.find(l => stampAreaMatch(stamp, l, areaTol) && (!stampTyped || l._named));
   if (onSolo) return [String(onSolo.key)];
 
   // (2) Chỉ hatch cùng loại với ký hiệu tem và gần tem — không fallback lệch loại.
@@ -1430,25 +1436,36 @@ export function matchStamps(stamps, lots, opt = {}) {
     layerRules = learnStampLayerMap(assigned, lots);
   };
 
-  // —— Pass 1 (Q3): ứng viên tem ∈ hatch + DT ±tol → greedy min(|ΔDT| + 0.01·dist) ——
+  // —— Pass 1 (Q3): tem ∈ hatch + DT ±tol; ưu tiên cùng loại (tránh OCT→tôn giáo chỉ vì DT) ——
   {
     let table = [];
     openStamps().forEach(stamp => {
+      const cands = [];
       free().forEach(lot => {
         const hit = stampOnLotHit(stamp, lot, pad);
         if (!hit) return;
         if (!stampAreaMatch(stamp, lot, areaTol)) return;
-        table.push({ stamp, lot, hit, score: q3PairScore(stamp, lot) });
+        cands.push({
+          stamp, lot, hit,
+          score: q3PairScore(stamp, lot),
+          named: stampNameMatch(stamp, lot, layerRules)
+        });
       });
+      const typed = !!(stampTypeKey(stamp.code) || stampCodePrefix(stamp.code).length >= 2);
+      // Có ký hiệu nhưng không hatch cùng loại dưới tem → bỏ (không gán/học lệch loại chỉ vì DT).
+      if (typed && !cands.some(c => c.named)) return;
+      const pool = typed ? cands.filter(c => c.named) : cands;
+      pool.forEach(c => table.push(c));
     });
     while (table.length) {
       let best = null;
       for (const item of table) {
-        if (!best || item.score < best.score) best = item;
+        if (!best || item.score < best.score
+          || (item.score === best.score && item.named && !best.named)) best = item;
       }
       if (!best) break;
       const how = (best.hit === 'hole' ? 'hole' : 'pos') + '+area'
-        + (stampNameMatch(best.stamp, best.lot, layerRules) ? '+name' : '');
+        + (best.named || stampNameMatch(best.stamp, best.lot, layerRules) ? '+name' : '');
       claim(best.stamp, [String(best.lot.key)], how);
       const sid = best.stamp.id;
       const lk = String(best.lot.key);
