@@ -713,7 +713,7 @@ assert.deepEqual(hintKeys.sort(), ['ha', 'hb']);
 const hintMap = suggestPendingStampHints([hintStamp], [hintA, hintB]);
 assert.deepEqual(hintMap['hint-oct'].sort(), ['ha', 'hb']);
 
-// Tự pair multi: tem trên hatch A (DT lệch > 5%) → gộp hatch B cùng layer, cạnh, quanh tem.
+// Tự pair multi: tem trên hatch A (DT lệch > 10%) → gộp hatch B cùng layer, cạnh, quanh tem.
 const growA = { key: 'ga', area: 5000, layer: 'DAT_O_Nhomnhao', rings: [ringA] };
 const growB = { key: 'gb', area: 4000, layer: 'DAT_O_Nhomnhao', rings: [ringB] };
 const growStamp = {
@@ -722,7 +722,7 @@ const growStamp = {
   cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon / 2 }]
 };
 assert.ok(lotsSameLayer(growA, growB));
-assert.ok(!stampAreaMatch(growStamp, growA, STAMP_AUTO_AREA_TOL), 'một hatch lệch > 5%');
+assert.ok(!stampAreaMatch(growStamp, growA, STAMP_AUTO_AREA_TOL), 'một hatch lệch > 10%');
 const growMatch = matchStamps([growStamp], [growA, growB]);
 assert.equal(growMatch.assigned.length, 1);
 assert.deepEqual(growMatch.assigned[0].keys.sort(), ['ga', 'gb']);
@@ -757,7 +757,7 @@ assert.equal(nearEdge.assigned.length, 1);
 assert.equal(nearEdge.assigned[0].key, 'nl');
 assert.ok(String(nearEdge.assigned[0].how).includes('near'));
 
-assert.equal(STAMP_AUTO_AREA_TOL, 0.05);
+assert.equal(STAMP_AUTO_AREA_TOL, 0.10);
 assert.equal(STAMP_NEAR_AUTO_M, 50);
 
 // Tem giữa lô to: ưu tiên lô chứa tem + DT — không nhảy sang lô cùng loại cách ~500 m.
