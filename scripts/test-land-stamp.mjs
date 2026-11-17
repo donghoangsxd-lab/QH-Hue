@@ -3,7 +3,7 @@ import {
   parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
   stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf,
   suggestStampLotKeys, suggestPendingStampHints, STAMP_AUTO_AREA_TOL, STAMP_NEAR_AUTO_M,
-  q3PairScore, lotsSameLayer
+  q3PairScore, lotsSameLayer, stampCodePrefix, learnStampLayerMap
 } from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
@@ -911,5 +911,37 @@ const octLotNear = {
 };
 assert.ok(stampNameMatch(octHintStamp, octLotNear));
 assert.deepEqual(suggestStampLotKeys(octHintStamp, [tg1, tg2, octLotNear]), ['oct1']);
+
+// Học nguyên tắc tiền tố tem → layer từ cặp đã ghép, áp cho gợi ý/pair còn lại.
+assert.equal(stampCodePrefix('OCT-A6'), 'OCT');
+assert.equal(stampCodePrefix('TT-A1'), 'TT');
+const learnedLots = [
+  { key: 'L1', area: 1000, layer: 'DAT_O_Nhomnhao', rings: shared },
+  { key: 'L2', area: 1100, layer: 'DAT_O_Nhomnhao', rings: shared },
+  { key: 'TG', area: 900, layer: 'DAT_Ditich_tongiao', rings: shared }
+];
+const learnedAssign = [
+  { stamp: { code: 'OCT-A1' }, key: 'L1', keys: ['L1'] },
+  { stamp: { code: 'OCT-A2' }, key: 'L2', keys: ['L2'] }
+];
+const rules = learnStampLayerMap(learnedAssign, learnedLots);
+assert.ok(rules.get('OCT')?.has('DATONHOMNHAO'));
+assert.ok(!rules.get('OCT')?.has('DATDITICHTONGIAO'));
+assert.ok(stampNameMatch({ code: 'OCT-B9' }, learnedLots[0], rules));
+assert.ok(!stampNameMatch({ code: 'OCT-B9' }, learnedLots[2], rules));
+assert.deepEqual(
+  suggestStampLotKeys({ code: 'OCT-B9', areaRaw: '0.10', lat: ambLat + d / 2, lng: ambLng + d / 2,
+    cands: [{ lat: ambLat + d / 2, lng: ambLng + d / 2 }] }, learnedLots, { layerRules: rules }),
+  ['L1']
+);
+// matchStamps trả layerRules sau khi pair Q3.
+const learnMatch = matchStamps([
+  {
+    id: 'lm1', code: 'OCT-Z1', areaRaw: '0.90', floors: '4', coverage: '60', far: '3',
+    lat: ambLat, lng: ambLng, cands: [{ lat: ambLat, lng: ambLng }]
+  }
+], [bigLot]);
+assert.ok(learnMatch.layerRules?.OCT?.length);
+assert.ok(learnMatch.layerRules.OCT.some(l => /DATO|NHOMNHAO/i.test(l)));
 
 console.log('land-stamp: ok');
