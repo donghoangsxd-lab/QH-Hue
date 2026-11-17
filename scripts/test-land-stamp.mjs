@@ -841,7 +841,8 @@ assert.ok(stampNameMatch(onBareStamp, namedBeside));
 const noJump = matchStamps([onBareStamp], [bareLot, namedBeside], { tolM: STAMP_NEAR_AUTO_M });
 assert.equal(noJump.assigned.length, 0, 'tem trên hatch không được pair lô bên cạnh');
 assert.equal(noJump.pending.length, 1);
-assert.deepEqual(suggestStampLotKeys(onBareStamp, [bareLot, namedBeside]), ['bare']);
+// Gợi ý: chỉ hatch cùng loại (TM↔Cong cong), không ép seed layer San_nen khác loại.
+assert.deepEqual(suggestStampLotKeys(onBareStamp, [bareLot, namedBeside]), ['beside']);
 
 // Greedy Q3: hai tem mỗi tem trên một hatch — score ΔDT+dist chọn đúng 1–1.
 const q3RingL = [[
@@ -871,5 +872,44 @@ assert.equal(q3Match.pending.length, 0);
 const byId = Object.fromEntries(q3Match.assigned.map(a => [a.stamp.id, a.key]));
 assert.equal(byId['qs-l'], 'ql');
 assert.equal(byId['qs-r'], 'qr');
+
+// Gợi ý: tem OCT không đề xuất hatch tôn giáo dù DT tổng khớp và nằm gần.
+const octHintStamp = {
+  id: 'oct-hint', code: 'OCT-A6', areaRaw: '2.78', floors: '5', coverage: '60', far: '5',
+  lat: ambLat, lng: ambLng, cands: [{ lat: ambLat, lng: ambLng }]
+};
+const tgRing1 = [[
+  [ambLng + 0.0003, ambLat - 0.0001],
+  [ambLng + 0.0005, ambLat - 0.0001],
+  [ambLng + 0.0005, ambLat + 0.0001],
+  [ambLng + 0.0003, ambLat + 0.0001],
+  [ambLng + 0.0003, ambLat - 0.0001]
+]];
+const tgRing2 = [[
+  [ambLng + 0.0005, ambLat - 0.0001],
+  [ambLng + 0.0007, ambLat - 0.0001],
+  [ambLng + 0.0007, ambLat + 0.0001],
+  [ambLng + 0.0005, ambLat + 0.0001],
+  [ambLng + 0.0005, ambLat - 0.0001]
+]];
+const tg1 = { key: 'tg1', area: 14000, layer: 'DAT_Ditich_tongiao', rings: [tgRing1] };
+const tg2 = { key: 'tg2', area: 13800, layer: 'DAT_Ditich_tongiao', rings: [tgRing2] };
+assert.ok(!stampNameMatch(octHintStamp, tg1));
+assert.ok(!stampNameMatch(octHintStamp, tg2));
+assert.deepEqual(suggestStampLotKeys(octHintStamp, [tg1, tg2]), []);
+const octLotNear = {
+  key: 'oct1', area: 27800, layer: 'DAT_O_Nhomnhao',
+  rings: [[
+    [
+      [ambLng - 0.0002, ambLat - 0.0002],
+      [ambLng + 0.0002, ambLat - 0.0002],
+      [ambLng + 0.0002, ambLat + 0.0002],
+      [ambLng - 0.0002, ambLat + 0.0002],
+      [ambLng - 0.0002, ambLat - 0.0002]
+    ]
+  ]]
+};
+assert.ok(stampNameMatch(octHintStamp, octLotNear));
+assert.deepEqual(suggestStampLotKeys(octHintStamp, [tg1, tg2, octLotNear]), ['oct1']);
 
 console.log('land-stamp: ok');

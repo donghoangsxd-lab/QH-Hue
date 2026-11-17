@@ -770,8 +770,9 @@ export function stampNameMatch(stamp, lot) {
   for (const [pre, re] of PREFIX_LAYER_RE) {
     if (pre.test(head) && re.test(layer)) return true;
   }
+  // Tiền tố ≥ 3 ký tự mới soi substring layer (tránh DT→DITICH, OC nhầm lớp khác).
   const pref = (head.match(/^[A-Z]+/) || [''])[0];
-  return !!(pref && pref.length >= 2 && layer.includes(pref));
+  return !!(pref && pref.length >= 3 && layer.includes(pref));
 }
 
 export function stampAreaMatch(stamp, lot, tol = STAMP_AREA_TOL) {
@@ -1199,6 +1200,7 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
     pool
       .filter(v => String(v.key) !== String(seed.key)
         && lotsSameLayer(seed, v)
+        && (seed._named ? v._named : true)
         && lotAroundStamp(stamp, v, STAMP_MULTI_AROUND_M)
         && seed._bbox && v._bbox && bboxGapM(seed._bbox, v._bbox) <= gapM)
       .sort((a, b) => a._dist - b._dist)
@@ -1207,7 +1209,10 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
     return soft;
   };
 
-  // (1) Tem nằm trên hatch → ưu tiên DT tương đương, rồi cùng loại; không nhảy lô xa.
+  const stampTyped = !!(stampTypeKey(stamp.code) || foldCompact(stamp.code).length >= 2);
+
+  // (1) Tem nằm trên hatch cùng loại (hoặc tem không có ký hiệu) → gợi ý từ seed đó.
+  // Không lấy hatch khác loại đang chứa tem làm seed (vd. OCT nằm gần / đè lên tôn giáo).
   const onLots = enriched
     .filter(l => l._on)
     .sort((a, b) => {
@@ -1223,21 +1228,23 @@ export function suggestStampLotKeys(stamp, lots, opt = {}) {
       const rb = cb.ratio == null ? 99 : cb.ratio;
       return ra - rb || (a.area || 0) - (b.area || 0);
     });
-  if (onLots.length) {
-    const seed = onLots[0];
-    // Solo DT đã khớp → chỉ gợi ý đúng lô chứa tem.
-    if (stampAreaMatch(stamp, seed, areaTol)) return [String(seed.key)];
-    // Multi chặt: cùng layer seed, quanh tem (growKeysFromSeed tự lọc layer + cạnh).
+  const onSeed = onLots.find(l => !stampTyped || l._named) || (!stampTyped ? onLots[0] : null);
+  if (onSeed) {
+    if (stampAreaMatch(stamp, onSeed, areaTol)) return [String(onSeed.key)];
     const pool = enriched.filter(l =>
-      String(l.key) === String(seed.key)
-      || (lotsSameLayer(seed, l) && lotAroundStamp(stamp, l, STAMP_MULTI_AROUND_M)));
-    return growFrom(seed, pool);
+      String(l.key) === String(onSeed.key)
+      || (lotsSameLayer(onSeed, l) && lotAroundStamp(stamp, l, STAMP_MULTI_AROUND_M)));
+    return growFrom(onSeed, pool);
   }
+  // Tem đang nằm trên hatch (kể cả layer chưa khớp tên) + DT solo khớp → gợi ý đúng lô đó, không multi lệch loại.
+  const onSolo = onLots.find(l => stampAreaMatch(stamp, l, areaTol));
+  if (onSolo) return [String(onSolo.key)];
 
-  // (2) Không nằm trên hatch nào: chỉ lô gần (bbox/tâm ≤ nearM), ưu tiên cùng loại.
+  // (2) Chỉ hatch cùng loại với ký hiệu tem và gần tem — không fallback lệch loại.
   const nearOk = (l) => l._dist <= nearM || stampInLotBbox(stamp, l, nearM);
-  let pool = enriched.filter(l => l._named && nearOk(l));
-  if (!pool.length) pool = enriched.filter(nearOk);
+  const pool = stampTyped
+    ? enriched.filter(l => l._named && nearOk(l))
+    : enriched.filter(nearOk);
   if (!pool.length) return [];
 
   const seeds = pool.slice().sort((a, b) => a._dist - b._dist);
