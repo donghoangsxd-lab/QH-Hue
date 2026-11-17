@@ -2501,7 +2501,7 @@ function bindShiftKeyTrack() {
 }
 
 /** Shift từ phím đang giữ hoặc sự kiện chuột (originalEvent / window.event). */
-function isShiftClick(e) {
+export function isShiftClick(e) {
   const oe = e?.originalEvent;
   return !!(shiftKeyHeld || oe?.shiftKey || e?.shiftKey
     || (typeof window !== 'undefined' && window.event?.shiftKey));

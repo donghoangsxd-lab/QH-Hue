@@ -1,6 +1,6 @@
 // Trục A — chọn hỗn hợp phường/xã hoặc đô thị (chuột phải / chuột trái).
 // Resolve hit theo nút HT/QH; tô ranh + đổi tab; thẻ thông tin hai khối Hiện trạng | Quy hoạch.
-import { wardNameAt, map } from './mapEngine.js';
+import { wardNameAt, map, isShiftClick } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { browseState } from './facetStore.js';
 import { DVHC_CITY, dvhcOf, shortPlaceName } from './dvhcStats.js';
@@ -9,9 +9,9 @@ import { STATUS_REF as STATUS_614 } from './urbanStatus.js';
 import { urbanStatusAt, urbanVisionAt } from './urbanAreaLayer.js';
 import { pickUrbanFromMap, clearUrbanMapPick } from './generalPlanUi.js';
 import {
-  columnMode, isDvhcBrowse, isDothiBrowse, ensureAdminTab, selectDvhcName
+  columnMode, isDvhcBrowse, isDothiBrowse, ensureAdminTab, selectDvhcName, getSelectedDvhcNames
 } from './chuyenNganh.js';
-import { escapeHtml, ico } from './utils.js';
+import { escapeHtml, ico, fmtNum } from './utils.js';
 
 const POP_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const KM_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -169,6 +169,63 @@ function blockHtml(block) {
   </section>`;
 }
 
+function pctOf(part, total) {
+  const p = Number(part);
+  const t = Number(total);
+  if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return 0;
+  return (p / t) * 100;
+}
+
+function fmtPct(pct) {
+  const n = Number(pct) || 0;
+  if (n >= 10) return `${fmtNum(Math.round(n))}%`;
+  if (n >= 1) return `${fmtNum(Math.round(n * 10) / 10)}%`;
+  if (n > 0) return '< 1%';
+  return '0%';
+}
+
+/** Tổng hợp nhiều phường/xã (Shift): dân số, diện tích, tỷ lệ % trên tổng đã chọn. */
+export function openMultiWardInfoCard(names, ev) {
+  closeAdminInfoCard();
+  const list = [...new Set((names || []).map(s => String(s || '').trim()).filter(Boolean))];
+  if (list.length < 2) {
+    if (list[0]) openAdminInfoCard({ kind: 'ward', name: list[0] }, ev);
+    return;
+  }
+  const rows = list.map(name => {
+    const stats = dvhcOf(name) || { pop: null, km2: null };
+    return { name, pop: Number(stats.pop) || 0, km2: Number(stats.km2) || 0 };
+  }).sort((a, b) => b.km2 - a.km2 || a.name.localeCompare(b.name, 'vi'));
+  const totalPop = rows.reduce((s, r) => s + r.pop, 0);
+  const totalKm = rows.reduce((s, r) => s + r.km2, 0);
+  const mix = rows.map(r => {
+    const popPct = pctOf(r.pop, totalPop);
+    const kmPct = pctOf(r.km2, totalKm);
+    return `<div class="admin-multi-row" title="${escapeHtml(r.name)}">
+      <span class="admin-multi-name">${escapeHtml(shortPlaceName(r.name))}</span>
+      <span class="admin-multi-pop">${fmtPop(r.pop)} <i>${escapeHtml(fmtPct(popPct))}</i></span>
+      <span class="admin-multi-km">${fmtKm(r.km2)} km² <i>${escapeHtml(fmtPct(kmPct))}</i></span>
+      <span class="admin-multi-bar" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, kmPct)).toFixed(1)}%"></i></span>
+    </div>`;
+  }).join('');
+  const el = document.createElement('aside');
+  el.className = 'place-card admin-info-card admin-info-multi';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Tổng hợp đơn vị hành chính');
+  el.innerHTML = `<header class="place-head"><span>${ico('locate')}Đã chọn ${list.length} đơn vị</span>
+      <button type="button" class="place-x" title="Đóng" aria-label="Đóng">${ico('close')}</button></header>
+    <p class="admin-multi-hint">Giữ Shift và bấm phường/xã để thêm hoặc bỏ chọn.</p>
+    <button type="button" class="place-row" disabled>
+      <span>Tổng dân số</span><b>${fmtPop(totalPop)}</b></button>
+    <button type="button" class="place-row" disabled>
+      <span>Tổng diện tích</span><b>${fmtKm(totalKm)} km²</b></button>
+    <div class="admin-multi-head"><span>Đơn vị</span><span>Dân số</span><span>Diện tích</span></div>
+    <div class="admin-multi-list">${mix}</div>`;
+  document.body.appendChild(el);
+  infoEl = el;
+  el.querySelector('.place-x')?.addEventListener('click', closeAdminInfoCard);
+}
+
 export function openAdminInfoCard(payload, ev) {
   closeAdminInfoCard();
   const data = payload.kind === 'urban'
@@ -198,10 +255,14 @@ export function openAdminInfoCard(payload, ev) {
   el.querySelector('.place-x')?.addEventListener('click', closeAdminInfoCard);
 }
 
-export function selectAdminWard(name, { tipAt, zoom = true, infoEv } = {}) {
+export function selectAdminWard(name, { tipAt, zoom = true, infoEv, shift } = {}) {
   ensureAdminTab('dvhc');
-  selectDvhcName(name || DVHC_CITY.name, { tipAt, zoom });
-  if (infoEv) openAdminInfoCard({ kind: 'ward', name: name || DVHC_CITY.name }, infoEv);
+  const useShift = shift != null ? !!shift : isShiftClick(infoEv);
+  selectDvhcName(name || DVHC_CITY.name, { tipAt, zoom, shift: useShift });
+  const names = getSelectedDvhcNames();
+  if (names.length >= 2) openMultiWardInfoCard(names, infoEv);
+  else if (infoEv) openAdminInfoCard({ kind: 'ward', name: names[0] || name || DVHC_CITY.name }, infoEv);
+  else closeAdminInfoCard();
 }
 
 export function selectAdminUrban(u, { infoEv } = {}) {
@@ -227,8 +288,9 @@ export async function consumeAdminHybridClick(latlng, m, ev) {
     return true;
   }
 
-  if (hits.hasWardGeom) selectAdminWard(hits.ward.name, { tipAt: latlng });
-  else selectAdminWard(DVHC_CITY.name, { tipAt: latlng });
+  const shift = isShiftClick(ev);
+  if (hits.hasWardGeom) selectAdminWard(hits.ward.name, { tipAt: latlng, shift, infoEv: shift ? ev : null });
+  else selectAdminWard(DVHC_CITY.name, { tipAt: latlng, shift: false });
   return true;
 }
 
@@ -248,7 +310,9 @@ export function adminContextMenuHtml(hits) {
 
 document.addEventListener('pointerdown', (e) => {
   if (chooserEl && !chooserEl.contains(e.target)) closeAdminChooser();
-  if (infoEl && !infoEl.contains(e.target)) closeAdminInfoCard();
+  if (infoEl && !infoEl.contains(e.target) && !e.target.closest?.('#axisWardList, [data-admin-tab]')) {
+    closeAdminInfoCard();
+  }
 }, true);
 
 document.addEventListener('keydown', (e) => {
@@ -256,3 +320,13 @@ document.addEventListener('keydown', (e) => {
   if (chooserEl) { closeAdminChooser(); e.stopPropagation(); }
   else if (infoEl) closeAdminInfoCard();
 });
+
+// Danh sách ĐVHC / map: khi ≥ 2 đơn vị thì mở thẻ tổng hợp bên trái.
+document.addEventListener('qh:dvhc-multi', (e) => {
+  const names = Array.isArray(e.detail) ? e.detail : [];
+  if (names.length >= 2) openMultiWardInfoCard(names);
+  else if (!infoEl?.classList.contains('admin-info-multi')) { /* giữ thẻ đơn nếu đang mở */ }
+  else closeAdminInfoCard();
+});
+
+document.addEventListener('qh:admin-release', () => closeAdminInfoCard());

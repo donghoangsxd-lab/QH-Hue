@@ -1,6 +1,9 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map, focusWard, clearWardHighlight, centerOnCity, wardNameAt, getLeftObstruction, getRightObstruction } from './mapEngine.js';
+import {
+  map, focusWard, clearWardHighlight, centerOnCity, wardNameAt, getLeftObstruction, getRightObstruction,
+  highlightWardNames, isShiftClick, renderGroupedPoints, refreshHeatmapOnly
+} from './mapEngine.js';
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
@@ -648,18 +651,74 @@ function hideDvhcTip() {
   if (dvhcTip && map?.hasLayer(dvhcTip)) map.closeTooltip(dvhcTip);
 }
 
-export function selectDvhcName(name, { tipAt, zoom = true } = {}) {
+/** Tên phường/xã đang chọn trên tab ĐVHC (không gồm Thành phố Huế). Shift+click thêm/bớt. */
+let selectedDvhcNames = [];
+
+export function getSelectedDvhcNames() {
+  return selectedDvhcNames.slice();
+}
+
+export function clearDvhcMulti({ paint = true } = {}) {
+  if (!selectedDvhcNames.length) return;
+  selectedDvhcNames = [];
+  if (paint) paintAdminList();
+  document.dispatchEvent(new CustomEvent('qh:dvhc-multi', { detail: [] }));
+}
+
+/**
+ * Chọn đơn vị hành chính. shift=true: thêm/bớt phường/xã (giống chọn nhiều lô QH).
+ * ≥ 2 đơn vị: tô nhiều ranh, phạm vi lọc về toàn TP, phát sự kiện qh:dvhc-multi.
+ */
+export function selectDvhcName(name, { tipAt, zoom = true, shift = false } = {}) {
   if (!name) return false;
+
   if (name === DVHC_CITY.name) {
+    selectedDvhcNames = [];
     setAreaFilter({ ...AREA_TP }, 'user');
     if (zoom) focusWard(DVHC_CITY.name);
-  } else {
-    setAreaFilter({ type: 'xa', code: areaCodeFromName(name), parent: 'TP' }, 'user');
-    if (zoom) focusWard(name);
+    if (tipAt) showDvhcTip(tipAt, name);
+    paintAdminList();
+    document.dispatchEvent(new CustomEvent('qh:dvhc-multi', { detail: [] }));
+    requestAnimationFrame(() => {
+      document.querySelector('#axisWardList .axis-area.active')?.scrollIntoView({ block: 'nearest' });
+    });
+    return true;
   }
-  if (tipAt) showDvhcTip(tipAt, name);
+
+  if (shift) {
+    const i = selectedDvhcNames.indexOf(name);
+    if (i >= 0) selectedDvhcNames.splice(i, 1);
+    else selectedDvhcNames.push(name);
+    if (!selectedDvhcNames.length) {
+      return selectDvhcName(DVHC_CITY.name, { tipAt, zoom, shift: false });
+    }
+  } else {
+    selectedDvhcNames = [name];
+  }
+
+  if (selectedDvhcNames.length === 1) {
+    const only = selectedDvhcNames[0];
+    setAreaFilter({ type: 'xa', code: areaCodeFromName(only), parent: 'TP' }, 'user');
+    if (zoom) focusWard(only);
+    if (tipAt) showDvhcTip(tipAt, only);
+  } else {
+    hideDvhcTip();
+    setAreaFilter({ ...AREA_TP }, 'user');
+    state.selectedWard = DVHC_CITY.name;
+    const wardSelector = document.getElementById('wardSelector');
+    if (wardSelector) wardSelector.value = DVHC_CITY.name;
+    highlightWardNames(selectedDvhcNames, { fitView: zoom });
+    renderGroupedPoints();
+    void refreshHeatmapOnly();
+  }
+
+  paintAdminList();
+  document.dispatchEvent(new CustomEvent('qh:dvhc-multi', { detail: selectedDvhcNames.slice() }));
   requestAnimationFrame(() => {
-    document.querySelector('#axisWardList .axis-area.active')?.scrollIntoView({ block: 'nearest' });
+    const tip = selectedDvhcNames[selectedDvhcNames.length - 1];
+    [...document.querySelectorAll('#axisWardList .axis-area[data-name]')]
+      .find(el => el.dataset.name === tip)
+      ?.scrollIntoView({ block: 'nearest' });
   });
   return true;
 }
@@ -675,14 +734,15 @@ export function ensureAdminTab(id) {
 }
 
 /** Bấm nền khi đang tab ĐVHC: chọn đơn vị tại điểm, phóng tới, hiện dân số / diện tích. */
-export function consumeDvhcMapClick(latlng) {
+export function consumeDvhcMapClick(latlng, ev) {
   if (!isDvhcBrowse() || !latlng) return false;
   const name = wardNameAt(latlng.lat, latlng.lng);
+  const shift = isShiftClick(ev);
   if (!name) {
-    selectDvhcName(DVHC_CITY.name, { tipAt: latlng });
+    selectDvhcName(DVHC_CITY.name, { tipAt: latlng, shift: false });
     return true;
   }
-  selectDvhcName(name, { tipAt: latlng });
+  selectDvhcName(name, { tipAt: latlng, shift });
   return true;
 }
 
@@ -710,7 +770,10 @@ function paintAdminList() {
   };
   const button = (area, label, num) => {
     const kv = formatKv(area);
-    const on = kv === current;
+    const multi = selectedDvhcNames.length > 0;
+    const on = area.type === 'tp'
+      ? (!multi && kv === current)
+      : (multi ? selectedDvhcNames.includes(label) : kv === current);
     const stats = area.type === 'tp' ? DVHC_CITY : dvhcOf(label);
     const pop = statText(stats && stats.pop, POP_FMT);
     const km = statText(stats && stats.km2, KM_FMT);
@@ -1762,6 +1825,7 @@ function placeIsoRadius() {
 }
 
 function releaseAdminAnchor() {
+  clearDvhcMulti({ paint: false });
   const area = getAreaFilter();
   if (!area || area.type !== 'tp') setAreaFilter({ ...AREA_TP }, 'axis');
   clearWardHighlight();
@@ -1986,6 +2050,7 @@ export function initChuyenNganh() {
         btn.setAttribute('aria-selected', String(on));
       });
       document.querySelectorAll('[data-admin-pane]').forEach(pane => { pane.hidden = pane.dataset.adminPane !== id; });
+      if (id !== 'dvhc') clearDvhcMulti({ paint: true });
       syncAdminBrowseClass();
       if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
       return;
@@ -2050,9 +2115,15 @@ export function initChuyenNganh() {
     const kvBtn = e.target.closest('[data-kv]');
     if (kvBtn) {
       const area = parseKv(kvBtn.dataset.kv) || { ...AREA_TP };
-      setAreaFilter(area, 'user');
-      if (area.type === 'xa') focusWard(areaLabel(area));
-      else if (area.type === 'tp') focusWard(DVHC_CITY.name);
+      const name = area.type === 'tp' ? DVHC_CITY.name : areaLabel(area);
+      // Tab ĐVHC: Shift+click thêm/bớt như chọn nhiều lô; tab khác giữ chọn một.
+      if (isDvhcBrowse()) {
+        selectDvhcName(name, { zoom: true, shift: isShiftClick(e) });
+      } else {
+        setAreaFilter(area, 'user');
+        if (area.type === 'xa') focusWard(name);
+        else if (area.type === 'tp') focusWard(DVHC_CITY.name);
+      }
       return;
     }
   });
