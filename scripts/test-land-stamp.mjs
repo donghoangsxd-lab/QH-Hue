@@ -796,14 +796,13 @@ assert.equal(midAuto.assigned.length, 1);
 assert.equal(midAuto.assigned[0].key, 'big');
 assert.ok(String(midAuto.assigned[0].how).includes('pos'));
 assert.ok(String(midAuto.assigned[0].how).includes('area'));
-// Trên lô + DT khớp, không cần tên layer → vẫn tự ghép.
+// Tem có ký hiệu OCT: không pair/gợi ý hatch lệch loại dù DT khớp (tránh tôn giáo).
 const bigBare = { key: 'bigx', area: 9000, layer: 'San_nen_khac', rings: [bigRing] };
 assert.ok(!stampNameMatch(midStamp, bigBare));
-assert.deepEqual(suggestStampLotKeys(midStamp, [bigBare, far1, far2, far3]), ['bigx']);
+assert.deepEqual(suggestStampLotKeys(midStamp, [bigBare, far1, far2, far3]), []);
 const bareArea = matchStamps([midStamp], [bigBare, far1, far2, far3]);
-assert.equal(bareArea.assigned.length, 1);
-assert.equal(bareArea.assigned[0].key, 'bigx');
-assert.equal(bareArea.assigned[0].how, 'pos+area');
+assert.equal(bareArea.assigned.length, 0);
+assert.ok(bareArea.pending.some(s => s.id === midStamp.id));
 // Không có hatch chứa tem, chỉ lô cách ~500 m → không gợi ý xa.
 assert.deepEqual(suggestStampLotKeys(midStamp, [far1, far2, far3]), []);
 // Tem trên hatch DT lệch + lô bên cạnh có tên+DT → không nhảy pair.
