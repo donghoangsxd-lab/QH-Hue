@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {
   parseLandStampDxf, projectStamps, matchStamps, stampNameMatch, stampAreaMatch,
   stampAreaM2, stampAreaVsLots, stampPendingWhy, lotMissingStampAttrs, assignKeysOf,
-  suggestStampLotKeys, suggestPendingStampHints, STAMP_AUTO_AREA_TOL, STAMP_NEAR_AUTO_M
+  suggestStampLotKeys, suggestPendingStampHints, STAMP_AUTO_AREA_TOL, STAMP_NEAR_AUTO_M,
+  q3PairScore, lotsSameLayer
 } from '../public/js/landStamp.js';
 import { vn2000ToWgs84, CRS_PRESETS } from '../public/js/cadImport.js';
 
@@ -712,7 +713,7 @@ assert.deepEqual(hintKeys.sort(), ['ha', 'hb']);
 const hintMap = suggestPendingStampHints([hintStamp], [hintA, hintB]);
 assert.deepEqual(hintMap['hint-oct'].sort(), ['ha', 'hb']);
 
-// Tự pair: tem trên hatch A (DT lệch > 5%) → gộp hatch B cạnh cùng loại đến ±5%.
+// Tự pair multi: tem trên hatch A (DT lệch > 5%) → gộp hatch B cùng layer, cạnh, quanh tem.
 const growA = { key: 'ga', area: 5000, layer: 'DAT_O_Nhomnhao', rings: [ringA] };
 const growB = { key: 'gb', area: 4000, layer: 'DAT_O_Nhomnhao', rings: [ringB] };
 const growStamp = {
@@ -720,13 +721,19 @@ const growStamp = {
   lat: ambLat + dLon / 2, lng: ambLng + dLon / 2,
   cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon / 2 }]
 };
-assert.ok(stampNameMatch(growStamp, growA));
+assert.ok(lotsSameLayer(growA, growB));
 assert.ok(!stampAreaMatch(growStamp, growA, STAMP_AUTO_AREA_TOL), 'một hatch lệch > 5%');
 const growMatch = matchStamps([growStamp], [growA, growB]);
 assert.equal(growMatch.assigned.length, 1);
 assert.deepEqual(growMatch.assigned[0].keys.sort(), ['ga', 'gb']);
 assert.ok(String(growMatch.assigned[0].how).includes('multi'));
 assert.equal(growMatch.unmatchedLots.length, 0);
+// Khác layer dù cạnh nhau → không gộp multi.
+const growOther = { key: 'go', area: 4000, layer: 'Cong_cong_TM', rings: [ringB] };
+assert.ok(!lotsSameLayer(growA, growOther));
+const growDiffLayer = matchStamps([growStamp], [growA, growOther]);
+assert.equal(growDiffLayer.assigned.length, 0);
+assert.equal(growDiffLayer.pending.length, 1);
 
 // Gần bao ≤ 50 m + tên + DT → tự pair (không cần nằm trong hatch).
 const nearD = 0.00035; // ~39 m vĩ độ
@@ -835,5 +842,34 @@ const noJump = matchStamps([onBareStamp], [bareLot, namedBeside], { tolM: STAMP_
 assert.equal(noJump.assigned.length, 0, 'tem trên hatch không được pair lô bên cạnh');
 assert.equal(noJump.pending.length, 1);
 assert.deepEqual(suggestStampLotKeys(onBareStamp, [bareLot, namedBeside]), ['bare']);
+
+// Greedy Q3: hai tem mỗi tem trên một hatch — score ΔDT+dist chọn đúng 1–1.
+const q3RingL = [[
+  [ambLng, ambLat], [ambLng + dLon, ambLat], [ambLng + dLon, ambLat + dLon],
+  [ambLng, ambLat + dLon], [ambLng, ambLat]
+]];
+const q3RingR = [[
+  [ambLng + dLon * 3, ambLat], [ambLng + dLon * 4, ambLat], [ambLng + dLon * 4, ambLat + dLon],
+  [ambLng + dLon * 3, ambLat + dLon], [ambLng + dLon * 3, ambLat]
+]];
+const q3LotL = { key: 'ql', area: 5000, layer: 'DAT_O', rings: [q3RingL] };
+const q3LotR = { key: 'qr', area: 8000, layer: 'DAT_O', rings: [q3RingR] };
+const q3StampL = {
+  id: 'qs-l', code: 'O-L', areaRaw: '0.50', floors: '3', coverage: '60', far: '2',
+  lat: ambLat + dLon / 2, lng: ambLng + dLon / 2,
+  cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon / 2 }]
+};
+const q3StampR = {
+  id: 'qs-r', code: 'O-R', areaRaw: '0.80', floors: '4', coverage: '70', far: '3',
+  lat: ambLat + dLon / 2, lng: ambLng + dLon * 3.5,
+  cands: [{ lat: ambLat + dLon / 2, lng: ambLng + dLon * 3.5 }]
+};
+assert.ok(q3PairScore(q3StampL, q3LotL) < q3PairScore(q3StampL, q3LotR));
+const q3Match = matchStamps([q3StampL, q3StampR], [q3LotL, q3LotR]);
+assert.equal(q3Match.assigned.length, 2);
+assert.equal(q3Match.pending.length, 0);
+const byId = Object.fromEntries(q3Match.assigned.map(a => [a.stamp.id, a.key]));
+assert.equal(byId['qs-l'], 'ql');
+assert.equal(byId['qs-r'], 'qr');
 
 console.log('land-stamp: ok');
