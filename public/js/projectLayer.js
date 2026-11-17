@@ -24,7 +24,7 @@ import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
-import { planMap, onCompareChange, passToolClick, shownMaps } from './planMap.js';
+import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
   wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
