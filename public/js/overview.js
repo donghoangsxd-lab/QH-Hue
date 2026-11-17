@@ -342,7 +342,7 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel trái. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel trái đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Droplist: <b>A. Quản lý phát triển đô thị</b>, <b>B. Hệ thống bản đồ quy hoạch</b>, <b>C. Hệ thống hạ tầng kỹ thuật</b>, <b>D. Hệ thống hạ tầng xã hội</b>, <b>E. Quản lý về kiến trúc</b>, <b>F. Dự án đầu tư</b>. Trong Hành chính có tab <b>Đơn vị hành chính</b>, <b>Đô thị</b> và <b>Chấm điểm</b>. Trong Quy hoạch, mỗi lúc một cấp.',
+          'Droplist: <b>A. Quản lý phát triển đô thị</b>, <b>B. Hệ thống bản đồ quy hoạch</b>, <b>C. Hệ thống hạ tầng kỹ thuật</b>, <b>D. Hệ thống hạ tầng xã hội</b>, <b>E. Quản lý về kiến trúc</b>, <b>F. Dự án đầu tư</b>. Trong Hành chính có tab <b>Hành chính</b>, <b>Đô thị</b> và <b>Chấm điểm</b>. Trong Quy hoạch, mỗi lúc một cấp.',
           'Dòng dưới droplist có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút cả nhóm. Công trình xã hội, PCCC, điểm giao thông và mục <b>Quỹ đất và công trình</b> (ranh lô, cơ sở chưa sử dụng) ở panel <b>Hạ tầng xã hội</b>. Chung cư và dự án kêu gọi đầu tư ở <b>F. Dự án đầu tư</b>. Nút <b>Tất cả</b> bật hoặc tắt 13 nhóm điểm của Hạ tầng xã hội.',
           'Mục <b>Lớp nền</b> ghim đáy mọi trục: ảnh nền, ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư. Tab <b>Lớp môi trường</b> cùng hàng: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
         ],

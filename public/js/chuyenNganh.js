@@ -614,7 +614,7 @@ function adminTabId() {
     || 'dvhc';
 }
 
-/** Tab Đơn vị hành chính đang mở trên trục A — bấm bản đồ chọn xã, không sang B. */
+/** Tab Hành chính đang mở trên trục A — bấm bản đồ chọn xã, không sang B. */
 export function isDvhcBrowse() {
   return browseState().axis === 'hanhchinh' && adminTabId() === 'dvhc';
 }

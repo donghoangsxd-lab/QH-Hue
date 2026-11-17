@@ -1,5 +1,5 @@
 #!/bin/bash
-# Đẩy QĐ 614 và QĐ 108 lên gs://hue-infra-data-us/docs/.
+# Đẩy QĐ 614, QĐ 756 và QĐ 108 lên gs://hue-infra-data-us/docs/.
 # Chạy trong GitHub Actions sau google-github-actions/auth (secret GCP_SA_KEY) và setup-gcloud.
 # pull_request không nhận secret này. File có thể đã gỡ khỏi tip: lấy từ commit đã thêm.
 set -euo pipefail
@@ -48,4 +48,5 @@ upload_one() {
 }
 
 upload_one 614-QD-UBND.pdf docs/614-QD-UBND.pdf 710578
+upload_one 756-QD-UBND.pdf docs/756-QD-UBND.pdf 795367
 upload_one 108-QD-TTg.pdf docs/108-QD-TTg.pdf 3401128

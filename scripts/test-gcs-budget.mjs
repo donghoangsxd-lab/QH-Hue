@@ -30,6 +30,7 @@ assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-01-1.jpg'), INFRA_JS
 assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-27-3.webp'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/ct-phap/anh/ct-phap-28-1.jpg'), '');
 assert.equal(cacheControlFor('docs/614-QD-UBND.pdf'), 'public, max-age=86400');
+assert.equal(cacheControlFor('docs/756-QD-UBND.pdf'), 'public, max-age=86400');
 assert.equal(cacheControlFor('docs/108-QD-TTg.pdf'), 'public, max-age=86400');
 assert.equal(cacheControlFor('projects/_pdf-in/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf'), 'private, no-store');
 assert.equal(cacheControlFor('projects/abc/quyet-dinh-cho.pdf'), 'private, no-store');

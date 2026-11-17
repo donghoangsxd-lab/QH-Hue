@@ -1,8 +1,8 @@
 // Quyết định / văn bản hồ sơ của lớp bản đồ dùng chung (Phân loại đô thị, QHC 2045).
 // QHC 1/25.000 và 1/10.000 dùng chung khóa qhc-2045: quyết định phê duyệt + quy định quản lý + thuyết minh (menu 3 lựa chọn).
 // Phân loại đô thị vẫn một nút quyết định (data-layer-decision).
-// QĐ 614 và QĐ 108 nằm trên bucket docs/ (phục vụ /gcs/docs/…). Không đưa PDF vào git hay asset Worker.
-// Bản admin gắn cùng mã (getLayerDecisions) thắng file docs/.
+// QĐ 614, QĐ 756 và QĐ 108 nằm trên bucket docs/ (phục vụ /gcs/docs/…). Không đưa PDF vào git hay asset Worker.
+// Bản admin PDF cùng mã (getLayerDecisions) thắng file docs/; link ngoài (STC/review) không thắng file đã gắn sẵn.
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico } from './utils.js';
@@ -23,6 +23,15 @@ const BUNDLED = {
     at: 1770656400000,
     embed: true
   },
+  'do-thi-quy-hoach': {
+    slug: 'lop-do-thi-quy-hoach',
+    kind: 'pdf',
+    url: '/gcs/docs/756-QD-UBND.pdf',
+    name: '756-QD-UBND.pdf',
+    bytes: 795367,
+    at: 1772298000000,
+    embed: true
+  },
   'qhc-2045': {
     slug: 'lop-qhc-2045',
     kind: 'pdf',
@@ -35,6 +44,7 @@ const BUNDLED = {
 };
 const BUNDLED_TITLE = {
   'do-thi-hien-trang': 'Phân loại đô thị · hiện trạng',
+  'do-thi-quy-hoach': 'Phân loại đô thị · quy hoạch',
   'qhc-2045': 'QHC đô thị Huế 2045'
 };
 
@@ -44,7 +54,12 @@ let docsByLayer = {};
 let busyId = null;
 
 function decisionFor(id) {
-  return items[id] || BUNDLED[id] || null;
+  const fromApi = items[id];
+  const bundled = BUNDLED[id] || null;
+  // Admin tải PDF mới vẫn thắng; link ngoài (không embed) không che file docs/.
+  if (fromApi && fromApi.kind === 'pdf') return fromApi;
+  if (bundled) return bundled;
+  return fromApi || null;
 }
 
 function docsFor(id) {

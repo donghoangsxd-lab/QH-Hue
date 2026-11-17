@@ -79,5 +79,6 @@ assert.match(read('docs/cong-suat-do-an.md'), /\/gcs\/docs\/108-QD-TTg\.pdf/);
 assert.match(read('.github/workflows/upload-docs.yml'), /credentials_json: \$\{\{ secrets\.GCP_SA_KEY \}\}/);
 assert.doesNotMatch(read('.github/workflows/upload-docs.yml'), /pull_request:/);
 assert.match(read('scripts/upload-app-docs.sh'), /docs\/614-QD-UBND\.pdf/);
+assert.match(read('scripts/upload-app-docs.sh'), /docs\/756-QD-UBND\.pdf/);
 
 console.log('pending pdf ok');
