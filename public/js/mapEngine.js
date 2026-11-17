@@ -875,6 +875,24 @@ export function clearMeasure() {
   notifyMeasure();
 }
 
+/** Tắt công cụ đo, giữ phép đo đã kết thúc trên bản đồ. */
+function disarmMeasureTool() {
+  state.activeMeasureType = null;
+  state.measurePoints = [];
+  clearMeasureSnap();
+  resetMeasureButtons();
+  syncMeasureZoom();
+  notifyMeasure();
+}
+
+/** Khép vùng đo khi bấm bên trong (≥ 3 đỉnh): ghi kết quả, chọn hình, tắt hẳn chế độ đo. */
+function finishAreaByInterior(host) {
+  const made = finishMeasureDraft();
+  if (made) selectMeasure(made, host);
+  disarmMeasureTool();
+  return made;
+}
+
 export function handleMeasureClick(latlng, hostMap) {
   if (measureLive?.session.isEditing()) return;
   if (performance.now() - measureGuardAt < 40) return;
@@ -899,7 +917,13 @@ export function handleMeasureClick(latlng, hostMap) {
       return;
     }
   }
-  if (editable && pts.length >= (type === 'area' ? 3 : 2) && hitMeasureGeom(host, latlng, pts, type)) {
+  // Diện tích: bấm trong vùng đã có ≥ 3 đỉnh → khép và dừng đo (không thêm đỉnh).
+  if (type === 'area' && pts.length >= 3 && hitMeasureGeom(host, latlng, pts, type)) {
+    measureGuardAt = performance.now();
+    finishAreaByInterior(host);
+    return;
+  }
+  if (type === 'distance' && pts.length >= 2 && hitMeasureGeom(host, latlng, pts, type)) {
     const made = finishMeasureDraft();
     if (made) selectMeasure(made, host);
     return;
@@ -1316,6 +1340,10 @@ function onMeasureShapeClick(e, item, hostMap) {
   measureGuardAt = performance.now();
   if (measureLive?.session.isEditing()) return;
   if (item) { selectMeasure(item, hostMap); return; }
+  if (state.activeMeasureType === 'area') {
+    finishAreaByInterior(hostMap);
+    return;
+  }
   const made = finishMeasureDraft();
   if (made) selectMeasure(made, hostMap);
 }
@@ -1448,7 +1476,8 @@ function paintMeasureShape(groups, pts, type, opt) {
         color, weight: 18, opacity: 0, interactive: true, bubblingMouseEvents: false,
         className: isArea ? 'measure-hit measure-hit-area' : 'measure-hit', ...draw
       };
-      if (isArea) { hitOpt.fillColor = color; hitOpt.fillOpacity = 0; }
+      // fillOpacity rất nhỏ: một số trình duyệt bỏ hit-test khi fill trong suốt hoàn toàn.
+      if (isArea) { hitOpt.fillColor = color; hitOpt.fillOpacity = 0.01; }
       const hit = (isArea ? L.polygon(latlngs, hitOpt) : L.polyline(latlngs, hitOpt)).addTo(group);
       hit.on('click', (e) => onMeasureShapeClick(e, item, hostMap));
       hit.on('contextmenu', (e) => onMeasureShapeMenu(e, item, hostMap));

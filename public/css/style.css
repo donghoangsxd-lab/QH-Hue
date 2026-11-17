@@ -5482,6 +5482,10 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit {
   pointer-events: stroke !important;
 }
+/* Vùng đo diện tích: giữ hit cả phần tô (không chỉ viền) khi detail-locked. */
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit-area {
+  pointer-events: all !important;
+}
 
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
 .ward-pie-mode .ward-label-text, .ward-names-off .ward-label-text { display: none; }
