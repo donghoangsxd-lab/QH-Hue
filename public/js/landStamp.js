@@ -1,7 +1,7 @@
 // Tem đất trên lớp ký hiệu (file KH, hoặc block ngay trong file sử dụng đất): vòng tròn + chữ, hoặc block.
-// Mục tiêu: mọi hatch nhận thuộc tính. Một tem → nhiều hatch chỉ khi cùng loại (khớp ký hiệu tem)
-// và tổng DT hatch ≈ DT tem (lệch ≤ 5%). Tự pair: (A) tem trên hatch + ký hiệu↔layer; lệch DT > 5%
-// thì gộp hatch cùng loại cạnh đến ≤ 5% rồi chốt; (B) tâm tem ≤ 50 m tới bao + khớp loại + DT.
+// Mục tiêu: mọi hatch nhận thuộc tính. Một tem → nhiều hatch chỉ khi cùng một layer, cạnh nhau,
+// quanh tem, và tổng DT ≈ tem (lệch ≤ 10%). Tự pair Q3: tem trên hatch + DT; multi cùng layer;
+// hoặc gần bao ≤ 50 m + khớp loại + DT.
 import { lotCodePatternKey, landPatternKey } from './tt16Symbols.js';
 
 function readTags(text) {
@@ -711,8 +711,8 @@ function mergeGroup(group) {
 
 /** Sai số diện tích khi gán tay / cảnh báo UI (1%). */
 export const STAMP_AREA_TOL = 0.01;
-/** Sai số diện tích tự pair / gộp hatch cạnh (5%). */
-export const STAMP_AUTO_AREA_TOL = 0.05;
+/** Sai số diện tích tự pair / gộp hatch cạnh (10%). */
+export const STAMP_AUTO_AREA_TOL = 0.10;
 
 const TYPE_FAMILY = {
   '1-CV': 'green', 'CX-HC': 'green', 'CX-CD': 'green',
@@ -961,7 +961,7 @@ function preferAssign(stamp, openLots, nearM, areaTol) {
   const scored = openLots.map(l => scoreLot(stamp, l, nearM, areaTol));
   const onHits = scored.filter(s => s.hit === 'in' || s.hit === 'hole');
 
-  // (1) Q3 solo: tem trên hatch + DT ±5% — chọn score nhỏ nhất.
+  // (1) Q3 solo: tem trên hatch + DT ±10% — chọn score nhỏ nhất.
   const onArea = onHits
     .filter(s => stampAreaMatch(stamp, s.lot, areaTol))
     .sort((a, b) => q3PairScore(stamp, a.lot) - q3PairScore(stamp, b.lot));
@@ -1302,10 +1302,10 @@ export function stampPendingWhy(stamp, lots, opt = {}) {
     return 'Không có hatch chứa tem hoặc gần tem (≤ 50 m) để gán thuộc tính.';
   }
   if ((best.hit === 'in' || best.hit === 'hole') && !best.area) {
-    return 'Tem đang nằm trên hatch nhưng diện tích lệch > 5% và chưa gộp được hatch cùng layer cạnh quanh tem — chọn thêm/bớt lô tay.';
+    return 'Tem đang nằm trên hatch nhưng diện tích lệch > 10% và chưa gộp được hatch cùng layer cạnh quanh tem — chọn thêm/bớt lô tay.';
   }
   if (best.near && best.name && !best.area) {
-    return 'Tem gần hatch cùng loại nhưng diện tích lệch > 5% — gán tay hoặc chọn thêm hatch cạnh.';
+    return 'Tem gần hatch cùng loại nhưng diện tích lệch > 10% — gán tay hoặc chọn thêm hatch cạnh.';
   }
   if (best.name && best.area && !best.pos) {
     return 'Khớp ký hiệu + diện tích nhưng tem cách bao hatch > 50 m — kéo gần hoặc gán tay.';
