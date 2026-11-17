@@ -1000,9 +1000,20 @@ assert.match(phoneMenus, /r\.left - menu\.offsetWidth/);
 assert.doesNotMatch(phoneMenus.slice(phoneMenus.indexOf('initPhoneToolMenus'), phoneMenus.indexOf('btnMeasureProfile')), /r\.right \+ 6/);
 assert.match(measureJs, /measure-mode/);
 assert.match(read('public/js/sketchLayer.js'), /measureBlocksSketch/);
+assert.match(read('public/js/sketchLayer.js'), /draftingSketch|sketch-hit-area|sketchStrokeWeight|strokeWeight/);
+assert.match(read('public/js/sketchLayer.js'), /cloneSelectionToSketch|btnSketchClone|resolveSketchCloneSources/);
+assert.match(read('public/js/mapEngine.js'), /DRAW_TOOL_Z = 690|DRAW_MARK_PANE|ensureDrawMarkPane/);
+assert.match(read('public/js/mapEngine.js'), /getSketchCloneSources|setSketchCloneSources/);
+assert.match(read('public/js/cadastreLayer.js'), /openParcelSketchSource/);
+assert.match(read('public/js/projectLayer.js'), /focusedProjectSketchSource/);
+assert.match(read('public/js/mapContext.js'), /sketch-clone|cloneSelectionToSketch/);
+assert.match(html, /id="sketchStrokeWeight"/);
+assert.match(html, /id="btnSketchClone"/);
 assert.match(read('public/css/style.css'), /measure-mode path\.sketch-hit/);
 assert.match(read('public/css/style.css'), /detail-locked[\s\S]*drawToolPane-pane[\s\S]*sketch-hit/);
 assert.match(read('public/css/style.css'), /detail-locked[\s\S]*marker-pane > \.sketch-text/);
+assert.match(read('public/css/style.css'), /detail-locked[\s\S]*drawMarkPane-pane > \.sketch-text/);
+assert.match(read('public/css/style.css'), /path\.sketch-hit-area/);
 assert.match(read('docs/ui-spec.md'), /detail-locked/);
 
 const linePts = [

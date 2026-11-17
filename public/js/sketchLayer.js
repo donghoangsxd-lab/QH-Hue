@@ -4,7 +4,7 @@
 // Admin: «Dự án» ghi vùng (đa giác / vòng tròn) thành dự án F → Đang nghiên cứu rồi xóa toàn bộ hình phiên.
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
-import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE } from './mapEngine.js';
+import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE, ensureDrawMarkPane, getSketchCloneSources } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_EVENT, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
 import { kmlTextFromFile, sketchShapesFromKml, KML_MAX_BYTES } from './kmlLoad.js';
@@ -14,6 +14,9 @@ import { exportKml, exportKmz, exportDxf, sketchShapesFromDxf, densifySpline } f
 import { createSketchEditSession, isVertexShape } from './sketchEdit.js';
 import { createVertexHandles, vertexMenuButton as menuButton } from './vertexHandles.js';
 import { createInvestFromSketch } from './investLayer.js';
+import { openParcelSketchSource } from './cadastreLayer.js';
+import { focusedProjectSketchSource } from './projectLayer.js';
+import { wardDrawGeometry } from './wardSeam.js';
 
 const TOOLS = {
   spline: { label: 'Đường cong', hint: 'Click các điểm điều khiển · nháy đúp hoặc Enter để kết thúc', min: 2 },
@@ -40,6 +43,29 @@ let snapMark = null;
 let color = COLORS[0];
 let dashed = false;
 const STROKE_DASH = '10,6';
+const STROKE_WEIGHTS = [
+  { v: 2, label: 'Mỏng' },
+  { v: 3, label: 'Vừa' },
+  { v: 5, label: 'Đậm' },
+  { v: 8, label: 'Rất đậm' }
+];
+const DEFAULT_WEIGHT = 3;
+let strokeWeight = DEFAULT_WEIGHT;
+const strokeWeightOf = (w) => {
+  const n = Number(w);
+  return STROKE_WEIGHTS.some(o => o.v === n) ? n : DEFAULT_WEIGHT;
+};
+const CITY_NAME = 'Thành phố Huế';
+const CLONE_MAX_VERTS = 180;
+const CLONE_KIND_LABEL = {
+  lot: 'lô quy hoạch',
+  qhc: 'lô quy hoạch',
+  qhct: 'lô quy hoạch',
+  area: 'vùng đang chọn',
+  parcel: 'thửa đất',
+  project: 'đồ án quy hoạch',
+  ward: 'phường/xã'
+};
 let open = false;
 let collapsed = false;      // đã chọn công cụ: thanh thu thành 1 nút cạnh nút Phác thảo
 let telexOn = true;
@@ -79,6 +105,8 @@ function hostOf(m) {
   if (!m) return null;
   let h = hosts.get(m);
   if (h) return h;
+  ensureDrawMarkPane(m);
+  drawToolRenderer(m);
   h = {
     group: L.featureGroup().addTo(m),
     draft: L.layerGroup().addTo(m),
@@ -208,23 +236,43 @@ function shapeTip(tool, text) {
   return text || TOOLS[tool]?.label || (tool === 'line' ? 'Đường thẳng' : 'Hình');
 }
 
-function shapeLayers(tool, lls, c, preview, hostMap, dash) {
+function shapeLayers(tool, lls, c, preview, hostMap, dash, weight) {
   const draw = { renderer: drawToolRenderer(hostMap), pane: DRAW_TOOL_PANE };
-  const line = {
-    color: c, weight: 3, opacity: 0.95, dashArray: dash ? STROKE_DASH : null,
-    interactive: !preview, className: preview ? undefined : 'sketch-shape', ...draw
+  const w = strokeWeightOf(weight);
+  const hitCommon = {
+    interactive: true, bubblingMouseEvents: false,
+    className: 'sketch-hit sketch-shape', ...draw
   };
-  const halo = { color: '#020617', weight: 6, opacity: 0.45, interactive: false, ...draw };
+  const line = {
+    color: c, weight: w, opacity: 0.95, dashArray: dash ? STROKE_DASH : null,
+    interactive: false, className: preview ? undefined : 'sketch-shape', ...draw
+  };
+  const halo = { color: '#020617', weight: w + 3, opacity: 0.45, interactive: false, ...draw };
   const out = [];
   if (tool === 'circle') {
     const r = distM(lls[0], lls[1]);
-    if (!preview) out.push(L.circle(lls[0], { color: '#ffffff', radius: r, weight: 8, opacity: 0, fill: false, interactive: false, ...draw }));
+    if (!preview) {
+      out.push(L.circle(lls[0], { color: '#ffffff', radius: r, weight: w + 5, opacity: 0, fill: false, interactive: false, ...draw }));
+      // hit cả phần tô + viền để chọn trên lớp quy hoạch / đô thị / dự án
+      out.push(L.circle(lls[0], {
+        ...hitCommon, className: 'sketch-hit sketch-hit-area sketch-shape',
+        radius: r, color: c, weight: Math.max(18, w + 12), opacity: 0,
+        fillColor: c, fillOpacity: 0.01
+      }));
+    }
     out.push(L.circle(lls[0], { ...line, radius: r, fillColor: c, fillOpacity: 0.12 }));
     if (preview) out.push(L.polyline(lls, { color: c, weight: 1.5, dashArray: '4,5', interactive: false, ...draw }));
     return { layers: out, text: shapeMeasure(tool, lls) };
   }
   if (tool === 'polygon' && lls.length >= 3) {
-    if (!preview) out.push(L.polygon(lls, { color: '#ffffff', weight: 8, opacity: 0, fill: false, interactive: false, ...draw }));
+    if (!preview) {
+      out.push(L.polygon(lls, { color: '#ffffff', weight: w + 5, opacity: 0, fill: false, interactive: false, ...draw }));
+      out.push(L.polygon(lls, {
+        ...hitCommon, className: 'sketch-hit sketch-hit-area sketch-shape',
+        color: c, weight: Math.max(18, w + 12), opacity: 0,
+        fillColor: c, fillOpacity: 0.01
+      }));
+    }
     out.push(L.polygon(lls, { ...line, fillColor: c, fillOpacity: 0.15 }));
     return { layers: out, text: shapeMeasure(tool, lls) };
   }
@@ -235,12 +283,22 @@ function shapeLayers(tool, lls, c, preview, hostMap, dash) {
   }
   out.push(L.polyline(path, halo), L.polyline(path, line));
   // Nét trong suốt, rộng hơn nét thấy được, để rê chuột và chuột phải trúng đường mảnh
-  if (!preview) out.push(L.polyline(path, { color: c, weight: 18, opacity: 0, interactive: true, className: 'sketch-hit sketch-shape', ...draw }));
+  if (!preview) {
+    out.push(L.polyline(path, {
+      ...hitCommon, color: c, weight: Math.max(18, w + 12), opacity: 0
+    }));
+  }
   if (tool === 'arrow' && lls.length === 2) {
     const head = arrowHead(lls[0], lls[1]);
     if (head) {
-      if (!preview) out.push(L.polygon(head, { color: '#ffffff', weight: 6, opacity: 0, fill: false, interactive: false, ...draw }));
-      out.push(L.polygon(head, { ...line, weight: 1, fillColor: c, fillOpacity: 1 }));
+      if (!preview) {
+        out.push(L.polygon(head, { color: '#ffffff', weight: 6, opacity: 0, fill: false, interactive: false, ...draw }));
+        out.push(L.polygon(head, {
+          ...hitCommon, className: 'sketch-hit sketch-hit-area sketch-shape',
+          color: c, weight: 10, opacity: 0, fillColor: c, fillOpacity: 0.01
+        }));
+      }
+      out.push(L.polygon(head, { ...line, weight: Math.max(1, Math.round(w * 0.35)), fillColor: c, fillOpacity: 1 }));
     }
   }
   return { layers: out, text: shapeMeasure(tool, lls) };
@@ -271,8 +329,8 @@ function applyChrome(fg) {
   const hot = fg === hoverFg || fg === pickFg;
   const picked = fg === pickFg;
   fg.eachLayer(l => {
-    const hit = String(l.options?.className || '').includes('sketch-hit');
-    if (hit) return;
+    const cls = String(l.options?.className || '');
+    if (cls.includes('sketch-hit')) return;
     const el = l.getElement?.();
     if (l.setStyle) {
       if (!l._skBase) {
@@ -281,14 +339,15 @@ function applyChrome(fg) {
           fillColor: l.options.fillColor, fillOpacity: l.options.fillOpacity
         };
       }
-      const halo = l.options.interactive === false;
+      // Nét thấy được mang class sketch-shape; quầng tối / viền ẩn không có class đó
+      const visual = cls.includes('sketch-shape');
       if (hot) {
-        l.setStyle(halo
-          ? { color: picked ? '#38bdf8' : '#ffffff', weight: (l._skBase.weight || 6) + (picked ? 5 : 3), opacity: 0.95 }
-          : { weight: (l._skBase.weight || 3) + (picked ? 2 : 1), opacity: 1 });
+        l.setStyle(visual
+          ? { weight: (l._skBase.weight || 3) + (picked ? 2 : 1), opacity: 1 }
+          : { color: picked ? '#38bdf8' : '#ffffff', weight: (l._skBase.weight || 6) + (picked ? 5 : 3), opacity: 0.95 });
       } else l.setStyle(l._skBase);
-      el?.classList.toggle('sketch-edge', hot && !halo);
-      el?.classList.toggle('sketch-picked', picked && !halo);
+      el?.classList.toggle('sketch-edge', hot && visual);
+      el?.classList.toggle('sketch-picked', picked && visual);
     } else {
       const body = el?.querySelector?.('.sketch-text-body');
       body?.classList.toggle('sketch-edge', hot);
@@ -317,9 +376,12 @@ function setPick(fg) {
 
 function armHit(fg) {
   fg.eachLayer(l => {
-    if (!String(l.options?.className || '').includes('sketch-hit')) return;
+    const cls = String(l.options?.className || '');
+    if (!cls.includes('sketch-hit')) return;
     const el = l.getElement?.();
-    if (el) el.style.pointerEvents = 'stroke';
+    if (!el) return;
+    // Vùng (đa giác / vòng tròn / đầu mũi tên): hit cả phần tô; đường chỉ hit theo nét
+    el.style.pointerEvents = cls.includes('sketch-hit-area') ? 'all' : 'stroke';
   });
 }
 
@@ -331,7 +393,7 @@ function renderDraft() {
   if (!tool || !pts.length) return;
   const lls = cursor ? [...pts, cursor] : pts.slice();
   if (lls.length >= 2) {
-    const { layers } = shapeLayers(state.sketchTool, lls, color, true, drawMap, dashed);
+    const { layers } = shapeLayers(state.sketchTool, lls, color, true, drawMap, dashed, strokeWeight);
     layers.forEach(l => l.addTo(draft));
   }
   const draw = { renderer: drawToolRenderer(drawMap), pane: DRAW_TOOL_PANE };
@@ -378,6 +440,9 @@ function openShapeMenu(fg, e) {
 /** Đang đo: không chặn click/chuột phải để chấm đỉnh hoặc mở menu đo trên nét phác thảo. */
 const measureBlocksSketch = () => !!(state.activeMeasureType);
 
+/** Đang chấm đỉnh dở: click trên hình cũ vẫn thêm đỉnh. Hết nét dở thì luôn chọn được hình (kể cả còn bật công cụ). */
+const draftingSketch = () => !!(state.sketchTool && pts.length);
+
 /** Hình đã vẽ: rê hoặc click sáng viền; chuột phải mở menu phác thảo (không mở menu bản đồ). */
 function bindShapeMenu(fg) {
   fg.on('mouseover', () => {
@@ -390,8 +455,7 @@ function bindShapeMenu(fg) {
   });
   fg.on('click', (e) => {
     if (measureBlocksSketch()) return;
-    // Đang chọn công cụ vẽ: để click xuống bản đồ (chấm đỉnh / đặt chữ), kể cả đè lên hình cũ
-    if (state.sketchTool) return;
+    if (draftingSketch()) return;
     stopShapeEvent(e);
     // Tránh ô focus đen quanh path SVG sau khi click chọn
     e.originalEvent?.target?.blur?.();
@@ -401,8 +465,7 @@ function bindShapeMenu(fg) {
   fg.on('contextmenu', (e) => {
     if (measureBlocksSketch()) return;
     // Đang chấm nét: chuột phải xóa đỉnh gần con trỏ (onSketchContextMenu), không mở menu hình
-    if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
-    if (state.sketchTool) return;
+    if (draftingSketch()) return;
     stopShapeEvent(e);
     openShapeMenu(fg, e);
   });
@@ -424,9 +487,19 @@ const asLatLngs = (pts) => pts.map(p => L.latLng(p.lat, p.lng));
 function selectShape(fg) {
   if (!fg?.sketch) return;
   document.dispatchEvent(new CustomEvent(DRAW_SELECT_EVENT, { detail: 'sketch' }));
+  if (fg.sketch.tool !== 'text') {
+    if (fg.sketch.color) color = fg.sketch.color;
+    dashed = !!fg.sketch.dash;
+    strokeWeight = strokeWeightOf(fg.sketch.weight);
+  } else if (fg.sketch.color) {
+    color = fg.sketch.color;
+  }
+  // Mở lại bảng để đổi màu / độ dày ngay trên hình vừa chọn
+  if (open && collapsed) collapsed = false;
   if (live?.fg === fg) {
     live.session.select();
     setPick(fg);
+    syncButtons();
     return;
   }
   if (live?.session.isEditing()) finishAdjust();
@@ -436,6 +509,7 @@ function selectShape(fg) {
     live.session.select();
   }
   setPick(fg);
+  syncButtons();
 }
 
 function shapeAt(m, latlng) {
@@ -460,8 +534,8 @@ function shapeAt(m, latlng) {
 function onShapePointerDown(ev, m) {
   if (ev.pointerType === 'mouse') return;
   if (measureBlocksSketch()) return;
-  // Đang vẽ: không chặn pointer — chạm trên hình cũ vẫn chấm được đỉnh
-  if (state.sketchTool) return;
+  // Đang chấm nét dở: không chặn pointer — chạm trên hình cũ vẫn thêm đỉnh
+  if (draftingSketch()) return;
   if (ev.target?.closest?.('.sketch-handle, .leaflet-popup, .map-ctx-menu, .sketch-menu')) return;
   const ll = m.mouseEventToLatLng(ev);
   const fg = shapeAt(m, ll);
@@ -498,7 +572,9 @@ function showEditHint() {}
 function paintShape(fg) {
   const s = fg.sketch;
   const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
-  const { layers, text } = shapeLayers(s.tool, lls, s.color, false, fg.sketchHost || map, s.dash);
+  const { layers, text } = shapeLayers(
+    s.tool, lls, s.color, false, fg.sketchHost || map, s.dash, s.weight
+  );
   fg.clearLayers();
   layers.forEach(l => fg.addLayer(l));
   armHit(fg);
@@ -525,6 +601,7 @@ function vertexUi() {
     sessionOf: () => live?.session || null,
     mapOf: () => live?.fg?.sketchHost || map,
     layerOf: () => hostOf(live?.fg?.sketchHost || map).edit,
+    paneOf: (m) => ensureDrawMarkPane(m || live?.fg?.sketchHost || map),
     paint(pts) {
       if (!live?.fg) return;
       live.fg.sketch.pts = asLatLngs(pts);
@@ -686,15 +763,161 @@ function finish() {
   const need = tool.points || tool.min;
   if (pts.length < need) { pts = []; clearSnap(); renderDraft(); return; }
   const m = drawMap || map;
-  const { layers, text } = shapeLayers(t, pts, color, false, m, dashed);
+  const { layers, text } = shapeLayers(t, pts, color, false, m, dashed, strokeWeight);
   const fg = L.featureGroup(layers);
   fg.bindTooltip(shapeTip(t, text), { sticky: true, className: 'sketch-tip' });
-  fg.sketch = { tool: t, pts: pts.map(p => L.latLng(p)), color, dash: dashed };
+  fg.sketch = { tool: t, pts: pts.map(p => L.latLng(p)), color, dash: dashed, weight: strokeWeightOf(strokeWeight) };
   if (t === 'arrow') fg.sketch.head = arrowHead(pts[0], pts[1]);
   addShape(fg, m);
   pts = [];
   clearSnap();
   renderDraft();
+  selectShape(fg);
+}
+
+function selectedWardSketchSource() {
+  const name = state.selectedWard;
+  if (!name || name === CITY_NAME) return null;
+  const ward = (state.wardLabelsList || []).find(w => w.name === name);
+  const geometry = wardDrawGeometry(name) || ward?.geometry || null;
+  if (!geometry || (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon')) return null;
+  return { geometry, label: name, kind: 'ward', map: shownMaps()[0] || map };
+}
+
+/** Ưu tiên: lô/vùng đang viền chọn → thửa đang mở → đồ án đang focus → phường/xã đang chọn. */
+function resolveSketchCloneSources() {
+  const outlined = getSketchCloneSources();
+  if (outlined.length) return outlined;
+  const parcel = openParcelSketchSource();
+  if (parcel) return [parcel];
+  const project = focusedProjectSketchSource();
+  if (project) return [project];
+  const ward = selectedWardSketchSource();
+  if (ward) return [ward];
+  return [];
+}
+
+function cleanOuterRing(ring) {
+  const out = [];
+  for (const p of ring || []) {
+    if (!p || p.length < 2) continue;
+    const lng = Number(p[0]);
+    const lat = Number(p[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+    const prev = out[out.length - 1];
+    if (prev && prev[0] === lng && prev[1] === lat) continue;
+    out.push([lng, lat]);
+  }
+  if (out.length > 1) {
+    const a = out[0];
+    const b = out[out.length - 1];
+    if (a[0] === b[0] && a[1] === b[1]) out.pop();
+  }
+  return out.length >= 3 ? out : null;
+}
+
+function simplifyRing(ring) {
+  if (!ring || ring.length <= CLONE_MAX_VERTS) return ring;
+  if (typeof turf === 'undefined') return ring.slice(0, CLONE_MAX_VERTS);
+  let tol = 0.00001;
+  let pts = ring;
+  for (let i = 0; i < 8 && pts.length > CLONE_MAX_VERTS; i++) {
+    try {
+      const closed = [...pts, pts[0]];
+      const simple = turf.simplify(turf.polygon([closed]), { tolerance: tol, highQuality: false });
+      const next = cleanOuterRing(simple?.geometry?.coordinates?.[0]);
+      if (next && next.length >= 3) pts = next;
+    } catch { /* giữ ring hiện tại */ }
+    tol *= 2;
+  }
+  if (pts.length > CLONE_MAX_VERTS) {
+    const step = Math.ceil(pts.length / CLONE_MAX_VERTS);
+    const sparse = pts.filter((_, i) => i % step === 0);
+    pts = sparse.length >= 3 ? sparse : pts.slice(0, CLONE_MAX_VERTS);
+  }
+  return pts;
+}
+
+function outerRingsOf(geometry) {
+  if (!geometry) return [];
+  const polys = geometry.type === 'Polygon'
+    ? [geometry.coordinates]
+    : geometry.type === 'MultiPolygon'
+      ? geometry.coordinates
+      : [];
+  return polys.map(poly => simplifyRing(cleanOuterRing(poly?.[0]))).filter(Boolean);
+}
+
+function addPolygonFromRing(ring, host, tip) {
+  const lls = ring.map(([lng, lat]) => L.latLng(lat, lng));
+  const { layers, text } = shapeLayers('polygon', lls, color, false, host, dashed, strokeWeight);
+  const fg = L.featureGroup(layers);
+  fg.bindTooltip(tip || shapeTip('polygon', text), { sticky: true, className: 'sketch-tip' });
+  fg.sketch = {
+    tool: 'polygon',
+    pts: lls,
+    color,
+    dash: dashed,
+    weight: strokeWeightOf(strokeWeight)
+  };
+  addShape(fg, host);
+  return fg;
+}
+
+/**
+ * Nhân bản ranh đối tượng đang chọn thành đa giác phác thảo (thửa, lô QH, đồ án, phường/xã).
+ * @returns {{ count: number, label: string }|null}
+ */
+export function cloneSelectionToSketch() {
+  const sources = resolveSketchCloneSources();
+  if (!sources.length) {
+    showToast('Hãy chọn thửa đất, lô quy hoạch, đồ án hoặc phường/xã trước khi nhân bản.', 'info');
+    return null;
+  }
+  if (pts.length) {
+    showToast('Hãy kết thúc nét đang vẽ trước khi nhân bản ranh.', 'warn');
+    return null;
+  }
+  if (live?.session.isEditing()) finishAdjust();
+  if (!open) setOpen(true);
+  else if (collapsed) { collapsed = false; syncButtons(); }
+
+  const hostPref = sources[0].map;
+  const shown = shownMaps();
+  const host = (hostPref && shown.includes(hostPref)) ? hostPref : (shown[0] || map);
+  if (!host) {
+    showToast('Không có bản đồ để ghi phác thảo.', 'error');
+    return null;
+  }
+
+  const created = [];
+  let label = sources[0].label || CLONE_KIND_LABEL[sources[0].kind] || 'đối tượng';
+  sources.forEach((src, i) => {
+    const rings = outerRingsOf(src.geometry);
+    const tipBase = src.label || CLONE_KIND_LABEL[src.kind] || 'Phác thảo';
+    rings.forEach((ring, j) => {
+      const tip = rings.length > 1 || sources.length > 1
+        ? `${tipBase} · ${i + 1}.${j + 1}`
+        : tipBase;
+      created.push(addPolygonFromRing(ring, host, tip));
+    });
+    if (src.label) label = src.label;
+    else if (CLONE_KIND_LABEL[src.kind]) label = CLONE_KIND_LABEL[src.kind];
+  });
+  if (!created.length) {
+    showToast('Ranh đang chọn không chuyển được thành đa giác phác thảo.', 'warn');
+    return null;
+  }
+  selectShape(created[created.length - 1]);
+  const bounds = L.featureGroup(created).getBounds?.();
+  if (bounds?.isValid?.()) host.fitBounds(bounds, { padding: [36, 36], maxZoom: 18 });
+  showToast(
+    created.length === 1
+      ? `✓ Đã nhân bản ranh ${label} thành phác thảo`
+      : `✓ Đã nhân bản ${created.length} đa giác từ ${label}`,
+    'success'
+  );
+  return { count: created.length, label };
 }
 
 function releaseSketchSelection() {
@@ -820,7 +1043,9 @@ const textHtml = (text, c, sizePx) =>
 function textShape(latlng, text, c, sizePx, m) {
   const marker = L.marker(latlng, {
     icon: L.divIcon({ className: 'sketch-text', html: textHtml(text, c, sizePx), iconSize: null, iconAnchor: [0, 0] }),
-    keyboard: false
+    keyboard: false,
+    pane: ensureDrawMarkPane(m),
+    bubblingMouseEvents: false
   });
   const fg = L.featureGroup([marker]);
   fg.bindTooltip('Chữ', { sticky: true, className: 'sketch-tip' });
@@ -961,6 +1186,11 @@ function syncButtons() {
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   });
+  const weightSel = $('sketchStrokeWeight');
+  if (weightSel) {
+    const w = strokeWeightOf(strokeWeight);
+    if (String(weightSel.value) !== String(w)) weightSel.value = String(w);
+  }
   const undo = $('btnSketchUndo'), clear = $('btnSketchClear'), save = $('btnSketchSave');
   if (undo) undo.disabled = !pts.length && !shapes.length;
   if (clear) clear.disabled = !shapes.length;
@@ -1116,9 +1346,10 @@ async function importSketchFile(file) {
       continue;
     }
     const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
-    const { layers, text } = shapeLayers(s.tool, lls, c, false, host, !!s.dash);
+    const w = strokeWeightOf(s.weight);
+    const { layers, text } = shapeLayers(s.tool, lls, c, false, host, !!s.dash, w);
     const fg = L.featureGroup(layers);
-    fg.sketch = { tool: s.tool, pts: lls, color: c, dash: !!s.dash };
+    fg.sketch = { tool: s.tool, pts: lls, color: c, dash: !!s.dash, weight: w };
     if (s.tool === 'arrow' && lls.length === 2) fg.sketch.head = arrowHead(lls[0], lls[1]);
     fg.bindTooltip(shapeTip(s.tool, text), { sticky: true, className: 'sketch-tip' });
     addShape(fg, host);
@@ -1186,6 +1417,16 @@ export function initSketchLayer() {
   });
   document.addEventListener('keydown', onSketchDeleteKey);
   $('sketchTextSize')?.addEventListener('change', applySketchSize);
+  $('sketchStrokeWeight')?.addEventListener('change', (e) => {
+    strokeWeight = strokeWeightOf(e.target.value);
+    if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
+      pickFg.sketch.weight = strokeWeight;
+      paintShape(pickFg);
+      applyChrome(pickFg);
+    }
+    if (pts.length) renderDraft();
+    syncButtons();
+  });
   pal?.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tool]');
     if (t) { setTool(state.sketchTool === t.dataset.tool ? null : t.dataset.tool); return; }
@@ -1193,6 +1434,26 @@ export function initSketchLayer() {
     if (c) {
       color = c.dataset.color;
       if (editor) { editor.color = color; refocusEditor(); }
+      if (pickFg?.sketch) {
+        pickFg.sketch.color = color;
+        if (pickFg.sketch.tool === 'text') {
+          const s = pickFg.sketch;
+          pickFg.eachLayer(l => {
+            if (l.setIcon) {
+              l.setIcon(L.divIcon({
+                className: 'sketch-text',
+                html: textHtml(s.text, color, s.sizePx),
+                iconSize: null,
+                iconAnchor: [0, 0]
+              }));
+            }
+          });
+          applyChrome(pickFg);
+        } else {
+          paintShape(pickFg);
+          applyChrome(pickFg);
+        }
+      }
       renderDraft(); syncButtons(); return;
     }
     const dashBtn = e.target.closest('[data-dash]');
@@ -1201,6 +1462,7 @@ export function initSketchLayer() {
       if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
         pickFg.sketch.dash = dashed;
         paintShape(pickFg);
+        applyChrome(pickFg);
       }
       if (pts.length) renderDraft();
       syncButtons();
@@ -1264,6 +1526,10 @@ export function initSketchLayer() {
         if (file) importSketchFile(file);
       });
       input.click();
+      return;
+    }
+    if (e.target.closest('#btnSketchClone')) {
+      cloneSelectionToSketch();
       return;
     }
     if (e.target.closest('#btnSketchClose')) setOpen(false);

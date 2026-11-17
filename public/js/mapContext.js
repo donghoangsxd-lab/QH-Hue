@@ -7,6 +7,7 @@ import { planMap } from './planMap.js';
 import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastreLayer.js';
 import { LOTS_PROGRESS_EVENT, lotsRevision } from './projectFiles.js';
 import { openStreetView } from './streetView.js';
+import { cloneSelectionToSketch } from './sketchLayer.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 import {
   isAdminAxis, resolveAdminHits, adminContextMenuHtml,
@@ -321,6 +322,7 @@ async function openMenu(ev, latlng, targetMap) {
     '<div class="map-ctx-sep"></div>',
     item('note', 'pin', 'Đánh dấu và ghi chú'),
     '<div class="map-ctx-sep"></div>',
+    item('sketch-clone', 'layers', 'Nhân bản ranh đang chọn thành phác thảo'),
     item('dist', 'ruler', 'Đo khoảng cách'),
     item('area', 'area', 'Đo diện tích'),
     '<div class="map-ctx-sep"></div>',
@@ -357,6 +359,8 @@ async function openMenu(ev, latlng, targetMap) {
       openPlace(ev, latlng);
     } else if (act === 'note') {
       openNoteEditor(ev, { lat: latlng.lat, lng: latlng.lng });
+    } else if (act === 'sketch-clone') {
+      cloneSelectionToSketch();
     } else if (act === 'dist') {
       startMeasure('distance', latlng, targetMap);
     } else if (act === 'area') {

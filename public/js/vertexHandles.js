@@ -15,6 +15,7 @@ export function vertexMenuButton(box, label, cls, icon, fn) {
  * @param {() => object|null} opt.sessionOf phiên createSketchEditSession
  * @param {() => object} opt.mapOf bản đồ đang sửa
  * @param {() => object} opt.layerOf nhóm chứa núm
+ * @param {() => string|undefined} [opt.paneOf] pane marker (phác thảo/đo: drawMarkPane)
  * @param {(pts: {lat:number,lng:number}[]) => void} opt.paint vẽ lại hình theo đỉnh đang sửa
  * @param {() => void} opt.finish ghi (Xong)
  * @param {() => string} opt.minLabel câu khi không xóa được vì chạm số đỉnh tối thiểu
@@ -201,10 +202,12 @@ export function createVertexHandles(opt) {
   }
 
   function makeHandle(m, layer, role, p, index) {
+    const pane = opt.paneOf?.(m) || undefined;
     const mk = L.marker([p.lat, p.lng], {
       draggable: true,
       autoPan: false,
       keyboard: false,
+      ...(pane ? { pane } : {}),
       zIndexOffset: role === 'vertex' ? 1400 : 1200,
       bubblingMouseEvents: false,
       icon: handleIcon(role)

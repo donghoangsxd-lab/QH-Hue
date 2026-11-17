@@ -1197,6 +1197,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 /* Đang đo: nét phác thảo không chặn click để chấm đỉnh đo trên hình đã vẽ */
 .leaflet-container.measure-mode path.sketch-shape,
 .leaflet-container.measure-mode path.sketch-hit,
+.leaflet-container.measure-mode path.sketch-hit-area,
 .leaflet-container.measure-mode .sketch-text,
 .leaflet-container.measure-mode .sketch-text-body {
   pointer-events: none !important;
@@ -1204,7 +1205,6 @@ body.compare-on .map-title-split { display: inline-flex; }
 /* Hàng phụ: tùy chọn chữ, chọn định dạng lưu */
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
-.sketch-sub select { height: 24px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); }
 #sketchInvestRow input {
   flex: 1 1 auto;
   min-width: 0;
@@ -1227,7 +1227,14 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-text-body { padding: 1px 3px; cursor: pointer; }
 .leaflet-pane > svg path.sketch-hit,
 .leaflet-pane > svg path.measure-hit { pointer-events: stroke; cursor: pointer; }
+.leaflet-pane > svg path.sketch-hit-area,
 .leaflet-pane > svg path.measure-hit-area { pointer-events: all; cursor: pointer; }
+.sketch-sub select,
+#sketchStrokeWeight.sketch-weight {
+  height: 28px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main);
+  background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm);
+}
+#sketchStrokeWeight.sketch-weight { width: auto; min-width: 4.5rem; margin-left: 2px; }
 .leaflet-interactive.sketch-edge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 3px #fff); cursor: pointer; }
 .leaflet-interactive.sketch-picked { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px rgb(var(--cyan-rgb))); }
 /* Bỏ ô focus đen của trình duyệt khi click chọn nét phác thảo / chữ / núm đỉnh */
@@ -5474,6 +5481,8 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.sketch-hit,
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit,
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit-area,
+.leaflet-container.detail-locked .leaflet-drawMarkPane-pane > .sketch-text,
+.leaflet-container.detail-locked .leaflet-drawMarkPane-pane > .sketch-handle,
 .leaflet-container.detail-locked .leaflet-marker-pane > .sketch-text,
 .leaflet-container.detail-locked .leaflet-marker-pane > .sketch-handle {
   pointer-events: auto !important;
@@ -5482,7 +5491,8 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit {
   pointer-events: stroke !important;
 }
-/* Vùng đo diện tích: giữ hit cả phần tô (không chỉ viền) khi detail-locked. */
+/* Vùng đo / đa giác phác thảo: giữ hit cả phần tô (không chỉ viền) khi detail-locked. */
+.leaflet-container.detail-locked .leaflet-drawToolPane-pane path.sketch-hit-area,
 .leaflet-container.detail-locked .leaflet-drawToolPane-pane path.measure-hit-area {
   pointer-events: all !important;
 }

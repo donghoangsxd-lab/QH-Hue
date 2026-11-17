@@ -494,9 +494,24 @@ function parcelHtml(p) {
   </div>`;
 }
 
+let highlightGeom = null;
+
 function clearHighlight() {
   highlight?.remove();
   highlight = null;
+  highlightGeom = null;
+}
+
+/** Thửa đang mở (popup hoặc bảng): nguồn nhân bản phác thảo. */
+export function openParcelSketchSource() {
+  const geom = cardState?.geom || highlightGeom;
+  if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return null;
+  return {
+    geometry: geom,
+    label: cardState?.title || 'Thửa đất',
+    kind: 'parcel',
+    map: cardState?.map || null
+  };
 }
 
 function clearLandFill() {
@@ -725,6 +740,7 @@ function drawHighlight(shape, targetMap) {
     pane.style.pointerEvents = 'none';
   }
   clearHighlight();
+  highlightGeom = shape?.type === 'Feature' ? shape.geometry : (shape?.geometry || shape);
   highlight = L.layerGroup([
     L.geoJSON(shape, { pane: HL_PANE, style: HIGHLIGHT_HALO, interactive: false }),
     L.geoJSON(shape, { pane: HL_PANE, style: HIGHLIGHT, interactive: false })

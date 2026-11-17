@@ -24,7 +24,7 @@ import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
-import { planMap, onCompareChange, passToolClick } from './planMap.js';
+import { planMap, onCompareChange, passToolClick, shownMaps } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
   wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
@@ -339,6 +339,22 @@ function outlineOf(p) {
   } catch (e) { geom = null; }
   fallbackCache.set(key, geom);
   return geom;
+}
+
+/** Ranh đồ án đang focus: nguồn nhân bản phác thảo. */
+export function focusedProjectSketchSource() {
+  const name = state.focusedProject || focusName;
+  if (!name) return null;
+  const p = projects.find(x => x.name === name);
+  if (!p) return null;
+  const geometry = outlineOf(p);
+  if (!geometry || (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon')) return null;
+  return {
+    geometry,
+    label: p.short || p.name || 'Đồ án quy hoạch',
+    kind: 'project',
+    map: shownMaps()[0] || null
+  };
 }
 
 function boundsOf(p) {

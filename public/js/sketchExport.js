@@ -1,5 +1,5 @@
 // Xuất/nhập lớp phác thảo: KML·KMZ (WGS84) và DXF R12 (VN-2000 TT-Huế KTT 107°00', mét).
-// items: [{ tool: 'spline' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text' | 'line'?, pts: [L.LatLng], color, head?, text?, heightM?, dash? }]
+// items: [{ tool: 'spline' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text' | 'line'?, pts: [L.LatLng], color, weight?, head?, text?, heightM?, dash? }]
 import { wgs84ToVn2000, vn2000ToWgs84 } from './cadImport.js';
 import { SKETCH_MAX_SHAPES, touchesHue } from './kmlLoad.js';
 
@@ -67,7 +67,8 @@ const ringKml = (ring) => ring.map(([lng, lat]) => `${lng.toFixed(7)},${lat.toFi
 const polyKml = (coords) => `<Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon>`;
 
 function kmlPlacemark(it, i) {
-  const style = `#c${it.color.slice(1)}`;
+  const w = Number(it.weight) > 0 ? Number(it.weight) : 3;
+  const style = `#c${it.color.slice(1)}_w${w}`;
   const name = it.tool === 'text' ? it.text.replace(/\s*\n\s*/g, ' ') : `${LABELS[it.tool] || 'Hình'} ${i + 1}`;
   const pts = exportPts(it);
   let geom;
@@ -83,12 +84,16 @@ function kmlPlacemark(it, i) {
 }
 
 export function buildKml(items) {
-  const colors = [...new Set(items.map(it => it.color))];
-  const styles = colors.map(c => `<Style id="c${c.slice(1)}">`
-    + `<LineStyle><color>${kmlColor(c, 'ff')}</color><width>3</width></LineStyle>`
-    + `<PolyStyle><color>${kmlColor(c, '40')}</color></PolyStyle>`
-    + `<IconStyle><scale>0</scale></IconStyle>`
-    + `<LabelStyle><color>${kmlColor(c, 'ff')}</color><scale>1.1</scale></LabelStyle></Style>`).join('');
+  const styleKey = (it) => `${it.color}|${Number(it.weight) > 0 ? Number(it.weight) : 3}`;
+  const keys = [...new Set(items.map(styleKey))];
+  const styles = keys.map(key => {
+    const [c, w] = key.split('|');
+    return `<Style id="c${c.slice(1)}_w${w}">`
+      + `<LineStyle><color>${kmlColor(c, 'ff')}</color><width>${w}</width></LineStyle>`
+      + `<PolyStyle><color>${kmlColor(c, '40')}</color></PolyStyle>`
+      + `<IconStyle><scale>0</scale></IconStyle>`
+      + `<LabelStyle><color>${kmlColor(c, 'ff')}</color><scale>1.1</scale></LabelStyle></Style>`;
+  }).join('');
   const name = `Phác thảo TP. Huế ${stamp()}`;
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`
     + `<name>${xml(name)}</name>${styles}${items.map(kmlPlacemark).join('')}</Document></kml>\n`;

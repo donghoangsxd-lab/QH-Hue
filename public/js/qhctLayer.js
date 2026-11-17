@@ -265,7 +265,10 @@ function openQhctPopup(m, f, latlng, opts) {
   if (!opts?.hideProject && props.tenQH) syncFocusedProjectToLot(props.tenQH);
   ensureQuyHoachPane();
   const popup = openDockPopup(m, 'qhct-popup land-lot-popup', popupHtml(props));
-  attachSelectionOutline(m, f.geometry, popup);
+  attachSelectionOutline(m, f.geometry, popup, {
+    kind: 'qhct',
+    label: props.chucNang || props.kyHieu || props.tenQH || 'Lô quy hoạch'
+  });
   qhctLotPop = { popup, f, map: m };
   attachLotBuildup(popup, {
     geometry: f.geometry,

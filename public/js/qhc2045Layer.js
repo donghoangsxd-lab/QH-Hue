@@ -962,7 +962,8 @@ function openLotPopup(f, latlng, opts) {
   ensureQuyHoachPane();
   syncQhcCityBrief(opts);
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcLotCardHtml(f, latlng, opts));
-  attachSelectionOutline(host, f.geometry, popup);
+  const lotLabel = f.properties?.ten || f.properties?.kyHieu || f.properties?.chucNang || 'Lô quy hoạch';
+  attachSelectionOutline(host, f.geometry, popup, { kind: 'qhc', label: lotLabel });
   qhcLotPop = { popup, f, map: host };
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô · giữ Shift để chọn thêm lô');
   bindLandCardTabs(popup.getElement());
@@ -1130,7 +1131,8 @@ function openVisionPopup(f, latlng) {
   ensureQuyHoachPane();
   syncQhcCityBrief();
   const popup = openDockPopup(host, 'qhc-popup land-lot-popup', qhcVisionCardHtml(f, latlng));
-  attachSelectionOutline(host, f.geometry, popup);
+  const visionLabel = f.properties?.ten || f.properties?.chucNang || 'Vùng quy hoạch';
+  attachSelectionOutline(host, f.geometry, popup, { kind: 'qhc', label: visionLabel });
   qhcLotPop = { popup, f, map: host };
   const again = f.properties.L === 'x'
     ? 'Bấm lại vào không gian cây xanh · giữ Shift để chọn thêm'

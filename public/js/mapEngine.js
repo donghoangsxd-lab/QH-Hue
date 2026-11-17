@@ -1188,6 +1188,7 @@ function measureHandleApi() {
     sessionOf: () => measureLive?.session || null,
     mapOf: () => measureLive?.host || map,
     layerOf: () => measureEditLayer(),
+    paneOf: (m) => ensureDrawMarkPane(m || measureLive?.host || map),
     paint(pts) {
       if (!measureLive?.item) return;
       measureLive.item.pts = pts.map(p => ({ lat: +p.lat, lng: +p.lng }));
@@ -1395,12 +1396,22 @@ export function consumeMeasureMapClick(e) {
   return true;
 }
 
-// Trên ảnh và ranh điều chỉnh cục bộ (z 449) cùng các lớp phủ phía trên overlayPane.
-// Dưới markerPane (600): nhãn số đo, chữ phác thảo và núm đỉnh vẫn nằm trên nét và vẫn bấm được.
-// SVG chứ không dùng canvas chung của bản đồ: vùng trống không chặn chuột xuống lớp bên dưới.
+// Phác thảo / đo nằm trên lô QH, đô thị, dự án, vi phạm… (z ~450–650) để luôn bấm chọn được.
+// SVG riêng: vùng trống không chặn chuột xuống lớp bên dưới. Chữ / núm / nhãn đo ở pane marker riêng phía trên nét.
 export const DRAW_TOOL_PANE = 'drawToolPane';
-const DRAW_TOOL_Z = 595;
+export const DRAW_MARK_PANE = 'drawMarkPane';
+const DRAW_TOOL_Z = 690;
+const DRAW_MARK_Z = 695;
 const drawRenderers = new WeakMap();
+
+export function ensureDrawMarkPane(m) {
+  if (!m) return null;
+  if (!m.getPane(DRAW_MARK_PANE)) {
+    const pane = m.createPane(DRAW_MARK_PANE);
+    pane.style.zIndex = String(DRAW_MARK_Z);
+  }
+  return DRAW_MARK_PANE;
+}
 
 export function drawToolRenderer(m) {
   if (!m) return null;
@@ -1411,6 +1422,7 @@ export function drawToolRenderer(m) {
     pane.style.zIndex = String(DRAW_TOOL_Z);
     pane.style.pointerEvents = 'none';
   }
+  ensureDrawMarkPane(m);
   renderer = L.svg({ pane: DRAW_TOOL_PANE });
   drawRenderers.set(m, renderer);
   return renderer;
@@ -1423,6 +1435,7 @@ function addMeasureLabel(group, hostMap, latlng, color, label, ringLngLat, editi
   const marker = L.marker(latlng, {
     interactive: false,
     keyboard: false,
+    pane: ensureDrawMarkPane(hostMap),
     zIndexOffset: editing ? 700 : 0,
     icon: L.divIcon({
       className: `measure-label${editing ? ' measure-label-live' : ''}`,
@@ -2573,6 +2586,11 @@ function attachMultiSelectionOutlines(m, lots, popup) {
     });
     group.addLayer(marks);
   }
+  setSketchCloneSources((lots || []).map(p => ({
+    geometry: p?.geometry,
+    label: p?.name || p?.lotCode || p?.ten || 'Lô quy hoạch',
+    kind: 'lot'
+  })), m);
   const seq = singleIsoSeq;
   popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
 }
@@ -2626,7 +2644,8 @@ function openLandSelectionPopup(m, epoch) {
 }
 
 // Viền sáng lô / vùng đang chọn. Cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ.
-export function attachSelectionOutline(m, geometry, popup) {
+// meta: { label, kind } — kind: lot | qhc | qhct | area… (nhân bản phác thảo).
+export function attachSelectionOutline(m, geometry, popup, meta = {}) {
   (m === map ? planMap : map)?.closePopup();
   clearSingleIsochrone();
   const group = m === planMap ? planLayers.singleIso : layers.singleIso;
@@ -2635,6 +2654,11 @@ export function attachSelectionOutline(m, geometry, popup) {
     addParcelOutline(marks, geometry, selRendererFor(m));
     group.addLayer(marks);
   }
+  setSketchCloneSources(geometry ? [{
+    geometry,
+    label: meta.label || '',
+    kind: meta.kind || 'area'
+  }] : [], m);
   const seq = singleIsoSeq;
   popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
 }
@@ -2960,7 +2984,10 @@ function openLandPopup(p, m, opts) {
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
   const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p, opts));
-  attachSelectionOutline(m, p.geometry, popup);
+  attachSelectionOutline(m, p.geometry, popup, {
+    kind: 'lot',
+    label: p.name || p.lotCode || p.ten || projectName || 'Lô quy hoạch'
+  });
   addPopupCollapseToggle(
     popup,
     facility ? 'ranh khu đất và vùng phục vụ' : 'viền lô',
@@ -3619,8 +3646,28 @@ function addInRangePoints(group, points, polygon, renderer, m) {
   (m === planMap ? planRenderer : leftRenderer).highlight(keys);
 }
 
+/** Ranh vừa gắn viền chọn (lô QH / vùng QHC…): nguồn nhân bản phác thảo. */
+let sketchCloneSources = [];
+
+function setSketchCloneSources(list, m) {
+  sketchCloneSources = (list || [])
+    .filter(x => x?.geometry && (x.geometry.type === 'Polygon' || x.geometry.type === 'MultiPolygon'))
+    .map(x => ({
+      geometry: x.geometry,
+      label: x.label || '',
+      kind: x.kind || '',
+      map: m || x.map || null
+    }));
+}
+
+/** Nguồn ranh đang có viền chọn trên bản đồ (phác thảo nhân bản). */
+export function getSketchCloneSources() {
+  return sketchCloneSources.slice();
+}
+
 function clearSingleIsochrone() {
   singleIsoSeq++;
+  sketchCloneSources = [];
   if (stopFlow) stopFlow();
   stopFlow = null;
   clearAccessPinLayout();
