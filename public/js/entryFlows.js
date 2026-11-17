@@ -28,7 +28,7 @@ import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
 import {
   projectStamps, matchStamps, stampAreaM2, stampLabel, STAMP_AREA_TOL,
   lotMissingStampAttrs, lotsSameLandType, stampAreaVsLots, stampPendingWhy,
-  suggestStampLotKeys, lotCentroidLngLat
+  suggestStampLotKeys, lotCentroidLngLat, learnStampLayerMap
 } from './landStamp.js';
 import { stampPendingBoxHtml, stampStatusNoteHtml, stampHatchCompareHtml } from './stampUi.js';
 import { landColor } from './tt16Symbols.js';
@@ -754,10 +754,14 @@ function applyKhToHeld(step, opt = {}) {
     // Giữ pending cũ nếu còn; tem mới gán đã taken.
     const oldPend = new Set((bag.stampMatch.pending || []).map(s => s.id));
     const pendingKeep = pending.filter(s => oldPend.has(s.id) || !(assign[s.id]));
+    const layerRules = learnStampLayerMap(assigned, lots);
+    const layerRulesObj = {};
+    layerRules.forEach((set, pref) => { layerRulesObj[pref] = [...set]; });
     match = {
       assigned,
       pending: pendingKeep.length ? pendingKeep : pending,
-      unmatchedLots: lots.filter(l => !used.has(String(l.key))).map(l => l.key)
+      unmatchedLots: lots.filter(l => !used.has(String(l.key))).map(l => l.key),
+      layerRules: layerRulesObj
     };
   } else {
     match = matchStamps(projected, lots, {
@@ -815,6 +819,7 @@ function stampBoxHtml(bag) {
     assignMode: !!bag.stampAssignMode,
     draft: bag.stampDraft || {},
     lots: bag.stampLots || [],
+    layerRules: match?.layerRules || null,
     pickAttr: 'data-ho-stamp',
     skipAttr: 'data-ho-stamp-skip',
     whyAttr: 'data-ho-stamp-why',
@@ -1408,7 +1413,9 @@ function paintStampMarkers(bag, opt = {}) {
   if (hintId && hintStamp && freeLots.length) {
     if (!bag.stampHints) bag.stampHints = {};
     if (!bag.stampHints[hintId]) {
-      bag.stampHints[hintId] = suggestStampLotKeys(hintStamp, freeLots);
+      bag.stampHints[hintId] = suggestStampLotKeys(hintStamp, freeLots, {
+        layerRules: bag.stampMatch?.layerRules || null
+      });
     }
   }
   const hintKeys = (hintId && bag.stampHints && bag.stampHints[hintId]) || [];

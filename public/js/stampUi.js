@@ -95,7 +95,7 @@ export function stampPendingBoxHtml(opts = {}) {
     const on = s.id === cur.id;
     const keys = draft[s.id] || [];
     const plusOn = on && (assignMode || keys.length > 0);
-    const why = escapeHtml(stampPendingWhy(s, lots));
+    const why = escapeHtml(stampPendingWhy(s, lots, { layerRules: opts.layerRules || null }));
     return `<tr class="cad-stamp-row${on ? ' on' : ''}" ${pickAttr}="${escapeHtml(s.id)}">
       <td class="cad-stamp-code">${escapeHtml(s.code || 'Tem')}</td>
       <td class="cad-stamp-num">${escapeHtml(s.areaRaw || '—')}</td>
