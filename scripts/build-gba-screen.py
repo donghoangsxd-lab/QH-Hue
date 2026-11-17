@@ -2,7 +2,9 @@
 # Tính sẵn hai lớp sàng lọc từ dấu chân Global Building Atlas (cùng bộ đã cắt ranh phường trong build-gba.py)
 # và ô đất quy hoạch (lots-use: tên loại đất).
 # public/data/gba/bank-forest.json — công trình giao hành lang 50 m ngoài bờ mặt nước quy hoạch,
-# hoặc nằm trên đất rừng phòng hộ / rừng đặc dụng (đúng từ hoặc mã RPH, RDD). Không đệm từ tim tuyến OSM.
+# hoặc nằm trên đất rừng phòng hộ / rừng đặc dụng (đúng từ hoặc mã RPH, RDD),
+# hoặc đất giao thông / cây xanh (is_road_lot / is_green_lot; bổ sung runtime bằng extend-bank-plan-flags.mjs).
+# Không đệm từ tim tuyến OSM.
 # Không ghi bldg-h.bin. Chiều cao mét đã có ở bldg-hf.bin.
 # Chạy: python3 scripts/build-gba-screen.py
 # Cần duckdb spatial, parquet /tmp/gba/e105_n20_e110_n15.parquet, lots-use.geojson, wards.geojson.
@@ -104,6 +106,32 @@ def forest_kinds(layer, name):
     return out
 
 
+def is_road_lot(layer, name):
+    # Đất giao thông / mở đường; không lấy bãi đỗ.
+    words = words_of(f'{layer or ""} {name or ""}')
+    bag = f' {" ".join(words)} '
+    if ' bai do ' in bag or ' bai xe ' in bag or ' parking ' in bag:
+        return False
+    if any(tok in bag for tok in (' giao thong ', ' mo duong ', ' mat duong ', ' bo via ')):
+        return True
+    if any(tok in bag for tok in (' c-gtdt ', ' c-gtdn ', ' gtdt ', ' gtdn ', ' dgt ')):
+        return True
+    return ' gt ' in bag and ' duong thuy ' not in bag and ' giao thong thuy ' not in bag
+
+
+def is_green_lot(layer, name):
+    # Công viên / cây xanh quy hoạch; không lấy rừng phòng hộ / đặc dụng.
+    words = words_of(f'{layer or ""} {name or ""}')
+    bag = f' {" ".join(words)} '
+    if any(tok in bag for tok in (' rph ', ' rdd ', ' phong ho ', ' dac dung ', ' rsx ', ' rung san xuat ')):
+        return False
+    if any(tok in bag for tok in (' cay xanh ', ' cong vien ', ' vuon hoa ', ' diem xanh ')):
+        return True
+    return any(tok in bag for tok in (
+        ' c-cxdt ', ' c-cxhc ', ' c-cxcd ', ' cx-hc ', ' cx-cd ', ' 1-cv ', ' cxdt ', ' cxhc ', ' cxcd '
+    ))
+
+
 def self_check():
     assert is_water('Đất mặt nước', '')
     assert is_water('Đất sông, suối, kênh, rạch', '')
@@ -131,6 +159,12 @@ def self_check():
     assert forest_kinds('C-RPH', '') == ['rph']
     assert forest_kinds('T-RDD', '') == ['rdd']
     assert forest_kinds('Đất rừng phòng hộ', 'khu Phong Hòa') == ['rph']
+    assert is_road_lot('Đất giao thông', '')
+    assert is_road_lot('C-GTDT', '')
+    assert not is_road_lot('Đất bãi đỗ xe', '')
+    assert is_green_lot('Đất cây xanh sử dụng công cộng đô thị', '')
+    assert is_green_lot('Công viên ven sông', '')
+    assert not is_green_lot('Rừng phòng hộ', '')
 
 
 def area_sql(geom):

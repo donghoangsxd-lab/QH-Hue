@@ -78,7 +78,7 @@ assert.ok(html.includes('id="osmWaterRow" hidden'), 'dòng đường thủy ẩn
 assert.match(html, /id="osmWaterRow" hidden[\s\S]*?id="chk_osmWater" data-layer-sub/);
 assert.ok(!/id="chk_osmRail"[^>]*\bchecked\b/.test(html), 'đường sắt hiện trạng tắt mặc định');
 assert.ok(!/id="chk_osmWater"[^>]*\bchecked\b/.test(html), 'đường thủy tắt mặc định');
-assert.match(html, /class="layer-alert" title="Công trình vi phạm hành lang\/đất rừng"/);
+assert.match(html, /class="layer-alert" title="Công trình vi phạm: hành lang sông, đất rừng, quy hoạch mở đường hoặc đất công viên cây xanh"/);
 assert.match(html, /id="chk_violate"/);
 assert.doesNotMatch(html, /<label[^>]*>[\s\S]*?Công trình vi phạm hành lang\/đất rừng<\/label>/);
 assert.ok(html.includes('id="chk_gt25rail"') && html.includes('id="chk_gt10rail"'), 'công tắc đường sắt QHC');

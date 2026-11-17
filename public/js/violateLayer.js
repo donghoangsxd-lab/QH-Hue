@@ -1,5 +1,7 @@
-// Công trình giao hành lang 50 m ngoài mép nước (đoạn sông rộng hơn 100 m tại chỗ), hoặc nằm trên rừng phòng hộ / đặc dụng.
-// Số liệu tính sẵn (scripts/rebuild-river-corridor.py). Bật lớp mới tải nét ranh 50 m.
+// Công trình giao hành lang 50 m ngoài mép nước (đoạn sông rộng hơn 100 m tại chỗ),
+// nằm trên rừng phòng hộ / đặc dụng, hoặc trên đất quy hoạch mở đường / cây xanh công viên.
+// Số liệu tính sẵn (scripts/rebuild-river-corridor.py, scripts/extend-bank-plan-flags.mjs).
+// Bật lớp mới tải nét ranh 50 m.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -14,6 +16,11 @@ const HIT_Z = 470;
 const LINE_Z = 650;
 const CELL = 0.008;
 
+const REASON_CORRIDOR = 1;
+const REASON_FOREST = 6;
+const REASON_ROAD = 8;
+const REASON_GREEN = 16;
+
 const $ = (id) => document.getElementById(id);
 
 let pack = null;
@@ -27,30 +34,56 @@ const hits = new Map();
 const renderers = new WeakMap();
 const unbind = [];
 
+function parseRow(row, wards, version) {
+  if ((version >= 5) || row.length >= 8) {
+    return {
+      lng: row[0], lat: row[1], ac: row[2], af: row[3],
+      ar: row[4], ag: row[5], reason: row[6],
+      ward: wards[row[7]] ? wards[row[7]].name : ''
+    };
+  }
+  return {
+    lng: row[0], lat: row[1], ac: row[2], af: row[3],
+    ar: 0, ag: 0, reason: row[4],
+    ward: wards[row[5]] ? wards[row[5]].name : ''
+  };
+}
+
 function colorOf(reason) {
-  const corridor = reason & 1;
-  const forest = reason & 6;
-  if (corridor && forest) return '#c084fc';
+  const corridor = reason & REASON_CORRIDOR;
+  const forest = reason & REASON_FOREST;
+  const road = reason & REASON_ROAD;
+  const green = reason & REASON_GREEN;
+  const n = (corridor ? 1 : 0) + (forest ? 1 : 0) + (road ? 1 : 0) + (green ? 1 : 0);
+  if (n > 1) return '#c084fc';
   if (corridor) return '#f87171';
-  return '#fbbf24';
+  if (forest) return '#fbbf24';
+  if (road) return '#38bdf8';
+  if (green) return '#4ade80';
+  return '#f87171';
 }
 
 function reasonText(pt) {
   const parts = [];
-  if (pt.reason & 1) parts.push(`Hành lang 50 m ngoài mép nước, đoạn sông rộng hơn 100 m tại chỗ. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
+  if (pt.reason & REASON_CORRIDOR) {
+    parts.push(`Hành lang 50 m ngoài mép nước, đoạn sông rộng hơn 100 m tại chỗ. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
+  }
   if (pt.reason & 2) parts.push('Nằm trên đất rừng phòng hộ quy hoạch.');
   if (pt.reason & 4) parts.push('Nằm trên đất rừng đặc dụng quy hoạch.');
-  if (pt.reason & 6) parts.push(`Diện tích dấu chân trên đất rừng ${fmtNum(pt.af)} m².`);
+  if (pt.reason & REASON_FOREST) parts.push(`Diện tích dấu chân trên đất rừng ${fmtNum(pt.af)} m².`);
+  if (pt.reason & REASON_ROAD) {
+    parts.push(`Nằm trong phạm vi quy hoạch mở đường (đất giao thông). Diện tích dấu chân ${fmtNum(pt.ar)} m².`);
+  }
+  if (pt.reason & REASON_GREEN) {
+    parts.push(`Nằm trên đất quy hoạch công viên / cây xanh. Diện tích dấu chân ${fmtNum(pt.ag)} m².`);
+  }
   return parts;
 }
 
-function indexPoints(pts, wards) {
+function indexPoints(pts, wards, version) {
   const grid = new Map();
   const list = pts.map((row) => {
-    const pt = {
-      lng: row[0], lat: row[1], ac: row[2], af: row[3], reason: row[4],
-      ward: wards[row[5]] ? wards[row[5]].name : ''
-    };
+    const pt = parseRow(row, wards, version);
     const key = `${Math.floor(pt.lng / CELL)}:${Math.floor(pt.lat / CELL)}`;
     if (!grid.has(key)) grid.set(key, []);
     grid.get(key).push(pt);
@@ -83,12 +116,13 @@ function pointsIn(bounds) {
 function loadPack() {
   if (pack) return Promise.resolve(pack);
   if (!loadP) {
-    const url = new URL('data/gba/bank-forest.json?v=4', document.baseURI).href;
+    const url = new URL('data/gba/bank-forest.json?v=5', document.baseURI).href;
     loadP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     }).then((data) => {
-      const indexed = indexPoints(data.pts || [], data.wards || []);
+      const version = Number(data.v) || 1;
+      const indexed = indexPoints(data.pts || [], data.wards || [], version);
       pack = { ...data, ...indexed };
       return pack;
     }).catch((err) => {
@@ -104,20 +138,29 @@ function statsHtml(data) {
   const rank = data.wardRank || [];
   const byName = new Map((data.wards || []).map((row) => [row.name, row]));
   const rows = rank.map((name) => byName.get(name)).filter(Boolean).slice(0, 40);
-  const body = rows.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${fmtNum(row.corridor)}</td><td>${fmtNum(row.forest)}</td><td>${fmtNum(row.both)}</td></tr>`).join('');
+  const body = rows.map((row) => `<tr><td>${escapeHtml(row.name)}</td>`
+    + `<td>${fmtNum(row.corridor)}</td><td>${fmtNum(row.forest)}</td>`
+    + `<td>${fmtNum(row.road || 0)}</td><td>${fmtNum(row.green || 0)}</td>`
+    + `<td>${fmtNum(row.both)}</td></tr>`).join('');
   return `<p>${escapeHtml(data.note || '')}</p>
     <div class="flood-kpi"><span>Trong hành lang sông</span><b>${fmtNum(t.corridor || 0)}</b></div>
     <div class="flood-kpi"><span>Trên đất rừng phòng hộ, đặc dụng</span><b>${fmtNum(t.forest || 0)}</b></div>
-    <div class="flood-kpi"><span>Cả hai</span><b>${fmtNum(t.both || 0)}</b></div>
+    <div class="flood-kpi"><span>Trong quy hoạch mở đường</span><b>${fmtNum(t.road || 0)}</b></div>
+    <div class="flood-kpi"><span>Trên đất công viên / cây xanh QH</span><b>${fmtNum(t.green || 0)}</b></div>
+    <div class="flood-kpi"><span>Hành lang và rừng trùng</span><b>${fmtNum(t.both || 0)}</b></div>
     <div class="violate-legend">
       <span><i style="background:#f87171"></i>Hành lang</span>
       <span><i style="background:#fbbf24"></i>Đất rừng</span>
-      <span><i style="background:#c084fc"></i>Cả hai</span>
+      <span><i style="background:#38bdf8"></i>Mở đường</span>
+      <span><i style="background:#4ade80"></i>Cây xanh</span>
+      <span><i style="background:#c084fc"></i>Nhiều lý do</span>
       <span><i class="violate-line"></i>Ranh 50 m</span>
     </div>
-    <p class="flood-muted">Cột hành lang và cột rừng đều gồm công trình trùng. Phóng tới mức 16 và bấm dấu tròn để xem lý do, diện tích.</p>
+    <p class="flood-muted">Phóng tới mức 16 và bấm dấu tròn để xem lý do, diện tích.</p>
     <details class="detail-more"><summary>Bảng phường, xã</summary>
-      <div class="violate-table-wrap"><table class="violate-table"><thead><tr><th>Phường, xã</th><th>Hành lang</th><th>Rừng</th><th>Trùng</th></tr></thead><tbody>${body}</tbody></table></div>
+      <div class="violate-table-wrap"><table class="violate-table"><thead><tr>
+        <th>Phường, xã</th><th>Hành lang</th><th>Rừng</th><th>Mở đường</th><th>Cây xanh</th><th>HL∩Rừng</th>
+      </tr></thead><tbody>${body}</tbody></table></div>
     </details>`;
 }
 
@@ -183,7 +226,7 @@ const Glow = L.Layer.extend({
 
 function popupHtml(pt) {
   const lines = reasonText(pt).map((line) => `<span>${escapeHtml(line)}</span>`).join('');
-  return `<div class="violate-pop"><b>Công trình trong hành lang / đất rừng</b>${lines}<span>Phường, xã: ${escapeHtml(pt.ward || 'chưa rõ')}</span></div>`;
+  return `<div class="violate-pop"><b>Công trình trong hành lang / đất rừng / mở đường / cây xanh</b>${lines}<span>Phường, xã: ${escapeHtml(pt.ward || 'chưa rõ')}</span></div>`;
 }
 
 function syncHits(m) {
@@ -306,7 +349,9 @@ function publishCounts(data) {
   const byName = new Map((data.wards || []).map((w) => [w.name, w]));
   setRiverCounts((name) => {
     const w = byName.get(name);
-    return w ? { corridor: w.corridor || 0, forest: w.forest || 0 } : { corridor: 0, forest: 0 };
+    return w
+      ? { corridor: w.corridor || 0, forest: w.forest || 0, road: w.road || 0, green: w.green || 0 }
+      : { corridor: 0, forest: 0, road: 0, green: 0 };
   });
 }
 
@@ -329,18 +374,21 @@ function setOn(next) {
     } catch (err) { console.warn('Nét hành lang:', err); }
   }).catch((err) => {
     console.warn('Hành lang sông:', err);
-    if (box) box.innerHTML = '<p>Chưa có tệp số liệu hành lang và đất rừng.</p>';
+    if (box) box.innerHTML = '<p>Chưa có tệp số liệu hành lang, đất rừng, mở đường và cây xanh.</p>';
   });
 }
 
 function wardHtml(name) {
   if (!pack) return '';
-  const row = (pack.wards || []).find((w) => w.name === name) || { corridor: 0, forest: 0, both: 0 };
+  const row = (pack.wards || []).find((w) => w.name === name)
+    || { corridor: 0, forest: 0, both: 0, road: 0, green: 0 };
   return `<section class="lot-over river-ward">
-    <h4>Hành lang sông và đất rừng</h4>
+    <h4>Hành lang sông, đất rừng, mở đường, cây xanh</h4>
     <div class="lot-over-kpis">
       <div><span>Hành lang sông</span><b>${fmtNum(row.corridor)}</b></div>
       <div><span>Rừng phòng hộ, đặc dụng</span><b>${fmtNum(row.forest)}</b></div>
+      <div><span>Quy hoạch mở đường</span><b>${fmtNum(row.road || 0)}</b></div>
+      <div><span>Công viên / cây xanh QH</span><b>${fmtNum(row.green || 0)}</b></div>
     </div>
   </section>`;
 }
