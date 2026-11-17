@@ -721,21 +721,32 @@ def flag_buildings(con):
 
 
 def load_forest():
+    # Giữ cờ rừng (2|4) và cờ quy hoạch mở đường / cây xanh (8|16) từ tệp cũ.
     if not os.path.exists(OUT_PATH):
         return [], 0, 0
     data = json.load(open(OUT_PATH, encoding='utf-8'))
     wards = [w.get('name') or '' for w in data.get('wards') or []]
+    version = int(data.get('v') or 1)
     forest = []
     for row in data.get('pts') or []:
-        reason = int(row[4]) & 6
-        if not reason or row[3] <= 0.5:
+        if version >= 5 or len(row) >= 8:
+            af, ar, ag, reason, idx = row[3], row[4], row[5], int(row[6]), int(row[7])
+        else:
+            af, ar, ag, reason, idx = row[3], 0, 0, int(row[4]), int(row[5])
+        keep = reason & (6 | 8 | 16)
+        if not keep:
             continue
-        idx = int(row[5])
+        if (keep & 6) and af <= 0.5 and not (keep & (8 | 16)):
+            continue
         forest.append({
-            'lng': row[0], 'lat': row[1], 'af': row[3], 'reason': reason,
+            'lng': row[0], 'lat': row[1],
+            'af': af if (keep & 6) else 0,
+            'ar': ar if (keep & 8) else 0,
+            'ag': ag if (keep & 16) else 0,
+            'reason': keep,
             'ward': wards[idx] if 0 <= idx < len(wards) else ''
         })
-    log(f'giữ {len(forest)} điểm rừng từ tệp cũ')
+    log(f'giữ {len(forest)} điểm rừng / mở đường / cây xanh từ tệp cũ')
     return forest, int(data.get('buildings') or 0), int(data.get('forestPolygons') or 0)
 
 
@@ -745,7 +756,7 @@ def write_payload(con, forest, exempt_n, buildings, forest_polygons):
         FROM corr c JOIN bldg_attr a ON a.id = c.id
         WHERE c.area > 0.5
     """).fetchall()
-    # Ghép điểm rừng theo tâm gần nhất. Cờ rừng giữ nguyên.
+    # Ghép điểm rừng / mở đường / cây xanh theo tâm gần nhất. Cờ ngoài hành lang giữ nguyên.
     used = set()
     corridor_pts = []
     for lng, lat, area, ward in rows:
@@ -761,51 +772,81 @@ def write_payload(con, forest, exempt_n, buildings, forest_polygons):
         if best_i >= 0:
             used.add(best_i)
             item = forest[best_i]
-            corridor_pts.append((item['lng'], item['lat'], area, item['af'], 1 | item['reason'], item['ward'] or ward))
+            corridor_pts.append((
+                item['lng'], item['lat'], area,
+                item.get('af') or 0, item.get('ar') or 0, item.get('ag') or 0,
+                1 | item['reason'], item['ward'] or ward
+            ))
         else:
-            corridor_pts.append((lng, lat, area, 0, 1, ward or ''))
+            corridor_pts.append((lng, lat, area, 0, 0, 0, 1, ward or ''))
     for i, item in enumerate(forest):
         if i not in used:
-            corridor_pts.append((item['lng'], item['lat'], 0, item['af'], item['reason'], item['ward']))
+            corridor_pts.append((
+                item['lng'], item['lat'], 0,
+                item.get('af') or 0, item.get('ar') or 0, item.get('ag') or 0,
+                item['reason'], item['ward']
+            ))
     wards = {}
-    corridor_n = forest_n = both_n = 0
+    corridor_n = forest_n = both_n = road_n = green_n = 0
     packed_src = []
-    for lng, lat, ac, af, reason, ward in corridor_pts:
+    for lng, lat, ac, af, ar, ag, reason, ward in corridor_pts:
         if reason == 0:
             continue
         name = ward or 'Chưa rõ phường, xã'
-        slot = wards.setdefault(name, [0, 0, 0])
+        slot = wards.setdefault(name, [0, 0, 0, 0, 0])
         in_c = bool(reason & 1)
         in_f = bool(reason & 6)
+        in_r = bool(reason & 8)
+        in_g = bool(reason & 16)
         if in_c and in_f:
             both_n += 1
             slot[2] += 1
             slot[0] += 1
             slot[1] += 1
+            corridor_n += 1
+            forest_n += 1
         elif in_c:
             corridor_n += 1
             slot[0] += 1
         elif in_f:
             forest_n += 1
             slot[1] += 1
-        packed_src.append((name, lng, lat, ac if in_c else 0, af if in_f else 0, reason))
+        if in_r:
+            road_n += 1
+            slot[3] += 1
+        if in_g:
+            green_n += 1
+            slot[4] += 1
+        packed_src.append((
+            name, lng, lat,
+            ac if in_c else 0, af if in_f else 0,
+            ar if in_r else 0, ag if in_g else 0,
+            reason
+        ))
     names = sorted(wards)
     index_of = {name: i for i, name in enumerate(names)}
     packed = [[
-        round(lng, 6), round(lat, 6), int(round(ac)), int(round(af)), reason, index_of[name]
-    ] for name, lng, lat, ac, af, reason in packed_src]
-    ranked = sorted(names, key=lambda name: -(wards[name][0] + wards[name][1]))
+        round(lng, 6), round(lat, 6),
+        int(round(ac)), int(round(af)), int(round(ar)), int(round(ag)),
+        reason, index_of[name]
+    ] for name, lng, lat, ac, af, ar, ag, reason in packed_src]
+    ranked = sorted(
+        names,
+        key=lambda name: -(wards[name][0] + wards[name][1] + wards[name][3] + wards[name][4])
+    )
     kept_n = con.execute('SELECT count(*) FROM river_keep').fetchone()[0]
     payload = {
-        'v': 4,
+        'v': 5,
         'buildings': int(buildings or 0),
         'waterPolygons': int(kept_n),
         'forestPolygons': int(forest_polygons or 0),
         'totals': {
-            'corridor': corridor_n + both_n,
-            'forest': forest_n + both_n,
+            'corridor': corridor_n if both_n == 0 else (corridor_n),
+            'forest': forest_n if both_n == 0 else forest_n,
             'both': both_n,
-            'flagged': corridor_n + forest_n + both_n,
+            'road': road_n,
+            'green': green_n,
+            'flagged': len(packed),
             'exemptRoad': exempt_n
         },
         'note': (
@@ -816,22 +857,29 @@ def write_payload(con, forest, exempt_n, buildings, forest_polygons):
             'Không gồm hồ, ao, đầm, mặt biển, bãi bồi và kênh hẹp hơn 100 m. '
             'Nhà bị đường trục chính hoặc đường có tên (không phải cầu, không phải kiệt) chắn giữa nhà và bờ, chạy dọc bờ, không tính vào hành lang. '
             'Rừng chỉ gồm ô quy hoạch có cụm phòng hộ hoặc đặc dụng, hoặc mã RPH / RDD. '
-            'Không gồm rừng sản xuất và không khớp tên chỗ như Phong Hòa.'
+            'Không gồm rừng sản xuất và không khớp tên chỗ như Phong Hòa. '
+            'Cờ mở đường (8) và cây xanh (16) giữ từ scripts/extend-bank-plan-flags.mjs.'
         ),
         'wards': [{
             'name': name,
             'corridor': wards[name][0],
             'forest': wards[name][1],
-            'both': wards[name][2]
+            'both': wards[name][2],
+            'road': wards[name][3],
+            'green': wards[name][4]
         } for name in names],
         'wardRank': ranked,
         'pts': packed
     }
+    # corridor/forest totals gồm cả điểm trùng (both) như bản cũ.
+    payload['totals']['corridor'] = sum(1 for *_, reason in packed_src if reason & 1)
+    payload['totals']['forest'] = sum(1 for *_, reason in packed_src if reason & 6)
     with open(OUT_PATH, 'w', encoding='utf-8') as handle:
         json.dump(payload, handle, ensure_ascii=False, separators=(',', ':'))
     log(
         f"hành lang {payload['totals']['corridor']}, rừng {payload['totals']['forest']}, "
-        f"cả hai {both_n}, loại đường {exempt_n}, tệp {os.path.getsize(OUT_PATH) / 1e6:.1f} MB"
+        f"mở đường {road_n}, cây xanh {green_n}, cả hai {both_n}, loại đường {exempt_n}, "
+        f"tệp {os.path.getsize(OUT_PATH) / 1e6:.1f} MB"
     )
     return payload['totals']
 
