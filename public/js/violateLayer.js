@@ -116,7 +116,7 @@ function pointsIn(bounds) {
 function loadPack() {
   if (pack) return Promise.resolve(pack);
   if (!loadP) {
-    const url = new URL('data/gba/bank-forest.json?v=5', document.baseURI).href;
+    const url = new URL('data/gba/bank-forest.json?v=6', document.baseURI).href;
     loadP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

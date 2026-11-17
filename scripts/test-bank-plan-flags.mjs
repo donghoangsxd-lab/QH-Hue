@@ -45,6 +45,13 @@ const layer = readFileSync(new URL('../public/js/violateLayer.js', import.meta.u
 assert.match(layer, /REASON_ROAD = 8/);
 assert.match(layer, /REASON_GREEN = 16/);
 assert.match(layer, /Quy hoạch mở đường/);
-assert.match(layer, /bank-forest\.json\?v=5/);
+assert.match(layer, /bank-forest\.json\?v=6/);
+assert.match(readFileSync(new URL('./sync-bank-forest-gba.mjs', import.meta.url), 'utf8'), /syncedGba|MATCH_M/);
+
+const pack = JSON.parse(readFileSync(new URL('../public/data/gba/bank-forest.json', import.meta.url), 'utf8'));
+assert.ok(Number(pack.v) >= 6, 'bank-forest phải v≥6 sau sync GBA');
+assert.equal(pack.totals?.syncedGba, true);
+assert.ok((pack.pts || []).length > 0);
+assert.ok((pack.pts[0] || []).length >= 8, 'pts v6 đủ 8 cột');
 
 console.log('test-bank-plan-flags: ok');
