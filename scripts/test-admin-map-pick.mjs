@@ -14,7 +14,7 @@ assert.match(pick, /admin-urban/);
 assert.match(pick, /Không có đô thị tại đây/);
 assert.match(pick, /if \(isDothiBrowse\(\)\)/);
 assert.match(pick, /clearUrbanMapPick\(\)/);
-assert.match(pick, /openMultiWardInfoCard|admin-info-multi|Tổng dân số|Tổng diện tích/);
+assert.match(pick, /openMultiWardInfoCard|admin-info-multi|TỔNG CỘNG|admin-multi-table/);
 assert.match(pick, /isShiftClick|getSelectedDvhcNames/);
 assert.doesNotMatch(pick, /openChooser\(hits/);
 
@@ -51,6 +51,6 @@ assert.match(cn, /highlightWardNames|isShiftClick/);
 assert.match(spec, /Shift và bấm|nhiều phường\/xã|admin-info-multi/);
 
 const css = read('public/css/style.css');
-assert.match(css, /admin-info-multi|admin-multi-row/);
+assert.match(css, /admin-info-multi|admin-multi-table/);
 
 console.log('admin map pick ok');

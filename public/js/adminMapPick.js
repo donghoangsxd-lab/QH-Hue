@@ -184,7 +184,7 @@ function fmtPct(pct) {
   return '0%';
 }
 
-/** Tổng hợp nhiều phường/xã (Shift): dân số, diện tích, tỷ lệ % trên tổng đã chọn. */
+/** Tổng hợp nhiều phường/xã (Shift): bảng Đơn vị | Dân số | Diện tích | Tỷ lệ + hàng TỔNG CỘNG. */
 export function openMultiWardInfoCard(names, ev) {
   closeAdminInfoCard();
   const list = [...new Set((names || []).map(s => String(s || '').trim()).filter(Boolean))];
@@ -198,15 +198,15 @@ export function openMultiWardInfoCard(names, ev) {
   }).sort((a, b) => b.km2 - a.km2 || a.name.localeCompare(b.name, 'vi'));
   const totalPop = rows.reduce((s, r) => s + r.pop, 0);
   const totalKm = rows.reduce((s, r) => s + r.km2, 0);
-  const mix = rows.map(r => {
-    const popPct = pctOf(r.pop, totalPop);
+  // Tỷ lệ theo diện tích trên tổng đã chọn (cột gọn một số %).
+  const body = rows.map(r => {
     const kmPct = pctOf(r.km2, totalKm);
-    return `<div class="admin-multi-row" title="${escapeHtml(r.name)}">
-      <span class="admin-multi-name">${escapeHtml(shortPlaceName(r.name))}</span>
-      <span class="admin-multi-pop">${fmtPop(r.pop)} <i>${escapeHtml(fmtPct(popPct))}</i></span>
-      <span class="admin-multi-km">${fmtKm(r.km2)} km² <i>${escapeHtml(fmtPct(kmPct))}</i></span>
-      <span class="admin-multi-bar" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, kmPct)).toFixed(1)}%"></i></span>
-    </div>`;
+    return `<tr title="${escapeHtml(r.name)}">
+      <th scope="row">${escapeHtml(shortPlaceName(r.name))}</th>
+      <td>${fmtPop(r.pop)}</td>
+      <td>${fmtKm(r.km2)}</td>
+      <td>${escapeHtml(fmtPct(kmPct))}</td>
+    </tr>`;
   }).join('');
   const el = document.createElement('aside');
   el.className = 'place-card admin-info-card admin-info-multi';
@@ -214,13 +214,17 @@ export function openMultiWardInfoCard(names, ev) {
   el.setAttribute('aria-label', 'Tổng hợp đơn vị hành chính');
   el.innerHTML = `<header class="place-head"><span>${ico('locate')}Đã chọn ${list.length} đơn vị</span>
       <button type="button" class="place-x" title="Đóng" aria-label="Đóng">${ico('close')}</button></header>
-    <p class="admin-multi-hint">Giữ Shift và bấm phường/xã để thêm hoặc bỏ chọn.</p>
-    <button type="button" class="place-row" disabled>
-      <span>Tổng dân số</span><b>${fmtPop(totalPop)}</b></button>
-    <button type="button" class="place-row" disabled>
-      <span>Tổng diện tích</span><b>${fmtKm(totalKm)} km²</b></button>
-    <div class="admin-multi-head"><span>Đơn vị</span><span>Dân số</span><span>Diện tích</span></div>
-    <div class="admin-multi-list">${mix}</div>`;
+    <p class="admin-multi-hint">Giữ Shift và bấm phường/xã để thêm hoặc bỏ chọn. Tỷ lệ theo diện tích.</p>
+    <table class="admin-multi-table">
+      <thead><tr><th scope="col">Đơn vị</th><th scope="col">Dân số</th><th scope="col">Diện tích<br><span>km²</span></th><th scope="col">Tỷ lệ</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr>
+        <th scope="row">TỔNG CỘNG</th>
+        <td>${fmtPop(totalPop)}</td>
+        <td>${fmtKm(totalKm)}</td>
+        <td>100%</td>
+      </tr></tfoot>
+    </table>`;
   document.body.appendChild(el);
   infoEl = el;
   el.querySelector('.place-x')?.addEventListener('click', closeAdminInfoCard);
