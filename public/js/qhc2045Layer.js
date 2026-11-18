@@ -1083,44 +1083,12 @@ function bindQhcDossier(popup) {
   popup.getElement()?.querySelectorAll('.lp-dossier').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       L.DomEvent.stop(e);
-      const { openDecision } = await import('./decisionViewer.js');
-      const entry = qhcLayerDossier();
-      if (btn.dataset.dossier === 'quy-dinh') {
-        const doc = (entry.docs || []).find(d => d && d.role === 'quy-dinh' && d.id);
-        if (!doc) return;
-        openDecision({
-          key: `layer-doc:qhc-2045:${doc.id}:quy-dinh`,
-          title: QHC2045.short,
-          noun: 'Quy định quản lý',
-          decision: {
-            slug: doc.slug || entry.slug,
-            kind: doc.kind || 'pdf',
-            url: doc.url || '',
-            name: doc.name || 'Quy định quản lý',
-            bytes: doc.bytes || 0,
-            at: doc.at || 0,
-            embed: doc.embed !== false
-          },
-          slug: doc.slug || entry.slug,
-          body: { layer: 'qhc-2045', docRole: 'quy-dinh', docId: String(doc.id) },
-          isBusy: () => false,
-          setBusy() {},
-          onSaved: () => null
-        });
-        return;
-      }
-      if (!entry.decision) return;
-      openDecision({
-        key: 'layer:qhc-2045',
-        title: QHC2045.short,
-        noun: 'lớp',
-        decision: entry.decision,
-        slug: entry.decision.slug || entry.slug,
-        body: { layer: 'qhc-2045' },
-        isBusy: () => false,
-        setBusy() {},
-        onSaved: () => null
-      });
+      // Cùng khóa qhc-2045 với menu danh sách QHC 1/25.000 và 1/10.000.
+      const { openLayerPick } = await import('./layerDecisions.js');
+      const pick = btn.dataset.dossier === 'quy-dinh' ? 'quy-dinh'
+        : btn.dataset.dossier === 'thuyet-minh' ? 'thuyet-minh'
+          : 'phe-duyet';
+      openLayerPick('qhc-2045', pick);
     });
   });
 }

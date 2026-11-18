@@ -99,6 +99,26 @@ function writeAction(t) {
   return t && t.body && t.body.docRole ? 'putProjectDoc' : 'putProjectDecision';
 }
 
+/** Body ghi API: luôn có layer (lớp tĩnh) hoặc tenQH (đồ án QHC/QHPK/QHCT nhập). */
+function writeBody(t, extra = {}) {
+  const body = { ...(t && t.body ? t.body : {}), ...extra };
+  let layer = String(body.layer || '').trim();
+  let tenQH = String(body.tenQH || '').trim();
+  if (!layer && !tenQH) {
+    const slug = String((t && t.slug) || body.slug || '');
+    if (slug.startsWith('lop-')) layer = slug.slice(4);
+    else if (t && t.title) tenQH = String(t.title).trim().slice(0, 120);
+  }
+  if (layer) {
+    body.layer = layer;
+    delete body.tenQH;
+  } else if (tenQH) {
+    body.tenQH = tenQH;
+    delete body.layer;
+  }
+  return body;
+}
+
 export function fmtBytes(n) {
   const v = Number(n) || 0;
   if (v < 1024) return v ? `${v} B` : '';
@@ -112,7 +132,13 @@ const setBusy = (t, on) => { if (t && t.setBusy) t.setBusy(on); };
 async function postJson(action, body, auth = true) {
   const headers = { 'Content-Type': 'application/json' };
   if (auth && state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const res = await fetch(geeApi(`action=${action}`), {
+  // layer/tenQH/docRole trên query: nếu thân JSON lỗi parse (PDF base64 lớn) API vẫn biết đích gắn.
+  let q = `action=${encodeURIComponent(action)}`;
+  if (body && body.layer) q += `&layer=${encodeURIComponent(String(body.layer).slice(0, 40))}`;
+  else if (body && body.tenQH) q += `&tenQH=${encodeURIComponent(String(body.tenQH).slice(0, 120))}`;
+  if (body && body.docRole) q += `&docRole=${encodeURIComponent(String(body.docRole).slice(0, 20))}`;
+  if (body && body.docId) q += `&docId=${encodeURIComponent(String(body.docId).slice(0, 16))}`;
+  const res = await fetch(geeApi(q), {
     method: 'POST',
     headers,
     body: JSON.stringify(body)
@@ -851,9 +877,14 @@ async function commitLink(t) {
   if (!isAdmin() || busyOf(t) || !pendingReview || pendingReview.key !== t.key) return;
   const el = ensureViewer();
   if (!String(el.querySelector('[data-decision-url]').value || '').trim()) return;
+  const body = writeBody(t, { url: pendingReview.url });
+  if (!body.layer && !body.tenQH) {
+    alert('Thiếu tên đồ án hoặc mã lớp bản đồ để gắn văn bản.');
+    return;
+  }
   setBusy(t, true);
   try {
-    const data = await postJson(writeAction(t), { ...t.body, url: pendingReview.url });
+    const data = await postJson(writeAction(t), body);
     pendingReview = null;
     const decision = t.body && t.body.docRole
       ? data.doc
@@ -879,13 +910,17 @@ async function uploadPdf(t, file) {
   if (!isAdmin() || busyOf(t)) return;
   const bad = readPdfError(file);
   if (bad) { alert(bad); return; }
+  const body = writeBody(t, {
+    name: file.name,
+    pdf: await fileToPdfBase64(file)
+  });
+  if (!body.layer && !body.tenQH) {
+    alert('Thiếu tên đồ án hoặc mã lớp bản đồ để gắn văn bản.');
+    return;
+  }
   setBusy(t, true);
   try {
-    const data = await postJson(writeAction(t), {
-      ...t.body,
-      name: file.name,
-      pdf: await fileToPdfBase64(file)
-    });
+    const data = await postJson(writeAction(t), body);
     revokePdfPreview();
     const decision = t.body && t.body.docRole
       ? data.doc
@@ -902,10 +937,15 @@ async function remove(t) {
   if (!isAdmin() || busyOf(t) || !t.decision) return;
   const what = t.body && t.body.docId ? (t.decision && t.decision.name) || 'văn bản này' : 'quyết định phê duyệt';
   if (!confirm(`Gỡ «${what}» khỏi đồ án «${t.title}»?`)) return;
+  const body = writeBody(t);
+  if (!body.layer && !body.tenQH) {
+    alert('Thiếu tên đồ án hoặc mã lớp bản đồ để gỡ văn bản.');
+    return;
+  }
   setBusy(t, true);
   try {
     const action = t.body && t.body.docId ? 'deleteProjectDoc' : 'deleteProjectDecision';
-    const data = await postJson(action, t.body);
+    const data = await postJson(action, body);
     closeDecision();
     if (t.onSaved) t.onSaved(null, data);
   } catch (err) {

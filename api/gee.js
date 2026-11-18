@@ -148,6 +148,17 @@ function readJsonBody(req) {
   return body && typeof body === 'object' ? body : {};
 }
 
+/** Đích gắn hồ sơ: lớp tĩnh (layer / slug lop-*) hoặc tên đồ án. Query dự phòng khi thân JSON lỗi parse. */
+function resolveProjectTarget(body = {}, query = {}) {
+  let layer = String(body.layer || query.layer || '').trim().slice(0, 40);
+  if (!layer) {
+    const slug = String(body.slug || query.slug || '').trim();
+    if (slug.startsWith('lop-')) layer = slug.slice(4).slice(0, 40);
+  }
+  const tenQH = layer ? '' : sanitizeSheetText(body.tenQH || query.tenQH, 120);
+  return { layer, tenQH };
+}
+
 function stagedTokenOf(body) {
   const token = String((body && body.staged) || '');
   return /^[a-f0-9]{32}$/.test(token) ? token : '';
@@ -4019,14 +4030,15 @@ module.exports = async (req, res) => {
     }
 
     // Admin gắn PDF tối đa 10 MB (base64 trong thân) hoặc link đã kiểm tra. stagedToken còn nhận nếu client cũ đã PUT.
-    // body.layer: gắn cho lớp bản đồ dùng chung, không ghi cột LinkQD trên sheet DS_DoAn.
+    // body.layer / ?layer=: gắn cho lớp bản đồ dùng chung, không ghi cột LinkQD trên sheet DS_DoAn.
     if (action === 'putProjectDecision') {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const layer = String(body.layer || '').slice(0, 40);
-      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
-      if (!layer && !tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const { layer, tenQH } = resolveProjectTarget(body, req.query);
+      if (!layer && !tenQH) {
+        return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc mã lớp bản đồ' });
+      }
       const url = String(body.url || '').trim();
       const staged = stagedTokenOf(body);
       let buffer = null;
@@ -4059,15 +4071,16 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Văn bản kèm hồ sơ đồ án hoặc lớp dùng chung (body.layer): quy chế (quy-dinh), thuyết minh… Không ghi cột LinkQD.
+    // Văn bản kèm hồ sơ đồ án hoặc lớp dùng chung (body.layer / ?layer=): quy chế (quy-dinh), thuyết minh… Không ghi cột LinkQD.
     if (action === 'putProjectDoc') {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const layer = String(body.layer || '').slice(0, 40);
-      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
-      const role = String(body.docRole || '').slice(0, 20);
-      if (!layer && !tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const { layer, tenQH } = resolveProjectTarget(body, req.query);
+      const role = String(body.docRole || req.query.docRole || '').slice(0, 20);
+      if (!layer && !tenQH) {
+        return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc mã lớp bản đồ' });
+      }
       const url = String(body.url || '').trim();
       const staged = stagedTokenOf(body);
       let buffer = null;
@@ -4076,7 +4089,7 @@ module.exports = async (req, res) => {
         catch (err) { return sendInlinePdfError(res, err); }
       }
       try {
-        const replaceId = String(body.docId || '').slice(0, 16);
+        const replaceId = String(body.docId || req.query.docId || '').slice(0, 16);
         const saved = url
           ? await projects.saveProjectDoc({ tenQH, layer, role, url, replaceId })
           : await projects.saveProjectDoc({ tenQH, layer, role, fileName: body.name, buffer, replaceId, stagedToken: staged });
@@ -4090,9 +4103,8 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const layer = String(body.layer || '').slice(0, 40);
-      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
-      const id = String(body.docId || '').slice(0, 16);
+      const { layer, tenQH } = resolveProjectTarget(body, req.query);
+      const id = String(body.docId || req.query.docId || '').slice(0, 16);
       if ((!layer && !tenQH) || !id) return res.status(400).json({ error: true, message: 'Thiếu văn bản cần gỡ' });
       try {
         const done = await projects.removeProjectDoc(tenQH, id, { layer });
@@ -4122,7 +4134,7 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const layer = String(body.layer || '').slice(0, 40);
+      const { layer, tenQH } = resolveProjectTarget(body, req.query);
       if (layer) {
         try {
           await projects.removeLayerDecision(layer);
@@ -4131,8 +4143,7 @@ module.exports = async (req, res) => {
           return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được quyết định' });
         }
       }
-      const tenQH = sanitizeSheetText(body.tenQH, 120);
-      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc mã lớp bản đồ' });
       try {
         await projects.removeDecision(tenQH);
         let sheet = false;

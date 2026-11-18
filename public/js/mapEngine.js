@@ -2829,35 +2829,41 @@ function bindDossier(popup, projectName) {
       L.DomEvent.stop(e);
       const entry = catalogEntry(name);
       if (!entry) return;
-      const { openDecision } = await import('./decisionViewer.js');
-      if (btn.dataset.dossier === 'quy-dinh') {
-        const doc = (entry.docs || []).find(d => d && d.role === 'quy-dinh' && d.id);
-        if (!doc) return;
-        openDecision({
-          key: `doc:${name}:${doc.id}:quy-dinh`,
-          title: projectFullName(name),
-          noun: 'Quy chế',
-          decision: decisionFile(doc, 'Quy chế'),
-          slug: doc.slug || entry.slug || '',
-          body: { tenQH: name, docRole: 'quy-dinh', docId: String(doc.id) },
+      // Đồ án nhập mọi cấp (QHC/QHPK/QHCT): luôn gửi tenQH; Admin chưa có file thì mở khung gắn.
+      const { openDecision, openOrAssign, openAssign } = await import('./decisionViewer.js');
+      const admin = isAdminUser();
+      if (btn.dataset.dossier === 'quy-dinh' || btn.dataset.dossier === 'thuyet-minh') {
+        const role = btn.dataset.dossier;
+        const label = role === 'thuyet-minh' ? 'Thuyết minh' : 'Quy định quản lý';
+        const doc = (entry.docs || []).find(d => d && d.role === role && d.id);
+        const target = {
+          key: `doc:${name}:${doc ? doc.id : 'new'}:${role}`,
+          title: projectFullName(name) || name,
+          noun: label,
+          decision: doc ? decisionFile(doc, label) : null,
+          slug: (doc && doc.slug) || entry.slug || '',
+          body: { tenQH: name, docRole: role, docId: doc ? String(doc.id) : '' },
           isBusy: () => false,
           setBusy() {},
           onSaved: () => null
-        });
+        };
+        if (doc) openOrAssign(target);
+        else if (admin) openAssign(target);
         return;
       }
-      if (!entry.decision) return;
-      openDecision({
+      const target = {
         key: `project:${name}`,
-        title: projectFullName(name),
+        title: projectFullName(name) || name,
         noun: 'đồ án',
-        decision: decisionFile(entry.decision, 'Quyết định phê duyệt'),
-        slug: entry.slug || entry.decision.slug || '',
+        decision: entry.decision ? decisionFile(entry.decision, 'Quyết định phê duyệt') : null,
+        slug: entry.slug || (entry.decision && entry.decision.slug) || '',
         body: { tenQH: name },
         isBusy: () => false,
         setBusy() {},
         onSaved: () => null
-      });
+      };
+      if (entry.decision) openOrAssign(target);
+      else if (admin) openAssign(target);
     });
   });
 }
