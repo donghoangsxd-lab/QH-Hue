@@ -2096,8 +2096,13 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-doc-add button:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 .project-doc-add button:disabled { opacity: 0.45; cursor: not-allowed; }
 .project-net-note { margin: 4px 0 2px; color: var(--text-muted); font-size: var(--fs-xs); }
-.decision-assign [data-proposal-note] { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-xs); }
+.decision-assign [data-proposal-note] { flex: 1 1 100%; min-width: 120px; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-assign [data-proposal-reject]:hover:not(:disabled) { border-color: var(--accent-red); color: var(--accent-red); }
+.decision-propose .propose-slots { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; }
+.propose-slot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.propose-slot-label { flex: 0 0 11em; font-size: var(--fs-xs); font-weight: 650; color: var(--text-main); }
+.propose-slot-file { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-xs); }
+.decision-propose [data-propose-commit] { border-color: var(--accent-orange); color: var(--accent-orange); font-weight: 650; }
 /* Neo phải, rộng A4; PDF/HTML qua iframe cố định [data-decision-frame] + blob */
 .decision-view {
   position: fixed; top: 8px; right: 8px; bottom: 8px; left: auto;

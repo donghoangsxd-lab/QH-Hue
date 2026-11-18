@@ -891,6 +891,9 @@ assert.doesNotMatch(read('public/js/decisionViewer.js'), /pdf\.js|pdfjsLib|PDFJS
 assert.match(read('public/js/decisionViewer.js'), /data-decision-pdf/);
 assert.match(read('public/js/decisionViewer.js'), /từ chối link phải mở tab mới/);
 assert.match(read('public/js/decisionViewer.js'), /pickFile\(t\)/);
+assert.match(read('public/js/decisionViewer.js'), /data-propose-slots/);
+assert.match(read('public/js/decisionViewer.js'), /id: 'quy-dinh'/);
+assert.match(read('public/js/decisionViewer.js'), /id: 'thuyet-minh'/);
 assert.match(read('public/js/decisionViewer.js'), /Cần đăng nhập quản trị để gắn PDF/);
 assert.match(read('services/projectStore.js'), /Chỉ chấp nhận link xem trực tiếp được hoặc file PDF/);
 assert.doesNotMatch(read('public/_headers'), /\/docs\/108-QD-TTg\.pdf/);

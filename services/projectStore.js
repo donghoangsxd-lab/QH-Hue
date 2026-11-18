@@ -8,7 +8,7 @@
 //   projects/<slug>/vb-<id>.pdf — văn bản kèm đã duyệt (quyết định đính chính / phê duyệt thêm, quy chế, thuyết minh), tối đa 8 file, cùng decisions.json.
 //   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
 //   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
-//   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định người dùng gửi (tối đa 2 MB). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
+//   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định / quy định / thuyết minh người dùng gửi (tối đa 2 MB mỗi file). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
 //   projects/<slug>/quyet-dinh-cho.pdf — đường cũ, chỉ đọc khi duyệt nốt rồi xóa.
 //   projects/<slug>/adjust/<id>.json|.pdf|.scan — điều chỉnh cục bộ. Chỉ quyết định: chưa có json cho đến khi gắn bản vẽ. Chỉ mục projects/adjustments.json (title = tóm tắt).
 //   projects/<slug>/sdd-scans.json + sdd-scan/<id>.webp|jpg|png — ảnh scan bản vẽ SDD (Admin, ≤ 5 MB/tờ, tối đa 8 tờ).
@@ -22,7 +22,7 @@ const net = require('net');
 const constants = require('../config/constants');
 const pdfLimits = require('./pdfLimits');
 const gcsWrite = require('./gcsWrite');
-const { pendingDecisionObject } = require('./pdfPaths');
+const { pendingDecisionObject, pendingDocObject, PENDING_DOC_ROLES } = require('./pdfPaths');
 const { adjustSubmitMode } = require('./adjustDraft');
 const { NET_ROLES: BAN_VE_NET_ROLES } = require('./netRoles');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
@@ -380,7 +380,7 @@ const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
 const STAGED_RE = /^[a-f0-9]{32}$/;
 // Văn bản kèm theo đồ án. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
 // quy-dinh = quy chế theo đồ án (file cũ giữ mã này). Kind ChoDuyet quy-che là quy chế kiến trúc theo đơn vị.
-const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy chế', 'thuyet-minh': 'Thuyết minh' };
+const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý', 'thuyet-minh': 'Thuyết minh' };
 
 function docRoleLabel(role) {
   return DOC_ROLES[role] || '';
@@ -1038,11 +1038,28 @@ function emptyProposals() {
   return { v: 1, items: {} };
 }
 
+function proposalDocsView(docs) {
+  if (!docs || typeof docs !== 'object') return undefined;
+  const out = {};
+  for (const role of PENDING_DOC_ROLES) {
+    const x = docs[role];
+    if (!x || !x.at) continue;
+    out[role] = {
+      name: decisionFileName(x.name),
+      bytes: Number(x.bytes) || 0,
+      at: Number(x.at) || 0
+    };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function proposalView(d) {
+  const docs = proposalDocsView(d && d.docs);
   return {
     name: decisionFileName(d.name),
     bytes: Number(d.bytes) || 0,
-    at: Number(d.at) || 0
+    at: Number(d.at) || 0,
+    ...(docs ? { docs } : {})
   };
 }
 
@@ -1104,16 +1121,62 @@ async function attachProposals(projects) {
   }
 }
 
-async function saveDecisionProposal({ tenQH, fileName, buffer }) {
+async function writePendingPdf(dest, buffer) {
+  await writeBytes(dest, buffer, 'application/pdf');
+  try { await gcsWrite.patchCacheControl(dest, 'private, no-store'); } catch (err) { /* metadata không chặn lần ghi */ }
+}
+
+async function fetchPendingPdf(objectNames, at, fileName) {
+  let status = 404;
+  const names = Array.isArray(objectNames) ? objectNames : [objectNames];
+  for (const objectName of names) {
+    const res = await axios.get(`${publicUrl(objectName)}?v=${at || 0}`, {
+      timeout: 20000,
+      responseType: 'arraybuffer',
+      maxContentLength: pdfLimits.PDF_USER_MAX_BYTES + 4096,
+      validateStatus: () => true
+    });
+    status = res.status;
+    if (res.status === 200) {
+      return { buffer: Buffer.from(res.data), name: decisionFileName(fileName), at: Number(at) || 0 };
+    }
+    if (res.status !== 404) break;
+  }
+  if (status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
+  rejectReview(`Đọc file chờ duyệt lỗi HTTP ${status}`, 502);
+}
+
+async function saveDecisionProposal({ tenQH, fileName, buffer, docs }) {
   if (!pdfOk(buffer, pdfLimits.PDF_USER_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_USER_MAX_BYTES);
   const { name, slug } = await listedProject(tenQH);
   const cur = await readProposals();
   if (cur.data.items && cur.data.items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
   const dest = proposalObject(slug);
-  await writeBytes(dest, buffer, 'application/pdf');
-  try { await gcsWrite.patchCacheControl(dest, 'private, no-store'); } catch (err) { /* metadata không chặn lần ghi */ }
+  await writePendingPdf(dest, buffer);
   try { await removeName(legacyProposalObject(slug)); } catch (err) { /* đường cũ không còn */ }
-  const meta = { slug, name: decisionFileName(fileName), bytes: buffer.length, at: Date.now() };
+  const docMetas = {};
+  const list = Array.isArray(docs) ? docs : [];
+  for (const doc of list) {
+    const role = String(doc && doc.role || '');
+    if (!PENDING_DOC_ROLES.has(role)) rejectReview('Loại văn bản kèm không hợp lệ');
+    if (!doc || !doc.buffer) rejectReview('Thiếu file PDF văn bản kèm');
+    if (!pdfOk(doc.buffer, pdfLimits.PDF_USER_MAX_BYTES)) rejectPdf(doc.buffer, pdfLimits.PDF_USER_MAX_BYTES);
+    if (docMetas[role]) rejectReview('Mỗi loại văn bản chỉ gửi một PDF');
+    const docDest = pendingDocObject(slug, role);
+    await writePendingPdf(docDest, doc.buffer);
+    docMetas[role] = {
+      name: decisionFileName(doc.fileName || doc.name),
+      bytes: doc.buffer.length,
+      at: Date.now()
+    };
+  }
+  const meta = {
+    slug,
+    name: decisionFileName(fileName),
+    bytes: buffer.length,
+    at: Date.now(),
+    ...(Object.keys(docMetas).length ? { docs: docMetas } : {})
+  };
   await updateProposals(base => {
     const items = { ...(base.items || {}) };
     if (items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
@@ -1123,27 +1186,19 @@ async function saveDecisionProposal({ tenQH, fileName, buffer }) {
   return proposalView(meta);
 }
 
-async function readDecisionProposal(tenQH) {
+async function readDecisionProposal(tenQH, docRole) {
   const name = String(tenQH || '').trim();
   const stored = await readProposals();
   const meta = stored.data.items && stored.data.items[name];
   if (!meta || !meta.at || !SLUG_RE.test(String(meta.slug || ''))) rejectReview('Không có file quyết định chờ duyệt', 404);
-  let status = 404;
-  for (const objectName of proposalNames(meta.slug)) {
-    const res = await axios.get(`${publicUrl(objectName)}?v=${meta.at}`, {
-      timeout: 20000,
-      responseType: 'arraybuffer',
-      maxContentLength: pdfLimits.PDF_USER_MAX_BYTES + 4096,
-      validateStatus: () => true
-    });
-    status = res.status;
-    if (res.status === 200) {
-      return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
-    }
-    if (res.status !== 404) break;
+  const role = String(docRole || '');
+  if (role) {
+    if (!PENDING_DOC_ROLES.has(role)) rejectReview('Loại văn bản chờ duyệt không hợp lệ');
+    const doc = meta.docs && meta.docs[role];
+    if (!doc || !doc.at) rejectReview('Không có văn bản kèm chờ duyệt', 404);
+    return fetchPendingPdf(pendingDocObject(meta.slug, role), doc.at, doc.name);
   }
-  if (status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
-  rejectReview(`Đọc file chờ duyệt lỗi HTTP ${status}`, 502);
+  return fetchPendingPdf(proposalNames(meta.slug), meta.at, meta.name);
 }
 
 async function clearProposal(tenQH, fallbackSlug) {
@@ -1151,6 +1206,7 @@ async function clearProposal(tenQH, fallbackSlug) {
   const cur = await readProposals();
   const item = cur.data.items && cur.data.items[name];
   const slug = (item && item.slug) || fallbackSlug || '';
+  const docs = item && item.docs && typeof item.docs === 'object' ? item.docs : {};
   if (item) {
     await updateProposals(base => {
       const items = { ...(base.items || {}) };
@@ -1162,6 +1218,10 @@ async function clearProposal(tenQH, fallbackSlug) {
     for (const objectName of proposalNames(slug)) {
       try { await removeName(objectName); } catch (err) { /* file chưa có */ }
     }
+    for (const role of PENDING_DOC_ROLES) {
+      if (!docs[role]) continue;
+      try { await removeName(pendingDocObject(slug, role)); } catch (err) { /* file chưa có */ }
+    }
   }
   return { slug: slug || '' };
 }
@@ -1171,6 +1231,13 @@ async function approveDecisionProposal(tenQH) {
   const stored = await readProposals();
   const meta = stored.data.items && stored.data.items[name];
   if (!meta || !meta.at || !SLUG_RE.test(String(meta.slug || ''))) rejectReview('Không có file quyết định chờ duyệt', 404);
+  const pendingDocs = [];
+  for (const role of PENDING_DOC_ROLES) {
+    const doc = meta.docs && meta.docs[role];
+    if (!doc || !doc.at) continue;
+    const file = await readDecisionProposal(name, role);
+    pendingDocs.push({ role, fileName: file.name, buffer: file.buffer });
+  }
   const dest = decisionObject(slug);
   let copied = false;
   let bytes = Number(meta.bytes) || 0;
@@ -1204,8 +1271,23 @@ async function approveDecisionProposal(tenQH) {
       tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: pdfLimits.PDF_USER_MAX_BYTES
     });
   }
+  let docs = [];
+  for (const doc of pendingDocs) {
+    const out = await saveProjectDoc({
+      tenQH: name,
+      role: doc.role,
+      fileName: doc.fileName,
+      buffer: doc.buffer
+    });
+    docs = out.docs || [];
+  }
+  if (!docs.length) {
+    const cur = await readDecisions();
+    const item = cur.data.items && cur.data.items[name];
+    docs = item ? docsView(item) : [];
+  }
   await clearProposal(name, slug);
-  return saved;
+  return { ...saved, docs };
 }
 
 async function rejectDecisionProposal(tenQH) {

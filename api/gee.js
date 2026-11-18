@@ -4146,7 +4146,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Người dùng gửi PDF tối đa 2 MB làm quyết định phê duyệt của đồ án. Chưa ghi decisions.json / LinkQD cho tới khi admin duyệt.
+    // Người dùng gửi PDF tối đa 2 MB: quyết định (+ tùy chọn quy định quản lý, thuyết minh). Chưa ghi decisions.json tới khi admin duyệt.
     if (action === 'submitDecisionProposal') {
       requirePostFromApp(req);
       const admin = await adminOrNull(req);
@@ -4157,9 +4157,21 @@ module.exports = async (req, res) => {
       let buffer;
       try { buffer = pdfLimits.inlineBuffer(body.pdf, false); }
       catch (err) { return sendInlinePdfError(res, err); }
+      const docsIn = Array.isArray(body.docs) ? body.docs.slice(0, 2) : [];
+      const docs = [];
+      for (const row of docsIn) {
+        const role = String(row && row.role || '').slice(0, 20);
+        if (role !== 'quy-dinh' && role !== 'thuyet-minh') {
+          return res.status(400).json({ error: true, message: 'Loại văn bản kèm không hợp lệ' });
+        }
+        let docBuf;
+        try { docBuf = pdfLimits.inlineBuffer(row.pdf, false); }
+        catch (err) { return sendInlinePdfError(res, err); }
+        docs.push({ role, fileName: row.name, buffer: docBuf });
+      }
       try {
         const proposal = await projects.saveDecisionProposal({
-          tenQH, fileName: body.name, buffer
+          tenQH, fileName: body.name, buffer, docs
         });
         return res.status(200).json({ success: true, proposal });
       } catch (err) {
@@ -4167,14 +4179,16 @@ module.exports = async (req, res) => {
       }
     }
 
-    // PDF chờ duyệt: chỉ Admin đọc được (iframe xem trước khi đồng ý / từ chối)
+    // PDF chờ duyệt: chỉ Admin đọc được (iframe xem trước khi đồng ý / từ chối). docRole = quy-dinh | thuyet-minh.
     if (action === 'getDecisionProposal') {
       requirePostFromApp(req);
       await requireAdmin(req);
-      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const docRole = String(body.docRole || '').slice(0, 20);
       if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       try {
-        const file = await projects.readDecisionProposal(tenQH);
+        const file = await projects.readDecisionProposal(tenQH, docRole || undefined);
         const ascii = String(file.name || 'quyet-dinh-cho.pdf').replace(/[^\w.\-]+/g, '_') || 'quyet-dinh-cho.pdf';
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name || 'quyet-dinh-cho.pdf')}`);
@@ -4203,7 +4217,8 @@ module.exports = async (req, res) => {
         }
         return res.status(200).json({
           success: true, kind: 'pdf', slug: saved.slug, name: saved.name, bytes: saved.bytes, at: saved.at,
-          embed: true, accessUrl: saved.accessUrl, sheet, sheetMessage, bucket: saved.via
+          embed: true, accessUrl: saved.accessUrl, sheet, sheetMessage, bucket: saved.via,
+          docs: Array.isArray(saved.docs) ? saved.docs : []
         });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không duyệt được quyết định' });

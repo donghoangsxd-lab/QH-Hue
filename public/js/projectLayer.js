@@ -7,7 +7,7 @@
 // Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link xem được trong khung).
 // Mũi tên cuối tên đồ án xổ cây bản đồ: a. Hiện trạng / b. Quy hoạch (PROJECT_LAYERS + mạng hạ tầng).
 // Hồ sơ (quyết định, quy định, điều chỉnh, chỉ tiêu) nằm ở brief — bấm ? trên bảng thông tin đồ án.
-// Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
+// Nút lưu: người dùng gửi hồ sơ PDF (Quyết định bắt buộc; Quy định quản lý / Thuyết minh tùy chọn; mỗi file ≤ 2 MB) để admin duyệt.
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
 // Mỗi đồ án một màu viền + nền mờ nhẹ (cùng kiểu wash vùng trung tâm QHC), nhãn tên ở giữa ranh.
 // Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
@@ -289,7 +289,23 @@ function collectProjects() {
     proposal: p.proposal && p.proposal.at ? {
       name: p.proposal.name || 'Quyết định phê duyệt',
       bytes: Number(p.proposal.bytes) || 0,
-      at: Number(p.proposal.at) || 0
+      at: Number(p.proposal.at) || 0,
+      docs: p.proposal.docs && typeof p.proposal.docs === 'object' ? {
+        ...(p.proposal.docs['quy-dinh'] ? {
+          'quy-dinh': {
+            name: p.proposal.docs['quy-dinh'].name || 'Quy định quản lý',
+            bytes: Number(p.proposal.docs['quy-dinh'].bytes) || 0,
+            at: Number(p.proposal.docs['quy-dinh'].at) || 0
+          }
+        } : {}),
+        ...(p.proposal.docs['thuyet-minh'] ? {
+          'thuyet-minh': {
+            name: p.proposal.docs['thuyet-minh'].name || 'Thuyết minh',
+            bytes: Number(p.proposal.docs['thuyet-minh'].bytes) || 0,
+            at: Number(p.proposal.docs['thuyet-minh'].at) || 0
+          }
+        } : {})
+      } : undefined
     } : null,
     docs: Array.isArray(p.docs) ? p.docs.filter(d => d && d.id && d.at).map(d => ({
       id: String(d.id),
@@ -1254,8 +1270,10 @@ function rowHtml(p, idx, admin, labelNo = null) {
   });
   const waiting = !!p.proposal;
   const proposeTitle = waiting
-    ? (admin ? `Duyệt file quyết định đang chờ: ${p.proposal.name}` : `Đang chờ admin duyệt: ${p.proposal.name}`)
-    : 'Gửi PDF quyết định phê duyệt (tối đa 2 MB) để admin duyệt';
+    ? (admin
+      ? `Duyệt hồ sơ PDF đang chờ: ${p.proposal.name}`
+      : `Đang chờ admin duyệt: ${p.proposal.name}`)
+    : 'Gửi hồ sơ PDF (Quyết định, Quy định quản lý, Thuyết minh; mỗi file ≤ 2 MB) để admin duyệt';
   const proposeBtn = (!admin || waiting)
     ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
     : '';
@@ -1327,11 +1345,11 @@ function revealInList(p) {
   row.classList.add('is-flash');
 }
 
-// quy-dinh là quy chế theo đồ án. Giữ mã này để PDF đã lưu vẫn mở. Kind ChoDuyet quy-che là quy chế kiến trúc theo đơn vị, không gắn vào đồ án.
+// quy-dinh = quy định quản lý theo đồ án (mã cũ «Quy chế» vẫn mở được). Kind ChoDuyet quy-che là quy chế kiến trúc theo đơn vị.
 const DOC_ROLE = {
   'phe-duyet': { short: 'PD', label: 'Quyết định phê duyệt' },
   'dinh-chinh': { short: 'ĐC', label: 'Quyết định đính chính' },
-  'quy-dinh': { short: 'QC', label: 'Quy chế' },
+  'quy-dinh': { short: 'QĐ', label: 'Quy định quản lý' },
   'thuyet-minh': { short: 'TM', label: 'Thuyết minh' }
 };
 
@@ -1373,7 +1391,7 @@ function projectDossierSummaryHtml(p, idx, admin) {
           <option value="dinh-chinh">Quyết định đính chính</option>
           <option value="phe-duyet">Quyết định phê duyệt</option>
         </optgroup>
-        <option value="quy-dinh">Quy chế</option>
+        <option value="quy-dinh">Quy định quản lý</option>
         <option value="thuyet-minh">Thuyết minh</option>
       </select>
       <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>
@@ -2878,7 +2896,8 @@ function proposalTarget(p) {
     onResolved: (decision, data) => {
       applyProposal(p.name, null);
       if (!decision) return null;
-      const next = applyDecision(p.name, decision);
+      let next = applyDecision(p.name, decision);
+      if (data && Array.isArray(data.docs)) next = applyDocs(p.name, data.docs) || next;
       if (data && !data.sheet) alert(`Đã ghi PDF lên bucket.${sheetNote(data)}`);
       return next ? decisionTarget(next) : null;
     }

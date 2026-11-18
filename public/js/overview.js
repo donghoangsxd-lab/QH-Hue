@@ -413,7 +413,7 @@ const SECTIONS = [
           'Nếu có ô <b>Tìm đồ án...</b>, gõ một phần tên để lọc. Chọn ô trước tên, bấm tên đồ án, hoặc bấm ranh trên bản đồ: lô hiện ra, ranh sáng, bảng hồ sơ mở góc trái.',
           'Nút mũi tên trên dòng đồ án xổ cây <b>a. Các bản đồ hiện trạng</b> / <b>b. Các bản đồ quy hoạch</b>. Bấm tên đồ án mở brief (chỉ tiêu đề); icon <b>?</b> xổ diện tích, dân số và hồ sơ. Nút bảng đưa cơ cấu sử dụng đất và chỉ tiêu QCVN xuống panel dưới.',
           'Nút tệp: nếu đã gắn file thì chú thích bắt đầu bằng <b>Xem quyết định phê duyệt</b> và mở PDF hoặc link. Khi chưa gắn tệp, chú thích là <b>Gắn quyết định phê duyệt (PDF tối đa 10 MB hoặc đường dẫn)</b>.',
-          'Người dùng chưa đăng nhập quản trị thấy nút gửi tệp, chú thích <b>Gửi PDF quyết định phê duyệt (tối đa 2 MB) để quản trị viên phê duyệt</b>. Đang chờ thì nút đồng hồ ghi <b>Đang chờ phê duyệt</b>.'
+          'Người dùng chưa đăng nhập quản trị thấy nút gửi tệp: gửi cùng lúc <b>Quyết định</b>, <b>Quy định quản lý</b> và <b>Thuyết minh</b> (mỗi file tối đa 2 MB; bắt buộc có Quyết định). Đang chờ thì nút đồng hồ.'
         ],
         facts: [
           'Ở QHPK 1/2.000, ranh mọi đồ án có thể hiện khi lớp bật; lô bên trong chỉ hiện khi tick hoặc bấm đồ án.',

@@ -9,7 +9,9 @@ function pendingSecret() {
   return process.env.PDF_PENDING_SECRET || process.env.GAS_SECRET || process.env.GEE_PRIVATE_KEY || '';
 }
 
-function pendingDecisionObject(slug, secret) {
+const PENDING_DOC_ROLES = new Set(['quy-dinh', 'thuyet-minh']);
+
+function pendingHmacObject(slug, tag, secret) {
   const key = secret == null ? pendingSecret() : String(secret);
   if (!key) {
     const err = new Error('Thiếu khóa để giấu file PDF chờ duyệt');
@@ -22,8 +24,25 @@ function pendingDecisionObject(slug, secret) {
     err.status = 400;
     throw err;
   }
-  const id = crypto.createHmac('sha256', key).update(`quyet-dinh:${slug}`).digest('hex').slice(0, 32);
+  const id = crypto.createHmac('sha256', key).update(`${tag}:${slug}`).digest('hex').slice(0, 32);
   return `cho-duyet/${id}.pdf`;
 }
 
-module.exports = { pendingDecisionObject, pendingSecret, PENDING_PDF_RE, SLUG_RE };
+function pendingDecisionObject(slug, secret) {
+  return pendingHmacObject(slug, 'quyet-dinh', secret);
+}
+
+/** PDF quy định quản lý / thuyết minh chờ duyệt (cùng thư mục cho-duyet/, khóa HMAC theo role). */
+function pendingDocObject(slug, role, secret) {
+  const r = String(role || '');
+  if (!PENDING_DOC_ROLES.has(r)) {
+    const err = new Error('Loại văn bản chờ duyệt không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  return pendingHmacObject(slug, r, secret);
+}
+
+module.exports = {
+  pendingDecisionObject, pendingDocObject, pendingSecret, PENDING_PDF_RE, PENDING_DOC_ROLES, SLUG_RE
+};

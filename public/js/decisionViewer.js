@@ -1,6 +1,7 @@
 // Khung xem / gắn quyết định phê duyệt dùng chung cho đồ án (projectLayer.js) và lớp bản đồ (layerDecisions.js).
 // Admin: PDF tối đa 10 MB hoặc link đã kiểm tra ghi thẳng (putProjectDecision / putProjectDoc) qua máy chủ.
-// Người dùng: PDF tối đa 2 MB gửi chờ duyệt (submitDecisionProposal); admin mở file, đồng ý thì mới thành quyết định.
+// Người dùng: tối đa 3 PDF ≤ 2 MB/file (Quyết định bắt buộc; Quy định quản lý / Thuyết minh tùy chọn) gửi chờ duyệt;
+// admin xem từng file rồi Đồng ý gắn cả bộ (hoặc Từ chối).
 // target: { key, title, noun, decision, proposal, slug, body: { tenQH } | { layer }, isBusy(), setBusy(on),
 //           onSaved(decision | null, data), onProposed(proposal), onResolved(decision | null, data) }
 import { state } from './state.js';
@@ -17,7 +18,13 @@ let viewerPdfBlob = '';
 export const DECISION_MAX_BYTES = PDF_ADMIN_MAX_BYTES;
 export const PROPOSE_MAX_BYTES = PDF_USER_MAX_BYTES;
 const ASSIGN_HINT = 'PDF tối đa 10 MB: chọn file để xem trước. Link chỉ nhận trang/PDF mở được ngay trong khung (từ chối link phải mở tab mới). Chỉ gán sau khi chấp nhận.';
-const PROPOSE_HINT = 'Chọn PDF tối đa 2 MB. Xem trước, rồi bấm «Gửi chờ duyệt». Admin đồng ý thì file mới thành quyết định của đồ án.';
+const PROPOSE_HINT = 'Có thể gửi cùng lúc Quyết định, Quy định quản lý và Thuyết minh; mỗi file tối đa 2 MB. Bắt buộc có Quyết định. Xem trước rồi bấm «Gửi chờ duyệt».';
+const PROPOSE_SLOTS = [
+  { id: 'phe-duyet', label: 'Quyết định phê duyệt', required: true },
+  { id: 'quy-dinh', label: 'Quy định quản lý', required: false },
+  { id: 'thuyet-minh', label: 'Thuyết minh', required: false }
+];
+const PROPOSE_DOC_ROLES = new Set(['quy-dinh', 'thuyet-minh']);
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
@@ -71,8 +78,12 @@ let pickTarget = null;
 let fileInput = null;
 let pendingReview = null;
 let pendingPdf = null;
+/** role → { key, file, blobUrl } cho form gửi chờ duyệt 3 ô. */
+let pendingPropose = {};
 let pickMode = 'assign';
+let pickProposeRole = 'phe-duyet';
 let proposalBlob = '';
+let proposalPreviewRole = '';
 
 export function decisionUrl(t) {
   const d = t && t.decision;
@@ -112,10 +123,19 @@ async function postJson(action, body, auth = true) {
   return data;
 }
 
+function proposeSlotsHtml() {
+  return PROPOSE_SLOTS.map(slot => `<div class="propose-slot" data-propose-slot="${slot.id}">
+      <span class="propose-slot-label">${slot.label}${slot.required ? ' *' : ''}</span>
+      <button type="button" data-propose-filepick data-propose-role="${slot.id}">Chọn PDF ≤ 2 MB</button>
+      <button type="button" data-propose-preview data-propose-role="${slot.id}" disabled>Xem</button>
+      <span class="propose-slot-file" data-propose-file="${slot.id}">Chưa chọn</span>
+    </div>`).join('');
+}
+
 function ensureViewer() {
   let el = document.getElementById('decisionView');
-  // Khung cũ (thiếu data-decision-frame) phải tạo lại — tránh PDF dính DOM lỗi.
-  if (el && !el.querySelector('[data-decision-frame]')) {
+  // Khung cũ (thiếu data-decision-frame / 3 ô propose) phải tạo lại.
+  if (el && (!el.querySelector('[data-decision-frame]') || !el.querySelector('[data-propose-slots]'))) {
     el.remove();
     el = null;
   }
@@ -144,12 +164,13 @@ function ensureViewer() {
       <p data-decision-review>${ASSIGN_HINT}</p>
       <button type="button" data-decision-commit disabled>Gán quyết định</button>
     </form>
-    <form class="decision-assign" data-decision-propose hidden>
-      <button type="button" data-propose-filepick>Chọn PDF tối đa 2 MB</button>
+    <form class="decision-assign decision-propose" data-decision-propose hidden>
       <p data-propose-review>${PROPOSE_HINT}</p>
+      <div class="propose-slots" data-propose-slots>${proposeSlotsHtml()}</div>
       <button type="button" data-propose-commit disabled>Gửi chờ duyệt</button>
     </form>
-    <div class="decision-assign" data-decision-pending hidden>
+    <div class="decision-assign decision-propose" data-decision-pending hidden>
+      <div class="propose-slots" data-proposal-slots></div>
       <span data-proposal-note></span>
       <button type="button" data-proposal-approve>Đồng ý</button>
       <button type="button" data-proposal-reject>Từ chối</button>
@@ -171,8 +192,20 @@ function ensureViewer() {
   });
   el.querySelector('[data-decision-filepick]').addEventListener('click', () => { if (current) pickFile(current); });
   el.querySelector('[data-decision-commit]').addEventListener('click', () => { if (current) commit(current); });
-  el.querySelector('[data-propose-filepick]').addEventListener('click', () => { if (current) pickPropose(current); });
+  el.querySelector('[data-propose-slots]').addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-propose-filepick]');
+    if (pick && current) {
+      pickPropose(current, pick.dataset.proposeRole || 'phe-duyet');
+      return;
+    }
+    const prev = e.target.closest('[data-propose-preview]');
+    if (prev && current) showProposePreview(current, prev.dataset.proposeRole || 'phe-duyet');
+  });
   el.querySelector('[data-propose-commit]').addEventListener('click', () => { if (current) submitPropose(current); });
+  el.querySelector('[data-proposal-slots]').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-proposal-view]');
+    if (btn && current) loadProposalPreview(current, btn.dataset.proposalView || '');
+  });
   el.querySelector('[data-proposal-approve]').addEventListener('click', () => { if (current) approveProposal(current); });
   el.querySelector('[data-proposal-reject]').addEventListener('click', () => { if (current) rejectProposal(current); });
   el.querySelector('[data-decision-replace]').addEventListener('click', () => { if (current) openAssign(current); });
@@ -358,6 +391,42 @@ function revokePdfPreview() {
   pendingPdf = null;
 }
 
+function revokeProposePreviews() {
+  Object.keys(pendingPropose).forEach(role => {
+    const hit = pendingPropose[role];
+    if (hit && hit.blobUrl) URL.revokeObjectURL(hit.blobUrl);
+  });
+  pendingPropose = {};
+}
+
+function paintProposeSlots(el, t) {
+  const form = el.querySelector('[data-decision-propose]');
+  if (!form) return;
+  PROPOSE_SLOTS.forEach(slot => {
+    const hit = pendingPropose[slot.id];
+    const same = hit && t && hit.key === t.key;
+    const fileEl = form.querySelector(`[data-propose-file="${slot.id}"]`);
+    const prev = form.querySelector(`[data-propose-preview][data-propose-role="${slot.id}"]`);
+    if (fileEl) fileEl.textContent = same ? `${hit.file.name} · ${fmtBytes(hit.file.size)}` : 'Chưa chọn';
+    if (prev) prev.disabled = !same;
+  });
+  const btn = form.querySelector('[data-propose-commit]');
+  const ready = !!(pendingPropose['phe-duyet'] && t && pendingPropose['phe-duyet'].key === t.key);
+  if (btn) btn.disabled = !ready;
+}
+
+function showProposePreview(t, role) {
+  const hit = pendingPropose[role];
+  if (!hit || !t || hit.key !== t.key || !hit.blobUrl) return;
+  const el = ensureViewer();
+  const open = el.querySelector('[data-decision-open]');
+  open.hidden = false;
+  open.href = hit.blobUrl;
+  const label = (PROPOSE_SLOTS.find(s => s.id === role) || {}).label || role;
+  showFrame(el, hit.blobUrl, '');
+  setDecisionFile(el, `${label} · ${hit.file.name}`);
+}
+
 export function openAssign(t) {
   if (!t) return;
   if (!isAdmin()) {
@@ -402,13 +471,39 @@ export function openOrAssign(t) {
   else openAssign(t);
 }
 
-/** Người dùng gửi PDF tối đa 2 MB. Đang có file chờ thì chỉ báo, không gửi thêm. */
+function proposalWaitingNote(proposal) {
+  if (!proposal) return '';
+  const parts = [`Quyết định: ${proposal.name}`];
+  const docs = proposal.docs || {};
+  if (docs['quy-dinh']) parts.push(`Quy định quản lý: ${docs['quy-dinh'].name}`);
+  if (docs['thuyet-minh']) parts.push(`Thuyết minh: ${docs['thuyet-minh'].name}`);
+  return parts.join(' · ');
+}
+
+function paintProposalSlots(el, proposal) {
+  const host = el.querySelector('[data-proposal-slots]');
+  if (!host) return;
+  const items = [
+    { id: '', label: 'Quyết định phê duyệt', name: proposal.name, bytes: proposal.bytes }
+  ];
+  const docs = proposal.docs || {};
+  if (docs['quy-dinh']) items.push({ id: 'quy-dinh', label: 'Quy định quản lý', name: docs['quy-dinh'].name, bytes: docs['quy-dinh'].bytes });
+  if (docs['thuyet-minh']) items.push({ id: 'thuyet-minh', label: 'Thuyết minh', name: docs['thuyet-minh'].name, bytes: docs['thuyet-minh'].bytes });
+  host.innerHTML = items.map(it => `<div class="propose-slot">
+      <span class="propose-slot-label">${it.label}</span>
+      <button type="button" data-proposal-view="${it.id}">Xem</button>
+      <span class="propose-slot-file">${[it.name, fmtBytes(it.bytes)].filter(Boolean).join(' · ')}</span>
+    </div>`).join('');
+}
+
+/** Người dùng gửi tối đa 3 PDF (Quyết định bắt buộc). Đang có file chờ thì chỉ báo, không gửi thêm. */
 export function openPropose(t) {
   if (!t || isAdmin()) return;
   const el = ensureViewer();
   current = t;
   pendingReview = null;
   revokePdfPreview();
+  revokeProposePreviews();
   el.hidden = false;
   paintHeading(el, t);
   el.querySelector('[data-decision-admin]').hidden = true;
@@ -417,7 +512,7 @@ export function openPropose(t) {
   if (t.proposal) {
     showMode(el, 'view');
     setDecisionFile(el, `Chờ duyệt · ${t.proposal.name}`);
-    showFrame(el, '', `File «${t.proposal.name}» đang chờ admin duyệt nên chưa gắn vào đồ án. Gửi file khác sau khi admin đồng ý hoặc từ chối.`);
+    showFrame(el, '', `Hồ sơ đang chờ admin duyệt (${proposalWaitingNote(t.proposal)}) nên chưa gắn vào đồ án. Gửi file khác sau khi admin đồng ý hoặc từ chối.`);
     announceFloat('decision');
     return;
   }
@@ -425,37 +520,29 @@ export function openPropose(t) {
   setDecisionFile(el, 'Gửi chờ duyệt');
   const form = el.querySelector('[data-decision-propose]');
   form.querySelector('[data-propose-review]').textContent = PROPOSE_HINT;
-  const btn = form.querySelector('[data-propose-commit]');
-  btn.disabled = true;
-  btn.textContent = 'Gửi chờ duyệt';
-  showFrame(el, '', 'Chọn file PDF quyết định phê duyệt, tối đa 2 MB.');
+  paintProposeSlots(el, t);
+  showFrame(el, '', 'Chọn PDF Quyết định (bắt buộc); có thể thêm Quy định quản lý và Thuyết minh. Mỗi file tối đa 2 MB.');
   announceFloat('decision');
 }
 
-/** Admin xem file đang chờ, đồng ý thì ghi thành quyết định của đồ án. */
-export async function openProposalReview(t) {
+async function loadProposalPreview(t, docRole) {
   if (!isAdmin() || !t || !t.proposal) return;
   const el = ensureViewer();
-  current = t;
-  pendingReview = null;
-  revokePdfPreview();
+  const role = String(docRole || '');
+  const label = role === 'quy-dinh' ? 'Quy định quản lý'
+    : role === 'thuyet-minh' ? 'Thuyết minh'
+      : 'Quyết định phê duyệt';
   revokeProposalPreview();
-  el.hidden = false;
-  showMode(el, 'pending');
-  paintHeading(el, t);
-  setDecisionFile(el, `Chờ duyệt · ${t.proposal.name}`);
-  el.querySelector('[data-decision-admin]').hidden = true;
-  el.querySelector('[data-proposal-note]').textContent = [t.proposal.name, fmtBytes(t.proposal.bytes)].filter(Boolean).join(' · ');
-  el.querySelector('[data-decision-open]').hidden = true;
-  el.querySelector('[data-decision-open]').href = '#';
-  showFrame(el, '', 'Đang tải file chờ duyệt…');
-  announceFloat('decision');
+  proposalPreviewRole = role;
+  showFrame(el, '', `Đang tải ${label.toLowerCase()}…`);
   setBusy(t, true);
   try {
+    const body = { ...t.body };
+    if (role) body.docRole = role;
     const res = await fetch(geeApi('action=getDecisionProposal'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
-      body: JSON.stringify(t.body)
+      body: JSON.stringify(body)
     });
     if (res.status === 401 || res.status === 403) signOutAdmin();
     if (!res.ok) {
@@ -467,12 +554,35 @@ export async function openProposalReview(t) {
     const open = el.querySelector('[data-decision-open]');
     open.hidden = false;
     open.href = proposalBlob;
+    setDecisionFile(el, `Chờ duyệt · ${label}`);
     showFrame(el, proposalBlob, '');
   } catch (err) {
     if (current === t) showFrame(el, '', err.message || 'Không tải được file chờ duyệt.');
   } finally {
     setBusy(t, false);
   }
+}
+
+/** Admin xem từng file đang chờ; Đồng ý ghi cả bộ vào đồ án. */
+export async function openProposalReview(t) {
+  if (!isAdmin() || !t || !t.proposal) return;
+  const el = ensureViewer();
+  current = t;
+  pendingReview = null;
+  revokePdfPreview();
+  revokeProposePreviews();
+  revokeProposalPreview();
+  el.hidden = false;
+  showMode(el, 'pending');
+  paintHeading(el, t);
+  setDecisionFile(el, `Chờ duyệt · ${t.proposal.name}`);
+  el.querySelector('[data-decision-admin]').hidden = true;
+  paintProposalSlots(el, t.proposal);
+  el.querySelector('[data-proposal-note]').textContent = proposalWaitingNote(t.proposal);
+  el.querySelector('[data-decision-open]').hidden = true;
+  el.querySelector('[data-decision-open]').href = '#';
+  announceFloat('decision');
+  await loadProposalPreview(t, '');
 }
 
 function revokeProposalPreview() {
@@ -492,8 +602,10 @@ export function closeDecision() {
   }
   current = null;
   revokePdfPreview();
+  revokeProposePreviews();
   revokeProposalPreview();
   pendingReview = null;
+  proposalPreviewRole = '';
 }
 
 function ensureFileInput() {
@@ -506,11 +618,13 @@ function ensureFileInput() {
     const file = input.files && input.files[0];
     const t = pickTarget;
     const mode = pickMode;
+    const role = pickProposeRole;
     input.value = '';
     pickTarget = null;
     pickMode = 'assign';
+    pickProposeRole = 'phe-duyet';
     if (!file || !t) return;
-    if (mode === 'propose') previewPropose(t, file);
+    if (mode === 'propose') previewPropose(t, file, role);
     else previewFile(t, file);
   });
   document.body.appendChild(input);
@@ -525,9 +639,12 @@ function pickFile(t) {
   ensureFileInput().click();
 }
 
-function pickPropose(t) {
+function pickPropose(t, role) {
   if (isAdmin() || busyOf(t) || (t && t.proposal)) return;
+  const id = String(role || 'phe-duyet');
+  if (!PROPOSE_SLOTS.some(s => s.id === id)) return;
   pickMode = 'propose';
+  pickProposeRole = id;
   pickTarget = t;
   ensureFileInput().click();
 }
@@ -615,43 +732,66 @@ async function previewFile(t, file) {
   showFrame(el, blobUrl, '');
 }
 
-async function previewPropose(t, file) {
+async function previewPropose(t, file, role) {
   if (isAdmin() || busyOf(t) || t.proposal) return;
+  const id = String(role || 'phe-duyet');
+  if (!PROPOSE_SLOTS.some(s => s.id === id)) return;
   const el = ensureViewer();
   const review = el.querySelector('[data-propose-review]');
-  const btn = el.querySelector('[data-propose-commit]');
-  revokePdfPreview();
-  btn.disabled = true;
   const bad = readPdfError(file, PROPOSE_MAX_BYTES);
-  if (bad) { review.textContent = bad; return; }
+  if (bad) {
+    review.textContent = bad;
+    paintProposeSlots(el, t);
+    return;
+  }
   let bytes;
   try { bytes = await readPdfBytes(file); }
-  catch (e) { review.textContent = e.message || 'Không đọc được file.'; return; }
+  catch (e) {
+    review.textContent = e.message || 'Không đọc được file.';
+    paintProposeSlots(el, t);
+    return;
+  }
+  const prev = pendingPropose[id];
+  if (prev && prev.blobUrl) URL.revokeObjectURL(prev.blobUrl);
   const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-  pendingPdf = { key: t.key, file, blobUrl };
-  review.textContent = `${file.name} · ${fmtBytes(file.size)}. Xem trước rồi bấm «Gửi chờ duyệt». File chưa gắn vào đồ án.`;
-  btn.disabled = false;
-  const open = el.querySelector('[data-decision-open]');
-  open.hidden = false;
-  open.href = blobUrl;
-  showFrame(el, blobUrl, '');
+  pendingPropose[id] = { key: t.key, file, blobUrl };
+  const label = (PROPOSE_SLOTS.find(s => s.id === id) || {}).label || id;
+  review.textContent = PROPOSE_HINT;
+  paintProposeSlots(el, t);
+  showProposePreview(t, id);
+  setDecisionFile(el, `${label} · ${file.name}`);
 }
 
 async function submitPropose(t) {
-  if (isAdmin() || busyOf(t) || !pendingPdf || pendingPdf.key !== t.key || t.proposal) return;
-  const file = pendingPdf.file;
-  const bad = readPdfError(file, PROPOSE_MAX_BYTES);
+  const decision = pendingPropose['phe-duyet'];
+  if (isAdmin() || busyOf(t) || !decision || decision.key !== t.key || t.proposal) return;
+  const bad = readPdfError(decision.file, PROPOSE_MAX_BYTES);
   if (bad) { alert(bad); return; }
   let bytes;
-  try { bytes = await readPdfBytes(file); }
+  try { bytes = await readPdfBytes(decision.file); }
   catch (e) { alert(e.message || 'Không đọc được file.'); return; }
+  const docs = [];
+  for (const role of PROPOSE_DOC_ROLES) {
+    const hit = pendingPropose[role];
+    if (!hit || hit.key !== t.key) continue;
+    const err = readPdfError(hit.file, PROPOSE_MAX_BYTES);
+    if (err) { alert(`${role}: ${err}`); return; }
+    let docBytes;
+    try { docBytes = await readPdfBytes(hit.file); }
+    catch (e) { alert(e.message || 'Không đọc được file.'); return; }
+    docs.push({ role, name: hit.file.name, pdf: bytesToBase64(docBytes) });
+  }
   setBusy(t, true);
   try {
-    const data = await postJson('submitDecisionProposal', { ...t.body, name: file.name, pdf: bytesToBase64(bytes) }, false);
-    revokePdfPreview();
+    const body = { ...t.body, name: decision.file.name, pdf: bytesToBase64(bytes) };
+    if (docs.length) body.docs = docs;
+    const data = await postJson('submitDecisionProposal', body, false);
+    revokeProposePreviews();
     closeDecision();
     if (t.onProposed) t.onProposed(data.proposal);
-    showToast('Đã gửi file quyết định, chờ admin duyệt.', 'success');
+    showToast(docs.length
+      ? 'Đã gửi hồ sơ PDF (quyết định và văn bản kèm), chờ admin duyệt.'
+      : 'Đã gửi file quyết định, chờ admin duyệt.', 'success');
   } catch (err) {
     alert(`Không gửi được file: ${err.message}`);
   } finally {
@@ -668,14 +808,17 @@ function decisionFrom(data) {
 async function approveProposal(t) {
   if (!isAdmin() || busyOf(t) || !t.proposal) return;
   const replace = t.decision ? `\nQuyết định đang gắn («${t.decision.name}») sẽ được thay bằng file này.` : '';
-  if (!confirm(`Đồng ý gắn «${t.proposal.name}» làm quyết định phê duyệt của ${t.noun || 'đồ án'} «${t.title}»?${replace}`)) return;
+  const extra = proposalWaitingNote(t.proposal);
+  if (!confirm(`Đồng ý gắn hồ sơ chờ duyệt vào ${t.noun || 'đồ án'} «${t.title}»?\n${extra}${replace}`)) return;
   setBusy(t, true);
   try {
     const data = await postJson('approveDecisionProposal', t.body);
     closeDecision();
     const next = t.onResolved ? t.onResolved(decisionFrom(data), data) : null;
     if (next) openDecision(next);
-    showToast('Đã duyệt quyết định phê duyệt.', 'success');
+    showToast(Array.isArray(data.docs) && data.docs.length
+      ? 'Đã duyệt quyết định và văn bản kèm.'
+      : 'Đã duyệt quyết định phê duyệt.', 'success');
   } catch (err) {
     alert(`Không duyệt được: ${err.message}`);
   } finally {
@@ -685,13 +828,13 @@ async function approveProposal(t) {
 
 async function rejectProposal(t) {
   if (!isAdmin() || busyOf(t) || !t.proposal) return;
-  if (!confirm(`Từ chối file «${t.proposal.name}» của ${t.noun || 'đồ án'} «${t.title}»?`)) return;
+  if (!confirm(`Từ chối hồ sơ chờ duyệt của ${t.noun || 'đồ án'} «${t.title}»?\n${proposalWaitingNote(t.proposal)}`)) return;
   setBusy(t, true);
   try {
     await postJson('rejectDecisionProposal', t.body);
     closeDecision();
     if (t.onResolved) t.onResolved(null, null);
-    showToast('Đã từ chối file quyết định.', 'info');
+    showToast('Đã từ chối hồ sơ chờ duyệt.', 'info');
   } catch (err) {
     alert(`Không từ chối được: ${err.message}`);
   } finally {
