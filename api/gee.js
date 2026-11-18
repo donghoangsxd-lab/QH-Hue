@@ -159,6 +159,14 @@ function resolveProjectTarget(body = {}, query = {}) {
   return { layer, tenQH };
 }
 
+function jsonBodyOrQueryError(body, layer, tenQH) {
+  if (body && body.__jsonParseError) {
+    if (layer || tenQH) return null;
+    return 'Thân JSON PDF không đọc được (file quá lớn hoặc hỏng). Thử file ≤ 8 MB hoặc gửi lại.';
+  }
+  return null;
+}
+
 function stagedTokenOf(body) {
   const token = String((body && body.staged) || '');
   return /^[a-f0-9]{32}$/.test(token) ? token : '';
@@ -4036,6 +4044,8 @@ module.exports = async (req, res) => {
       await requireAdmin(req);
       const body = readJsonBody(req);
       const { layer, tenQH } = resolveProjectTarget(body, req.query);
+      const parseErr = jsonBodyOrQueryError(body, layer, tenQH);
+      if (parseErr) return res.status(400).json({ error: true, message: parseErr });
       if (!layer && !tenQH) {
         return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc mã lớp bản đồ' });
       }
@@ -4043,6 +4053,12 @@ module.exports = async (req, res) => {
       const staged = stagedTokenOf(body);
       let buffer = null;
       if (!url && !staged) {
+        if (body.__jsonParseError) {
+          return res.status(400).json({
+            error: true,
+            message: 'Thân JSON PDF không đọc được dù đã biết lớp/đồ án. Thử file nhỏ hơn hoặc gửi lại.'
+          });
+        }
         try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
         catch (err) { return sendInlinePdfError(res, err); }
       }
@@ -4078,6 +4094,8 @@ module.exports = async (req, res) => {
       const body = readJsonBody(req);
       const { layer, tenQH } = resolveProjectTarget(body, req.query);
       const role = String(body.docRole || req.query.docRole || '').slice(0, 20);
+      const parseErr = jsonBodyOrQueryError(body, layer, tenQH);
+      if (parseErr) return res.status(400).json({ error: true, message: parseErr });
       if (!layer && !tenQH) {
         return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc mã lớp bản đồ' });
       }
@@ -4085,6 +4103,12 @@ module.exports = async (req, res) => {
       const staged = stagedTokenOf(body);
       let buffer = null;
       if (!url && !staged) {
+        if (body.__jsonParseError) {
+          return res.status(400).json({
+            error: true,
+            message: 'Thân JSON PDF không đọc được dù đã biết lớp/đồ án. Thử file nhỏ hơn hoặc gửi lại.'
+          });
+        }
         try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
         catch (err) { return sendInlinePdfError(res, err); }
       }

@@ -79,7 +79,12 @@ function parseBody(buf, contentType) {
   if (!buf || !buf.length) return {};
   const ct = String(contentType || '').toLowerCase();
   if (ct.includes('application/json') || ct.includes('+json') || ct.includes('text/plain')) {
-    try { return JSON.parse(buf.toString('utf8')); } catch (e) { return {}; }
+    try {
+      return JSON.parse(buf.toString('utf8'));
+    } catch (e) {
+      // Giữ query (layer/tenQH) vẫn dùng được; đánh dấu để handler báo lỗi rõ, không nuốt thành {}.
+      return { __jsonParseError: true, __jsonBytes: buf.length };
+    }
   }
   return buf;
 }
