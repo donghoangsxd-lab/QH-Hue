@@ -70,6 +70,21 @@ function titleFor(id) {
   return titles[id] || BUNDLED_TITLE[id] || '';
 }
 
+/** Tra mã lớp tĩnh từ id, slug lop-* hoặc tiêu đề (QHC 2045, QĐ 614/756…). */
+export function layerIdOfName(name) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return '';
+  const known = (id) => !!(id && (BUNDLED[id] || BUNDLED_TITLE[id] || titles[id]));
+  if (wanted.startsWith('lop-')) {
+    const id = wanted.slice(4);
+    return known(id) ? id : '';
+  }
+  if (known(wanted)) return wanted;
+  const fromTitle = Object.keys(BUNDLED_TITLE).find(id => BUNDLED_TITLE[id] === wanted)
+    || Object.keys(titles).find(id => titles[id] === wanted);
+  return fromTitle || '';
+}
+
 function decisionTarget(id) {
   return {
     key: `layer:${id}`,
@@ -112,16 +127,19 @@ function docTarget(id, doc, role) {
   };
 }
 
-function openLayerPick(id, pick) {
+/** Mở gắn/xem hồ sơ lớp tĩnh (QHC 2045…): luôn gửi body.layer, không dùng tenQH. */
+export function openLayerPick(id, pick) {
+  const layer = String(id || '').trim();
+  if (!layer) return;
   if (pick === 'phe-duyet') {
     // QĐ 108 gắn sẵn (BUNDLED): mở xem; Admin bấm «Thay» trong khung để gắn bản khác.
-    openOrAssign(decisionTarget(id));
+    openOrAssign(decisionTarget(layer));
     return;
   }
   if (pick !== 'quy-dinh' && pick !== 'thuyet-minh') return;
-  const doc = latestDocOf(docsFor(id), pick);
-  if (doc) openOrAssign(docTarget(id, doc, pick));
-  else openAssign(docTarget(id, null, pick));
+  const doc = latestDocOf(docsFor(layer), pick);
+  if (doc) openOrAssign(docTarget(layer, doc, pick));
+  else openAssign(docTarget(layer, null, pick));
 }
 
 /** Quyết định / docs đã gắn lớp (thẻ lô QHC đọc). */
@@ -182,22 +200,24 @@ async function load() {
 export function initLayerDecisions() {
   paintLayerDecisions();
   document.addEventListener('click', (e) => {
+    // Ưu tiên mục menu (Quy định / Thuyết minh) trước nút mở menu — tránh nuốt click.
+    const pick = e.target.closest('[data-dossier-pick]');
+    const host = pick && pick.closest('[data-dossier-layer-host]');
+    if (pick && host) {
+      e.preventDefault();
+      e.stopPropagation();
+      const wrap = pick.closest('.dossier-menu-wrap');
+      const layerBtn = wrap && wrap.querySelector('[data-dossier-layer]');
+      const id = (layerBtn && layerBtn.dataset.dossierLayer) || host.dataset.dossierLayerHost || '';
+      closeAllDossierMenus();
+      if (id) openLayerPick(id, pick.dataset.dossierPick);
+      return;
+    }
     const layerBtn = e.target.closest('[data-dossier-layer]');
     if (layerBtn) {
       e.preventDefault();
       e.stopPropagation();
       toggleDossierMenu(layerBtn);
-      return;
-    }
-    const pick = e.target.closest('[data-dossier-pick]');
-    if (pick && pick.closest('[data-dossier-layer-host]')) {
-      e.preventDefault();
-      e.stopPropagation();
-      const wrap = pick.closest('.dossier-menu-wrap');
-      const btn = wrap && wrap.querySelector('[data-dossier-layer]');
-      const id = btn && btn.dataset.dossierLayer;
-      closeAllDossierMenus();
-      if (id) openLayerPick(id, pick.dataset.dossierPick);
       return;
     }
     if (!e.target.closest('.dossier-menu-wrap')) closeAllDossierMenus();

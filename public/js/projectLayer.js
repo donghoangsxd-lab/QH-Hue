@@ -40,6 +40,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
+import { openLayerPick, paintLayerDecisions, layerIdOfName } from './layerDecisions.js';
 import { dossierAdjustments, adjustmentSiteCount, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
@@ -1206,6 +1207,8 @@ function renderList() {
   if (q) {
     box.innerHTML = migrateBtn + none + rows(visible);
     paintLevelCounts();
+    // Host QHC tĩnh đang nằm ở #planStaticRows khi đang tìm — vẫn sơn lại menu hồ sơ.
+    paintLayerDecisions();
     return;
   }
   // Đang xem QHC 1/10.000: nhóm QHPK chỉ giữ đồ án và nhóm phường trong vùng lõi.
@@ -1239,6 +1242,8 @@ function renderList() {
     return `<div class="pl-group open" data-level-group="${level.key}"><div class="pl-body">${body}</div></div>`;
   }).join('');
   mountStatic(box);
+  // Gắn lại menu hồ sơ lớp tĩnh (QHC 1/25.000 + 1/10.000) sau khi chuyển DOM.
+  paintLayerDecisions(box);
   refreshQhct();
   paintEyes();
 }
@@ -1261,7 +1266,8 @@ function rowHtml(p, idx, admin, labelNo = null) {
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const decisionBtn = dossierMenuHtml({
-    attrs: `data-dossier-menu="${idx}"`,
+    // tenQH gắn trên nút: sau renderList chỉ số idx có thể lệch; QHC/QHPK/QHCT đều tra theo tên.
+    attrs: `data-dossier-menu="${idx}" data-dossier-tenqh="${escapeHtml(p.name)}"`,
     decision: p.decision,
     docs: p.docs,
     admin,
@@ -2952,6 +2958,10 @@ function decisionTarget(p) {
 }
 
 function openDossierPick(p, pick) {
+  if (!p || !String(p.name || '').trim()) {
+    showToast('Thiếu tên đồ án để gắn hồ sơ.', 'error');
+    return;
+  }
   if (pick === 'phe-duyet') {
     if (p.decision) openOrAssign(decisionTarget(p));
     else openAssign(decisionTarget(p));
@@ -2971,6 +2981,12 @@ export function openProjectDocByName(name, role) {
   const wanted = String(name || '').trim();
   const pick = String(role || '').trim();
   if (!wanted || !pick) return false;
+  // Lớp tĩnh (QHC 2045 dùng chung 1/25.000 và 1/10.000; Phân loại đô thị QĐ 614/756).
+  const layerId = layerIdOfName(wanted);
+  if (layerId) {
+    openLayerPick(layerId, pick);
+    return true;
+  }
   if (!projects.length && state.projectCatalog?.length) projects = collectProjects();
   const p = projects.find(x => x.name === wanted || x.slug === wanted || x.short === wanted);
   if (!p) return false;
@@ -3121,14 +3137,32 @@ export function initProjectLayer(opts = {}) {
     }
     const dossierPick = e.target.closest('[data-dossier-pick]');
     if (dossierPick) {
+      // Lớp tĩnh QHC 1/25.000 + 1/10.000 (data-dossier-layer-host): không có data-dossier-menu.
+      const layerHost = dossierPick.closest('[data-dossier-layer-host]');
+      if (layerHost) {
+        e.preventDefault();
+        e.stopPropagation();
+        const wrap = dossierPick.closest('.dossier-menu-wrap');
+        const layerBtn = wrap && wrap.querySelector('[data-dossier-layer]');
+        const id = (layerBtn && layerBtn.dataset.dossierLayer) || layerHost.dataset.dossierLayerHost || '';
+        closeAllDossierMenus();
+        if (id) openLayerPick(id, dossierPick.dataset.dossierPick);
+        return;
+      }
+      // Đồ án nhập mọi cấp (QHC / QHPK / QHCT): ưu tiên tenQH trên nút, idx chỉ là phụ.
       const wrap = dossierPick.closest('.dossier-menu-wrap');
       const btn = wrap && wrap.querySelector('[data-dossier-menu]');
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
-      const p = projects[Number(btn.dataset.dossierMenu)];
+      const tenQH = String(btn.dataset.dossierTenqh || '').trim();
+      const p = (tenQH && projects.find(x => x.name === tenQH))
+        || projects[Number(btn.dataset.dossierMenu)];
       closeAllDossierMenus();
-      if (!p) return;
+      if (!p || !p.name) {
+        showToast('Không xác định được đồ án để gắn hồ sơ.', 'error');
+        return;
+      }
       openDossierPick(p, dossierPick.dataset.dossierPick);
       return;
     }

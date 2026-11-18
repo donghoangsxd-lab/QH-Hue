@@ -876,7 +876,21 @@ assert.equal((html.match(/data-dossier-layer-host="qhc-2045"/g) || []).length, 2
 assert.match(read('public/js/dossierAttach.js'), /Quy định quản lý/);
 assert.match(read('public/js/dossierAttach.js'), /Thuyết minh/);
 assert.match(read('public/js/layerDecisions.js'), /data-dossier-layer-host/);
+assert.match(read('public/js/layerDecisions.js'), /export function openLayerPick/);
+assert.match(read('public/js/layerDecisions.js'), /export function layerIdOfName/);
 assert.match(read('public/js/projectLayer.js'), /data-dossier-menu/);
+assert.match(read('public/js/projectLayer.js'), /data-dossier-tenqh/);
+assert.match(read('public/js/projectLayer.js'), /openLayerPick/);
+assert.match(read('public/js/projectLayer.js'), /layerIdOfName/);
+assert.match(read('public/js/projectLayer.js'), /data-dossier-layer-host/);
+assert.match(read('public/js/projectLayer.js'), /paintLayerDecisions/);
+assert.match(read('public/js/decisionViewer.js'), /function writeBody/);
+assert.match(read('api/gee.js'), /function resolveProjectTarget/);
+assert.match(read('api/gee.js'), /Thiếu tên đồ án hoặc mã lớp bản đồ/);
+// Hai host QHC (1/25.000 + 1/10.000) cùng khóa; QHPK/QHCT gắn theo tenQH đồ án nhập.
+assert.match(read('public/js/layerDecisions.js'), /'qhc-2045'/);
+assert.match(read('public/js/qhc2045Layer.js'), /openLayerPick\('qhc-2045'/);
+assert.match(read('public/js/mapEngine.js'), /body: \{ tenQH: name, docRole: role/);
 assert.match(layerDecisionsJs, /\/gcs\/docs\/108-QD-TTg\.pdf/);
 assert.match(layerDecisionsJs, /bytes: 3401128/);
 assert.equal(fs.existsSync(new URL('public/docs/108-QD-TTg.pdf', root)), false);
