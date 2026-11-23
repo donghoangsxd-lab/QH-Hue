@@ -1,5 +1,5 @@
 // Raster IMAGE từ gisHue mapid 21817 (XYZ Web Mercator đã nắn). Ưu tiên Bản đồ 09 SDD dưới lớp lô vector.
-// Tile lấy trực tiếp từ gissonganh (CORS *); cache cục bộ .cache/gishue/raster/<id>/ để mirror GCS sau.
+// Tile lấy trực tiếp từ gissonganh (không crossOrigin: server trả ACAO «*, *» nên trình duyệt chặn).
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -59,7 +59,6 @@ function paintOne(m) {
     maxZoom: Math.max(entry.zMax || 18, 19),
     maxNativeZoom: entry.zMax || 18,
     opacity: 0.88,
-    crossOrigin: true,
     attribution: 'gisHue mapid 21817'
   });
   layer.addTo(m);
