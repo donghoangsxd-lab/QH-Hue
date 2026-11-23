@@ -276,13 +276,7 @@ async function openLevel(page, id) {
 async function scene(page, name) {
   await page.goto(page.url().split('#')[0].replace(/\?.*$/, '/'), { waitUntil: 'domcontentloaded', timeout: 45000 });
   await waitCatalog(page);
-  await page.evaluate(async () => {
-    const { map } = await import('./js/mapEngine.js');
-    const { planMap } = await import('./js/planMap.js');
-    const c = [16.4637, 107.5905];
-    map.setView(c, 13, { animate: false });
-    if (planMap) planMap.setView(c, 13, { animate: false });
-  });
+  // QHC 1/10.000 giữ khung (keepView). Không ghim zoom 13 vào nội thành: ranh Chân Mây nằm ngoài ô đó.
   await openLevel(page, 'qhc10');
   let last = null;
   for (let i = 0; i < 24; i++) {
