@@ -1985,9 +1985,19 @@ function paintPanel(model, place) {
     li('Chợ', nearestText(model.nearest.market, place.r, model.osmError && !hasLocal), ''),
     li('Xe buýt', nearestText(model.nearest.bus, place.r, model.osmError && !hasLocal), '')
   ];
+  if (model.dem && Number.isFinite(model.dem.min) && Number.isFinite(model.dem.max)) {
+    const name = model.dem.source === 'srtm' ? 'SRTM (FABDEM không tải được)' : 'FABDEM 30 m';
+    items.push(li(
+      'Cao độ nền',
+      `${fmt1(model.dem.min)}–${fmt1(model.dem.max)} m`,
+      `${name}, cùng mô hình lớp địa hình và mô phỏng ngập. Chưa dựng mặt đất 3D.`
+    ));
+  }
   $('stats').replaceChildren(...items);
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
-  const demNote = model.dem ? ' Cao độ nền Terrarium (FABDEM/SRTM).' : '';
+  const demNote = !model.dem ? '' : (model.dem.source === 'srtm'
+    ? ' Cao độ nền SRTM (FABDEM không tải được).'
+    : ' Cao độ nền FABDEM 30 m.');
   const lotNote = (model.infraLots || []).length ? ` Ranh lô hạ tầng ${fmt0(model.infraLots.length)} (màu hatch TT16).` : '';
   $('src').textContent = `Nền vệ tinh © Google (không nhãn POI); tên đường OSM.${demNote}${lotNote} Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Hạ tầng nội bộ Sở XD; đường/công viên OSM ODbL.${when}`;
   paintMassing(model.massing || [], place.r);
@@ -2807,6 +2817,8 @@ function showBuilt() {
   if (!built) return;
   const model = buildModel(built.raw, built.origin, built.place.r, built.heights, floorPack);
   model.osmError = built.raw.osmError;
+  model.dem = built.dem || null;
+  built.panel = model;
   model.towerPins = towerPinsOf(model.volumes);
   paintPanel(model, built.place, built.ward);
   const treeN = (model.trees || []).length;
@@ -2941,8 +2953,14 @@ async function start() {
     try { showBuilt(); } catch (err) { console.warn('Nền 3D:', err); }
   }).catch(() => {});
   // Không dựng lưới DEM lên GPU (mesh XYZ làm mất context, trắng màn rồi reset).
-  // sampleDemGrid giữ trong module để lấy cao độ khi cần, không gọi trong khung này.
-  void sampleDemGrid;
+  // Vẫn lấy FABDEM (getDemTile) để hiện chênh cao, cùng nguồn với lớp địa hình.
+  sampleDemGrid(place, origin).then((dem) => {
+    if (!built || !dem) return;
+    built.dem = dem;
+    if (!built.panel) return;
+    built.panel.dem = dem;
+    try { paintPanel(built.panel, built.place); } catch (err) { console.warn('Cao độ 3D:', err); }
+  }).catch(() => {});
   loadOsm(place).then((osm) => {
     if (!built) return;
     built.raw.osm = osm;

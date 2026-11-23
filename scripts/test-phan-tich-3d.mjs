@@ -146,6 +146,12 @@ const dem = fs.readFileSync(new URL('../public/js/view3dDem.js', import.meta.url
 if (!dem.includes('sampleDemGrid') || !dem.includes('terrarium') || !dem.includes('offsetAt')) {
   throw new Error('view3dDem thiếu lưới cao độ');
 }
+if (!dem.includes('getDemTile&dem=fabdem') || !dem.includes("source = template === AWS_URL ? 'srtm' : 'fabdem'")) {
+  throw new Error('view3dDem chưa lấy FABDEM, SRTM chỉ là dự phòng');
+}
+if (!js.includes('sampleDemGrid(') || !js.includes('Cao độ nền FABDEM 30 m') || js.includes("id: 'dem-mesh'")) {
+  throw new Error('khung 3D chưa đọc FABDEM hoặc vẫn dựng mesh DEM');
+}
 if (!js.includes('orthographic: false') || !js.includes('WHITE_BLOCK') || !js.includes('openBloom')) {
   throw new Error('thiếu phối cảnh, khối trắng hoặc vầng không gian mở');
 }

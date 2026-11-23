@@ -5361,7 +5361,7 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    // Cao độ nền FABDEM dạng ô Terrarium, chỉ trong HUE_BOUNDS + 10 km: terrainLayer.js / floodSim.js giải mã trên trình duyệt
+    // Cao độ nền FABDEM dạng ô Terrarium, chỉ trong HUE_BOUNDS + 10 km: terrainLayer.js / floodSim.js / view3dDem.js giải mã trên trình duyệt
     if (action === 'getDemTile') {
       res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
       const region = sat.demRegion(ee, constants.HUE_BOUNDS);

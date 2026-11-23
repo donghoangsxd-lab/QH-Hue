@@ -1,15 +1,42 @@
-// Lấy cao độ nền Terrarium (cùng họ FABDEM/SRTM lớp môi trường) cho khung 3D.
-// Lưới thưa: đủ thấy địa hình đặt khối, không đốt GPU.
+// Cao độ nền cho khung 3D, cùng ô Terrarium với lớp địa hình:
+// FABDEM qua getDemTile (đã gỡ nhà và tán cây). GEE lỗi thì SRTM/GMTED trên AWS.
+// Lưới thưa: đủ thấy địa hình đặt khối, không đốt GPU. Không vẽ mesh (mesh XYZ làm mất WebGL).
+
+import { geeApi } from './api.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 const DEM_Z = 13;
+const TEMPLATE_MS = 20000;
 export const DEM_N = 11;
 
-function tileUrl(z, x, y) {
-  return AWS_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+let templatePromise = null;
+
+/** Điền z/x/y vào mẫu ô Leaflet hoặc Earth Engine. */
+export function tileUrlFromTemplate(template, z, x, y) {
+  return String(template).split('{z}').join(z).split('{x}').join(x).split('{y}').join(y);
 }
 
-function loadElevTile(z, x, y) {
+function fabdemTemplate() {
+  if (!templatePromise) {
+    templatePromise = fetch(geeApi('action=getDemTile&dem=fabdem'), { signal: AbortSignal.timeout(TEMPLATE_MS) })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(d => {
+        if (!d || !d.urlFormat) throw new Error('phản hồi không có urlFormat');
+        return d.urlFormat;
+      })
+      .catch(err => {
+        console.warn('Không lấy được ô cao độ FABDEM, dùng SRTM (AWS):', err.message);
+        return AWS_URL;
+      });
+  }
+  return templatePromise;
+}
+
+function tileUrl(template, z, x, y) {
+  return tileUrlFromTemplate(template, z, x, y);
+}
+
+function loadElevTile(template, z, x, y) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -27,7 +54,7 @@ function loadElevTile(z, x, y) {
       resolve(elev);
     };
     img.onerror = () => reject(new Error('dem tile'));
-    img.src = tileUrl(z, x, y);
+    img.src = tileUrl(template, z, x, y);
   });
 }
 
@@ -50,8 +77,7 @@ function elevAtLngLat(tiles, lng, lat, z) {
   return elev[iy * 256 + ix];
 }
 
-/** Lưới n×n mét địa phương: elev tương đối (trừ min), quads XYZ cho PolygonLayer. */
-export async function sampleDemGrid(place, origin, n = DEM_N) {
+async function sampleFrom(template, place, origin, n) {
   const r = place.r;
   const dlat = (r * 1.05) / origin.mLat;
   const dlng = (r * 1.05) / origin.mLng;
@@ -72,10 +98,11 @@ export async function sampleDemGrid(place, origin, n = DEM_N) {
   await Promise.all([...keys].map(async (key) => {
     const [tx, ty] = key.split('/').map(Number);
     try {
-      tiles.set(key, await loadElevTile(DEM_Z, tx, ty));
+      tiles.set(key, await loadElevTile(template, DEM_Z, tx, ty));
     } catch (e) { /* bỏ ô */ }
   }));
   if (!tiles.size) return null;
+  const source = template === AWS_URL ? 'srtm' : 'fabdem';
 
   const cell = (r * 2) / (n - 1);
   const elev = new Float32Array(n * n);
@@ -142,6 +169,7 @@ export async function sampleDemGrid(place, origin, n = DEM_N) {
     min,
     max,
     centerElev,
+    source,
     quads,
     /** Mét tuyệt đối tại tọa độ địa phương; trừ centerElev để dựng khối quanh z=0. */
     offsetAt(x, y) {
@@ -151,4 +179,12 @@ export async function sampleDemGrid(place, origin, n = DEM_N) {
       return atLocal(x, y) - min;
     }
   };
+}
+
+/** Lưới n×n mét địa phương: elev tương đối (trừ min), quads XYZ cho PolygonLayer. */
+export async function sampleDemGrid(place, origin, n = DEM_N) {
+  const template = await fabdemTemplate();
+  const grid = await sampleFrom(template, place, origin, n);
+  if (grid || template === AWS_URL) return grid;
+  return sampleFrom(AWS_URL, place, origin, n);
 }
