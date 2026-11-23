@@ -1146,7 +1146,7 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
 assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
 assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261117/);
+assert.match(html, /css\/style\.css\?v=20261117b/);
 assert.match(html, /js\/app\.js\?v=20261117b/);
 
 assert.equal(HTKT_GROUPS.length, 8);

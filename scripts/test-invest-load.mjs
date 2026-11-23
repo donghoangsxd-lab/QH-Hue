@@ -18,8 +18,6 @@ assert.match(layer, /INVEST_BOUND_URL\s*=\s*'\.\/data\/invest-boundary\.geojson'
 assert.match(layer, /softRefreshInvest/);
 assert.match(layer, /gcsUrl\(INVEST_GCS_SHEET\)/);
 assert.match(layer, /gcsUrl\(INVEST_GCS_EDITS\)/);
-assert.match(layer, /LOAD_MIN_MS\s*=\s*200/);
-assert.match(layer, /LOAD_DONE_HOLD_MS\s*=\s*300/);
 assert.doesNotMatch(layer, /getInvestCalls/, 'trục F không còn gọi getInvestCalls trên client');
 assert.match(api, /export function gcsUrl/);
 

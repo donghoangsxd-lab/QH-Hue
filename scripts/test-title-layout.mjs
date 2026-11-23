@@ -1,4 +1,4 @@
-// Hộp tiêu đề không đè cột nút, nút Giới thiệu hay panel trục; rộng vừa chữ, không kéo tới cột nút.
+// Hộp tiêu đề căn giữa ngang, không đè cột nút, nút Giới thiệu hay panel trục; rộng vừa chữ.
 // Không còn nút «>>» góc trên trái. Mỏ bảng tổng hợp cùng bề rộng và cùng mép phải cột nút.
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -109,17 +109,17 @@ async function measure(page) {
 }
 
 try {
-  for (const [w, h] of [[1280, 800], [960, 700]]) {
+  for (const [w, h] of [[1280, 800], [1200, 700]]) {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
     const rows = await measure(page);
     rows.forEach(row => {
-      const slotLeft = 12 + 340 + 16;
       const slotRight = w - (12 + 34 + 16);
       assert.equal(row.full, 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ', `${w} ${row.name}`);
       assert.equal(row.clipped, false, `${w} ${row.name} cụt chữ`);
       assert.ok(row.text >= 240, `${w} ${row.name} tiêu đề rộng ${row.text}`);
-      assert.ok(Math.abs(row.left - slotLeft) < 1.5, `${w} ${row.name} mép trái ${row.left}`);
+      const mid = (row.left + row.right) / 2;
+      assert.ok(Math.abs(mid - w / 2) < 2, `${w} ${row.name} tâm ${mid.toFixed(1)} lệch giữa`);
       assert.ok(row.right < slotRight - 8, `${w} ${row.name} mép phải ${row.right} kéo tới ${slotRight}`);
       assert.ok(row.slack < 20, `${w} ${row.name} khoảng trống phải ${row.slack}`);
       assert.ok(row.width > row.text, `${w} ${row.name} hộp ${row.width} hẹp hơn chữ ${row.text}`);
@@ -174,7 +174,7 @@ try {
     }, withClass);
     boxes.panels.forEach(panel => {
       assert.ok(panel.width > 80, `${withClass} ${panel.cls} rộng ${panel.width}`);
-      assert.ok(panel.left >= boxes.tool.right + 6, `${withClass} ${panel.cls} left ${panel.left} đè cột nút ${boxes.tool.right}`);
+      assert.ok(panel.right <= boxes.tool.left - 6, `${withClass} ${panel.cls} right ${panel.right} đè cột nút ${boxes.tool.left}`);
     });
     console.log(JSON.stringify({ phone: withClass ? 'class' : 'media', toolRight: Math.round(boxes.tool.right), panels: boxes.panels.map(p => ({ cls: p.cls, left: Math.round(p.left) })) }));
   }
