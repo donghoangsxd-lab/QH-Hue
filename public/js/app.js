@@ -64,6 +64,7 @@ import { initEntryFlows } from './entryFlows.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectBrief } from './projectBrief.js';
 import { initSchemeSddScan } from './schemeSddScan.js';
+import { initQhcRasterLayer } from './qhcRasterLayer.js';
 import { initProjectReview } from './projectReview.js';
 import { initLocalAdjust } from './localAdjust.js';
 import { initAdjustLayer } from './adjustLayer.js';
@@ -643,6 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initUrbanAreaLayer();
   initLayerDecisions();
   initQhc2045Layer();
+  initQhcRasterLayer();
   initQhc25Scale();
   initQhctLayer();
   document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));
