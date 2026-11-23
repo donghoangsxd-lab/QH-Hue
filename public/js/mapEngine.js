@@ -1398,11 +1398,25 @@ export function consumeMeasureMapClick(e) {
 
 // Phác thảo / đo nằm trên lô QH, đô thị, dự án, vi phạm… (z ~450–650) để luôn bấm chọn được.
 // SVG riêng: vùng trống không chặn chuột xuống lớp bên dưới. Chữ / núm / nhãn đo ở pane marker riêng phía trên nét.
+// Tooltip / popup mặc định Leaflet (650 / 700) phải nâng lên trên drawToolPane kẻo tip bị khuất dưới nét.
 export const DRAW_TOOL_PANE = 'drawToolPane';
 export const DRAW_MARK_PANE = 'drawMarkPane';
 const DRAW_TOOL_Z = 690;
 const DRAW_MARK_Z = 695;
+const DRAW_TIP_Z = 700;
+const DRAW_POPUP_Z = 710;
 const drawRenderers = new WeakMap();
+
+function ensureDrawOverlayPanes(m) {
+  if (!m) return;
+  const tip = m.getPane('tooltipPane');
+  if (tip) {
+    tip.style.zIndex = String(DRAW_TIP_Z);
+    tip.style.pointerEvents = 'none';
+  }
+  const pop = m.getPane('popupPane');
+  if (pop) pop.style.zIndex = String(DRAW_POPUP_Z);
+}
 
 export function ensureDrawMarkPane(m) {
   if (!m) return null;
@@ -1410,6 +1424,7 @@ export function ensureDrawMarkPane(m) {
     const pane = m.createPane(DRAW_MARK_PANE);
     pane.style.zIndex = String(DRAW_MARK_Z);
   }
+  ensureDrawOverlayPanes(m);
   return DRAW_MARK_PANE;
 }
 

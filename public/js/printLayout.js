@@ -7,7 +7,8 @@
 // tỷ lệ vùng map còn lại của khổ đang chọn — nếu giữ 1:1 / A3 sẽ hụt, để khoảng trắng khi in.
 // Chữ lưới VN-2000 cũng chromeScale, không nhân tuyến tính theo bề ngang tờ.
 // Hoa văn TT16 (tick #printShowHatch): ép lên canvas Leaflet rồi chụp vào PDF (jsPDF không vẽ CanvasPattern).
-// Mặc định tắt = tô màu đặc. Khi bật, staging phóng cao hơn (đến ~zoom 17) để ô hatch px không bị kéo phình trên 4A0.
+// Mặc định tắt = tô màu đặc. Khi bật: staging phóng denser + setPrintHatchScale theo mm/px khổ giấy (~2,5 mm/ô).
+// Nền vệ tinh: html2canvas bỏ ô tile/WebGL; underlayRasters tô nền → vẽ ô (fetch CORS nếu cần) → đè vector (tránh JPEG đen).
 // Nét vector dùng trần mm/px trong printVector (STROKE_K_CAP), không nhân đủ theo bề ngang tờ.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { announceFloat, FLOAT_OPEN_EVENT } from './utils.js';
@@ -19,7 +20,10 @@ import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
 import { basemapLabel, isLightBasemap, whenBasemapSettled } from './basemap.js';
 import { getLevel, levelChk, LEVELS } from './mapLevel.js';
-import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss, setPrintTt16Detail, tt16Detailed, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
+import {
+  LEGEND_SETS, TT16_STYLES, tt16SwatchCss, setPrintTt16Detail, setPrintHatchScale,
+  tt16Detailed, TT16_PATTERN_ZOOM
+} from './tt16Symbols.js';
 import {
   PX_MM, loadPrintFonts, createPdf, cleanText, setFont, setAlpha, withClip, parseColor,
   vectorContainers, captureVectorGroups, drawMapPaths, drawDom
@@ -72,6 +76,9 @@ const STAGE_MAX_PX = 3600;
 const STAGE_MAX_GAIN = 2.5;
 /** Khi xuất hatch: trần phóng khung cao hơn để ô hoa văn (px màn hình) không bị kéo phình trên A0/4A0 */
 const STAGE_HATCH_MAX_GAIN = 12;
+/** Ô hatch tham chiếu ~16 CSS px; trên giấy nhắm ~2,5 mm — setPrintHatchScale co theo mm/px của khổ */
+const HATCH_REF_CELL_PX = 16;
+const HATCH_TARGET_CELL_MM = 2.5;
 const BASE_MAX_PIXELS = 40e6;
 const TOP_MAX_PIXELS = 20e6;
 const INK = [15, 23, 42];
@@ -226,12 +233,10 @@ function layerFilter(m, mode) {
 
 // html2canvas đọc canvas WebGL của nền đường phố ra trong suốt vì buffer đã bị xóa, vùng nền thành một màu đặc.
 // Ô ảnh và canvas nền được chép theo vị trí trên màn hình, đặt dưới nét vector.
+// JPEG không giữ trong suốt → nếu thiếu ô vệ tinh, vùng trống thành đen: luôn tô nền rồi vẽ ô rồi đè vector.
 function ownRaster(n) {
-  if (!n.classList) return false;
-  if (n.tagName === 'IMG' && n.classList.contains('leaflet-tile')) {
-    const src = n.currentSrc || n.src || '';
-    return src.startsWith('blob:') || src.startsWith('data:') || !!n.crossOrigin;
-  }
+  if (!n?.classList) return false;
+  if (n.tagName === 'IMG' && n.classList.contains('leaflet-tile')) return true;
   return n.tagName === 'CANVAS' && (n.classList.contains('maplibregl-canvas') || n.classList.contains('leaflet-tile'));
 }
 
@@ -250,58 +255,86 @@ function shownAlpha(node, stop) {
   return a;
 }
 
-function readableRaster(node) {
-  if (node.tagName === 'IMG' && (!node.complete || !node.naturalWidth)) return false;
-  if (node.tagName === 'CANVAS' && (!node.width || !node.height)) return false;
-  const probe = document.createElement('canvas');
-  probe.width = probe.height = 1;
+/** Chép ô ảnh/canvas sang bitmap cùng nguồn (tránh canvas bị tainted → nền PDF đen). */
+async function materializeRaster(node) {
+  if (node.tagName === 'CANVAS') {
+    if (!node.width || !node.height) return null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = node.width;
+      c.height = node.height;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(node, 0, 0);
+      ctx.getImageData(0, 0, 1, 1);
+      return c;
+    } catch (e) {
+      return null;
+    }
+  }
+  if (node.tagName !== 'IMG' || !node.complete || !node.naturalWidth) return null;
   try {
-    const pctx = probe.getContext('2d', { willReadFrequently: true });
-    pctx.drawImage(node, 0, 0, 1, 1);
-    pctx.getImageData(0, 0, 1, 1);
-    return true;
+    const c = document.createElement('canvas');
+    c.width = node.naturalWidth;
+    c.height = node.naturalHeight;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(node, 0, 0);
+    ctx.getImageData(0, 0, 1, 1);
+    return c;
+  } catch (e) { /* tainted — thử fetch CORS */ }
+  const src = node.currentSrc || node.src || '';
+  if (!src || src.startsWith('blob:') || src.startsWith('data:')) return null;
+  try {
+    const res = await fetch(src, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+    if (!res.ok) return null;
+    return await createImageBitmap(await res.blob());
   } catch (e) {
-    return false;
+    return null;
   }
 }
 
-// Vẽ nền xuống dưới lớp html2canvas (vector, icon). destination-over giữ nét đã chụp ở trên.
-function underlayRasters(overlay, el) {
+// Nền (tô) → ô vệ tinh/WebGL → lớp html2canvas (vector/icon đã lọc). Tránh JPEG biến trong suốt thành đen.
+async function underlayRasters(overlay, el) {
   const origin = el.getBoundingClientRect();
   if (origin.width < 2 || origin.height < 2) return overlay;
-  const ctx = overlay.getContext('2d');
   const sx = overlay.width / origin.width;
   const sy = overlay.height / origin.height;
-  // html2canvas để lại scale/translate trên context; vẽ theo pixel canvas.
-  const nodes = [...el.querySelectorAll('img.leaflet-tile, canvas.maplibregl-canvas, canvas.leaflet-tile')]
-    .filter(ownRaster)
-    .filter(node => shownAlpha(node, el) > 0.01 && readableRaster(node))
+  const candidates = [...el.querySelectorAll('img.leaflet-tile, canvas.maplibregl-canvas, canvas.leaflet-tile')]
+    .filter(node => shownAlpha(node, el) > 0.01)
     .map((node, i) => ({ node, i, z: paneZ(node), alpha: shownAlpha(node, el) }))
-    .sort((a, b) => b.z - a.z || b.i - a.i);
-  ctx.save();
+    .sort((a, b) => a.z - b.z || a.i - b.i);
+  const prepared = [];
+  for (const item of candidates) {
+    const img = await materializeRaster(item.node);
+    if (img) prepared.push({ ...item, img });
+  }
+  const out = document.createElement('canvas');
+  out.width = overlay.width;
+  out.height = overlay.height;
+  const ctx = out.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalCompositeOperation = 'destination-over';
+  ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  nodes.forEach(({ node, alpha }) => {
+  ctx.fillStyle = isLightBasemap() ? '#f4f1ea' : '#0f172a';
+  ctx.fillRect(0, 0, out.width, out.height);
+  prepared.forEach(({ node, img, alpha }) => {
     const r = node.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return;
     ctx.save();
     if (alpha < 1) ctx.globalAlpha = alpha;
     try {
-      ctx.drawImage(node, (r.left - origin.left) * sx, (r.top - origin.top) * sy, r.width * sx, r.height * sy);
+      ctx.drawImage(img, (r.left - origin.left) * sx, (r.top - origin.top) * sy, r.width * sx, r.height * sy);
     } catch (e) { /* ô khác nguồn */ }
     ctx.restore();
   });
   ctx.globalAlpha = 1;
-  ctx.fillStyle = isLightBasemap() ? '#f4f1ea' : '#0f172a';
-  ctx.fillRect(0, 0, overlay.width, overlay.height);
-  ctx.restore();
-  return overlay;
+  ctx.drawImage(overlay, 0, 0);
+  return out;
 }
 
 function snap(el, scale, size, { skip = null, transparent = false } = {}) {
   return window.html2canvas(el, {
     useCORS: true,
+    allowTaint: false,
     logging: false,
     backgroundColor: null,
     scale,
@@ -429,6 +462,21 @@ function stageGain(rect, pixelW, { hatch = false, zoom0 = 0 } = {}) {
     gain = Math.min(Math.max(gain, need), capPx, STAGE_HATCH_MAX_GAIN);
   }
   return gain;
+}
+
+/** Tỷ lệ ô hatch trên giấy: nhắm ~HATCH_TARGET_CELL_MM; khổ lớn → scale < 1. */
+function hatchScaleForFrame(frameMm, sizePx) {
+  const mmPerPx = frameMm.w / Math.max(1, sizePx.x || sizePx.w || 1);
+  const cellMm = HATCH_REF_CELL_PX * mmPerPx;
+  return Math.max(0.12, Math.min(1, HATCH_TARGET_CELL_MM / Math.max(0.01, cellMm)));
+}
+
+/** Ép hoa văn + co ô theo khổ; chờ lớp Leaflet vẽ lại pattern mới. */
+async function prepareHatchForPrint(frameMm, sizePx) {
+  if (!showHatch) return;
+  setPrintHatchScale(hatchScaleForFrame(frameMm, sizePx));
+  setPrintTt16Detail(true);
+  await sleep(120);
 }
 
 /**
@@ -1286,6 +1334,7 @@ function placePathCanvases(pdf, m, frameMm, rect) {
 async function paintMapCell(pdf, m, full, framePx, targetW) {
   const F = toMm(framePx);
   const size = m.getSize();
+  await prepareHatchForPrint(F, size);
   const groups = captureVectorGroups(m);
   const hatch = showHatch && tt16Detailed(m.getZoom());
   const base = await captureOneMap(m, rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
@@ -1364,6 +1413,7 @@ async function drawMapFrame(pdf, rect, sheet) {
   try {
     const size = staged.size;
     const full = { x: 0, y: 0, w: size.x, h: size.y };
+    await prepareHatchForPrint(F, size);
     const groups = captureVectorGroups(staged.map);
     const hatch = showHatch && tt16Detailed(staged.map.getZoom());
     const base = await captureMapCanvas(rasterScale(size, targetW, BASE_MAX_PIXELS), 'base');
@@ -1402,11 +1452,7 @@ async function runExport() {
   try {
     showToast(`⏳ Đang dựng bản đồ ${sheet.paper.label}${dual ? ' (hai ô so sánh)' : ''}${showHatch ? ' (có hatch)' : ''}...`);
     const [fonts] = await Promise.all([loadPrintFonts(), loadJsPdf(), loadHtml2Canvas()]);
-    // Chỉ ép hoa văn khi tick «Hoa văn TT16»; mặc định tô màu đặc (tránh hatch phóng trên 4A0)
-    if (showHatch) {
-      setPrintTt16Detail(true);
-      await sleep(80);
-    }
+    // Hoa văn + co ô theo khổ: prepareHatchForPrint trong drawMapFrame / paintMapCell
     const seen = scaleInfo(rect, sheet.frame.w);
     const pdf = createPdf(sheet.paper, fonts);
     let grid;
@@ -1437,6 +1483,7 @@ async function runExport() {
     console.error('In bản đồ lỗi:', err);
     showToast(`❌ Không xuất được bản đồ ${sheet.paper.label}: ${err.message || err}`, 'error');
   } finally {
+    setPrintHatchScale(1);
     setPrintTt16Detail(false);
     holder?.remove();
     busy = false;

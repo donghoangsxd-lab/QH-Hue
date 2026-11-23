@@ -97,9 +97,50 @@ const TEXT_SIZES = [
 ];
 const textSize = () => Number($('sketchTextSize')?.value) || 16;
 const sizeLabel = () => TEXT_SIZES.find(o => o.v === textSize())?.label || 'Vừa';
+const textMapLock = () => !!$('sketchTextMapLock')?.checked;
 /** Cỡ đầu mũi tên tỉ lệ với cỡ chữ (mốc Vừa = 16px) */
 const arrowSizeScale = () => textSize() / 16;
 const offsetSplit = () => isSplitOn() && getSplitKind() === 'offset';
+
+function syncTextMapLockUi(on) {
+  const el = $('sketchTextMapLock');
+  if (el) el.checked = !!on;
+}
+
+/** Cỡ px trên màn hình: khóa theo bản đồ thì suy từ heightM và mức phóng hiện tại. */
+function textDisplayPx(s, m) {
+  if (!s) return textSize();
+  if (!s.mapLock || !(s.heightM > 0) || s.pts?.[0]?.lat == null) return s.sizePx || textSize();
+  return Math.max(5, Math.round(s.heightM / metersPerPixel(s.pts[0].lat, m || map)));
+}
+
+function setTextMarkerIcon(fg, displayPx) {
+  const s = fg?.sketch;
+  if (s?.tool !== 'text') return;
+  const px = displayPx ?? textDisplayPx(s, fg.sketchHost || map);
+  fg.eachLayer(l => {
+    if (!l.setIcon) return;
+    l.setIcon(L.divIcon({
+      className: 'sketch-text',
+      html: textHtml(s.text, s.color, px),
+      iconSize: null,
+      iconAnchor: [0, 0]
+    }));
+  });
+}
+
+function refreshMapLockedTexts(m) {
+  if (!m) return;
+  shapes.forEach(fg => {
+    if (fg.sketchHost !== m || fg.sketch?.tool !== 'text' || !fg.sketch.mapLock) return;
+    setTextMarkerIcon(fg);
+    if (fg === pickFg || fg === hoverFg) applyChrome(fg);
+  });
+  if (editor?.map === m && editor.mapLock && editor.heightM > 0) {
+    editor.sizePx = Math.max(5, Math.round(editor.heightM / metersPerPixel(editor.latlng.lat, m)));
+    styleEditor();
+  }
+}
 
 function hostOf(m) {
   if (!m) return null;
@@ -118,6 +159,7 @@ function hostOf(m) {
   m.on('dblclick', onDblClick);
   m.on('contextmenu', onSketchContextMenu);
   m.on('zoomend', () => {
+    refreshMapLockedTexts(m);
     if (m !== drawMap || !cursor || !state.sketchTool || state.sketchTool === 'text') return;
     setSnap(nearestSketchIndex(m, cursor), m);
   });
@@ -201,14 +243,48 @@ function syncSizeBtn() {
 }
 
 function applySketchSize() {
-  if (editor) { editor.sizePx = textSize(); refocusEditor(); }
+  if (editor) {
+    editor.sizePx = textSize();
+    if (editor.mapLock) {
+      editor.heightM = editor.sizePx * metersPerPixel(editor.latlng.lat, editor.map);
+    }
+    refocusEditor();
+  }
   if (pts.length) renderDraft();
   shapes.forEach(fg => {
+    if (fg?.sketch?.tool === 'text' && fg === pickFg) {
+      fg.sketch.sizePx = textSize();
+      if (fg.sketch.mapLock) {
+        fg.sketch.heightM = fg.sketch.sizePx * metersPerPixel(fg.sketch.pts[0].lat, fg.sketchHost || map);
+      }
+      setTextMarkerIcon(fg);
+      applyChrome(fg);
+      return;
+    }
     if (fg?.sketch?.tool !== 'arrow' || !fg.sketch.lls || fg.sketch.lls.length < 2) return;
     fg.sketch.head = arrowHead(fg.sketch.lls[0], fg.sketch.lls[1]);
     paintShape(fg);
   });
   syncSizeBtn();
+}
+
+function applyTextMapLock() {
+  const on = textMapLock();
+  if (editor) {
+    editor.mapLock = on;
+    if (on) editor.heightM = editor.sizePx * metersPerPixel(editor.latlng.lat, editor.map);
+    styleEditor();
+  }
+  if (pickFg?.sketch?.tool === 'text') {
+    pickFg.sketch.mapLock = on;
+    if (on) {
+      pickFg.sketch.heightM = pickFg.sketch.sizePx * metersPerPixel(
+        pickFg.sketch.pts[0].lat, pickFg.sketchHost || map
+      );
+    }
+    setTextMarkerIcon(pickFg);
+    applyChrome(pickFg);
+  }
 }
 
 function cycleSketchSize() {
@@ -412,7 +488,10 @@ function openShapeMenu(fg, e) {
       m.closePopup();
       const s = fg.sketch;
       removeShape(fg);
-      openTextEditor(s.pts[0], { text: s.text, color: s.color, sizePx: s.sizePx, restore: fg }, m);
+      openTextEditor(s.pts[0], {
+        text: s.text, color: s.color, sizePx: s.sizePx,
+        mapLock: s.mapLock, heightM: s.heightM, restore: fg
+      }, m);
     });
   } else if (live?.fg === fg) {
     const items = live.session.openMenu();
@@ -440,10 +519,18 @@ function openShapeMenu(fg, e) {
 /** Đang đo: không chặn click/chuột phải để chấm đỉnh hoặc mở menu đo trên nét phác thảo. */
 const measureBlocksSketch = () => !!(state.activeMeasureType);
 
-/** Đang chấm đỉnh dở: click trên hình cũ vẫn thêm đỉnh. Hết nét dở thì luôn chọn được hình (kể cả còn bật công cụ). */
+/** Đang chấm đỉnh dở (đã có ≥ 1 điểm, còn công cụ). */
 const draftingSketch = () => !!(state.sketchTool && pts.length);
 
-/** Hình đã vẽ: rê hoặc click sáng viền; chuột phải mở menu phác thảo (không mở menu bản đồ). */
+/** Hit layer tắt bubbling → map không nhận click; khi đang chọn công cụ phải chuyển tay sang chấm đỉnh. */
+function forwardSketchDraw(e, fg) {
+  const host = fg.sketchHost || drawMap || map;
+  stopShapeEvent(e);
+  e.originalEvent?.target?.blur?.();
+  handleSketchClick(e.latlng, host);
+}
+
+/** Hình đã vẽ: rê sáng viền; không công cụ → click chọn; có công cụ → chấm đỉnh trên hình cũ; chuột phải mở menu. */
 function bindShapeMenu(fg) {
   fg.on('mouseover', () => {
     if (measureBlocksSketch()) return;
@@ -455,17 +542,35 @@ function bindShapeMenu(fg) {
   });
   fg.on('click', (e) => {
     if (measureBlocksSketch()) return;
-    if (draftingSketch()) return;
+    // Công cụ đang bật: click trên hình cũ vẫn chấm (kể cả điểm đầu) — hit không bubble lên map
+    if (state.sketchTool) {
+      forwardSketchDraw(e, fg);
+      return;
+    }
     stopShapeEvent(e);
     // Tránh ô focus đen quanh path SVG sau khi click chọn
     e.originalEvent?.target?.blur?.();
     (fg.sketchHost || map).closePopup();
     selectShape(fg);
   });
+  fg.on('dblclick', (e) => {
+    if (measureBlocksSketch()) return;
+    if (!state.sketchTool || state.sketchTool === 'text' || !pts.length) return;
+    stopShapeEvent(e);
+    onDblClick({ target: drawMap || fg.sketchHost || map, latlng: e.latlng });
+  });
   fg.on('contextmenu', (e) => {
     if (measureBlocksSketch()) return;
-    // Đang chấm nét: chuột phải xóa đỉnh gần con trỏ (onSketchContextMenu), không mở menu hình
-    if (draftingSketch()) return;
+    // Đang chấm nét: chuột phải xóa đỉnh gần con trỏ — hit không bubble nên gọi tay
+    if (draftingSketch()) {
+      stopShapeEvent(e);
+      onSketchContextMenu({
+        target: drawMap || fg.sketchHost || map,
+        latlng: e.latlng,
+        originalEvent: e.originalEvent
+      });
+      return;
+    }
     stopShapeEvent(e);
     openShapeMenu(fg, e);
   });
@@ -491,8 +596,14 @@ function selectShape(fg) {
     if (fg.sketch.color) color = fg.sketch.color;
     dashed = !!fg.sketch.dash;
     strokeWeight = strokeWeightOf(fg.sketch.weight);
-  } else if (fg.sketch.color) {
-    color = fg.sketch.color;
+  } else {
+    if (fg.sketch.color) color = fg.sketch.color;
+    syncTextMapLockUi(!!fg.sketch.mapLock);
+    const sizeSel = $('sketchTextSize');
+    if (sizeSel && fg.sketch.sizePx) {
+      const hit = TEXT_SIZES.some(o => o.v === fg.sketch.sizePx);
+      if (hit) sizeSel.value = String(fg.sketch.sizePx);
+    }
   }
   // Mở lại bảng để đổi màu / độ dày ngay trên hình vừa chọn
   if (open && collapsed) collapsed = false;
@@ -534,8 +645,8 @@ function shapeAt(m, latlng) {
 function onShapePointerDown(ev, m) {
   if (ev.pointerType === 'mouse') return;
   if (measureBlocksSketch()) return;
-  // Đang chấm nét dở: không chặn pointer — chạm trên hình cũ vẫn thêm đỉnh
-  if (draftingSketch()) return;
+  // Đang chọn công cụ vẽ: không chặn pointer — chạm trên hình cũ vẫn chấm đỉnh
+  if (state.sketchTool) return;
   if (ev.target?.closest?.('.sketch-handle, .leaflet-popup, .map-ctx-menu, .sketch-menu')) return;
   const ll = m.mouseEventToLatLng(ev);
   const fg = shapeAt(m, ll);
@@ -675,6 +786,7 @@ function placeMoved(fg) {
   if (fg.sketch.tool === 'text') {
     const p = fg.sketch.pts[0];
     fg.eachLayer(l => { if (l.setLatLng) l.setLatLng(p); });
+    if (fg.sketch.mapLock) setTextMarkerIcon(fg);
     return;
   }
   paintShape(fg);
@@ -1037,10 +1149,13 @@ async function saveSketchAsInvest() {
 }
 
 // ================== CHỮ (MTEXT) ==================
-const textHtml = (text, c, sizePx) =>
-  `<div class="sketch-text-body" style="color:${c};font-size:${sizePx}px;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+function textHtml(text, c, sizePx) {
+  return `<div class="sketch-text-body" style="color:${c};font-size:${sizePx}px;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+}
 
-function textShape(latlng, text, c, sizePx, m) {
+function textShape(latlng, text, c, sizePx, m, mapLock) {
+  const lock = !!mapLock;
+  const heightM = sizePx * metersPerPixel(latlng.lat, m);
   const marker = L.marker(latlng, {
     icon: L.divIcon({ className: 'sketch-text', html: textHtml(text, c, sizePx), iconSize: null, iconAnchor: [0, 0] }),
     keyboard: false,
@@ -1049,8 +1164,10 @@ function textShape(latlng, text, c, sizePx, m) {
   });
   const fg = L.featureGroup([marker]);
   fg.bindTooltip('Chữ', { sticky: true, className: 'sketch-tip' });
-  // Chiều cao chữ ngoài thực địa theo mức phóng lúc ghi (để DXF ra đúng cỡ như đang thấy)
-  fg.sketch = { tool: 'text', pts: [L.latLng(latlng)], color: c, text, sizePx, heightM: sizePx * metersPerPixel(latlng.lat, m) };
+  // heightM: cỡ thực địa lúc ghi (DXF + khi khóa theo bản đồ thì scale theo zoom)
+  fg.sketch = {
+    tool: 'text', pts: [L.latLng(latlng)], color: c, text, sizePx, heightM, mapLock: lock
+  };
   return fg;
 }
 
@@ -1059,6 +1176,13 @@ function placeEditor() {
   const p = editor.map.latLngToContainerPoint(editor.latlng);
   editor.el.style.left = `${Math.round(p.x)}px`;
   editor.el.style.top = `${Math.round(p.y)}px`;
+  if (editor.mapLock && editor.heightM > 0) {
+    const px = Math.max(5, Math.round(editor.heightM / metersPerPixel(editor.latlng.lat, editor.map)));
+    if (px !== editor.sizePx) {
+      editor.sizePx = px;
+      styleEditor();
+    }
+  }
 }
 
 function fitEditor() {
@@ -1082,8 +1206,9 @@ function closeEditor(commit) {
   ed.map.off('move zoom', placeEditor);
   ed.el.remove();
   const text = ed.el.value.replace(/\s+$/, '');
-  if (commit && text.trim()) addShape(textShape(ed.latlng, text, ed.color, ed.sizePx, ed.map), ed.map);
-  else if (!commit && ed.restore) addShape(ed.restore, ed.map);
+  if (commit && text.trim()) {
+    addShape(textShape(ed.latlng, text, ed.color, ed.sizePx, ed.map, ed.mapLock), ed.map);
+  } else if (!commit && ed.restore) addShape(ed.restore, ed.map);
   syncButtons();
 }
 
@@ -1098,19 +1223,29 @@ function openTextEditor(latlng, opts = {}, m) {
   el.value = opts.text || '';
   L.DomEvent.disableClickPropagation(el);
   L.DomEvent.disableScrollPropagation(el);
-  editor = { el, latlng: L.latLng(latlng), color: opts.color || color, sizePx: opts.sizePx || textSize(), restore: opts.restore || null, map: host };
+  const sizePx = opts.sizePx || textSize();
+  const mapLock = opts.mapLock != null ? !!opts.mapLock : textMapLock();
+  const heightM = opts.heightM > 0 ? opts.heightM : sizePx * metersPerPixel(latlng.lat, host);
+  editor = {
+    el, latlng: L.latLng(latlng), color: opts.color || color, sizePx,
+    mapLock, heightM, restore: opts.restore || null, map: host
+  };
+  syncTextMapLockUi(mapLock);
   attachTelex(el, () => telexOn);
   el.addEventListener('input', fitEditor);
   el.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
     else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
   });
-  // Bấm sang bảng công cụ (đổi màu, cỡ chữ, Telex) không đóng ô gõ
+  // Bấm sang bảng công cụ (đổi màu, cỡ chữ, Telex, khóa bản đồ) không đóng ô gõ
   el.addEventListener('blur', (e) => {
     if (e.relatedTarget && $('sketchPalette')?.contains(e.relatedTarget)) return;
     setTimeout(() => { if (editor && editor.el === el && document.activeElement !== el) closeEditor(true); }, 0);
   });
   host.on('move zoom', placeEditor);
+  if (mapLock) {
+    editor.sizePx = Math.max(5, Math.round(heightM / metersPerPixel(latlng.lat, host)));
+  }
   placeEditor();
   styleEditor();
   setTimeout(() => { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 0);
@@ -1417,6 +1552,7 @@ export function initSketchLayer() {
   });
   document.addEventListener('keydown', onSketchDeleteKey);
   $('sketchTextSize')?.addEventListener('change', applySketchSize);
+  $('sketchTextMapLock')?.addEventListener('change', applyTextMapLock);
   $('sketchStrokeWeight')?.addEventListener('change', (e) => {
     strokeWeight = strokeWeightOf(e.target.value);
     if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
@@ -1437,17 +1573,7 @@ export function initSketchLayer() {
       if (pickFg?.sketch) {
         pickFg.sketch.color = color;
         if (pickFg.sketch.tool === 'text') {
-          const s = pickFg.sketch;
-          pickFg.eachLayer(l => {
-            if (l.setIcon) {
-              l.setIcon(L.divIcon({
-                className: 'sketch-text',
-                html: textHtml(s.text, color, s.sizePx),
-                iconSize: null,
-                iconAnchor: [0, 0]
-              }));
-            }
-          });
+          setTextMarkerIcon(pickFg);
           applyChrome(pickFg);
         } else {
           paintShape(pickFg);

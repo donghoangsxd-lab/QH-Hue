@@ -371,7 +371,7 @@
           <button type="button" class="sketch-btn" id="btnSketchSave" title="Lưu file KML, KMZ, DXF" aria-label="Lưu file KML, KMZ, DXF" aria-expanded="false" aria-controls="sketchSaveRow"><svg class="ico"><use href="#i-save"/></svg></button>
           <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình" aria-label="Xóa toàn bộ hình"><svg class="ico"><use href="#i-trash"/></svg></button>
           <button type="button" class="sketch-btn" id="btnSketchSize" title="Cỡ chữ / đầu mũi tên: Vừa" aria-label="Cỡ chữ và đầu mũi tên"><svg class="ico"><use href="#i-sk-size"/></svg></button>
-          <button type="button" class="sketch-btn" id="btnSketchClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
+          <button type="button" class="sketch-btn sketch-end" id="btnSketchClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
         </div>
         <div class="sketch-row">
           <button type="button" class="sketch-color" data-color="#f43f5e" title="Đỏ" aria-label="Màu đỏ"></button>
@@ -388,7 +388,7 @@
             <option value="5">Đậm</option>
             <option value="8">Rất đậm</option>
           </select>
-          <button type="button" class="sketch-btn" id="btnSketchClone" title="Nhân bản ranh đang chọn thành đa giác phác thảo" aria-label="Nhân bản ranh đang chọn thành đa giác phác thảo"><svg class="ico"><use href="#i-sk-clone"/></svg></button>
+          <button type="button" class="sketch-btn sketch-end" id="btnSketchClone" title="Nhân bản ranh đang chọn thành đa giác phác thảo" aria-label="Nhân bản ranh đang chọn thành đa giác phác thảo"><svg class="ico"><use href="#i-sk-clone"/></svg></button>
         </div>
         <div class="sketch-row">
           <button type="button" class="sketch-btn" data-tool="spline" title="Đường cong" aria-label="Đường cong" aria-pressed="false"><svg class="ico"><use href="#i-sk-spline"/></svg></button>
@@ -396,7 +396,7 @@
           <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="circle" title="Vòng tròn" aria-label="Vòng tròn" aria-pressed="false"><svg class="ico"><use href="#i-sk-circle"/></svg></button>
-          <button type="button" class="sketch-btn" data-tool="text" title="Chữ" aria-label="Chữ" aria-pressed="false"><svg class="ico"><use href="#i-sk-text"/></svg></button>
+          <button type="button" class="sketch-btn sketch-end" data-tool="text" title="Chữ" aria-label="Chữ" aria-pressed="false"><svg class="ico"><use href="#i-sk-text"/></svg></button>
         </div>
         <div class="sketch-row sketch-sub" id="sketchTextRow" hidden>
           <select id="sketchTextSize" aria-label="Cỡ chữ">
@@ -406,6 +406,9 @@
             <option value="30">Rất lớn</option>
           </select>
           <button type="button" class="sketch-btn sketch-telex" id="btnSketchTelex" title="Telex" aria-label="Telex" aria-pressed="true">Telex</button>
+          <label class="sketch-lock" title="Bật: chữ thu nhỏ khi zoom nhỏ, giữ kích thước trên bản đồ. Tắt: cỡ cố định trên màn hình.">
+            <input type="checkbox" id="sketchTextMapLock"> Khóa theo bản đồ
+          </label>
         </div>
         <div class="sketch-row sketch-sub" id="sketchSaveRow" hidden>
           <button type="button" class="sketch-btn sketch-export" data-export="kml" title="Lưu KML" aria-label="Lưu KML">KML</button>

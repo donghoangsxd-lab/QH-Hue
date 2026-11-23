@@ -276,6 +276,8 @@ export function setLotOpacity(v) {
 export const TT16_PATTERN_ZOOM = 17;
 export const PRINT_TT16_DETAIL_EVENT = 'qh:print-tt16-detail';
 let printForceDetail = false;
+/** Nhân kích thước ô hatch khi xuất PDF (< 1 = denser, vừa mắt trên A0/4A0). */
+let printHatchScale = 1;
 
 export function setPrintTt16Detail(on) {
   const next = !!on;
@@ -284,6 +286,25 @@ export function setPrintTt16Detail(on) {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(PRINT_TT16_DETAIL_EVENT, { detail: next }));
   }
+}
+
+/**
+ * Co/giãn ô hatch khi xuất PDF theo khổ giấy (mm/px).
+ * Gọi với 1 để trả về mật độ màn hình. Xóa cache ô mẫu và báo lớp vẽ lại.
+ */
+export function setPrintHatchScale(s) {
+  const next = Math.max(0.12, Math.min(2, Number(s) || 1));
+  if (Math.abs(next - printHatchScale) < 1e-3) return printHatchScale;
+  printHatchScale = next;
+  tileCache.clear();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(PRINT_TT16_DETAIL_EVENT, { detail: printForceDetail }));
+  }
+  return printHatchScale;
+}
+
+export function getPrintHatchScale() {
+  return printHatchScale;
 }
 
 /** true khi phải tô hoa văn TT16 (đủ zoom hoặc đang xuất PDF) */
@@ -808,17 +829,18 @@ function drawTile(c, t, k) {
   }
 }
 
-// Ô mẫu vẽ ở độ phân giải màn hình (retina) để nét không nhòe
+// Ô mẫu vẽ ở độ phân giải màn hình (retina) để nét không nhòe; printHatchScale co ô khi xuất khổ lớn
 const tileCache = new Map();
 function tileFor(key) {
-  if (tileCache.has(key)) return tileCache.get(key);
+  const cacheKey = printHatchScale === 1 ? key : `${key}@${printHatchScale.toFixed(3)}`;
+  if (tileCache.has(cacheKey)) return tileCache.get(cacheKey);
   const s = TT16_STYLES[key];
   const t = s && TILES[s.pattern];
   let tile = null;
   if (t && typeof document !== 'undefined') {
     const k = (t.scale || 1) * (LOOSE_HATCH_KEYS.has(key) ? 2 : 1);
-    const w = Math.max(4, Math.round(t.w * PT_PX * k));
-    const h = Math.max(4, Math.round(t.h * PT_PX * k));
+    const w = Math.max(4, Math.round(t.w * PT_PX * k * printHatchScale));
+    const h = Math.max(4, Math.round(t.h * PT_PX * k * printHatchScale));
     const r = Math.max(1, Math.round(window.devicePixelRatio || 1));
     const cv = document.createElement('canvas');
     cv.width = w * r;
@@ -829,12 +851,13 @@ function tileFor(key) {
     c.scale((w * r) / t.w, (h * r) / t.h);
     const hatchA = s.hatchOpacity != null ? s.hatchOpacity : 1;
     c.strokeStyle = c.fillStyle = hatchA < 1 ? hexToRgba(s.color, hatchA) : s.color;
-    c.lineWidth = LINE_PT / k;
+    // Co ô hatch: giữ nét đủ dày trên giấy (không nhân đủ printHatchScale)
+    c.lineWidth = LINE_PT / (k * Math.sqrt(printHatchScale));
     c.lineCap = t.round ? 'round' : 'butt';
     drawTile(c, t, k);
     tile = { canvas: cv, w, h, r, pattern: null };
   }
-  tileCache.set(key, tile);
+  tileCache.set(cacheKey, tile);
   return tile;
 }
 

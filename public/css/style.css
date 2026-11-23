@@ -1150,6 +1150,9 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-pin { position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); z-index: 1; }
 .sketch-pin[hidden] { display: none !important; }
 .sketch-row { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
+/* Ba hàng chính cùng bề rộng: Đóng / Nhân bản / Chữ neo mép phải một cột */
+.sketch-palette > .sketch-row:not(.sketch-sub) { width: 100%; }
+.sketch-palette > .sketch-row:not(.sketch-sub) > .sketch-end { margin-left: auto; }
 .sketch-btn {
   width: 30px; height: 30px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1217,8 +1220,14 @@ body.compare-on .map-title-split { display: inline-flex; }
   border-radius: var(--r-sm);
 }
 .sketch-btn.sketch-telex, .sketch-btn.sketch-export { width: auto; height: 28px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
+.sketch-lock {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 2px;
+  color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; cursor: pointer;
+  user-select: none;
+}
+.sketch-lock input { accent-color: var(--accent-cyan); width: 13px; height: 13px; margin: 0; flex-shrink: 0; cursor: pointer; }
 #map.sketch-moving, #mapPlan.sketch-moving { cursor: move !important; }
-/* Chữ phác thảo: cỡ cố định trên màn hình, viền tối để đọc được trên ảnh vệ tinh */
+/* Chữ phác thảo: mặc định cỡ cố định trên màn hình; tick «Khóa theo bản đồ» thì scale theo zoom. Viền tối để đọc trên vệ tinh. */
 .sketch-text { background: none; border: none; }
 .sketch-text-body, .sketch-text-editor {
   font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; line-height: 1.25; white-space: pre;
@@ -1229,6 +1238,9 @@ body.compare-on .map-title-split { display: inline-flex; }
 .leaflet-pane > svg path.measure-hit { pointer-events: stroke; cursor: pointer; }
 .leaflet-pane > svg path.sketch-hit-area,
 .leaflet-pane > svg path.measure-hit-area { pointer-events: all; cursor: pointer; }
+/* Tooltip trên nét phác thảo/đo: không chặn chuột xuống hình bên dưới */
+.leaflet-tooltip-pane,
+.leaflet-tooltip { pointer-events: none; }
 .sketch-sub select,
 #sketchStrokeWeight.sketch-weight {
   height: 28px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main);
