@@ -8,6 +8,7 @@ import { bareName, URBANS_614 } from './urbanStatus.js';
 import { URBANS_VISION } from './urbanVision.js';
 import { CORE_AREAS, GENERAL_PLANS, planLevelOf, planProjectOf } from './generalPlan.js';
 import { namesOfProject } from './projectNames.js';
+import { isSchemeArchived } from './schemeValidity.js';
 
 export const AXES = [
   { id: 'hanhchinh', label: 'A. Quản lý phát triển đô thị' },
@@ -494,6 +495,7 @@ export function schemesAt(level, catalog = []) {
   }
   (catalog || []).forEach(p => {
     if (!p || SCHEME_ALIAS[p.slug]) return;
+    if (isSchemeArchived(p.tenQH) || isSchemeArchived(p.slug)) return;
     const kind = planLevelOf(p.tenQH);
     const lv = kind === 'QHC' ? 'QHC10' : kind === 'QHPK' ? 'QHPK' : kind === 'QHCT' ? 'QHCT' : '';
     if (lv !== level) return;
@@ -507,8 +509,10 @@ export function schemesAt(level, catalog = []) {
   layers.forEach(l => {
     if (l.level !== level || !l.scheme) return;
     const slug = SCHEME_ALIAS[l.scheme] || l.scheme;
+    if (isSchemeArchived(slug) || isSchemeArchived(l.scheme)) return;
     const meta = schemeMeta(slug);
     const project = (catalog || []).find(p => p && p.slug === slug);
+    if (project && (isSchemeArchived(project.tenQH) || isSchemeArchived(project.slug))) return;
     const name = project
       ? (namesOfProject(project).tenRutGon || project.tenQH || slug)
       : (meta && meta.name) || slug;

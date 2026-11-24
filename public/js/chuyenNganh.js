@@ -76,7 +76,7 @@ const ICONS = {
 const SECTOR_COLOR = {
   'khong-gian': '#f59e0b',
   'giao-thong': '#0284c7',
-  'cap-nuoc': '#0369a1',
+  'cap-nuoc': '#38bdf8',
   'cap-dien': '#dc2626',
   'san-nen-thoat-mua': '#a16207',
   'thoat-nuoc-thai': '#7c2d12',
@@ -174,12 +174,12 @@ function popupHtml(layer, props) {
   const title = capNuocPopupTitle(layer, props, baseName) || baseName;
   const waterExtra = capNuocPopupExtra(layer, props);
   let html = `<b>${escapeHtml(String(title || layer.name))}</b>`;
-  if (geomKind(layer) === 'point') {
-    html += `<br>Bán kính phục vụ: ${escapeHtml(formatRadius(planRadiusM(getPlanRadii(), layer)))}`;
-  }
   if (waterExtra) {
     html += waterExtra;
     return html;
+  }
+  if (geomKind(layer) === 'point') {
+    html += `<br>Bán kính phục vụ: ${escapeHtml(formatRadius(planRadiusM(getPlanRadii(), layer)))}`;
   }
   const bits = [];
   if (props.loai) bits.push(props.loai);
@@ -2408,6 +2408,7 @@ export function initChuyenNganh() {
     else noteUrbanFocus(`gp:${d.id}`, !!d.city || d.id === 'hue');
   });
   document.addEventListener('cadparcels:loaded', () => { paint(); paintMatrix(); });
+  document.addEventListener('sotay:validity', () => { paint(); });
   onFacet(() => paint());
   document.getElementById('cnMatrix')?.addEventListener('toggle', (e) => { if (e.target.open) paintMatrix(); });
 

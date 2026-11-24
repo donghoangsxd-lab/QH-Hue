@@ -1611,6 +1611,10 @@
         <header class="catalog-toolbar bp-part-head catalog-table-head">
           <b class="catalog-toolbar-title" id="catalogTableTitle">DANH MỤC</b>
           <div class="catalog-toolbar-filters">
+            <div class="catalog-validity-tabs" id="catalogValidityTabs" role="tablist" aria-label="Hiệu lực quy hoạch" hidden>
+              <button type="button" class="catalog-validity-tab is-on" role="tab" id="catalogTabHieuLuc" data-catalog-validity="1" aria-selected="true">Đang có hiệu lực <span class="catalog-validity-n" id="catalogCountHieuLuc">0</span></button>
+              <button type="button" class="catalog-validity-tab" role="tab" id="catalogTabHetHieuLuc" data-catalog-validity="0" aria-selected="false">Hết hiệu lực <span class="catalog-validity-n" id="catalogCountHetHieuLuc">0</span></button>
+            </div>
             <input type="search" id="catalogSearch" class="catalog-search" placeholder="Tìm tên, đơn vị, quyết định…" aria-label="Tìm trong danh mục">
             <select id="catalogFilter" class="catalog-filter" aria-label="Lọc theo cấp"></select>
             <select id="catalogStatusFilter" class="catalog-filter" aria-label="Lọc theo trạng thái" hidden></select>

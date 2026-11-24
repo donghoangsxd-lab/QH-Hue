@@ -46,6 +46,7 @@ import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
 import { consumeCatalogLinkPick } from './catalogLinkPick.js';
 import { displayNameForTenQH, SOTAY_DISPLAY_EVENT } from './soTayDisplay.js';
+import { isSchemeArchived, SOTAY_VALIDITY_EVENT } from './schemeValidity.js';
 import {
   dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
 } from './dossierAttach.js';
@@ -1166,12 +1167,27 @@ function keepInFocusList(p) {
  * Đang chọn đồ án và không gõ tìm: chỉ đồ án giao khung nhìn (+ đồ án đang focus / peers).
  * Esc bỏ chọn → state.focusedProject null → đủ danh sách cấp đang bật. Ô tìm quét cả danh mục.
  */
-function listedProjects(q) {
-  let items = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || dossierSearchText(p).includes(q));
+function isArchivedProject(p) {
+  return isSchemeArchived(p?.name) || isSchemeArchived(p?.slug);
+}
+
+/** Danh sách cấp thường — bỏ đồ án hết hiệu lực (nhóm Lưu trữ riêng). */
+function listedProjects(q, { includeArchived = false } = {}) {
+  let items = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => {
+    if (!includeArchived && isArchivedProject(p)) return false;
+    return !q || dossierSearchText(p).includes(q);
+  });
   if (!state.focusedProject || q) return items;
   const view = viewHost()?.getBounds?.();
   const bounds = view && view.isValid?.() ? view : null;
   return items.filter(({ p }) => keepInFocusList(p) || projectInView(p, bounds));
+}
+
+function archivedListed(q) {
+  return projects.map((p, idx) => ({ p, idx })).filter(({ p }) => {
+    if (!isArchivedProject(p)) return false;
+    return !q || dossierSearchText(p).includes(q);
+  });
 }
 
 let listViewTimer = 0;
@@ -1197,7 +1213,6 @@ function renderList() {
   const migrateBtn = admin && legacyN
     ? `<button type="button" class="project-migrate" data-migrate ${migrating || busy ? ' disabled' : ''}>${migrating ? 'Đang chuyển…' : `Chuyển ${legacyN} đồ án cũ lên bucket`}</button>`
     : '';
-  const none = visible.length ? '' : '<div class="project-empty">Không có đồ án khớp từ khóa.</div>';
   const rows = (items, numbered = false) => items.map(({ p, idx }, i) => rowHtml(p, idx, admin, numbered ? i + 1 : null)).join('');
   const wardHtml = ([ward, items]) => {
     const cur = ward === currentWard;
@@ -1211,7 +1226,12 @@ function renderList() {
   // Đang tìm: danh sách phẳng; không tìm: nội dung cấp đang bật (lớp tĩnh + đồ án). Không hàng tiêu đề trùng tên tab.
   // Ô lớp tĩnh luôn nằm trong thân nhóm để không rời document khi dựng lại danh sách.
   if (q) {
-    box.innerHTML = migrateBtn + none + rows(visible);
+    const archivedQ = archivedListed(q);
+    const none = (visible.length || archivedQ.length) ? '' : '<div class="project-empty">Không có đồ án khớp từ khóa.</div>';
+    const archiveQHtml = archivedQ.length
+      ? `<div class="project-archive-label">Lưu trữ (${archivedQ.length})</div>${rows(archivedQ)}`
+      : '';
+    box.innerHTML = migrateBtn + none + rows(visible) + archiveQHtml;
     paintLevelCounts();
     // Host QHC tĩnh đang nằm ở #planStaticRows khi đang tìm — vẫn sơn lại menu hồ sơ.
     paintLayerDecisions();
@@ -1231,13 +1251,13 @@ function renderList() {
   const viewNote = state.focusedProject
     ? `<div class="project-scope" title="Đang xem đồ án: danh sách chỉ còn đồ án giao khung nhìn. Bấm Esc để hiện đủ danh sách.">${ico('coverage')}<span>Trong khung nhìn · Esc hiện đủ</span></div>`
     : '';
-  box.innerHTML = migrateBtn + viewNote + LIST_LEVELS.filter(level => openTabs.has(GROUP_LEVEL[level.key])).map(level => {
+  const levelBlocks = LIST_LEVELS.filter(level => openTabs.has(GROUP_LEVEL[level.key])).map(level => {
     const scoped = coreOnly && level.key === 'QHPK';
     const all = visible.filter(({ p }) => p.level === level.key);
     const items = scoped ? all.filter(({ p }) => p.wards.some(isCoreWard)) : all;
     const fixed = !!staticOf(level.key);
     if (!fixed && !items.length && level.key !== 'QHPK') return '';
-    const empty = level.key === 'QHPK' && !projects.length
+    const empty = level.key === 'QHPK' && !projects.filter(p => !isArchivedProject(p)).length
       ? '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>' : '';
     const scopeNote = scoped && all.length
       ? `<div class="project-scope" title="Đồ án có phường, xã thuộc vùng lõi (phạm vi QHC 1/10.000 mở rộng theo QĐ 756). Chọn lớp khác để xem toàn bộ">${ico('coverage')}<span>Trong phạm vi QHC 1/10.000: <b>${items.length}</b>/${all.length} đồ án</span></div>` : '';
@@ -1247,6 +1267,22 @@ function renderList() {
     const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote + list;
     return `<div class="pl-group open" data-level-group="${level.key}"><div class="pl-body">${body}</div></div>`;
   }).join('');
+  const archived = archivedListed(q)
+    .sort((a, b) => (a.p.short || a.p.name).localeCompare(b.p.short || b.p.name, 'vi'));
+  const archiveOpen = openGroups.has('__archive__');
+  const archiveRows = (items) => items.map(({ p, idx }, i) => {
+    const base = rowHtml(p, idx, admin, i + 1);
+    const tag = p.level ? `<small class="layer-hint project-archive-level"> · ${escapeHtml(p.level)}</small>` : '';
+    return tag ? base.replace('</span></label>', `${tag}</span></label>`) : base;
+  }).join('');
+  const archiveHtml = archived.length
+    ? `<div class="pg-group project-archive${archiveOpen ? ' open' : ''}" data-ward-group="__archive__">
+      <button type="button" class="pg-head" data-group-toggle="__archive__" aria-expanded="${archiveOpen}" title="${archiveOpen ? 'Thu gọn' : 'Xem'} đồ án hết hiệu lực">
+        ${ico('chev-right')}<span>Lưu trữ</span><small>${archived.length}</small></button>
+      ${archiveOpen ? `<div class="pg-body">${archiveRows(archived)}</div>` : ''}
+    </div>`
+    : '';
+  box.innerHTML = migrateBtn + viewNote + levelBlocks + archiveHtml;
   mountStatic(box);
   // Gắn lại menu hồ sơ lớp tĩnh (QHC 1/25.000 + 1/10.000) sau khi chuyển DOM.
   paintLayerDecisions(box);
@@ -2588,7 +2624,7 @@ function layerOffNames() {
 
 function schemesOnLevel(levelKey) {
   const names = new Set(enabledSchemes(schemeRecords(), levelKey, state.hiddenProjects, layerOffNames()).map(p => p.name));
-  return projects.filter(p => names.has(p.name));
+  return projects.filter(p => names.has(p.name) && !isArchivedProject(p));
 }
 
 /** Tên đồ án cấp levelKey đang được vẽ ranh. Test hồi quy và droplist dùng cùng danh sách. */
@@ -2631,6 +2667,8 @@ function outlineList() {
   const ward = wardScopeName();
   const selectedNames = new Set(schemesOnLevel(selected).map(p => p.name));
   return projects.filter(p => {
+    // Hết hiệu lực: chỉ vẽ ranh khi đang mở từ nhóm Lưu trữ.
+    if (isArchivedProject(p) && p.name !== state.focusedProject) return false;
     if (isLayerHidden(p.name, 'ranh-gioi')) return false;
     if (selected && p.level === selected && selectedNames.has(p.name)) {
       // Cấp đang chọn: mọi đồ án enabledSchemes. QHC / QHCT không cắt theo phường.
@@ -3268,6 +3306,7 @@ export function initProjectLayer(opts = {}) {
   });
   document.addEventListener('auth:change', renderList);
   document.addEventListener(ADJUST_CHANGE_EVENT, renderList);
+  document.addEventListener(SOTAY_VALIDITY_EVENT, () => { refreshAll(); });
   document.addEventListener(LEVEL_EVENT, focusLevelGroup);
   let placeZoom = (() => {
     const host = viewHost();

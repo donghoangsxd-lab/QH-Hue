@@ -339,4 +339,38 @@ assert.equal(
   'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương'
 );
 
+// Hết hiệu lực: patch hieuLuc false → hàng archived; schemeValidity nhận diện theo zoomKey/slug.
+const expiredEdits = mergeSoTayEdits(sheet, {
+  projects: [],
+  links: [],
+  dccb: [],
+  patches: [{
+    ma: 'TH.B.001',
+    hieuLuc: false,
+    hetHieuLucAt: '2026-03-24T00:00:00.000Z',
+    hetHieuLucBy: 'admin@example.com'
+  }]
+});
+const expiredRows = planRowsFromSoTay(expiredEdits, catalog, {
+  areaHaOf: (p) => (p.tenQH.includes('Nam Giao') ? 170 : null)
+});
+const expiredNam = expiredRows.find((r) => r.maDoAn === 'TH.B.001');
+assert.ok(expiredNam);
+assert.equal(expiredNam.hieuLuc, false);
+assert.equal(expiredNam.archived, true);
+assert.ok(expiredNam.hetHieuLucAt);
+const activeOnly = expiredRows.filter((r) => r.hieuLuc !== false);
+const expiredOnly = expiredRows.filter((r) => r.hieuLuc === false);
+assert.ok(activeOnly.every((r) => r.maDoAn !== 'TH.B.001'));
+assert.ok(expiredOnly.some((r) => r.maDoAn === 'TH.B.001'));
+
+const {
+  rebuildValidityFromPlanRows, isSchemeArchived, archivedSchemeCount
+} = await import('../public/js/schemeValidity.js');
+rebuildValidityFromPlanRows(expiredRows);
+assert.equal(isSchemeArchived(expiredNam.zoomKey || expiredNam.fullName), true);
+assert.ok(archivedSchemeCount() >= 1);
+rebuildValidityFromPlanRows(expiredRows.map((r) => ({ ...r, hieuLuc: true })));
+assert.equal(isSchemeArchived(expiredNam.zoomKey || expiredNam.fullName), false);
+
 console.log('test-catalog-table: ok');

@@ -15,6 +15,7 @@ import { isLevelPair, sideOf } from './splitPair.js';
 import { planMap } from './planMap.js';
 import { SHELL_V } from './gbaVersion.js';
 import { linkedAssetHref, mergeLinkedProjects, parcelsFromCollection } from './linkedLots.js';
+import { isSchemeArchived } from './schemeValidity.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -154,10 +155,17 @@ function wanted() {
   if (isLevelPair() && planMap) {
     try { bounds = bounds.extend(planMap.getBounds()); } catch (e) { /* bản đồ kia chưa có kích thước */ }
   }
+  // Đồ án hết hiệu lực: chỉ tải lô khi đang mở (focus) hoặc force từ nhóm Lưu trữ.
+  const allowArchived = (tenQH) => {
+    if (!isSchemeArchived(tenQH)) return true;
+    const focus = focusedProjectName();
+    return tenQH === focus || force.has(tenQH);
+  };
   if (isLevelPair() && zoom >= minZoom) {
     const want = new Set([map, planMap].map(m => ({ qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)])).filter(Boolean));
     return state.projectCatalog.filter(p => {
       if (!p || !p.tenQH || p.sheetOnly || !want.has(planLevelOf(p.tenQH))) return false;
+      if (!allowArchived(p.tenQH)) return false;
       if (!schemeInteriorOn(p.tenQH)) return false;
       if (!p.bbox) return true;
       return intersects(p.bbox, bounds);
@@ -168,6 +176,7 @@ function wanted() {
   const wardName = wardScopeName();
   return state.projectCatalog.filter(p => {
     if (!p || !p.tenQH || p.sheetOnly) return false;
+    if (!allowArchived(p.tenQH) && p.tenQH !== focus && !force.has(p.tenQH)) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
     if (!isLevelPair()) {

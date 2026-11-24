@@ -382,6 +382,8 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
     const zoomKey = hasBoundary ? (names.tenQH || '') : '';
     const phases = phaseLayerCountsOfCatalogProject(p);
     const docs = docsStatusOfCatalogProject(p);
+    const hieuLuc = item.hieuLuc !== false;
+    if (!hieuLuc) notes.push('Hết hiệu lực');
     rows.push({
       id: item.ma,
       source: 'plan',
@@ -411,12 +413,17 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       docsScore: docs.score,
       note: notes.join(' · '),
       zoomKey,
+      slug: p?.slug || '',
       maDoAn: item.ma,
       quyetDinh: item.quyetDinh || '',
       linkGis: item.linkGis || '',
       soDccb: children.filter((c) => c.loaiDong === 'dccb').length,
       children,
-      matched: !!hit
+      matched: !!hit,
+      hieuLuc,
+      archived: !hieuLuc,
+      hetHieuLucAt: item.hetHieuLucAt || '',
+      hetHieuLucBy: item.hetHieuLucBy || ''
     });
   }
 
@@ -463,12 +470,17 @@ export function planRowsFromSoTay(sheetItems, catalog, opts = {}) {
       docsScore: docs.score,
       note: notes.join(' · '),
       zoomKey,
+      slug: p.slug || '',
       maDoAn: '',
       quyetDinh: p.decision?.name || '',
       linkGis: '',
       soDccb: 0,
       children: [],
-      matched: false
+      matched: false,
+      hieuLuc: true,
+      archived: false,
+      hetHieuLucAt: '',
+      hetHieuLucBy: ''
     });
   }
 
@@ -900,6 +912,9 @@ export function mergeSoTayEdits(items, edits) {
       parent.dienTichHa = Number.isFinite(row.dienTichHa) ? row.dienTichHa : null;
     }
     if (row.danSo != null) parent.danSo = String(row.danSo || '').trim();
+    if (row.hieuLuc != null) parent.hieuLuc = row.hieuLuc !== false;
+    if (row.hetHieuLucAt != null) parent.hetHieuLucAt = String(row.hetHieuLucAt || '').trim();
+    if (row.hetHieuLucBy != null) parent.hetHieuLucBy = String(row.hetHieuLucBy || '').trim();
     const note = String(parent.ghiChu || '');
     if (!/Sửa bởi admin/i.test(note)) {
       parent.ghiChu = note ? `${note} · Sửa bởi admin` : 'Sửa bởi admin';
