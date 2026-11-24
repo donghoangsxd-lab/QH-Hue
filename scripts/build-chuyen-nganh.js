@@ -43,24 +43,33 @@ const RULES = [
 const SCHEMES = [
   { slug: 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1', catalogScheme: 'qhc-hue-2045', name: 'QHC đô thị Thừa Thiên Huế 1/25.000', level: 'QHC', mapid: 21817, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'add' },
   { slug: 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72', catalogScheme: 'qhc-trung-tam', name: 'QHC đô thị trung tâm Thừa Thiên Huế 1/10.000', level: 'QHC', mapid: 21817, scale: 10000, parent: null, overrides: [], priority: 1, gcs: 'add' },
-  { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', level: 'QHC', mapid: 20674, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'phu-loc' }, taskDecision: '3134/QĐ-UBND', taskDecisionDate: '2019-12-16', decision: '1101/QĐ-UBND', decisionDate: '2020-04-17', authority: 'UBND tỉnh' },
+  { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', level: 'QHC', mapid: 20674, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-phu-loc', area: { type: 'xa', code: 'phu-loc' }, taskDecision: '3134/QĐ-UBND', taskDecisionDate: '2019-12-16', decision: '1101/QĐ-UBND', decisionDate: '2020-04-17', authority: 'UBND tỉnh' },
   { slug: 'qhc-khe-tre-4a4803cd', name: 'QHC Khe Tre', level: 'QHC', mapid: 20778, scale: 2000, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-khe-tre', area: { type: 'dothi', code: 'khe-tre' }, taskDecision: '1022/QĐ-UBND', taskDecisionDate: '2016-05-16', decision: '688/QĐ-UBND', decisionDate: '2020-03-13' },
   { slug: 'qhc-do-thi-moi-vinh-hung-8899f27b', name: 'QHC Đô thị mới Vinh Hưng', level: 'QHC', mapid: 22906, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'vinh-loc' }, decision: '193/QĐ-UBND', decisionDate: '2025-01-21', authority: 'UBND thành phố Huế' },
   { slug: KCN, name: 'QHC Khu công nghiệp Phong Điền', level: 'QHC', mapid: 22880, scale: null, parent: PHONG_DIEN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN', priority: 2, gcs: 'add', area: { type: 'dothi', code: 'phong-dien' }, boundaryFile: `data/chuyen-nganh/${KCN}/sdd/quy-hoach/ranh-gioi-quy-hoach-a.geojson` },
-  { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: null, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', skipLayers: true },
+  { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: 20710, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-phong-dien', area: { type: 'dothi', code: 'phong-dien' } },
   { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', mapid: 23935, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } },
   { slug: 'qhc-xa-thuong-long-3f2c4da4', name: 'QHC xã Thượng Long', level: 'QHC', mapid: 20797, scale: 10000, sourceScale: 25000, homeLevel: 'QHC10', parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'long-quang' }, authority: 'UBND huyện Nam Đông, tỉnh Thừa Thiên Huế' }
 ];
 
 // Không có thư mục LOP. Bản vẽ mạng lưới đã nằm trên GCS (đồ án), chỉ ngành giao thông, quy hoạch.
+// GT Chân Mây đã nằm trong catalog import (đường bộ / đường sắt). Bản gộp rút gọn phục vụ đồ án cũ:
 const EXTERNAL_LAYERS = [
   {
     sector: 'giao-thong', scale: null, status: 'quy-hoach', scheme: 'qhc-chan-may-lang-co-a44cfad0', level: 'QHC',
-    name: 'Quy hoạch giao thông', geomType: 'Mixed', featureCount: 773,
+    name: 'Quy hoạch giao thông', geomType: 'Mixed', featureCount: 173,
     fields: ['ten', 'loai', 'capDuong', 'loGioi', 'matCat'],
-    file: 'https://storage.googleapis.com/hue-infra-data-us/projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json',
+    file: 'data/qhc-chan-may/giaothong.json',
     bbox: [107.799193, 16.158494, 108.202886, 16.377232],
     area: { type: 'dothi', code: 'chan-may' }, mapid: 23935
+  },
+  {
+    sector: 'giao-thong', scale: null, status: 'quy-hoach', scheme: 'qhc-tt-phu-loc-19e96a86', level: 'QHC',
+    name: 'Quy hoạch giao thông', geomType: 'Mixed', featureCount: 204,
+    fields: ['ten', 'loai', 'capDuong', 'loGioi', 'matCat'],
+    file: 'data/qhc-phu-loc/giaothong.json',
+    bbox: [107.82, 16.25, 107.92, 16.32],
+    area: { type: 'xa', code: 'phu-loc' }, mapid: 20674
   }
 ];
 

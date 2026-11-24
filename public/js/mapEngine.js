@@ -279,7 +279,11 @@ export function initMap() {
   map.on('mousemove', onMeasureMouseMove);
   map.on('mouseout', onMeasureMouseOut);
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); refreshMeasureSnap(); });
-  map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
+  map.on('moveend', () => {
+    refreshLeftSoon();
+    scheduleLots();
+    if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+  });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
   onChangeLots(() => { redrawParcels(); redrawLands(); });
   updateWardLabelFontSize();
@@ -313,7 +317,10 @@ function ensurePlanHooks() {
   planMap.on('mousemove', onMeasureMouseMove);
   planMap.on('mouseout', onMeasureMouseOut);
   planMap.on('zoomend', refreshMeasureSnap);
-  planMap.on('moveend', refreshPlanSoon);
+  planMap.on('moveend', () => {
+    refreshPlanSoon();
+    if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+  });
 }
 
 // Khi so sánh, bản đồ còn lại được đồng bộ bằng setView mỗi khung hình (mỗi lần phát moveend): gom lại, vẽ 1 lần khi dừng
@@ -2338,11 +2345,12 @@ const LAND_LEVEL_EYEBROW = {
 function landPopupHtml(p, opts) {
   const facility = opts?.facility || null;
   const key = landPatternKey(p.layer, p.name) || (facility ? infraStyleKey(layerType(facility), p.layer, facility.name) : null);
-  const nhom = p.nhom || landLabel(p.layer);
-  const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
+  const style = key && TT16_STYLES[key];
+  // Ưu tiên nhãn TT16 (O-HH → Hỗn hợp…) — không gom về nhóm thống kê «Đất ở» / «Đất khác».
+  const rawType = (style && style.label) || p.nhom || landLabel(p.layer);
   const type = shortLandUse(expandPlanWords(rawType));
   const code = lotSymbol(facility ? (facility.name || p.name) : (p.name || landCode(p)), p.lotCode || facility?.lotCode);
-  const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
+  const tone = (style && style.color) || landColor(p.layer) || '#94a3b8';
   const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
@@ -2447,13 +2455,33 @@ const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.ad
 
 // Lô hạ tầng: cùng kiểu tô landParcelStyle với lô đất; có điểm Sheet thì ưu tiên ký hiệu theo loại công trình.
 // Bấm mở thẻ lô đất (tabs + lưới 2×2) kèm bán kính phục vụ — không dùng layout popup điểm riêng.
+const landRenderers = new WeakMap();
+function landRenderer(m) {
+  let r = landRenderers.get(m);
+  if (r) return r;
+  r = L.canvas({ padding: 0.35 });
+  landRenderers.set(m, r);
+  return r;
+}
+
+function lotHitsView(p, m) {
+  if (!p?.geometry || !m) return true;
+  try {
+    const [w, s, e, n] = turf.bbox(p.geometry);
+    const b = m.getBounds().pad(0.3);
+    return e >= b.getWest() && w <= b.getEast() && n >= b.getSouth() && s <= b.getNorth();
+  } catch {
+    return true;
+  }
+}
+
 function infraLotShape(lot, item, m, detailed) {
   const style = item && !landPatternKey(lot.layer, lot.name)
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name, geometry: lot.geometry })
     : landParcelStyle(lot.layer, {
       detailed, phase: lot.phase, name: lot.name || item?.name, geometry: lot.geometry
     });
-  const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
+  const shape = L.geoJSON(lot.geometry, { style, renderer: landRenderer(m), bubblingMouseEvents: false });
   bindLotHover(shape);
   if (item) bindNameTip(shape, item);
   shape.on('click', (e) => {
@@ -2470,6 +2498,7 @@ function infraLotShape(lot, item, m, detailed) {
 function landLotShape(p, m, detailed) {
   const shape = L.geoJSON(p.geometry, {
     style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name, geometry: p.geometry }),
+    renderer: landRenderer(m),
     bubblingMouseEvents: false
   });
   bindLotHover(shape);
@@ -2567,10 +2596,10 @@ function landLotTypeMeta(p) {
     return { id: p.mixId || label, label, color: p.mixColor || '#94a3b8' };
   }
   const key = landPatternKey(p.layer, p.name);
-  const nhom = p.nhom || landLabel(p.layer);
-  const rawType = nhom === 'Đất khác' && key && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
+  const style = key && TT16_STYLES[key];
+  const rawType = (style && style.label) || p.nhom || landLabel(p.layer);
   const label = shortLandUse(expandPlanWords(rawType)) || 'Đất khác';
-  const color = (key && TT16_STYLES[key]?.color) || landColor(p.layer) || '#94a3b8';
+  const color = (style && style.color) || landColor(p.layer) || '#94a3b8';
   return { id: key || label, label, color };
 }
 
@@ -3127,6 +3156,7 @@ function drawLandsOn(m, list, infra = []) {
   const qhById = infra.length && m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
   const showGaps = isAdminUser();
   ordered.forEach(({ p, rank }) => {
+    if (!lotHitsView(p, m)) return;
     if (rank !== LOT_RANK_INFRA) {
       group.addLayer(landLotShape(p, m, detailed));
       if (showGaps && landNeedsStampDot(p)) {

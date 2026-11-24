@@ -1,7 +1,8 @@
 // Một lệnh: metadata gisHue → tải lớp → VN-2000 sang WGS84 → cắt lô → catalog tĩnh.
-// node scripts/gishue-import.mjs --mapid 20797 [--mapid 20800] [--dry-run]
+// node scripts/gishue-import.mjs --mapid 20797 [--mapid 20800] [--dry-run] [--no-gcs]
 // --dry-run không ghi catalog, không sửa đồ án đã xuất bản. Cache thô nằm ở .cache/gishue (gitignore).
-// REST trước. TLS gServer từ Node hay bị từ chối thì Chrome headless riêng (không đụng tab sẵn có).
+// --no-gcs: không putHeavy; lớp >5MB chỉ ở cache — rút gọn rồi ghi projects/ trước khi lên bucket.
+// REST trước. TLS gServer từ Node hay bị từ chối thì Edge headless riêng (không đụng tab sẵn có; không dùng Chrome).
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -148,9 +149,11 @@ function parseArgs(argv) {
   const mapids = [];
   let dry = false;
   let self = false;
+  let noGcs = false;
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') dry = true;
+    else if (a === '--no-gcs') noGcs = true;
     else if (a === '--self-test') self = true;
     else if (a === '--mapid') {
       const n = Number(argv[++i]);
@@ -161,7 +164,7 @@ function parseArgs(argv) {
       mapids.length = 0;
     } else throw new Error(`Không hiểu ${a}`);
   }
-  return { mapids, dry, self };
+  return { mapids, dry, self, noGcs };
 }
 
 function parsePayload(text) {
@@ -221,26 +224,23 @@ function killTree(pid) {
   }
 }
 
-// Chromium (Edge/Chrome) trên Windows tách process khỏi PID spawn. Chỉ giết profile của lần chạy này.
+// Edge headless trên Windows tách process khỏi PID spawn. Chỉ giết profile của lần chạy này.
 function killChromeDir(dir) {
   if (process.platform !== 'win32' || !dir) return;
   spawnSync('powershell', [
     '-NoProfile',
     '-Command',
-    "Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('msedge.exe','chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($env:GISHUE_CHROME_DIR) } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
+    "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -and $_.CommandLine.Contains($env:GISHUE_CHROME_DIR) } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
   ], { stdio: 'ignore', env: { ...process.env, GISHUE_CHROME_DIR: dir } });
 }
 
 function chromePath() {
-  // Windows: ưu tiên Edge (máy dev hay dùng), rồi Chrome.
+  // Chỉ Microsoft Edge (không dùng Chrome). EDGE_PATH ghi đè đường dẫn.
   const candidates = [
+    process.env.EDGE_PATH,
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium'
-  ];
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+  ].filter(Boolean);
   return candidates.find((p) => fs.existsSync(p)) || '';
 }
 
@@ -276,15 +276,15 @@ function openCdp(wsUrl) {
         }
       });
     });
-    ws.addEventListener('error', () => reject(new Error('Không nối được Chrome')));
+    ws.addEventListener('error', () => reject(new Error('Không nối được Edge CDP')));
   });
 }
 
 async function startChrome() {
   const bin = chromePath();
-  if (!bin) throw new Error('Không có Edge/Chrome để tải gisHue');
+  if (!bin) throw new Error('Không có Microsoft Edge để tải gisHue (cài Edge hoặc đặt EDGE_PATH)');
   const port = await freePort();
-  const dir = path.join(repo, '.cache', 'gishue', `chrome-${process.pid}`);
+  const dir = path.join(repo, '.cache', 'gishue', `edge-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const child = spawn(bin, [
@@ -308,18 +308,27 @@ async function startChrome() {
         const res = await fetch(`http://127.0.0.1:${port}/json/version`);
         if (res.ok) break;
       } catch { /* đang mở */ }
-      if (i === 49) throw new Error('Chrome headless không mở cổng gỡ lỗi');
+      if (i === 49) throw new Error('Edge headless không mở cổng gỡ lỗi');
       await sleep(200);
     }
-    const created = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' });
-    const target = await created.json();
+    let target = null;
+    try {
+      const created = await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`, { method: 'PUT' });
+      if (created.ok) target = await created.json();
+    } catch { /* Edge đôi khi từ chối /json/new */ }
+    if (!target?.webSocketDebuggerUrl) {
+      const listed = await fetch(`http://127.0.0.1:${port}/json/list`);
+      const tabs = listed.ok ? await listed.json() : [];
+      target = (Array.isArray(tabs) ? tabs : []).find((row) => row?.webSocketDebuggerUrl) || null;
+    }
+    if (!target?.webSocketDebuggerUrl) throw new Error('Edge không mở được tab CDP');
     const cdp = await openCdp(target.webSocketDebuggerUrl);
     await cdp.send('Page.enable');
     await cdp.send('Page.navigate', { url: `${HOST}/` });
     for (let i = 0; i < 40; i++) {
       const got = await cdp.send('Runtime.evaluate', { expression: 'location.origin', returnByValue: true });
-      if (got.result && got.result.value === HOST) break;
-      if (i === 39) throw new Error('Chrome không vào được gisHue');
+      if (got?.result?.value === HOST) break;
+      if (i === 39) throw new Error('Edge không vào được gisHue');
       await sleep(250);
     }
     return {
@@ -327,9 +336,12 @@ async function startChrome() {
       async text(url) {
         const expr = `fetch(${JSON.stringify(url)}).then(async (r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); })`;
         const got = await cdp.send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
-        if (got.exceptionDetails) {
-          const detail = got.exceptionDetails.exception && got.exceptionDetails.exception.description;
-          throw new Error(detail || got.exceptionDetails.text || 'fetch Chrome lỗi');
+        if (got?.exceptionDetails) {
+          const detail = got.exceptionDetails.exception?.description;
+          throw new Error(detail || got.exceptionDetails.text || 'fetch Edge lỗi');
+        }
+        if (got?.result == null || got.result.value == null) {
+          throw new Error('fetch Edge trả về rỗng');
         }
         return got.result.value;
       }
@@ -345,13 +357,18 @@ function makeTransport(warnings) {
   let chrome = null;
   return {
     async text(url) {
-      if (mode === 'chrome') return chrome.text(url);
+      if (mode === 'chrome' && chrome) return chrome.text(url);
       try {
         return await nodeText(url);
       } catch (err) {
-        mode = 'chrome';
-        warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Edge/Chrome headless riêng`);
-        chrome = await startChrome();
+        if (typeof WebSocket !== 'function') {
+          throw new Error(`REST lỗi (${err.message}); cần Node 22 hoặc --experimental-websocket để bật Edge headless`);
+        }
+        if (!chrome) {
+          warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Edge headless riêng`);
+          chrome = await startChrome();
+          mode = 'chrome';
+        }
         return chrome.text(url);
       }
     },
@@ -754,7 +771,7 @@ async function putHeavy(uploads) {
   }
 }
 
-async function publish(mapid, scheme, area, built, dry) {
+async function publish(mapid, scheme, area, built, dry, noGcs = false) {
   if (dry) return { wrote: false, uploaded: [] };
   const schemesFile = path.join(repo, 'public', 'data', 'chuyen-nganh', 'schemes.json');
   const indexFile = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
@@ -807,11 +824,18 @@ async function publish(mapid, scheme, area, built, dry) {
     const relDir = path.posix.join(slugName, layer.sector, layer.status);
     let file = rel;
     if (geoHeavy) {
-      const object = `${GCS_PREFIX}/${relDir}/${stem}.geojson`;
-      uploads.push({ local: geoLocal, object, type: 'application/geojson', name: layer.name, bytes: geoBytes });
-      file = GCS_PUBLIC + object;
+      if (noGcs) {
+        // Bản thô ở cache; lớp SDD sẽ trỏ projects/ sau bước rút gọn + upload đồ án.
+        file = landUseName(layer.name)
+          ? `projects/${slugName}/${layer.status === 'hien-trang' ? 'hien-trang' : 'su-dung-dat'}.json`
+          : path.posix.join('.cache/gishue/out', String(mapid), stem, `${stem}.geojson`);
+      } else {
+        const object = `${GCS_PREFIX}/${relDir}/${stem}.geojson`;
+        uploads.push({ local: geoLocal, object, type: 'application/geojson', name: layer.name, bytes: geoBytes });
+        file = GCS_PUBLIC + object;
+      }
     }
-    if (zipHeavy) {
+    if (zipHeavy && !noGcs) {
       uploads.push({
         local: zipLocal,
         object: `${GCS_PREFIX}/${relDir}/${stem}.zip`,
@@ -822,7 +846,7 @@ async function publish(mapid, scheme, area, built, dry) {
     }
     const boundaryFile = geoHeavy ? geoLocal : path.join(repo, rel);
     if (isBoundaryName(layer.name) && (!boundaryAbs || layer.kind === 'polygon')) boundaryAbs = boundaryFile;
-    entries.push({
+    const entry = {
       sector: layer.sector,
       scale: scheme.scale,
       status: layer.status,
@@ -834,7 +858,9 @@ async function publish(mapid, scheme, area, built, dry) {
       fields: fieldOrder(layer.features),
       file,
       bbox: bboxOf(layer.features)
-    });
+    };
+    if (landUseName(layer.name) && String(file).startsWith('projects/')) entry.ref = file;
+    entries.push(entry);
     if (layer.clip) clipLogs.push({ rel, clip: layer.clip });
   }
   const { logFile, kept } = clipLogKept(slugName);
@@ -877,7 +903,16 @@ async function publish(mapid, scheme, area, built, dry) {
   const link = path.join(repo, 'public', 'data', 'chuyen-nganh', slugName);
   const target = path.join(repo, 'data', 'chuyen-nganh', slugName);
   if (!fs.existsSync(link) && fs.existsSync(target)) {
-    fs.symlinkSync(path.relative(path.dirname(link), target), link, 'dir');
+    try {
+      fs.symlinkSync(path.relative(path.dirname(link), target), link, 'dir');
+    } catch (err) {
+      // Windows không quyền symlink: junction tuyệt đối (cùng nghĩa thư mục).
+      if (process.platform === 'win32') {
+        fs.symlinkSync(target, link, 'junction');
+      } else {
+        throw err;
+      }
+    }
   }
   return {
     wrote: true,
@@ -915,6 +950,24 @@ function publishedRows(mapid) {
   const index = readJson(path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json'));
   const layers = (index.layers || []).filter((row) => row.scheme === hit.slug);
   return { scheme: hit, layers };
+}
+
+/** Ranh Polygon/MultiPolygon từ projects/index khi bản đồ gisHue không có lớp ranh giới. */
+async function loadProjectBoundary(mapid) {
+  const hit = publishedRows(mapid);
+  if (!hit || !hit.scheme || !hit.scheme.slug) return null;
+  try {
+    loadGeeKey(repo);
+    const gcs = require('../services/gcsWrite');
+    const got = await gcs.readJson('projects/index.json');
+    const entry = ((got && got.data && got.data.projects) || []).find((p) => p && p.slug === hit.scheme.slug && !p.deleted);
+    const geom = entry && entry.boundary;
+    if (!geom || !geom.type || !geom.coordinates) return null;
+    if (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') return null;
+    return geom;
+  } catch (err) {
+    return null;
+  }
 }
 
 function printMap(mapid, scheme, area, rows, warnings, published) {
@@ -955,7 +1008,7 @@ function printMap(mapid, scheme, area, rows, warnings, published) {
   return { features, counted, ht, cn, mismatch: warnings.some((text) => text.includes('catalog')) };
 }
 
-async function importMap(transport, mapid, dry) {
+async function importMap(transport, mapid, dry, noGcs = false) {
   const warnings = [];
   const info = await getJson(transport, `${HOST}/gservices/rest/vectormaps/gsv_system/map/${mapid}`);
   const tenBanDo = info.tenBanDo || '';
@@ -981,16 +1034,37 @@ async function importMap(transport, mapid, dry) {
   const boundarySrc = loaded.find((item) => item.layer.kind === 'polygon' && isBoundaryName(item.layer.ten))
     || loaded.find((item) => isBoundaryName(item.layer.ten));
   const boundaryFeatures = boundarySrc ? featuresFrom(boundarySrc.doc.rows).features : [];
-  const boundary = schemeBoundaryOf(boundaryFeatures);
+  let boundary = schemeBoundaryOf(boundaryFeatures);
+  // Map chỉ có SDD (vd. 20710 Phong Điền): lấy ranh đồ án đã có trên projects/index.
+  if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
+    boundary = await loadProjectBoundary(mapid);
+    if (boundary) warnings.push('dùng ranh đồ án sẵn có trên projects/index để cắt lô');
+  }
   if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
     throw new Error(`mapid ${mapid}: không khép được ranh để cắt lô`);
   }
   const metaRow = boundarySrc && boundarySrc.doc.rows[0];
-  const scheme = schemeFrom(metaRow, tenBanDo);
+  const knownScheme = publishedRows(mapid);
+  let scheme = schemeFrom(metaRow, tenBanDo);
+  if (knownScheme && knownScheme.scheme) {
+    const prev = knownScheme.scheme;
+    scheme = {
+      ...scheme,
+      name: prev.name || scheme.name,
+      level: prev.level || scheme.level,
+      scale: prev.scale != null ? prev.scale : scheme.scale,
+      decision: prev.decision || scheme.decision,
+      decisionDate: prev.decisionDate || scheme.decisionDate,
+      taskDecision: prev.taskDecision || scheme.taskDecision,
+      taskDecisionDate: prev.taskDecisionDate || scheme.taskDecisionDate,
+      authority: prev.authority || scheme.authority
+    };
+  }
   if (!scheme.level) warnings.push('không nhận được cấp đồ án');
   if (scheme.decision && !scheme.decisionDate && scheme.rawDecisionDate) warnings.push('ngày quyết định phê duyệt không đọc được');
   if (scheme.taskDecision && !scheme.taskDecisionDate && scheme.rawTaskDate) warnings.push('ngày quyết định nhiệm vụ không đọc được');
-  const area = wardOf(boundary);
+  // Ưu tiên area đã gắn trên schemes (vd. dothi:phong-dien); wardOf chỉ khi chưa có.
+  let area = (knownScheme && knownScheme.scheme && knownScheme.scheme.area) || wardOf(boundary);
   if (!area || !area.code) warnings.push('không gắn được xã/phường hiện hành');
   const built = [];
   for (const item of loaded) {
@@ -1041,12 +1115,15 @@ async function importMap(transport, mapid, dry) {
   if (dry) {
     const published = publishedRows(mapid);
     const printed = printMap(mapid, scheme, area, summary, warnings, published);
-    if (published && printed.mismatch) throw new Error(`mapid ${mapid} lệch catalog`);
+    // Catalog trống (đồ án mới gắn mapid) không coi là lệch — lần import thật sẽ ghi lớp.
+    const emptyCatalog = published && !(published.layers || []).length;
+    if (published && printed.mismatch && !emptyCatalog) throw new Error(`mapid ${mapid} lệch catalog`);
     return printed;
   }
   const printed = printMap(mapid, scheme, area, summary, warnings, null);
-  const result = await publish(mapid, scheme, area, built, dry);
+  const result = await publish(mapid, scheme, area, built, dry, noGcs);
   (result.uploaded || []).forEach((item) => console.log(`! GCS ${item.bytes} byte ${item.object}`));
+  if (noGcs && !(result.uploaded || []).length) console.log('! --no-gcs: giữ bản thô ở cache, chưa putHeavy');
   return printed;
 }
 
@@ -1077,7 +1154,7 @@ async function main() {
     return;
   }
   if (!args.mapids.length) {
-    console.error('Dùng: node scripts/gishue-import.mjs --mapid <id> [--mapid <id> ...] [--dry-run]');
+    console.error('Dùng: node scripts/gishue-import.mjs --mapid <id> [--mapid <id> ...] [--dry-run] [--no-gcs]');
     process.exit(1);
   }
   const warnings = [];
@@ -1086,7 +1163,7 @@ async function main() {
   try {
     for (const mapid of args.mapids) {
       try {
-        await importMap(transport, mapid, args.dry);
+        await importMap(transport, mapid, args.dry, args.noGcs);
       } catch (err) {
         failed = true;
         console.log(`! mapid ${mapid}: ${err.message || err}`);

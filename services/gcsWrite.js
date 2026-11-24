@@ -98,15 +98,18 @@ async function readJson(name) {
   });
   if (metaRes.status === 404) return null;
   if (metaRes.status !== 200) throw fail(name, metaRes.status, 'Đọc');
-  const media = await axios.get(`${objectApiUrl(name)}?alt=media`, {
-    headers: { Authorization: `Bearer ${access}` },
+  // Gắn generation để khớp metadata — alt=media không generation đôi khi trả bản CDN cũ.
+  const generation = String(metaRes.data.generation || '');
+  const mediaUrl = `${objectApiUrl(name)}?alt=media${generation ? `&generation=${encodeURIComponent(generation)}` : ''}`;
+  const media = await axios.get(mediaUrl, {
+    headers: { Authorization: `Bearer ${access}`, 'Cache-Control': 'no-cache' },
     timeout: 20000,
     maxContentLength: Infinity,
     maxBodyLength: Infinity,
     validateStatus: () => true
   });
   if (media.status !== 200) throw fail(name, media.status, 'Đọc');
-  return { generation: String(metaRes.data.generation || ''), data: media.data };
+  return { generation, data: media.data };
 }
 
 async function removeObject(name) {

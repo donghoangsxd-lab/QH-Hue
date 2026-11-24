@@ -1567,8 +1567,8 @@ const lotIndex = new WeakMap();
 const flat = (s) => foldText(s).replace(/[^a-z0-9]+/g, '');
 
 function lotTypeLabel(lot) {
-  if (lot.nhom && lot.nhom !== 'Đất khác') return lot.nhom;
-  return TT16_STYLES[landPatternKey(lot.layer, lot.name)]?.label || landLabel(lot.layer);
+  // Cùng ưu tiên nhãn TT16 như thẻ Chức năng SDĐ (không lấy nhóm thống kê «Đất ở»).
+  return TT16_STYLES[landPatternKey(lot.layer, lot.name)]?.label || lot.nhom || landLabel(lot.layer);
 }
 
 function lotEntry(tenQH, lot) {

@@ -1,7 +1,7 @@
 {
   "v": 1,
   "built": "2026-10-24",
-  "count": 99,
+  "count": 101,
   "note": "95 lớp có dữ liệu sử dụng đất. Kỳ vọng khoảng 117 không khớp: projects/index.json có 136 mục, 40 đã xóa, 96 còn lại; 93 đồ án có file projects/<slug>/su-dung-dat.json (lands > 0) và 3 mục sheetOnly không có lô (hai đồ án mapid 21817 và QHC Khu công nghiệp Phong Điền). Cộng 2 lớp tĩnh mapid 21817 (qhc-hue-2045, qhc-trung-tam) thành 95. 91 file hien-trang.json trên bucket đều parcels rỗng nên không tính. cad_parcels.json không còn lô DXF (6675 INFRA và 93 khung PROJECT).",
   "aliases": [
     {
@@ -42,12 +42,22 @@
     },
     {
       "scheme": "qhc-chan-may-lang-co-a44cfad0",
+      "name": "Hiện trạng sử dụng đất",
+      "mapid": 23935,
+      "layer": "hien-trang",
+      "role": "hien-trang",
+      "path": "projects/qhc-chan-may-lang-co-a44cfad0/hien-trang.json",
+      "lands": 1892,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-chan-may-lang-co-a44cfad0",
       "name": "QHC Chân Mây - Lăng Cô",
-      "mapid": null,
+      "mapid": 23935,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhc-chan-may-lang-co-a44cfad0/su-dung-dat.json",
-      "lands": 1017,
+      "lands": 1072,
       "source": "projects"
     },
     {
@@ -63,11 +73,11 @@
     {
       "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
       "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
-      "mapid": null,
+      "mapid": 20710,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3/su-dung-dat.json",
-      "lands": 6963,
+      "lands": 8441,
       "source": "projects"
     },
     {
@@ -97,7 +107,7 @@
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhc-tt-phu-loc-19e96a86/su-dung-dat.json",
-      "lands": 1131,
+      "lands": 1467,
       "source": "projects"
     },
     {
@@ -1009,6 +1019,16 @@
       "scale": 25000,
       "path": "data/chuyen-nganh/qhc-xa-huong-loc-1487608f/sdd/quy-hoach/chuc-nang-su-dung-dat.geojson",
       "source": "static"
+    },
+    {
+      "scheme": "qhc-tt-phu-loc-19e96a86",
+      "name": "QHC TT Phú Lộc",
+      "mapid": 20674,
+      "layer": "hien-trang",
+      "role": "hien-trang",
+      "path": "projects/qhc-tt-phu-loc-19e96a86/hien-trang.json",
+      "lands": 2863,
+      "source": "projects"
     }
   ],
   "pairings": [

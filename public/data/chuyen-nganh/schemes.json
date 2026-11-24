@@ -39,7 +39,8 @@
       "decisionDate": "2020-04-17",
       "taskDecision": "3134/QĐ-UBND",
       "taskDecisionDate": "2019-12-16",
-      "authority": "UBND tỉnh"
+      "authority": "UBND tỉnh",
+      "catalogScheme": "qhc-phu-loc"
     },
     {
       "slug": "qhc-khe-tre-4a4803cd",
@@ -97,10 +98,15 @@
       "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
       "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
       "level": "QHC",
-      "mapid": null,
+      "mapid": 20710,
       "parent": null,
       "overrides": [],
-      "priority": 1
+      "priority": 1,
+      "catalogScheme": "qhc-phong-dien",
+      "area": {
+        "type": "dothi",
+        "code": "phong-dien"
+      }
     },
     {
       "slug": "qhc-chan-may-lang-co-a44cfad0",
@@ -114,7 +120,10 @@
       "area": {
         "type": "dothi",
         "code": "chan-may"
-      }
+      },
+      "taskDecision": "418/QĐ-TTg",
+      "decision": "1657/QĐ-TTg",
+      "authority": "Chính phủ"
     },
     {
       "slug": "qhc-xa-thuong-long-3f2c4da4",

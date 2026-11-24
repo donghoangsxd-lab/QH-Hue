@@ -1,4 +1,4 @@
-// Liệt kê lớp IMAGE mapid → JSON (Chrome CDP).
+// Liệt kê lớp IMAGE mapid → JSON (Edge CDP).
 // node scripts/gishue-raster-list.mjs --mapid 21817
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -33,10 +33,11 @@ function parseArgs(argv) {
 }
 
 function chromePath() {
+  // Chỉ Microsoft Edge (không dùng Chrome). EDGE_PATH ghi đè đường dẫn.
   return [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    process.env.CHROME_PATH
+    process.env.EDGE_PATH,
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
   ].filter(Boolean).find((p) => fs.existsSync(p)) || '';
 }
 
@@ -83,15 +84,15 @@ function openCdp(wsUrl) {
         }
       });
     });
-    ws.on('error', () => reject(new Error('Không nối được Chrome')));
+    ws.on('error', () => reject(new Error('Không nối được Edge CDP')));
   });
 }
 
 async function startChrome() {
   const bin = chromePath();
-  if (!bin) throw new Error('Không có Chrome');
+  if (!bin) throw new Error('Không có Microsoft Edge (cài Edge hoặc đặt EDGE_PATH)');
   const port = await freePort();
-  const dir = path.join(repo, '.cache', 'gishue', `chrome-list-${process.pid}`);
+  const dir = path.join(repo, '.cache', 'gishue', `edge-list-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const child = spawn(bin, [
@@ -107,7 +108,7 @@ async function startChrome() {
     try {
       if ((await fetch(`http://127.0.0.1:${port}/json/version`)).ok) break;
     } catch { /* */ }
-    if (i === 49) { stop(); throw new Error('Chrome không mở'); }
+    if (i === 49) { stop(); throw new Error('Edge không mở'); }
     await sleep(200);
   }
   const created = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' });
@@ -118,7 +119,7 @@ async function startChrome() {
   for (let i = 0; i < 40; i++) {
     const got = await cdp.send('Runtime.evaluate', { expression: 'location.origin', returnByValue: true });
     if (got.result && got.result.value === HOST) break;
-    if (i === 39) { cdp.close(); stop(); throw new Error('Chrome không vào được gisHue'); }
+    if (i === 39) { cdp.close(); stop(); throw new Error('Edge không vào được gisHue'); }
     await sleep(250);
   }
   return {

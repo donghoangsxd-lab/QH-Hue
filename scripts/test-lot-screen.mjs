@@ -55,6 +55,12 @@ if (!landChunk.includes('metricGridHtml') || !landChunk.includes('landCardTabsHt
 if (!landChunk.includes('landUseWithSymbol') || !landChunk.includes('lotSymbol')) {
   throw new Error('thẻ lô đất chưa gộp ký hiệu vào Chức năng SDĐ');
 }
+if (landChunk.includes("nhom === 'Đất khác'")) {
+  throw new Error('Chức năng SDĐ vẫn chỉ lấy nhãn TT16 khi nhóm là Đất khác (O-HH sẽ hiện Đất ở)');
+}
+if (!landChunk.includes('style.label') && !landChunk.includes('style && style.label')) {
+  throw new Error('thẻ lô đất chưa ưu tiên nhãn TT16 cho Chức năng SDĐ');
+}
 if (landChunk.includes("metaRow('Đồ án'") || landChunk.includes('lp-project-row')) {
   throw new Error('thẻ lô đất còn dòng Đồ án ở chân panel');
 }

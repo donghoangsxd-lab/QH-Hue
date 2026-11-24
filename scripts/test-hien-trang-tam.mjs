@@ -93,6 +93,17 @@ assert.equal(doc.type, 'FeatureCollection');
 assert.equal(doc.features[0].properties.ten, 'Đường A');
 assert.equal(doc.features[0].properties.capDuong, 'đường chính');
 assert.equal(toFeatureCollection({ type: 'FeatureCollection', features: [] }).features.length, 0);
+const fromParcels = toFeatureCollection({
+  v: 2,
+  role: 'su-dung-dat',
+  parcels: [{
+    kind: 'DXF', id: 'CM-1', phase: 'QH', layer: 'Cây xanh', area: 12.5,
+    geometry: { type: 'Polygon', coordinates: [[[108, 16], [108.1, 16], [108.1, 16.1], [108, 16]]] }
+  }]
+});
+assert.equal(fromParcels.features.length, 1);
+assert.equal(fromParcels.features[0].properties.id, 'CM-1');
+assert.equal(fromParcels.features[0].properties.chucnangsudungdat, 'Cây xanh');
 
 for (const sector of ['giao-thong', 'cap-dien', 'cap-nuoc']) {
   const file = `public/data/hien-trang-tam/${sector}.geojson`;

@@ -141,8 +141,12 @@ function clearDrawn(id) {
 }
 
 function assetHref(file) {
-  const path = gcsObjectPath(file);
-  return path ? `/gcs/${path}` : file;
+  const raw = String(file || '');
+  const path = gcsObjectPath(raw);
+  if (path) return `/gcs/${path}`;
+  // Cùng nguồn admin ghi lô: projects/<slug>/su-dung-dat.json | hien-trang.json
+  if (/^projects\//.test(raw)) return `/gcs/${raw}`;
+  return raw;
 }
 
 function loadFile(file) {
