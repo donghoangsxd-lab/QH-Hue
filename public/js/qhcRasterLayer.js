@@ -1,6 +1,7 @@
 // Raster IMAGE từ gisHue mapid 21817 (XYZ Web Mercator đã nắn).
 // Pane dưới qhcPane (350): trên tilePane vệ tinh (200), dưới lô vector QHC.
-// Phân cấp catalog.level = qhc25 | qhc10; phase HT | QH. Không crossOrigin (ACAO gisHue lỗi).
+// Phân cấp catalog.level = qhc25 | qhc10; phase HT | QH. sector = ngành HTKT (thiếu = slot đầu a/b).
+// Không crossOrigin (ACAO gisHue lỗi).
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -8,7 +9,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 const PANE = 'qhcRasterPane';
 const PANE_Z = 250;
 const HOST = 'https://gissonganh.hue.gov.vn';
-const CAT = 'data/qhc-raster/catalog.json?v=20261124';
+const CAT = 'data/qhc-raster/catalog.json?v=20261124b';
 const DEFAULT_OPACITY = 70;
 const SLOT = {
   qhc25: { HT: 'qhcRasterSlot25Ht', QH: 'qhcRasterSlot25Qh' },
@@ -21,6 +22,7 @@ let catalog = null;
 // map → Map(layerId → L.TileLayer)
 const layersByMap = new WeakMap();
 const opacityById = new Map();
+let uiBound = false;
 
 function ensurePane(m) {
   if (!m) return;
@@ -150,6 +152,18 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+function rowPhase(row) {
+  if (row.phase === 'HT' || row.phase === 'QH') return row.phase;
+  const s = String(row.name || row.short || '').toLowerCase();
+  if (s.includes('hiện trạng') || /\b2[a-e]\b/i.test(s) || /\b3[a-e]\b/i.test(s) || /\b04\b/.test(s)) return 'HT';
+  return 'QH';
+}
+
+function rowSector(row) {
+  const s = String(row.sector || '').trim();
+  return s || '';
+}
+
 function rowHtml(row) {
   const label = `${row.short || row.name} (raster)`;
   const tip = `${row.name}. Tile XYZ gisHue (mapid 21817), trên vệ tinh, dưới lớp vector QHC.`;
@@ -167,11 +181,18 @@ function rowHtml(row) {
   </div>`;
 }
 
-function rowPhase(row) {
-  if (row.phase === 'HT' || row.phase === 'QH') return row.phase;
-  const s = String(row.name || row.short || '').toLowerCase();
-  if (s.includes('hiện trạng') || /\b2[a-e]\b/i.test(s) || /\b3[a-e]\b/i.test(s) || /\b04\b/.test(s)) return 'HT';
-  return 'QH';
+/** HTML các dòng raster theo cấp / phase / ngành (sector rỗng = lớp không gian, slot đầu a/b). */
+export function rasterRowsHtml(level, phase, sector = '') {
+  const want = String(sector || '');
+  return layerList()
+    .filter((row) => row.level === level && rowPhase(row) === phase && rowSector(row) === want)
+    .map(rowHtml)
+    .join('');
+}
+
+export function rasterSectorHas(level, phase, sector) {
+  const want = String(sector || '');
+  return layerList().some((row) => row.level === level && rowPhase(row) === phase && rowSector(row) === want);
 }
 
 function paintSlots() {
@@ -179,23 +200,38 @@ function paintSlots() {
     Object.entries(phases).forEach(([phase, slotId]) => {
       const slot = $(slotId);
       if (!slot) return;
-      const rows = layerList().filter((row) => row.level === level && rowPhase(row) === phase);
+      // QHC 1/25.000: raster không gian nằm trong hàng «Sơ đồ / Hiện trạng không gian» (cùng cấp ngành).
+      if (level === 'qhc25') {
+        slot.innerHTML = '';
+        slot.hidden = true;
+        return;
+      }
+      // QHC 1/10.000: tạm giữ slot đầu a/b cho lớp không gắn ngành.
+      const rows = layerList().filter((row) => row.level === level && rowPhase(row) === phase && !rowSector(row));
       slot.innerHTML = rows.map(rowHtml).join('');
       slot.hidden = !rows.length;
     });
   });
-  layerList().forEach((row) => {
-    $(chkId(row.id))?.addEventListener('change', () => {
-      paintAll();
-    });
-    $(opId(row.id))?.addEventListener('input', (e) => {
-      const n = Number(e.target.value);
-      opacityById.set(row.id, Number.isFinite(n) ? Math.min(1, Math.max(0, n / 100)) : DEFAULT_OPACITY / 100);
-      applyOpacity(row.id);
-      syncOpBoxes();
-    });
-  });
   syncOpBoxes();
+}
+
+function bindUi() {
+  if (uiBound) return;
+  uiBound = true;
+  document.addEventListener('change', (e) => {
+    const id = e.target?.dataset?.qhcRasterId;
+    if (!id) return;
+    paintAll();
+  });
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el?.id?.startsWith('qhcRasterOp_')) return;
+    const id = el.id.slice('qhcRasterOp_'.length);
+    const n = Number(el.value);
+    opacityById.set(id, Number.isFinite(n) ? Math.min(1, Math.max(0, n / 100)) : DEFAULT_OPACITY / 100);
+    applyOpacity(id);
+    syncOpBoxes();
+  });
 }
 
 async function loadCatalog() {
@@ -214,9 +250,11 @@ async function loadCatalog() {
 function refreshUi() {
   paintSlots();
   paintAll();
+  document.dispatchEvent(new Event('qh:qhc-raster-ready'));
 }
 
 export function initQhcRasterLayer() {
+  bindUi();
   loadCatalog().then(refreshUi);
   document.addEventListener(LEVEL_EVENT, () => paintAll());
   // Danh sách đồ án park/mount lại ô tĩnh — sơn lại slot nếu lần đầu bị bỏ trống

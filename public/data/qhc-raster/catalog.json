@@ -3,7 +3,7 @@
   "mapid": 21817,
   "source": "https://gissonganh.hue.gov.vn/geditor.aspx?mapid=21817",
   "host": "https://gissonganh.hue.gov.vn",
-  "note": "Lớp IMAGE XYZ Web Mercator (Leaflet {z}/{x}/{y}). Không crossOrigin (ACAO gisHue lỗi). Phân cấp qhc25 / qhc10 và phase HT / QH.",
+  "note": "Lớp IMAGE XYZ Web Mercator (Leaflet {z}/{x}/{y}). Không crossOrigin (ACAO gisHue lỗi). Phân cấp qhc25 / qhc10 và phase HT / QH. sector = ngành HTKT (null/omit = không gian hoặc dùng chung, hiện ở slot đầu nhóm a/b).",
   "defaultId": "bando_qhsdd_kvdttt_1_10n",
   "layers": [
     {
@@ -30,7 +30,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 2,
       "level": "qhc25",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "giao-thong"
     },
     {
       "id": "bando_ht_htd_ccnl_kvtdt_1_25n",
@@ -43,7 +44,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 3,
       "level": "qhc25",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "cap-dien"
     },
     {
       "id": "bando_ht_cn_tnt_qlctr_nt_kvtdt_1_25n",
@@ -56,7 +58,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 4,
       "level": "qhc25",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "cap-nuoc"
     },
     {
       "id": "bando_2e_ht_htvttd_kvtdt_1_25n",
@@ -69,7 +72,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 5,
       "level": "qhc25",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "thong-tin-lien-lac"
     },
     {
       "id": "bando_dg_thdxd_kvtdt_1_25n",
@@ -108,7 +112,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 8,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "san-nen-thoat-mua"
     },
     {
       "id": "bando_dh_gt_kvtdt_1_25n",
@@ -121,7 +126,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 9,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "giao-thong"
     },
     {
       "id": "bando_7c_dh_htd_ccnl_kvtdt_1_25n",
@@ -134,7 +140,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 10,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "cap-dien"
     },
     {
       "id": "bando_7d_dh_cn_kvtdt_1_25n",
@@ -147,7 +154,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 11,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "cap-nuoc"
     },
     {
       "id": "bando_7e_dh_tnt_qlctr_nt_kvtdt_1_25n",
@@ -160,7 +168,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 12,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "thoat-nuoc-thai"
     },
     {
       "id": "bando_7f_dh_htvttd_kvtdt_1_25n",
@@ -173,7 +182,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 13,
       "level": "qhc25",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "thong-tin-lien-lac"
     },
     {
       "id": "bando_ht_sdd_kvdttt_1_10n",
@@ -199,7 +209,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 15,
       "level": "qhc10",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "giao-thong"
     },
     {
       "id": "bando_3c_ht_htd_ccnl_kvdttt_1_10N",
@@ -212,7 +223,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 16,
       "level": "qhc10",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "cap-dien"
     },
     {
       "id": "bando3d_ht_cntnt_1_10n",
@@ -225,7 +237,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 17,
       "level": "qhc10",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "cap-nuoc"
     },
     {
       "id": "bando_ht_ttll_kvdttt_1_10n",
@@ -238,7 +251,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 18,
       "level": "qhc10",
-      "phase": "HT"
+      "phase": "HT",
+      "sector": "thong-tin-lien-lac"
     },
     {
       "id": "bando_8a_dh_ptkg_kvdttt_1_10n",
@@ -290,7 +304,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 22,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "san-nen-thoat-mua"
     },
     {
       "id": "bando_dhpt_gt_kvdttt_1_10n",
@@ -303,7 +318,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 23,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "giao-thong"
     },
     {
       "id": "bando_qh_htd_cnl_kvdttt_1_10n",
@@ -316,7 +332,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 24,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "cap-dien"
     },
     {
       "id": "bando_dh_cn_kvdttt_1_10n",
@@ -329,7 +346,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 25,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "cap-nuoc"
     },
     {
       "id": "bando_10e_dh_tnt_qlctr_nt_kvdttt_1_10n",
@@ -342,7 +360,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 26,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "thoat-nuoc-thai"
     },
     {
       "id": "bando_dh_htvttd_kvdttt_1_10n",
@@ -355,7 +374,8 @@
       "crsTiles": "EPSG:3857",
       "priority": 27,
       "level": "qhc10",
-      "phase": "QH"
+      "phase": "QH",
+      "sector": "thong-tin-lien-lac"
     }
   ]
 }

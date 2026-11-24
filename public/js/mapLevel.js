@@ -3,8 +3,8 @@
 //  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
 //                                        đồ án → chi tiết
 //  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
-//  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
-//                                        QHPK lọc theo vùng lõi
+//  qhc10  QHC 1/10.000 (chk_qhc10)       lô sử dụng đất trung tâm + ranh/tên đồ án QHC khác; ranh mở rộng QĐ 756,
+//                                        QHPK lọc theo vùng lõi. Bấm ngoài vùng lõi tạm thu lô về đường bao.
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; tick hoặc bấm một đồ án mới hiện lô.
 //                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường vẫn chỉ ranh.
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, tick hoặc bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)

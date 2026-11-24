@@ -4654,7 +4654,6 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .qhc-sw { flex: none; display: inline-block; width: 14px; height: 11px; border: 1px solid transparent; border-radius: 2px; }
 .qhc-label-icon { background: none; border: 0; }
 .qhc-label { position: absolute; transform: translate(-50%, -50%); padding: 1px 6px; border-radius: var(--r-sm); white-space: nowrap; pointer-events: none; font-size: var(--fs-xs); text-shadow: 0 1px 2px #000; }
-.qhc-label-tv { background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(248, 250, 252, 0.7); color: #f8fafc; font-size: var(--fs-sm); }
 .qhc-label-dc { background: rgba(127, 29, 29, 0.85); border: 1px solid #ef4444; color: #fecaca; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; line-height: 1.35; padding: 2px 8px; }
 /* Tem số hiệu tuyến (kiểu Google Maps) trên lớp giao thông QHC */
 .qhc-road-shield-icon { background: none; border: 0; }
@@ -8640,7 +8639,16 @@ body.project-review.la-page #projectReviewHost {
 .qhc25-htkt[hidden] { display: none; }
 .qhc25-htkt .cn-scheme { margin-left: 0; }
 .qhc25-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
+#gt25Park[hidden], #qhc25SpacePark[hidden] { display: none !important; }
+.qhc25-space-mount { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+.qhc25-space-label {
+  flex: 1 1 auto; display: flex; gap: 6px; align-items: center; min-width: 0;
+  font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color); cursor: pointer;
+}
+.qhc25-space-label .cn-ico { flex: none; width: 14px; height: 14px; color: #f59e0b; }
+.qhc25-space-label span { min-width: 0; }
 .project-gt25 { margin: 0; }
+.qhc25-sector .project-gt25 { margin: 2px 0 4px; }
 .project-gt25 > .project-layer { gap: 2px; }
 .gt25-children { margin: 1px 0 4px 18px; padding: 2px 0 2px 8px; border-left: 1px dashed rgba(148, 163, 184, 0.45); }
 .gt25-children[hidden] { display: none; }

@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261117">
+  <link rel="stylesheet" href="css/style.css?v=20261124t">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -613,21 +613,28 @@
                 </button>
                 <div class="project-map-group-body">
                   <div id="qhcRasterSlot25Qh" class="qhc-raster-slot" hidden></div>
-                  <div class="project-layer">
-                    <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
-                      <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
+                  <!-- park: sơ đồ không gian mount vào hàng đầu #qhc25HtktQh (cùng cấp ngành HTKT, mặc định bật) -->
+                  <div id="qhc25SpacePark" hidden>
+                    <label class="qhc25-space-label" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
+                      <input type="checkbox" id="chk_qhc25" data-qhc-child="25">
+                      <svg class="cn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="m4 14 4-3 3 2 4-4 5 5"/></svg>
+                      <span>Sơ đồ phát triển không gian TP</span>
+                    </label>
                   </div>
-                  <div class="project-gt25">
-                    <div class="project-layer">
-                      <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Xổ mũi tên để xem lớp GIS quy hoạch thành phần; chỉ tải khi tick từng lớp con. Lớp hiện trạng giao thông nằm ở nhóm a.">
-                        <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
-                      <label class="project-rail" title="Đường sắt">
-                        <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
-                        <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                      </label>
-                      <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                  <!-- park: khối GT mount vào nhóm Giao thông khi xổ ngành -->
+                  <div id="gt25Park" hidden>
+                    <div class="project-gt25">
+                      <div class="project-layer">
+                        <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Nằm trong nhóm Giao thông cùng raster và lớp GIS thành phần; chỉ tải GIS khi tick từng lớp con.">
+                          <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
+                        <label class="project-rail" title="Đường sắt">
+                          <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
+                          <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
+                        </label>
+                        <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                      </div>
+                      <div id="gt25Children" class="gt25-children" hidden></div>
                     </div>
-                    <div id="gt25Children" class="gt25-children" hidden></div>
                   </div>
                   <div id="qhc25HtktQh" class="qhc25-htkt" hidden></div>
                 </div>
@@ -1970,6 +1977,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261124r"></script>
+  <script type="module" src="./js/app.js?v=20261124t"></script>
 </body>
 </html>

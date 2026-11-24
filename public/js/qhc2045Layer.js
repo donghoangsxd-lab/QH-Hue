@@ -1,12 +1,14 @@
 // Lớp bản đồ đồ án QHC đô thị Thừa Thiên Huế 2045 (qhc2045.js) trên bản đồ quy hoạch, điều khiển ở panel Lớp dữ liệu:
 //  - chk_qhc25: sơ đồ tổ chức không gian 1/25.000 toàn đô thị (vùng phát triển, mặt nước, cây xanh, ranh khu vực;
 //    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js). Nằm trong dòng «QHC đô thị Huế 2045 (toàn đô thị)»;
-//  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
-//    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
-//    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
-//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: đường bao vùng lõi (4 quận) và mọi ranh đồ án QHC 1/10.000 đã nhập
-//    (projectLayer). Rê chuột vào vùng lõi thì sáng nền, bấm vào ranh lõi mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh lõi.
-//    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền xanh nhạt.
+//  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + khung
+//    phân khu, điểm chức năng (không gắn nhãn A1–A4 trên bản đồ). Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn
+//    lô và ranh 1/10.000 mở rộng theo QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có
+//    trong đồ án cũ). Bật lớp (droplist QHC 1/10.000 hoặc ô «QH sử dụng đất») luôn vẽ lô — khớp trạng thái tích chọn.
+//    Thu gọn lô khi bấm ngoài vùng lõi hoặc mở đồ án QHC khác; lúc đó chỉ còn đường bao vùng lõi + ranh đồ án đã nhập
+//    (projectLayer), rê chuột sáng nền, bấm ranh lõi mở lại lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần):
+//    mở thẳng lô, không vẽ ranh lõi. Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm
+//    (hợp 4 tiểu vùng) luôn có nền và viền xanh nhạt.
 //  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp trong cùng dòng QHC, không phụ thuộc vùng / lô;
 //    1/10.000 lọc theo nút giai đoạn như lô. Bấm ký hiệu ở chú giải: phóng tới cả loại tuyến và làm nổi, các loại khác mờ.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
@@ -52,7 +54,6 @@ const ROAD_PANE = ['qhcRoadPane', 415];
 const ROAD_LABEL_PANE = ['qhcRoadLabelPane', 450];
 const ROAD_HIT_PX = 6;
 const LABEL_MIN_ZOOM = 14;
-const TV_LABEL_MAX_ZOOM = 14;
 const STAGES = [
   { id: '0', label: 'Hiện trạng' },
   { id: '1', label: 'Đến 2030' },
@@ -199,10 +200,7 @@ function clearQhc(m, keys) {
   const b = use(m);
   keys.forEach(k => {
     const layer = b.layers[k];
-    if (k === 'frame') {
-      layer?.tvLabels?.remove();
-      layer?.points?.remove();
-    }
+    if (k === 'frame') layer?.points?.remove();
     layer?.remove();
     b.layers[k] = null;
   });
@@ -453,7 +451,6 @@ function drawFrame() {
   const r = ensureRenderer(m);
   const lr = ensureLineRenderer(m);
   const lines = L.featureGroup();
-  const tvLabels = L.layerGroup();
   const ptLayer = L.featureGroup();
   const outer = unionTv();
   if (outer) {
@@ -463,10 +460,8 @@ function drawFrame() {
   }
   data.frame.features.forEach(f => {
     const p = f.properties;
-    if (p.k === 'tv') {
-      const c = turf.pointOnFeature(f).geometry.coordinates;
-      L.marker([c[1], c[0]], { icon: frameLabel(`<b>${escapeHtml(p.tv)}</b> ${escapeHtml(p.ten)}`, 'qhc-label-tv'), interactive: false, keyboard: false }).addTo(tvLabels);
-    } else if (p.k === 'pk') {
+    // k === 'tv': chỉ dùng cho hợp ranh / click mở lô, không gắn nhãn A1–A4 trên bản đồ
+    if (p.k === 'pk') {
       L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#e2e8f0', weight: 1.1, opacity: 0.7, dashArray: '3 4', fill: false } }).addTo(lines);
     } else if (p.k === 'd') {
       const [lng, lat] = f.geometry.coordinates;
@@ -476,7 +471,6 @@ function drawFrame() {
     }
   });
   layers.frame = L.featureGroup([lines]);
-  layers.frame.tvLabels = tvLabels;
   layers.frame.points = ptLayer;
   layers.frame.addTo(m);
   zoomFrame();
@@ -486,10 +480,8 @@ function drawFrame() {
 function zoomFrame() {
   const m = active.m;
   if (!layers.frame || !m.hasLayer(layers.frame)) return;
-  const z = m.getZoom();
-  const { tvLabels, points } = layers.frame;
-  if (z <= TV_LABEL_MAX_ZOOM) tvLabels.addTo(m); else tvLabels.remove();
-  if (z >= LABEL_MIN_ZOOM) { points.addTo(m); points.bringToFront(); } else points.remove();
+  const { points } = layers.frame;
+  if (m.getZoom() >= LABEL_MIN_ZOOM) { points.addTo(m); points.bringToFront(); } else points.remove();
 }
 
 // Bỏ các vòng lỗ. Ranh 4 quận không khít nhau nên hợp xong còn hàng trăm khe nhỏ; viền bám theo khe thành nét lỗi giữa các quận.
@@ -594,7 +586,7 @@ function drawWash() {
   }).addTo(m);
 }
 
-// Thu gọn: nhãn tên đồ án ở mép trên (nhãn A1–A4 nằm giữa tiểu vùng). Nền vùng trung tâm là layers.wash
+// Thu gọn: nhãn tên đồ án ở mép trên. Nền vùng trung tâm là layers.wash
 function drawCore() {
   layers.core?.remove();
   layers.core = null;
@@ -704,7 +696,8 @@ async function setLand(on) {
       // Cùng ngưỡng viewFlow (PLACE_ZOOM 14): zoom trong lúc tải phải được tính lại lúc vẽ, không giữ mức zoom lúc bấm droplist
       const place = preferPlace || !!(state.focusedProject || !city || (shown && shown.getZoom() >= 14));
       placeLots = place;
-      coreOpen = place;
+      // Ô «QH sử dụng đất» / chk_qhc10 đang bật → luôn mở lô (không để thu gọn chỉ còn ranh khi mới tích)
+      coreOpen = true;
     }
     const now = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
     both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame']); });
@@ -714,7 +707,6 @@ async function setLand(on) {
       if (!collapsed()) drawLand();
       else dropLand();
       if (placeLots && !isLevelPair()) {
-        layers.frame?.tvLabels?.remove();
         layers.frame?.points?.remove();
         layers.frame?.remove();
         layers.core?.remove();

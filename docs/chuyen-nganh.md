@@ -1,6 +1,6 @@
 # Hạ tầng chuyên ngành
 
-Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.
+Bộ dữ liệu hạ tầng chuyên ngành, gắn trục C (Hạ tầng kỹ thuật). Mô hình sáu trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.
 
 Đường dẫn: `data/chuyen-nganh/<scheme>/<sector>/<hien-trang|quy-hoach>/` (GeoJSON đủ thuộc tính, zip shapefile UTF-8, `-ten-truong.txt`). Manifest: `public/data/chuyen-nganh/index.json`. Quan hệ đồ án: `public/data/chuyen-nganh/schemes.json`.
 

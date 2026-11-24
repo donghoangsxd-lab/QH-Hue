@@ -1,4 +1,4 @@
-// Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
+// Sáu trục A–F là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
 import {
   map, focusWard, clearWardHighlight, centerOnCity, wardNameAt, getLeftObstruction, getRightObstruction,
@@ -41,6 +41,7 @@ import {
   loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocLegendHtml, capNuocPopupExtra, capNuocPointStyle,
   capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, setCapNuocZones, setCapNuocZoneOn, capNuocPlantLayer
 } from './capNuocQhc.js';
+import { rasterRowsHtml, rasterSectorHas } from './qhcRasterLayer.js';
 
 const STORE_KEY = 'qh_axes_v1';
 // Không còn lưu / khôi phục lớp trên máy. Xóa khóa cũ khi mở trang.
@@ -54,11 +55,13 @@ const QHC25_PHASE_TITLE = {
   'hien-trang': 'Bản đồ hiện trạng tỷ lệ 1/25.000',
   'quy-hoach': 'Bản đồ quy hoạch tỷ lệ 1/25.000'
 };
-// Trên B → QHC 1/25.000: giao thông không thành ngành ngang hàng; lớp catalog là con của chk_gt25.
-const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe && g.id !== 'giao-thong');
+// Trên B → QHC 1/25.000: không gian + đủ ngành HTKT cùng cấp. QH giao thông: chk_gt25 + lớp GIS con trong nhóm Giao thông.
+const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe);
 const QHC25_GT_SECTOR = 'giao-thong';
+const QHC25_SPACE = 'khong-gian';
 
 const ICONS = {
+  'khong-gian': '<path d="M4 6h16v12H4z"/><path d="m4 14 4-3 3 2 4-4 5 5"/>',
   'giao-thong': '<path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/>',
   'cap-nuoc': '<path d="M12 3s6 6.2 6 10.2A6 6 0 0 1 6 13.2C6 9.2 12 3 12 3z"/>',
   'cap-dien': '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
@@ -69,6 +72,7 @@ const ICONS = {
   'tong-hop-duong-ong': '<path d="M3 8h7v8H3zM14 8h7v8h-7zM10 12h4"/>'
 };
 const SECTOR_COLOR = {
+  'khong-gian': '#f59e0b',
   'giao-thong': '#0284c7',
   'cap-nuoc': '#0369a1',
   'cap-dien': '#dc2626',
@@ -99,8 +103,8 @@ const openSchemes = new Set([
   'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c',
   'qhc-xa-thuong-long-3f2c4da4'
 ]);
-// Mặc định thu: chỉ hiện tên ngành / GT25; xổ mới thấy lớp con (không tải cho đến khi tick).
-const qhc25OpenSectors = new Set();
+// Không gian mặc định xổ (lớp chk_qhc25 bật khi mở trang); ngành khác thu, xổ mới thấy lớp con.
+const qhc25OpenSectors = new Set([QHC25_SPACE]);
 let gt25ChildrenOpen = false;
 const capOpen = new Set();
 let layerQuery = '';
@@ -417,47 +421,120 @@ function qhc25GtChildLayers(kind) {
 
 function qhc25PhaseLayers(kind = qhc25PhaseKind()) {
   const seen = new Set();
-  const extra = kind === 'hien-trang' ? qhc25GtChildLayers('hien-trang') : [];
-  return [...extra, ...QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind))].filter(layer => {
+  return QHC25_SECTORS.flatMap(sec => qhc25SectorLayers(sec.id, kind)).filter(layer => {
     if (seen.has(layer.id)) return false;
     seen.add(layer.id);
     return true;
   });
 }
 
+function qhc25RasterPhase(kind) {
+  return kind === 'hien-trang' ? 'HT' : 'QH';
+}
+
+function parkGt25Block() {
+  const park = document.getElementById('gt25Park');
+  const block = document.querySelector('.project-gt25');
+  if (park && block && block.parentElement !== park) park.appendChild(block);
+}
+
+function remountGt25Block() {
+  const park = document.getElementById('gt25Park');
+  const block = document.querySelector('.project-gt25');
+  const mount = document.querySelector('#qhc25HtktQh [data-gt25-mount]');
+  if (!block) return;
+  if (mount) mount.appendChild(block);
+  else if (park) park.appendChild(block);
+}
+
+function parkSpaceLabel() {
+  const park = document.getElementById('qhc25SpacePark');
+  const label = document.querySelector('.qhc25-space-label');
+  if (park && label && label.parentElement !== park) park.appendChild(label);
+}
+
+function remountSpaceLabel() {
+  const park = document.getElementById('qhc25SpacePark');
+  const label = document.querySelector('.qhc25-space-label');
+  const mount = document.querySelector('#qhc25HtktQh [data-qhc25-space-mount], #qhc25HtktHt [data-qhc25-space-mount]');
+  if (!label) return;
+  if (mount) mount.appendChild(label);
+  else if (park) park.appendChild(label);
+}
+
+/** Hàng đầu cùng cấp ngành: sơ đồ không gian (QH, mặc định bật) hoặc hiện trạng không gian (HT, chỉ raster). */
+function qhc25SpaceBlock(kind) {
+  const phase = qhc25RasterPhase(kind);
+  const rasters = rasterRowsHtml('qhc25', phase, '');
+  const isQh = kind === 'quy-hoach';
+  if (!isQh && !rasters) return '';
+  const open = qhc25OpenSectors.has(QHC25_SPACE);
+  const label = isQh ? 'Sơ đồ phát triển không gian TP' : 'Hiện trạng không gian';
+  const head = isQh
+    ? `<div data-qhc25-space-mount class="qhc25-space-mount"></div>`
+    : `<label><input type="checkbox" data-qhc25-sector="${QHC25_SPACE}"><span>${icon(QHC25_SPACE)}${escapeHtml(label)}</span></label>`;
+  // QH: ô chk_qhc25 nằm trong label mount (cùng cấp ngành, mặc định bật); hàng thêm nút xổ raster.
+  const body = open ? `<div class="cn-groups">${rasters || '<p class="cn-empty">Chưa có raster không gian.</p>'}</div>` : '';
+  return `<div class="cn-scheme qhc25-sector qhc25-space" data-qhc25-sector-row="${QHC25_SPACE}">
+    <div class="cn-scheme-row">
+      ${head}
+      <button type="button" class="cn-fold" data-qhc25-fold="${QHC25_SPACE}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
+    </div>
+    ${body}
+  </div>`;
+}
+
 function qhc25SectorBlock(sec, kind, labelOverride) {
   const rows = qhc25SectorLayers(sec.id, kind);
-  if (!rows.length) return '';
-  const on = rows.every(layer => isLayerOn(layer.id));
-  const some = rows.some(layer => isLayerOn(layer.id));
+  const rasters = rasterRowsHtml('qhc25', qhc25RasterPhase(kind), sec.id);
+  const hasRaster = rasterSectorHas('qhc25', qhc25RasterPhase(kind), sec.id);
+  const isGtQh = kind === 'quy-hoach' && sec.id === QHC25_GT_SECTOR;
+  // QH giao thông luôn hiện (chk_gt25 + lớp GIS con); ngành khác cần GIS hoặc raster.
+  if (!rows.length && !hasRaster && !isGtQh) return '';
+  const gtOn = isGtQh && !!document.getElementById('chk_gt25')?.checked;
+  const layersOn = rows.length ? rows.every(layer => isLayerOn(layer.id)) : true;
+  const layersSome = rows.some(layer => isLayerOn(layer.id));
+  const on = isGtQh ? (gtOn && layersOn) : layersOn;
+  const some = isGtQh ? (gtOn || layersSome) : layersSome;
   const open = qhc25OpenSectors.has(sec.id);
-  const label = labelOverride || sec.label;
+  const label = labelOverride
+    || (kind === 'hien-trang' && sec.id === QHC25_GT_SECTOR ? 'Hiện trạng giao thông' : sec.label);
+  const gis = isGtQh ? '' : rows.map(layer => layerRow(layer, false)).join('');
+  const body = open
+    ? `<div class="cn-groups">${rasters}${isGtQh ? '<div data-gt25-mount></div>' : ''}${gis}</div>`
+    : '';
   return `<div class="cn-scheme qhc25-sector" data-qhc25-sector-row="${escapeHtml(sec.id)}">
     <div class="cn-scheme-row">
       <label><input type="checkbox" data-qhc25-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(label)}</span></label>
       <button type="button" class="cn-fold" data-qhc25-fold="${escapeHtml(sec.id)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
     </div>
-    ${open ? `<div class="cn-groups">${rows.map(layer => layerRow(layer, false)).join('')}</div>` : ''}
+    ${body}
   </div>`;
 }
 
 function paintQhc25HtktBox(boxId, kind) {
   const box = document.getElementById(boxId);
   if (!box) return;
+  if (kind === 'quy-hoach') {
+    parkGt25Block();
+    parkSpaceLabel();
+  } else {
+    parkSpaceLabel();
+  }
   if (!ready) {
     box.hidden = true;
     box.innerHTML = '';
     return;
   }
-  // Nhóm a: Hiện trạng giao thông đứng đầu; nhóm b không còn lớp HT giao thông.
-  const gtHt = kind === 'hien-trang'
-    ? qhc25SectorBlock({ id: QHC25_GT_SECTOR, label: 'Hiện trạng giao thông' }, 'hien-trang', 'Hiện trạng giao thông')
-    : '';
+  // Không gian đứng đầu, rồi đủ ngành HTKT cùng cấp.
+  const space = qhc25SpaceBlock(kind);
   const sectors = QHC25_SECTORS.map(sec => qhc25SectorBlock(sec, kind)).filter(Boolean).join('');
-  const body = `${gtHt}${sectors}`;
+  const body = `${space}${sectors}`;
   box.hidden = false;
   box.innerHTML = body || `<p class="cn-empty">Chưa có lớp hạ tầng (${escapeHtml(QHC25_PHASE_TITLE[kind] || kind)}).</p>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
+  remountSpaceLabel();
+  if (kind === 'quy-hoach') remountGt25Block();
 }
 
 function paintGt25Children() {
@@ -487,11 +564,12 @@ function paintGt25Children() {
 }
 
 function paintQhc25Htkt() {
-  // Cây a/b luôn hiện đủ hiện trạng và quy hoạch (không lọc theo nút HT/QH toàn cục).
-  // a: Hiện trạng giao thông + ngành khác; b: chk_gt25 (+ lớp QH GIS trong #gt25Children) + ngành khác.
+  // Cây a/b: không gian + ngành HTKT cùng cấp; raster chuyên ngành trong từng ngành; QH giao thông gắn chk_gt25.
   paintQhc25HtktBox('qhc25HtktHt', 'hien-trang');
   paintQhc25HtktBox('qhc25HtktQh', 'quy-hoach');
   paintGt25Children();
+  remountSpaceLabel();
+  remountGt25Block();
   // Host cũ (nếu còn trong DOM / test) — không dùng cho UI mới.
   const legacy = document.getElementById('qhc25Htkt');
   if (legacy) {
@@ -1932,6 +2010,7 @@ function initDauTuTabs() {
 export function initChuyenNganh() {
   if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
+  document.addEventListener('qh:qhc-raster-ready', () => paintQhc25Htkt());
   document.addEventListener('qh:axis-all-paint', () => {
     paintAxisAll();
     paintForeignAxes();
@@ -2195,9 +2274,27 @@ export function initChuyenNganh() {
         : host?.id === 'qhc25HtktQh' ? 'quy-hoach'
           : qhc25PhaseKind();
       const rows = qhc25SectorLayers(id, kind);
-      if (e.target.checked) qhc25OpenSectors.add(id);
-      rows.forEach(l => setLayerOn(l, e.target.checked));
-      if (e.target.checked && rows[0]) publishSectorLegend(true, rows[0].sector);
+      const turnOn = e.target.checked;
+      if (turnOn) qhc25OpenSectors.add(id);
+      // Đọc ô raster trước khi sơn lại DOM (mở nhóm nếu đang thu).
+      const rasterChks = [...(host?.querySelectorAll(`[data-qhc25-sector-row="${CSS.escape(id)}"] [data-qhc-raster-id]`) || [])];
+      if (id === QHC25_GT_SECTOR && kind === 'quy-hoach') {
+        const gt = document.getElementById('chk_gt25');
+        if (gt && gt.checked !== turnOn) {
+          gt.checked = turnOn;
+          gt.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      rows.forEach(l => setLayerOn(l, turnOn));
+      paintQhc25Htkt();
+      const hostAfter = document.getElementById(host?.id || 'qhc25HtktQh');
+      const rasterAfter = hostAfter?.querySelectorAll(`[data-qhc25-sector-row="${CSS.escape(id)}"] [data-qhc-raster-id]`) || [];
+      (rasterAfter.length ? rasterAfter : rasterChks).forEach((chk) => {
+        if (chk.checked === turnOn) return;
+        chk.checked = turnOn;
+        chk.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      if (turnOn) publishSectorLegend(true, rows[0]?.sector || id);
       return;
     }
     const schemeEl = e.target.closest('[data-cn-scheme]');
@@ -2426,6 +2523,6 @@ export function initChuyenNganh() {
     paint();
   }).catch(err => {
     ready = true;
-    console.warn('Bốn trục', err);
+    console.warn('Sáu trục', err);
   });
 }

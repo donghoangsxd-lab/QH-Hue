@@ -221,18 +221,21 @@ function killTree(pid) {
   }
 }
 
-// Chrome trên Windows tách process khỏi PID spawn. Chỉ giết profile của lần chạy này.
+// Chromium (Edge/Chrome) trên Windows tách process khỏi PID spawn. Chỉ giết profile của lần chạy này.
 function killChromeDir(dir) {
   if (process.platform !== 'win32' || !dir) return;
   spawnSync('powershell', [
     '-NoProfile',
     '-Command',
-    "Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe'\" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($env:GISHUE_CHROME_DIR) } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
+    "Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('msedge.exe','chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($env:GISHUE_CHROME_DIR) } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
   ], { stdio: 'ignore', env: { ...process.env, GISHUE_CHROME_DIR: dir } });
 }
 
 function chromePath() {
+  // Windows: ưu tiên Edge (máy dev hay dùng), rồi Chrome.
   const candidates = [
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     '/usr/bin/google-chrome',
@@ -279,7 +282,7 @@ function openCdp(wsUrl) {
 
 async function startChrome() {
   const bin = chromePath();
-  if (!bin) throw new Error('Không có Chrome để tải gisHue');
+  if (!bin) throw new Error('Không có Edge/Chrome để tải gisHue');
   const port = await freePort();
   const dir = path.join(repo, '.cache', 'gishue', `chrome-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -347,7 +350,7 @@ function makeTransport(warnings) {
         return await nodeText(url);
       } catch (err) {
         mode = 'chrome';
-        warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Chrome headless riêng`);
+        warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Edge/Chrome headless riêng`);
         chrome = await startChrome();
         return chrome.text(url);
       }

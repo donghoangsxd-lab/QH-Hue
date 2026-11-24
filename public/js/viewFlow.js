@@ -6,7 +6,8 @@
 //      đã có QHC / QHPK / QHCT, bấm vùng đồ án để mở; vùng QHC đô thị TT Huế 2045 → QHC 1/10.000 và mở lô.
 //      Bấm nền ngoài mọi đô thị thì bỏ chọn.
 //    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn. Đang xem một địa điểm thì chỉ vùng chức năng, không nét ranh, không phóng ra toàn thành phố.
-//    - QHC 1/10.000: ranh + tên mọi đồ án QHC đang bật (kể cả ngoài vùng trung tâm). Droplist phóng khung nếu còn đồ án ngoài màn hình, không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung, mở thẳng lô.
+//    - QHC 1/10.000: mở lô sử dụng đất trung tâm + ranh/tên đồ án QHC khác. Droplist phóng khung nếu còn đồ án ngoài màn hình,
+//      không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung. Bấm ngoài vùng lõi tạm thu lô về đường bao;
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: nhìn rộng chỉ ranh; bấm ranh / tick mới tải lô. Zoom ≥ PLACE_DETAIL_ZOOM (hoặc đang
@@ -124,7 +125,8 @@ function onLevelChange({ level, prev, keepView }) {
   const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
   setQhcPlaceMode(place);
   if (level === 'qhc10') {
-    setCoreOpen(place);
+    // Khớp ô «QH sử dụng đất»: vào cấp 1/10.000 luôn mở lô trung tâm, không chỉ hiện ranh 4 tiểu vùng
+    setCoreOpen(true);
     if (place && !inspectSync) openLotsAtView('QHC');
   }
   if (level === 'qhct' && viewingPlace() && !inspectSync) openLotsAtView('QHCT');

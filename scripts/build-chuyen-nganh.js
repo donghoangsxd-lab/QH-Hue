@@ -29,7 +29,7 @@ const SECTOR_LABEL = Object.fromEntries(SECTORS);
 // Tách camelCase trước khi bỏ dấu: mangLuoiNghiaTrang → «nghia trang».
 // sdd đứng trước hạ tầng để ranh / sử dụng đất không bị nuốt. Thải đứng trước «thoát nước» mưa.
 const RULES = [
-  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|dinh huong phat trien|co cau phan lo|phan o quy hoach|moc gioi|hanh lang an toan|cay xanh|quan trac/, 'sdd'],
+  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|dinh huong phat trien|co cau phan lo|co cau quy hoach|phan o quy hoach|phan vung quy hoach|tieu khu quy hoach|moc gioi|hanh lang an toan|cay xanh|quan trac/, 'sdd'],
   [/chat thai ran|nghia trang/, 'chat-thai-ran-nghia-trang'],
   [/thoat nuoc thai|thoat muoc thai|xu ly nuoc thai|vsmt/, 'thoat-nuoc-thai'],
   [/thong tin|tram thong tin/, 'thong-tin-lien-lac'],
@@ -521,7 +521,7 @@ function docOf(manifest, heavy) {
   nameOf['qhc-trung-tam'] = 'QHC đô thị TTHuế 2045 (Trung tâm)';
   lines.push('# Hạ tầng chuyên ngành');
   lines.push('');
-  lines.push('Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.');
+  lines.push('Bộ dữ liệu hạ tầng chuyên ngành, gắn trục C (Hạ tầng kỹ thuật). Mô hình sáu trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.');
   lines.push('');
   lines.push('Đường dẫn: `data/chuyen-nganh/<scheme>/<sector>/<hien-trang|quy-hoach>/` (GeoJSON đủ thuộc tính, zip shapefile UTF-8, `-ten-truong.txt`). Manifest: `public/data/chuyen-nganh/index.json`. Quan hệ đồ án: `public/data/chuyen-nganh/schemes.json`.');
   lines.push('');
