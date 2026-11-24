@@ -273,7 +273,7 @@ export function setLotOpacity(v) {
 
 // Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu.
 // In PDF: setPrintTt16Detail(true) ép hoa văn dù zoom khung xem trước còn thấp (khổ lớn, khung gần full màn hình).
-export const TT16_PATTERN_ZOOM = 17;
+export const TT16_PATTERN_ZOOM = 16;
 export const PRINT_TT16_DETAIL_EVENT = 'qh:print-tt16-detail';
 let printForceDetail = false;
 /** Nhân kích thước ô hatch khi xuất PDF (< 1 = denser, vừa mắt trên A0/4A0). */
