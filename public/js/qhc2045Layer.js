@@ -1072,7 +1072,7 @@ function qhcLayerDossier() {
 }
 
 function bindQhcDossier(popup) {
-  popup.getElement()?.querySelectorAll('.lp-dossier').forEach(btn => {
+  popup.getElement()?.querySelectorAll('[data-dossier]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       L.DomEvent.stop(e);
       // Cùng khóa qhc-2045 với menu danh sách QHC 1/25.000 và 1/10.000.

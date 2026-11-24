@@ -79,6 +79,8 @@ assert.match(regulationsPaneHtml(null), /Chưa gắn quy định/);
 assert.doesNotMatch(regulationsPaneHtml(null), /Tab này sẽ mở/);
 const regs = regulationsPaneHtml({ slug: 'da', docs: [{ role: 'quy-dinh', id: '1', at: 2 }] });
 assert.match(regs, /data-dossier="quy-dinh"/);
+assert.match(regs, /class="lp-reg-btn"/);
+assert.doesNotMatch(regs, /lp-reg-btn lp-dossier|class="lp-reg-btn lp-dossier"/);
 assert.doesNotMatch(regs, /lp-reg-hint|Tab này sẽ mở/);
 
 assert.deepEqual(dossierButtons(null), []);

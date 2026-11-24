@@ -52,11 +52,6 @@ function propText(props, key) {
   return s;
 }
 
-function line(label, value) {
-  if (value == null || value === '') return '';
-  return `<br>${escapeHtml(label)}: ${escapeHtml(String(value))}`;
-}
-
 export function loadCapNuocDoc() {
   if (doc) return Promise.resolve(doc);
   if (!loading) {
@@ -118,64 +113,90 @@ function num(n) {
   return n == null ? '—' : FMT.format(n);
 }
 
+function csLabel(n) {
+  if (n == null || n === '') return '';
+  const v = Number(n);
+  if (!Number.isFinite(v)) return String(n);
+  return `${FMT.format(v)} m³/ngày đêm`;
+}
+
 function loaiCongTrinhLabel(props) {
   const loaiRaw = propText(props, 'loaicongtrinh');
   return domainLabel(LOAI_CT, loaiRaw) || (loaiRaw ? `mã ${loaiRaw}` : '');
 }
 
-/** Tiêu đề gộp loại + tên (vd. Nhà máy nước A Lưới); không phải lớp đầu mối thì ''. */
+function titleParen(props) {
+  const thoihan = propText(props, 'thoihanquyhoach');
+  const tt = domainLabel(TRANG_QH, propText(props, 'trangthaiquyhoach'));
+  if (/hiện trạng/i.test(thoihan) || tt === 'Hiện có') return 'Hiện trạng';
+  if (tt && thoihan) {
+    const period = thoihan.charAt(0).toLowerCase() + thoihan.slice(1);
+    return `${tt} ${period}`;
+  }
+  return tt || thoihan || '';
+}
+
+/** Tiêu đề gọn: «Nhà máy nước A Lin (Quy hoạch ngắn hạn 2030)». */
 export function capNuocPopupTitle(layer, props, name) {
   if (!isPlantLayer(layer)) return '';
   const loai = loaiCongTrinhLabel(props);
   const ten = String(name || propText(props, 'tencongtrinh') || '').trim();
-  if (loai && ten) return `${loai} ${ten}`;
-  return loai || ten || '';
+  const base = loai && ten ? `${loai} ${ten}` : (loai || ten || '');
+  if (!base) return '';
+  const paren = titleParen(props || {});
+  return paren ? `${base} (${paren})` : base;
 }
 
-function webgisBlock(props) {
-  const ttRaw = propText(props, 'trangthaiquyhoach');
-  const tt = domainLabel(TRANG_QH, ttRaw) || ttRaw;
-  const cs = propText(props, 'congsuat');
-  const dt = propText(props, 'dientich');
-  let html = '';
-  if (cs !== '') html += line('Công suất', cs);
-  html += line('Trạng thái quy hoạch', tt);
-  html += line('Thời hạn quy hoạch', propText(props, 'thoihanquyhoach'));
-  if (dt !== '') {
-    const n = Number(dt);
-    html += line('Diện tích', Number.isFinite(n) ? `${FMT.format(n)} m²` : dt);
+function hienTrangText(plant, props) {
+  if (plant && plant.cs2022 != null) return csLabel(plant.cs2022);
+  if (plant && (plant.trangThai === 'xay-moi' || plant.cs2022 == null)) return 'Chưa có';
+  const tt = domainLabel(TRANG_QH, propText(props, 'trangthaiquyhoach'));
+  const thoihan = propText(props, 'thoihanquyhoach');
+  if (tt === 'Hiện có' || /hiện trạng/i.test(thoihan)) {
+    const cs = propText(props, 'congsuat');
+    if (cs !== '' && Number(cs) > 0) return csLabel(cs);
   }
-  html += line('Ghi chú', propText(props, 'ghichu'));
-  html += line('Trình bày dữ liệu', propText(props, 'trinhbaydulieu'));
-  return html;
+  return 'Chưa có';
 }
 
-function enrichBlock(plant) {
-  const bits = [
-    `2022: ${cell(plant, 2022)}`,
-    `2030: ${cell(plant, 2030)}`,
-    `2045: ${cell(plant, 2045)}`,
-    doc.donVi
-  ];
-  let html = `<br><br><b>Bổ sung thuyết minh QHC</b>`;
-  html += `<br>${escapeHtml(bits.join(' · '))}`;
-  if (plant.nguon) html += `<br>Nguồn: ${escapeHtml(plant.nguon)}`;
-  if (plant.phamVi) html += `<br>Phạm vi: ${escapeHtml(plant.phamVi)}`;
-  if (plant.dienTich != null) html += `<br>Diện tích khu đất: ${escapeHtml(FMT.format(plant.dienTich))} m²`;
-  if (plant.ghiChu) html += `<br>${escapeHtml(plant.ghiChu)}`;
-  if (plant.trangThai && TRANG[plant.trangThai]) {
-    html += `<br>Hướng xử lý: ${escapeHtml(TRANG[plant.trangThai])}`;
+function otherInfo(plant) {
+  if (!plant) return '';
+  if (plant.dienTich != null) return `Diện tích ${FMT.format(plant.dienTich)} m².`;
+  const note = String(plant.ghiChu || '');
+  const gop = note.match(/gộp\s+([^:]+):/i);
+  const area = note.match(/diện tích chung\s+([\d.]+)/i);
+  if (gop && area) {
+    const m2 = Number(String(area[1]).replace(/\./g, ''));
+    const areaTxt = Number.isFinite(m2) ? `${FMT.format(m2)} m²` : `${area[1]} m²`;
+    return `Theo thuyết minh QHC, diện tích ${plant.ten} chưa thể hiện cụ thể mà gộp chung với ${gop[1].trim()} là ${areaTxt}.`;
   }
-  html += `<br><small>Mục 9.3.5 thuyết minh QHC. Mã đối tượng ${escapeHtml(String(plant.ma || ''))} trên lớp đầu mối QHC 1/25.000.</small>`;
+  if (/gộp|bảng 83/i.test(note)) {
+    return `Theo thuyết minh QHC: ${note}`;
+  }
+  return note;
+}
+
+function compactBody(props, plant) {
+  const unit = (doc && doc.donVi) || 'm³/ngày đêm';
+  let html = `<br>Hiện trạng: ${escapeHtml(hienTrangText(plant, props))}`;
+  const y2030 = plant ? plant.cs2030 : null;
+  const y2045 = plant ? plant.cs2045 : null;
+  if (y2030 != null || y2045 != null) {
+    html += '<br>Quy hoạch:';
+    if (y2030 != null) html += `<br>&nbsp;&nbsp;- Năm 2030: ${escapeHtml(csLabel(y2030) || `${FMT.format(y2030)} ${unit}`)}`;
+    if (y2045 != null) html += `<br>&nbsp;&nbsp;- Năm 2045: ${escapeHtml(csLabel(y2045) || `${FMT.format(y2045)} ${unit}`)}`;
+  }
+  const nguon = (plant && plant.nguon) || '';
+  if (nguon) html += `<br>Nguồn: ${escapeHtml(nguon)}.`;
+  const other = otherInfo(plant);
+  if (other) html += `<br>Thông tin khác: ${escapeHtml(other)}`;
   return html;
 }
 
 export function capNuocPopupExtra(layer, props) {
   if (!isPlantLayer(layer)) return '';
-  let html = webgisBlock(props || {});
   const plant = doc ? byMa(props && props.madoituong) : null;
-  if (plant) html += enrichBlock(plant);
-  return html;
+  return compactBody(props || {}, plant);
 }
 
 function rowHtml(row) {

@@ -657,7 +657,7 @@ assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot >
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot > \.land-lot-popup[\s\S]{0,500}padding-top:\s*2px\s*!important/);
 assert.doesNotMatch(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot > \.land-lot-popup[\s\S]{0,500}padding:\s*28px 0 5px/);
 assert.match(read('docs/ui-spec.md'), /lp-eyebrow.*cùng hàng với hàng icon|cùng hàng với hàng icon thao tác/);
-assert.match(read('docs/ui-spec.md'), /chỉ dòng cấp chừa|Tiêu đề lô \(dòng dưới\) giãn/);
+assert.match(read('docs/ui-spec.md'), /chỉ dòng eyebrow chừa|ký hiệu lô \(lp-eyebrow|Tiêu đề lô \(dòng dưới\) giãn/);
 {
   const css = read('public/css/style.css');
   assert.match(css, /\.land-lot-popup\.pp-located \.lp-eyebrow[\s\S]{0,80}padding-right:\s*124px/);

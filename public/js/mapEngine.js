@@ -2355,7 +2355,8 @@ function landPopupHtml(p, opts) {
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
   const phase = p.phase === 'QH' ? (stage || '') : 'Hiện trạng';
-  const eyebrow = LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch';
+  // Eyebrow = ký hiệu lô (CC.B-02); thiếu mã mới hiện cấp QH.
+  const eyebrow = code || LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch';
   const place = placeField(p.ward || facility?.ward);
   const projectFile = p.file || facility?.tenQH || '';
   const entry = opts?.hideProject ? null : catalogEntry(projectFile);
@@ -2879,7 +2880,7 @@ export function syncFocusedProjectToLot(projectName) {
 function bindDossier(popup, projectName) {
   const name = String(projectName || '').trim();
   if (!name) return;
-  popup.getElement()?.querySelectorAll('.lp-dossier').forEach(btn => {
+  popup.getElement()?.querySelectorAll('[data-dossier]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       L.DomEvent.stop(e);
       const entry = catalogEntry(name);

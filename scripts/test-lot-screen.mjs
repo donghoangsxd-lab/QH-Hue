@@ -55,6 +55,9 @@ if (!landChunk.includes('metricGridHtml') || !landChunk.includes('landCardTabsHt
 if (!landChunk.includes('landUseWithSymbol') || !landChunk.includes('lotSymbol')) {
   throw new Error('thẻ lô đất chưa gộp ký hiệu vào Chức năng SDĐ');
 }
+if (!landChunk.includes('code || LAND_LEVEL_EYEBROW') && !landChunk.includes('eyebrow = code')) {
+  throw new Error('thẻ lô đất chưa ưu tiên ký hiệu lô trên lp-eyebrow');
+}
 if (landChunk.includes("nhom === 'Đất khác'")) {
   throw new Error('Chức năng SDĐ vẫn chỉ lấy nhãn TT16 khi nhóm là Đất khác (O-HH sẽ hiện Đất ở)');
 }
@@ -71,6 +74,9 @@ const qhct = src('../public/js/qhctLayer.js');
 const qhctPop = qhct.slice(qhct.indexOf('function popupHtml'), qhct.indexOf('const drawn'));
 if (!qhctPop.includes('landUseWithSymbol') || qhctPop.includes('lp-project-row') || qhctPop.includes('lp-title-row')) {
   throw new Error('thẻ lô QHCT chưa chuẩn hóa ký hiệu / bỏ Đồ án');
+}
+if (!qhctPop.includes("code || 'Quy hoạch chi tiết'") && !qhctPop.includes('eyebrow = code')) {
+  throw new Error('thẻ lô QHCT chưa ưu tiên ký hiệu trên lp-eyebrow');
 }
 if (engine.includes('lotActionsHtml(')) throw new Error('còn lotActionsHtml (nút chữ bán kính/3D)');
 const infraLand = engine.includes('openLandPopup(lot, m, { facility: item })')

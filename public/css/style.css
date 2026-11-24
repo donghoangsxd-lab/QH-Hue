@@ -1508,7 +1508,7 @@ body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-buildup) a
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-buildup) a.pp-radius-btn { right: 100px; }
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-has-radius) a.pp-buildup-btn { right: 148px; }
 body.plan-info-open #planInfoSlot > .dock-card.pp-located:not(.pp-editable):not(.pp-has-radius) a.pp-buildup-btn { right: 100px; }
-/* Dòng cấp QH (lp-eyebrow) sát mép trên, cùng hàng nút; head không pad-right lớn (chừa chỗ nằm ở .lp-eyebrow). */
+/* Ký hiệu lô (lp-eyebrow) sát mép trên, cùng hàng nút; head không pad-right lớn (chừa chỗ nằm ở .lp-eyebrow). */
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located .lp-head,
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible .lp-head,
 body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-collapsible.pp-has-buildup .lp-head,
@@ -7165,9 +7165,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 }
 .land-popup .lp-regs { display: flex; flex-direction: column; gap: 4px; }
 .land-popup .lp-reg-btn {
-  display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 5px 8px;
+  display: flex; align-items: center; gap: 6px; flex: none; box-sizing: border-box;
+  width: 100%; height: auto; min-height: 30px; margin: 0; padding: 5px 8px;
   border: 1px solid var(--border-soft); border-radius: 6px; background: rgba(255, 255, 255, 0.04);
-  color: #fff; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer;
+  color: #fff; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.25; text-align: left;
+  white-space: nowrap; cursor: pointer;
+}
+/* Tránh .lp-dossier (ô 22px) đè lên hàng nút Quy chế / Quyết định nếu còn gắn chung class. */
+.land-popup .lp-reg-btn.lp-dossier {
+  flex: none; width: 100%; height: auto; min-height: 30px; padding: 5px 8px;
+  border: 1px solid var(--border-soft); border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04); color: #fff; justify-content: flex-start;
 }
 .land-popup .lp-reg-btn:hover { border-color: rgba(var(--orange-rgb), 0.45); background: rgba(var(--orange-rgb), 0.1); }
 .land-popup .lp-reg-ico {

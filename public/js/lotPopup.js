@@ -108,7 +108,7 @@ export function landUseWithSymbol(type, symbol) {
 
 /**
  * Tiêu đề lô hạ tầng / chọn nhiều: loại đất ngắn + mã. kind là dòng cam (cấp công trình) để bỏ cụm trùng.
- * Thẻ lô QHPK/QHCT không dùng hàm này cho tiêu đề — ký hiệu gộp vào Chức năng SDĐ.
+ * Thẻ lô QHPK/QHCT: ký hiệu lên lp-eyebrow và gộp vào Chức năng SDĐ; không dùng hàm này làm tiêu đề.
  */
 export function lotHeading(name, lotCode, kind) {
   let t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
@@ -215,7 +215,8 @@ export function regulationsPaneHtml(entry) {
   const btns = dossierButtons(entry);
   const rows = btns.map(b => {
     const icon = DOSSIER_ICON[b.key] || 'file';
-    return `<button type="button" class="lp-reg-btn lp-dossier" data-dossier="${b.key}">
+    // Không gắn class lp-dossier (ô icon 22px) — chỉ data-dossier để bind click.
+    return `<button type="button" class="lp-reg-btn" data-dossier="${b.key}">
       <span class="lp-reg-ico">${ico(icon)}</span>
       <span class="lp-reg-label">${escapeHtml(b.label)}</span>
       <span class="lp-reg-go" aria-hidden="true">→</span>

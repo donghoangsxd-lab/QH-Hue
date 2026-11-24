@@ -181,12 +181,13 @@ function popupHtml(p) {
   const key = landPatternKey([p.chucNang, p.kyHieu].filter(Boolean).join(' '));
   const tone = (key && TT16_STYLES[key]?.color) || p.mau || DEFAULT_COLOR;
   const swatch = `<i class="lp-swatch" style="background:${tone};"></i>`;
-  // Không tiêu đề mô tả / dòng Đồ án / Ký hiệu riêng — ký hiệu gộp vào Chức năng SDĐ.
+  // Eyebrow = ký hiệu lô; thiếu mã mới ghi cấp QH. Ký hiệu vẫn gộp thêm vào Chức năng SDĐ.
+  const eyebrow = code || 'Quy hoạch chi tiết';
   return `<div class="pp land-popup land-popup-card">
     <div class="pp-title lp-head" title="${escapeHtml([p.chucNang, code].filter(Boolean).join(' · '))}">
       <div class="lp-head-main">
         <div class="lp-eyebrow">
-          <span class="lp-eyebrow-label">Quy hoạch chi tiết</span>
+          <span class="lp-eyebrow-label">${escapeHtml(eyebrow)}</span>
           <span class="lp-phase lp-phase-qh">Quy hoạch</span>
         </div>
       </div>
