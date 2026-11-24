@@ -8,6 +8,8 @@ Trước khi sửa: chọn nhóm MOD, mở `.cursor/rules/modules.mdc`, rg trong
 
 Quy tắc nghiệp vụ (schema, QCVN, cache, ngôn ngữ) nằm ở `.cursorrules`. Mục dưới là ngân sách.
 
+**Nơi lưu đồ án quy hoạch:** QHC → dữ liệu tĩnh (repo/Worker), tối đa ~40 đồ án; QHPK (~100) và QHCT (~400) → bucket GCS (lazy-load). Chi tiết + simplify theo tỷ lệ: `.cursor/skills/gishue-download/SKILL.md`.
+
 ## Ngân sách / Budget rules
 
 Kiểm soát chi phí là ràng buộc cứng. Không triển khai tính năng đốt CPU, đọc GCS hoặc gọi API bên ngoài rồi mới báo sau.

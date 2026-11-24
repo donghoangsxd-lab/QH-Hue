@@ -592,7 +592,8 @@ function docOf(manifest, heavy) {
   lines.push('');
   if (!heavy.length) {
     lines.push('Từng file GeoJSON và zip đều dưới 5 MB, nằm trong git. Không đẩy file lớp lên GCS, không dựng pmtiles. Đồ án chưa có trong `projects/index.json` được thêm dạng mục danh mục (không có ranh lô).');
-    lines.push('Rút gọn hình học (`turf.simplify`, script `build-qhc-*.mjs`): chỉ QHC ~1/10.000 trở lên thô hơn. QHPK 1/2.000 và QHCT 1/500 không simplify hàng loạt — giữ geom đầy đủ. Cắt lô ranh (`SCHEME_EDGE_M` 5 m) không tính là simplify.');
+    lines.push('Nơi lưu trữ: QHC → dữ liệu tĩnh (repo/Worker), tối đa ~40 đồ án; QHPK (~100) và QHCT (~400) → bucket GCS, không nhét geom đầy đủ vào `public/`.');
+    lines.push('Rút gọn hình học (`turf.simplify`, script `build-qhc-*.mjs`): chỉ QHC ~1/10.000 trở lên thô hơn. QHPK 1/2.000 và QHCT 1/500 không simplify hàng loạt — giữ geom đầy đủ trên bucket. Cắt lô ranh (`SCHEME_EDGE_M` 5 m) không tính là simplify.');
   } else {
     lines.push('File trên 5 MB nằm trên GCS `hue-infra-data-us/chuyen-nganh/v1/`, `Cache-Control: public, max-age=31536000, immutable`. Không dựng pmtiles (chưa có tippecanoe; lớp lớn là polygon sử dụng đất).');
     heavy.forEach((h) => lines.push(`- ${h.file} (geojson ${h.geojson}, zip ${h.zip})`));

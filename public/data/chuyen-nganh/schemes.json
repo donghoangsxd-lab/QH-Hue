@@ -360,6 +360,23 @@
       "authority": "UBND huyện Nam Đông",
       "sourceScale": 25000,
       "homeLevel": "QHC10"
+    },
+    {
+      "slug": "qhpk-tt-phia-nam-0f29aa49",
+      "name": "QHPK TT phía Nam",
+      "level": "QHPK",
+      "mapid": 22872,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "2882/QĐ-UBND",
+      "decisionDate": "2024-11-08",
+      "authority": "UBND tỉnh"
     }
   ]
 }

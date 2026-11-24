@@ -5,6 +5,7 @@ import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { escapeHtml } from './utils.js';
 import { withAssetVersion } from './gbaVersion.js';
+import { htktWaterStatusDrop, htktPointIcon } from './htktMarkers.js';
 
 const FILE_MARK = 'qhc-do-thi-thua-thien-hue-1-25-000';
 const FILE_TAIL = 'cong-trinh-dau-moi-cap-nuoc.geojson';
@@ -139,7 +140,12 @@ export function capNuocLegendHtml() {
   const note = zoneNote
     ? `<p class="cnu-src"><b>${escapeHtml(zoneNote.ten)}</b> · 2030 ${num(zoneNote.nhuCau2030)} · 2045 ${num(zoneNote.nhuCau2045)} · ${escapeHtml(zoneNote.nguon)}. Nhà máy: ${escapeHtml(zoneNote.nhaMay.join(', '))}.${zoneNote.ghiChu ? ` ${escapeHtml(zoneNote.ghiChu)}` : ''}</p>`
     : `<p class="cnu-src">${escapeHtml(doc.ranh)}</p>`;
-  return `<div class="cnu-legend" aria-label="Màu nhà máy"><i class="is-giu"></i>Hiện có <i class="is-moi"></i>Xây mới <i class="is-ngung"></i>Ngừng <i class="is-nho"></i>Quy mô nhỏ</div>
+  return `<div class="cnu-legend" aria-label="Ký hiệu nhà máy">
+      <span class="cnu-leg">${htktWaterStatusDrop('giu')}Hiện có</span>
+      <span class="cnu-leg">${htktWaterStatusDrop('xay-moi')}Xây mới</span>
+      <span class="cnu-leg">${htktWaterStatusDrop('ngung')}Ngừng</span>
+      <span class="cnu-leg">${htktWaterStatusDrop('quy-mo-nho')}Quy mô nhỏ</span>
+    </div>
     <label class="htkt-legend-row"><i class="htkt-mark is-polygon"></i><span>Phân vùng cấp nước</span><input type="checkbox" data-cnu-zones${all ? ' checked' : ''}${partial ? ' data-cnu-partial="1"' : ''} aria-label="Hiện phân vùng cấp nước"></label>
     ${zones}${note}`;
 }
@@ -239,8 +245,12 @@ function drawZones() {
     groups.set(host, group);
   });
   if (plant && Number.isFinite(plant.lat) && Number.isFinite(plant.lng) && map) {
-    pin = L.circleMarker([plant.lat, plant.lng], {
-      radius: 11, color: '#fff', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.95
+    const layer = { sector: 'cap-nuoc', name: 'cong-trinh-dau-moi-cap-nuoc', file: FILE_TAIL };
+    pin = L.marker([plant.lat, plant.lng], {
+      icon: htktPointIcon(layer, {}, { fill: '#b91c1c', radius: 8 }),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 800
     }).addTo(map);
   }
 }

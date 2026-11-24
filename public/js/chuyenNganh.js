@@ -41,6 +41,7 @@ import {
   loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocLegendHtml, capNuocPopupExtra, capNuocPointStyle,
   capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, setCapNuocZones, setCapNuocZoneOn, capNuocPlantLayer
 } from './capNuocQhc.js';
+import { htktPointIcon, htktDropSvg, htktSectorLook } from './htktMarkers.js';
 import { rasterRowsHtml, rasterSectorHas } from './qhcRasterLayer.js';
 
 const STORE_KEY = 'qh_axes_v1';
@@ -208,8 +209,12 @@ async function showFile(layer, frame) {
     pointToLayer: (f, latlng) => {
       const props = f.properties || {};
       const styled = capNuocPointStyle(layer, props);
-      const color = styled ? styled.fill : featureColor(layer, props);
-      return L.circleMarker(latlng, { radius: styled ? styled.radius : 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
+      // Giọt nước đồng bộ HTXH / đầu tư (điểm công trình dễ đọc trên nền vệ tinh / nét QH).
+      return L.marker(latlng, {
+        icon: htktPointIcon(layer, props, styled),
+        keyboard: false,
+        bubblingMouseEvents: false
+      });
     },
     onEachFeature: (f, l) => {
       const props = f.properties || {};
@@ -285,8 +290,9 @@ function legendHtml(sector) {
   }
   const color = SECTOR_COLOR[sector] || '#94a3b8';
   const label = SECTORS.find(s => s.id === sector)?.label || '';
+  const drop = htktDropSvg(htktSectorLook(sector), 'htkt-drop htkt-legend-drop');
   const water = sector === 'cap-nuoc' && browseState().axis === 'hatang' && !pipeOn ? capNuocLegendHtml() : '';
-  return `<div class="cn-legend" aria-label="Chú giải ${escapeHtml(label)}"><span><i style="background:${color}"></i>${escapeHtml(label)}</span>${dash}</div>${water}`;
+  return `<div class="cn-legend" aria-label="Chú giải ${escapeHtml(label)}"><span><i style="background:${color}"></i>Tuyến ${escapeHtml(label)}</span><span class="cn-legend-drop">${drop}Điểm công trình</span>${dash}</div>${water}`;
 }
 
 function areaOptions() {
