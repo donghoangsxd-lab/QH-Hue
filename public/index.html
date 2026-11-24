@@ -1948,7 +1948,7 @@
         if (!secure) return Promise.resolve();
         return navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(function () {});
       }
-      var purge = '20261026-gba';
+      var purge = '20261124-raster';
       var ready = Promise.resolve();
       try {
         if (localStorage.getItem('qhhue_sw_purge') !== purge) {
@@ -1970,6 +1970,6 @@
       return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261117b"></script>
+  <script type="module" src="./js/app.js?v=20261124r"></script>
 </body>
 </html>

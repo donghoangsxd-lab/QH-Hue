@@ -8,7 +8,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 const PANE = 'qhcRasterPane';
 const PANE_Z = 250;
 const HOST = 'https://gissonganh.hue.gov.vn';
-const CAT = 'data/qhc-raster/catalog.json';
+const CAT = 'data/qhc-raster/catalog.json?v=20261124';
 const DEFAULT_OPACITY = 70;
 const SLOT = {
   qhc25: { HT: 'qhcRasterSlot25Ht', QH: 'qhcRasterSlot25Qh' },
@@ -167,12 +167,19 @@ function rowHtml(row) {
   </div>`;
 }
 
+function rowPhase(row) {
+  if (row.phase === 'HT' || row.phase === 'QH') return row.phase;
+  const s = String(row.name || row.short || '').toLowerCase();
+  if (s.includes('hiện trạng') || /\b2[a-e]\b/i.test(s) || /\b3[a-e]\b/i.test(s) || /\b04\b/.test(s)) return 'HT';
+  return 'QH';
+}
+
 function paintSlots() {
   Object.entries(SLOT).forEach(([level, phases]) => {
     Object.entries(phases).forEach(([phase, slotId]) => {
       const slot = $(slotId);
       if (!slot) return;
-      const rows = layerList().filter((row) => row.level === level && row.phase === phase);
+      const rows = layerList().filter((row) => row.level === level && rowPhase(row) === phase);
       slot.innerHTML = rows.map(rowHtml).join('');
       slot.hidden = !rows.length;
     });
@@ -194,7 +201,7 @@ function paintSlots() {
 async function loadCatalog() {
   if (catalog) return catalog;
   try {
-    const res = await fetch(CAT, { cache: 'force-cache' });
+    const res = await fetch(CAT, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     catalog = await res.json();
   } catch (err) {
@@ -204,10 +211,16 @@ async function loadCatalog() {
   return catalog;
 }
 
+function refreshUi() {
+  paintSlots();
+  paintAll();
+}
+
 export function initQhcRasterLayer() {
-  loadCatalog().then(() => {
-    paintSlots();
-    paintAll();
-  });
+  loadCatalog().then(refreshUi);
   document.addEventListener(LEVEL_EVENT, () => paintAll());
+  // Danh sách đồ án park/mount lại ô tĩnh — sơn lại slot nếu lần đầu bị bỏ trống
+  document.addEventListener('qh:axis-all-paint', () => {
+    if (catalog && layerList().length && !document.querySelector('[id^="chk_qhcRaster_"]')) refreshUi();
+  });
 }
