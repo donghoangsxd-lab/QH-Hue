@@ -1332,7 +1332,12 @@ function revealInList(p) {
   // Đang kiểm tra QH theo ranh dự án (F, mọi cấp QHCT/QHPK/QHC): không bấm sang B.
   const invest = document.getElementById('investCard');
   const holdAxis = !!(invest && !invest.hidden && invest.querySelector('.invest-plan:not([hidden])'));
-  if (!holdAxis) document.querySelector('[data-main-tab="quyhoach"]')?.click();
+  // Không .click() tiêu đề mag — đang đúng trục B sẽ xổ droplist A–F.
+  if (!holdAxis) {
+    document.dispatchEvent(new CustomEvent('qh:axis-tab', {
+      detail: { id: 'quyhoach', keepCamera: true }
+    }));
+  }
   const q = foldText(query.trim());
   if (q && !dossierSearchText(p).includes(q)) {
     query = '';

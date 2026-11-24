@@ -1037,13 +1037,14 @@ export function planLevelsAt(latlng) {
   return task;
 }
 
-/** Chuyển droplist sang B. Quy hoạch, mở panel lớp, bật chế độ xem QH (giữ khung nhìn). */
+/** Chuyển sang B. Quy hoạch, mở panel lớp, bật chế độ xem QH (giữ khung nhìn). Không xổ droplist A–F. */
 function goPlanAxis() {
   const mag = document.getElementById('layerMagMenu');
   if (mag) mag.hidden = true;
   document.dispatchEvent(new CustomEvent('qh:axis-tab', {
     detail: { id: 'quyhoach', openPanel: true, keepCamera: true }
   }));
+  if (mag) mag.hidden = true;
   if (!isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
 }
 
@@ -1108,8 +1109,11 @@ async function openParcel(latlng, targetMap, opts = {}) {
     let levels = [];
     try { levels = await planLevelsAt(latlng); } catch { levels = []; }
     if (seq !== clickSeq) return false;
+    // Cấp chi tiết nhất còn lô tại điểm (QHCT → … → QHC 1/25.000).
     planTab = levels[levels.length - 1]?.id || planTab || 'qhpk';
     if (isPlanLevel(planTab)) setLevel(planTab, { keepView: true });
+    const mag = document.getElementById('layerMagMenu');
+    if (mag) mag.hidden = true;
   }
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
   closeDocked();

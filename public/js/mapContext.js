@@ -8,11 +8,13 @@ import { openParcelAt, openPlanAt, planLevelsAt, parcelFactsAt } from './cadastr
 import { LOTS_PROGRESS_EVENT, lotsRevision } from './projectFiles.js';
 import { openStreetView } from './streetView.js';
 import { cloneSelectionToSketch } from './sketchLayer.js';
+import { selectWardDetail, setBottomPanelCollapsed } from './uiComponents.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 import {
   isAdminAxis, resolveAdminHits, adminContextMenuHtml,
   selectAdminWard, selectAdminUrban, closeAdminInfoCard, closeAdminChooser
 } from './adminMapPick.js';
+import { DVHC_CITY } from './dvhcStats.js';
 
 const NOTE_KEY = 'qhhue_map_notes';
 const LONG_MS = 1500;
@@ -317,6 +319,7 @@ async function openMenu(ev, latlng, targetMap) {
     adminBlock,
     item('parcel', 'parcel', 'Xem thông tin thửa đất'),
     planItem(),
+    item('ward', 'map', 'Xem thông tin phường/xã'),
     item('access', 'inspect', 'Xem khả năng tiếp cận hạ tầng'),
     item('place', 'locate', 'Xem thông tin địa điểm'),
     '<div class="map-ctx-sep"></div>',
@@ -353,6 +356,14 @@ async function openMenu(ev, latlng, targetMap) {
       });
     } else if (act === 'plan') {
       openPlanAt(latlng, targetMap);
+    } else if (act === 'ward') {
+      // Giữ trục / cấp đang xem (B+QHPK → lô QHPK trong phường…); cùng droplist #wardSelector panel dưới.
+      void (async () => {
+        const hits = el._adminHits || await resolveAdminHits(latlng, targetMap);
+        const name = hits?.ward?.name || wardNameAt(latlng.lat, latlng.lng) || DVHC_CITY.name;
+        setBottomPanelCollapsed(false);
+        await selectWardDetail(name);
+      })();
     } else if (act === 'access') {
       inspectAccessAt(latlng.lat, latlng.lng, targetMap);
     } else if (act === 'place') {

@@ -568,6 +568,7 @@ const ctx = read('public/js/mapContext.js');
 for (const label of [
   'Xem thông tin thửa đất',
   'Xem thông tin lô đất quy hoạch',
+  'Xem thông tin phường/xã',
   'Xem khả năng tiếp cận hạ tầng',
   'Xem thông tin địa điểm',
   'Đánh dấu và ghi chú',
@@ -577,6 +578,10 @@ for (const label of [
 ]) {
   assert.ok(ctx.includes(label), `menu chuột phải thiếu ${label}`);
 }
+assert.match(ctx, /data-act="ward"|act === 'ward'/);
+assert.match(ctx, /selectWardDetail/);
+assert.match(ctx, /setBottomPanelCollapsed\(false\)/);
+assert.doesNotMatch(ctx, /act === 'ward'[\s\S]{0,400}qh:axis-tab[\s\S]{0,80}hanhchinh/);
 assert.match(ctx, /map-ctx-menu/);
 assert.match(ctx, /openStreetView\(/);
 assert.doesNotMatch(ctx, /window\.open\(streetViewUrl|window\.open\([^)]*pano/);
@@ -597,6 +602,11 @@ assert.match(read('public/js/cadastreLayer.js'), /revealPlan/);
 assert.match(read('public/js/cadastreLayer.js'), /applyInspectLevel/);
 assert.match(ctx, /revealPlan:\s*true/);
 assert.match(read('docs/ui-spec.md'), /chuyển sang B\. Hệ thống bản đồ quy hoạch/);
+// Đổi trục programmatic: syncMainPane / qh:axis-tab, không .click() tiêu đề mag (sẽ xổ A–F).
+assert.match(read('public/js/chuyenNganh.js'), /function syncMainPane/);
+assert.match(read('public/js/chuyenNganh.js'), /setMagMenu\(false\)/);
+assert.doesNotMatch(read('public/js/chuyenNganh.js'), /openingAxis = true;\s*document\.querySelector\(`\[data-main-tab="\$\{id\}"\]`\)\?\.click\(\)/);
+assert.doesNotMatch(read('public/js/projectLayer.js'), /\[data-main-tab="quyhoach"\]`\)\?\.click\(/);
 // Bấm ô đất đồ án khác: brief/hồ sơ theo đúng đồ án của lô (keepView).
 // QHC / QHPK / QHCT: cùng đồ án vẫn mở lại brief; lớp tĩnh QHC/QHCT cũng gọi sync.
 assert.match(read('public/js/mapEngine.js'), /syncFocusedProjectToLot/);

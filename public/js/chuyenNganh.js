@@ -191,6 +191,7 @@ async function showFile(layer, frame) {
   clearDrawn(layer.id);
   const dash = layer.kind === 'quy-hoach' ? '8 6' : null;
   const groups = hosts().map(m => L.geoJSON(fc, {
+    renderer: L.canvas({ padding: 0.3 }),
     style: (f) => {
       const props = f.properties || {};
       const color = featureColor(layer, props);
@@ -1407,6 +1408,21 @@ function setMagMenu(open) {
   if (open) placeMagMenu();
 }
 
+/** Đổi pane trục trong #layerMain, không .click() tiêu đề mag (click khi đúng trục sẽ xổ droplist A–F). */
+function syncMainPane(id) {
+  const root = document.getElementById('layerMain');
+  if (!root || !id) return;
+  root.querySelectorAll('[data-main-tab]').forEach(btn => {
+    const on = btn.dataset.mainTab === id;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+  });
+  root.querySelectorAll('[data-main-pane]').forEach(pane => {
+    pane.hidden = pane.dataset.mainPane !== id;
+  });
+  root.dataset.active = id;
+}
+
 function stepMag(dir) {
   const cur = Math.max(0, MAG_ORDER.indexOf(browseState().axis || 'quyhoach'));
   goMag(MAG_ORDER[cur + dir]);
@@ -1415,9 +1431,7 @@ function stepMag(dir) {
 function goMag(id) {
   if (!id) return;
   setMagMenu(false);
-  magGoing = true;
-  document.querySelector(`#layerMagTrack [data-main-tab="${id}"]`)?.click();
-  magGoing = false;
+  showAxis(id, { openPanel: true });
 }
 
 let sectorHold = false;
@@ -1817,7 +1831,8 @@ function paint() {
 
 function showPlanPane() {
   const id = browseState().axis || 'quyhoach';
-  document.querySelector(`[data-main-tab="${id}"]`)?.click();
+  setMagMenu(false);
+  syncMainPane(id);
 }
 
 function openQhc25Layers() {
@@ -1832,7 +1847,6 @@ function openQhc25Layers() {
 }
 
 let openingAxis = false;
-let magGoing = false;
 let listenLevel = false;
 let levelTab = false;
 let axisBeforeUrban = null;
@@ -1920,8 +1934,9 @@ function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}
   if (id === 'quyhoach') ensurePlanTab('qhc25');
   placeIsoRadius();
   setBrowseState({ axis: id }, { url });
+  setMagMenu(false);
   openingAxis = true;
-  document.querySelector(`[data-main-tab="${id}"]`)?.click();
+  syncMainPane(id);
   openingAxis = false;
   if (openPanel) document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
   paint();
@@ -2313,8 +2328,11 @@ export function initChuyenNganh() {
     axisBeforeUrban = null;
     const openPanel = !!e.detail?.openPanel;
     const keepCamera = e.detail?.keepCamera !== false;
+    // Đổi trục / giữ trục từ menu chuột phải: không bao giờ xổ droplist A–F.
+    setMagMenu(false);
     // Đã đúng trục: vẫn mở panel lớp nếu menu chuột phải yêu cầu.
     if (browseState().axis === id) {
+      syncMainPane(id);
       if (openPanel) {
         document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
       }
@@ -2393,7 +2411,10 @@ export function initChuyenNganh() {
     setTimeout(() => { swiped = false; }, 0);
   });
   track?.addEventListener('click', (e) => {
-    if (openingAxis || magGoing) return;
+    if (openingAxis) {
+      setMagMenu(false);
+      return;
+    }
     if (swiped) { swiped = false; e.stopPropagation(); e.preventDefault(); return; }
     const tab = e.target.closest('[data-main-tab]');
     if (!tab) return;

@@ -23,6 +23,9 @@ assert.match(ctx, /from '\.\/adminMapPick\.js'/);
 assert.match(ctx, /admin-ward/);
 assert.match(ctx, /admin-urban/);
 assert.match(ctx, /isAdminAxis/);
+assert.match(ctx, /Xem thông tin phường\/xã/);
+assert.match(ctx, /act === 'ward'/);
+assert.match(ctx, /selectWardDetail/);
 
 const app = read('public/js/app.js');
 assert.match(app, /consumeAdminHybridClick/);
@@ -41,6 +44,8 @@ assert.match(spec, /chỉ chọn đúng xã\/phường/);
 assert.match(spec, /chỉ chọn theo ranh đô thị/);
 assert.match(spec, /Esc khi đang chọn đô thị/);
 assert.match(spec, /Đơn vị tại điểm/);
+assert.match(spec, /Xem thông tin phường\/xã/);
+assert.match(spec, /giống droplist|#wardSelector|không chuyển trục/);
 
 const cn = read('public/js/chuyenNganh.js');
 assert.match(cn, /export function selectDvhcName/);
