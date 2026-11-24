@@ -107,6 +107,8 @@ const openSchemes = new Set([
 ]);
 // Không gian mặc định xổ (lớp chk_qhc25 bật khi mở trang); ngành khác thu, xổ mới thấy lớp con.
 const qhc25OpenSectors = new Set([QHC25_SPACE]);
+// Đồ án nhập trên B: khóa `${slug}|${kind}|${sector}` — mặc định thu.
+const projectHtktOpen = new Set();
 let gt25ChildrenOpen = false;
 const capOpen = new Set();
 let layerQuery = '';
@@ -596,6 +598,71 @@ function paintQhc25Htkt() {
   }
 }
 
+/** Lớp HTKT một đồ án (catalog), một phase; không cột đèn. */
+function schemeSectorLayers(sector, level, slug, kind) {
+  if (!sector || !level || !slug) return [];
+  return layersFor(sector, level, slug, { filter: false })
+    .filter((layer) => layer.kind === kind)
+    .filter((layer) => !isCotDenLayer(layer))
+    .filter((layer) => formAllows(layer, geomOn, false));
+}
+
+function projectHtktKey(slug, kind, sector) {
+  return `${slug}|${kind}|${sector}`;
+}
+
+/** Accordion ngành cho đồ án nhập trên trục B (cùng markup QHC 1/25.000, không raster/chk_gt25). */
+function schemeHtktSectorBlock(sec, kind, level, slug) {
+  const rows = schemeSectorLayers(sec.id, level, slug, kind);
+  if (!rows.length) return '';
+  const key = projectHtktKey(slug, kind, sec.id);
+  const open = projectHtktOpen.has(key);
+  const on = rows.every((layer) => isLayerOn(layer.id));
+  const some = rows.some((layer) => isLayerOn(layer.id));
+  const label = kind === 'hien-trang' && sec.id === QHC25_GT_SECTOR ? 'Hiện trạng giao thông' : sec.label;
+  const body = open
+    ? `<div class="cn-groups">${rows.map((layer) => layerRow(layer, false)).join('')}</div>`
+    : '';
+  return `<div class="cn-scheme qhc25-sector" data-htkt-sector-row="${escapeHtml(sec.id)}">
+    <div class="cn-scheme-row">
+      <label><input type="checkbox" data-htkt-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(label)}</span></label>
+      <button type="button" class="cn-fold" data-htkt-fold="${escapeHtml(sec.id)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
+    </div>
+    ${body}
+  </div>`;
+}
+
+/**
+ * Sơn một host `.project-htkt[data-scheme-htkt]` — slug/level/kind lấy từ data-*.
+ * Chỉ ngành có lớp; trống thì ẩn host (không «Chưa có» nếu đồ án đã có dòng SDD).
+ */
+export function paintSchemeHtkt(host) {
+  if (!host) return;
+  const slug = String(host.dataset.slug || '').trim();
+  const level = String(host.dataset.level || '').trim();
+  const kind = host.dataset.kind === 'hien-trang' ? 'hien-trang' : 'quy-hoach';
+  if (!ready || !slug || !level) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  const sectors = QHC25_SECTORS.map((sec) => schemeHtktSectorBlock(sec, kind, level, slug)).filter(Boolean).join('');
+  if (!sectors) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = sectors;
+  host.querySelectorAll('[data-mixed="1"]').forEach((el) => { el.indeterminate = true; });
+}
+
+/** Mọi host HTKT trong danh sách đồ án trục B (sau renderList / loadLayers). */
+export function paintProjectHtktHosts(root = document) {
+  const scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll('[data-scheme-htkt]').forEach((host) => paintSchemeHtkt(host));
+}
+
 function synthBlock(rows) {
   if (!rows.length) return '';
   const byDonor = new Map();
@@ -648,13 +715,22 @@ function schemeBlock(sector, levelId, scheme) {
 }
 
 
+function qhpkHasCatalogLayers() {
+  const { sector, level } = browseState();
+  if (level !== 'QHPK') return false;
+  return hatangSchemes(sector, 'QHPK').some((scheme) => listedForScheme(sector, scheme.level || 'QHPK', scheme.slug).length > 0);
+}
+
 function qhpkHookHtml() {
   if (browseState().level !== 'QHPK') return '';
+  // Đã có lớp HTKT trong catalog: không hiện note «Chưa có» (xem hồ sơ đủ ngành trên trục B).
+  if (qhpkHasCatalogLayers()) return '';
   const hook = synthDoc.qhpkHook || {};
   const extra = qhpkLayersFromHook(hook).map(layer => {
     const known = getLayers().find(row => row.file === layer.file || row.id === layer.id);
     return known ? layerRow(known, false) : `<p class="cn-layer"><span>${escapeHtml(layer.name || 'Lớp')}</span><small>Chưa gắn</small></p>`;
   }).join('');
+  if (!extra && !(hook.note || '').trim()) return '';
   return `<div id="qhpkHtktHook" data-htkt-hook="${escapeHtml(hook.id || 'qhpk-htkt')}"><p class="cn-empty">${escapeHtml(hook.note || 'Chưa có lớp HTKT cấp QHPK.')}</p>${extra}</div>`;
 }
 
@@ -1553,10 +1629,10 @@ function applyLayerQuery() {
     if (el.closest('#projectList')) return;
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
-  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktHt .cn-layer, #qhc25HtktQh .cn-scheme, #qhc25HtktQh .cn-layer, #gt25Children .cn-layer, #gt25Children .cn-status').forEach(el => {
+  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktHt .cn-layer, #qhc25HtktQh .cn-scheme, #qhc25HtktQh .cn-layer, #gt25Children .cn-layer, #gt25Children .cn-status, [data-scheme-htkt] .cn-scheme, [data-scheme-htkt] .cn-layer').forEach(el => {
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
   });
-  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktQh .cn-scheme').forEach(scheme => {
+  document.querySelectorAll('#qhc25HtktHt .cn-scheme, #qhc25HtktQh .cn-scheme, [data-scheme-htkt] .cn-scheme').forEach(scheme => {
     const layers = [...scheme.querySelectorAll('.cn-layer')];
     if (!layers.length) return;
     const any = layers.some(row => !row.classList.contains('is-filter-hide'));
@@ -1838,6 +1914,7 @@ function paint() {
   paintXaHoi();
   paintXahoiList();
   paintQhc25Htkt();
+  paintProjectHtktHosts();
   paintAxisAll();
   paintForeignAxes();
   syncViewSwitchVisibility();
@@ -2043,6 +2120,7 @@ export function initChuyenNganh() {
   if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
   document.addEventListener('qh:qhc-raster-ready', () => paintQhc25Htkt());
+  document.addEventListener('qh:project-list-painted', () => paintProjectHtktHosts());
   document.addEventListener('qh:axis-all-paint', () => {
     paintAxisAll();
     paintForeignAxes();
@@ -2216,6 +2294,20 @@ export function initChuyenNganh() {
       applyLayerQuery();
       return;
     }
+    const htktFold = e.target.closest('[data-htkt-fold]');
+    if (htktFold) {
+      const host = htktFold.closest('[data-scheme-htkt]');
+      const sector = htktFold.dataset.htktFold;
+      const slug = host?.dataset.slug || '';
+      const kind = host?.dataset.kind === 'hien-trang' ? 'hien-trang' : 'quy-hoach';
+      if (slug && sector) {
+        const key = projectHtktKey(slug, kind, sector);
+        if (projectHtktOpen.has(key)) projectHtktOpen.delete(key); else projectHtktOpen.add(key);
+        paintSchemeHtkt(host);
+        applyLayerQuery();
+      }
+      return;
+    }
     const capBtn = e.target.closest('[data-cs-open]');
     if (capBtn) {
       const slug = capBtn.dataset.csOpen;
@@ -2296,6 +2388,21 @@ export function initChuyenNganh() {
         frame: e.target.checked && !layer.bind && !gtQhc25Child
       });
       if (e.target.checked && layer) publishSectorLegend(true, layer.sector);
+      return;
+    }
+    const htktSector = e.target.closest('[data-htkt-sector]');
+    if (htktSector) {
+      const id = htktSector.dataset.htktSector;
+      const host = htktSector.closest('[data-scheme-htkt]');
+      const slug = host?.dataset.slug || '';
+      const level = host?.dataset.level || '';
+      const kind = host?.dataset.kind === 'hien-trang' ? 'hien-trang' : 'quy-hoach';
+      const rows = schemeSectorLayers(id, level, slug, kind);
+      const turnOn = e.target.checked;
+      if (turnOn && slug) projectHtktOpen.add(projectHtktKey(slug, kind, id));
+      rows.forEach((l) => setLayerOn(l, turnOn));
+      if (host) paintSchemeHtkt(host);
+      if (turnOn) publishSectorLegend(true, rows[0]?.sector || id);
       return;
     }
     const qhc25Sector = e.target.closest('[data-qhc25-sector]');

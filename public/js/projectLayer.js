@@ -1235,6 +1235,7 @@ function renderList() {
     paintLevelCounts();
     // Host QHC tĩnh đang nằm ở #planStaticRows khi đang tìm — vẫn sơn lại menu hồ sơ.
     paintLayerDecisions();
+    document.dispatchEvent(new CustomEvent('qh:project-list-painted'));
     return;
   }
   // Đang xem QHC 1/10.000: nhóm QHPK chỉ giữ đồ án và nhóm phường trong vùng lõi.
@@ -1288,6 +1289,7 @@ function renderList() {
   paintLayerDecisions(box);
   refreshQhct();
   paintEyes();
+  document.dispatchEvent(new CustomEvent('qh:project-list-painted'));
 }
 
 function wardGroups(items) {
@@ -1546,18 +1548,56 @@ function mapGroupHtml(phase, title, inner, open) {
   </div>`;
 }
 
+/** Cấp catalog facet (QHC25/QHC10/QHPK/QHCT) từ đồ án projects + schemes.json. */
+function catalogLevelOfProject(p) {
+  const hit = catalogSchemeRecords().find((r) => r && (
+    r.slug === p.slug || r.catalogScheme === p.slug || r.name === p.name || r.name === p.short || r.name === p.full
+  ));
+  if (hit) {
+    const lv = String(hit.level || '').toUpperCase();
+    if (lv === 'QHPK') return 'QHPK';
+    if (lv === 'QHCT') return 'QHCT';
+    if (lv === 'QHC') {
+      if (hit.homeLevel === 'QHC25' || Number(hit.scale) === 25000) return 'QHC25';
+      if (hit.homeLevel === 'QHC10') return 'QHC10';
+      return 'QHC10';
+    }
+  }
+  if (p.level === 'QHPK') return 'QHPK';
+  if (p.level === 'QHCT') return 'QHCT';
+  if (p.level === 'QHC') return 'QHC10';
+  return '';
+}
+
+/** Slug lớp chuyên ngành: ưu tiên slug có trong schemes; fallback catalogScheme. */
+function catalogSlugOfProject(p) {
+  const hit = catalogSchemeRecords().find((r) => r && (
+    r.slug === p.slug || r.catalogScheme === p.slug || r.name === p.name || r.name === p.short || r.name === p.full
+  ));
+  if (hit?.slug) return hit.slug;
+  return String(p.slug || '').trim();
+}
+
+function htktHostHtml(p, phase) {
+  const slug = catalogSlugOfProject(p);
+  const level = catalogLevelOfProject(p);
+  if (!slug || !level) return '';
+  const kind = phase === 'HT' ? 'hien-trang' : 'quy-hoach';
+  return `<div class="project-htkt qhc25-htkt" data-scheme-htkt data-slug="${escapeHtml(slug)}" data-level="${escapeHtml(level)}" data-kind="${kind}" hidden></div>`;
+}
+
 function layersHtml(p, idx, projectOn, admin) {
   const info = layerInfo.get(p.name);
   if (!info || info.loading) return '<div class="project-layers"><div class="project-empty">Đang tải các lớp…</div></div>';
   if (info.error) return `<div class="project-layers"><div class="project-empty">Không tải được lớp: ${escapeHtml(info.error)}</div></div>`;
-  if (!info.list.length) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
+  const list = Array.isArray(info.list) ? info.list : [];
   const groups = [
     { phase: 'HT', title: 'a. Các bản đồ hiện trạng', open: false },
     { phase: 'QH', title: 'b. Các bản đồ quy hoạch', open: true }
   ];
   let netNoted = false;
   const body = groups.map(({ phase, title, open }) => {
-    const rows = info.list.map((g, li) => {
+    const rows = list.map((g, li) => {
       if (g.phase !== phase) return '';
       const html = layerRowHtml(p, idx, projectOn, admin, g, li, {
         note: g.kind === 'net' && !netNoted
@@ -1565,16 +1605,19 @@ function layersHtml(p, idx, projectOn, admin) {
       if (html && g.kind === 'net') netNoted = true;
       return html;
     }).filter(Boolean).join('');
-    if (!rows && !admin) return '';
-    return mapGroupHtml(phase, title, rows || '<div class="project-empty">Chưa có lớp ở nhóm này.</div>', open);
+    const htkt = htktHostHtml(p, phase);
+    if (!rows && !htkt && !admin) return '';
+    const inner = `${rows || (admin && !htkt ? '<div class="project-empty">Chưa có lớp ở nhóm này.</div>' : '')}${htkt}`;
+    return mapGroupHtml(phase, title, inner || '<div class="project-empty">Chưa có lớp ở nhóm này.</div>', open);
   }).join('');
-  const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
+  if (!body) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
+  const lotsN = list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
       <input type="search" class="project-search" data-lot-search="${idx}" value="${escapeHtml(lotQuery.get(p.name) || '')}"
         placeholder="Tìm trong ${fmtNum(lotsN)} lô: ký hiệu, tên, loại đất…" aria-label="Tìm lô trong đồ án ${escapeHtml(p.name)}">
       <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
     </div>` : '';
-  return `<div class="project-layers">${body || '<div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div>'}${search}</div>`;
+  return `<div class="project-layers">${body}${search}</div>`;
 }
 
 /** Tên dòng danh sách: ưu tiên tên sổ tay (alias); tiền tố cấp trước tên — không nhân đôi nếu đã có. */

@@ -8836,6 +8836,10 @@ body.project-review.la-page #projectReviewHost {
 .qhc25-htkt[hidden] { display: none; }
 .qhc25-htkt .cn-scheme { margin-left: 0; }
 .qhc25-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
+.project-htkt { margin: 2px 0; }
+.project-htkt[hidden] { display: none; }
+.project-htkt .cn-scheme { margin-left: 0; }
+.project-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
 #gt25Park[hidden], #qhc25SpacePark[hidden] { display: none !important; }
 .qhc25-space-mount { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 .qhc25-space-label {

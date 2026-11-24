@@ -19,7 +19,7 @@ const { classifySector, slug, landUseName, SECTORS, loadGeeKey } = require('./bu
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = 'https://gissonganh.hue.gov.vn';
 const LIMIT = 20;
-const CONC = 6;
+const CONC = 2;
 const TRIES = 4;
 const MB5 = 5 * 1024 * 1024;
 const GCS_PREFIX = 'chuyen-nganh/v1';
@@ -334,8 +334,9 @@ async function startChrome() {
     return {
       stop() { cdp.close(); stop(); },
       async text(url) {
-        const expr = `fetch(${JSON.stringify(url)}).then(async (r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); })`;
-        const got = await cdp.send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
+        // Abort trong trang — CDP awaitPromise không hủy được fetch treo phía máy chủ.
+        const expr = `fetch(${JSON.stringify(url)},{signal:AbortSignal.timeout(60000)}).then(async (r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); })`;
+        const got = await cdp.send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, 75000);
         if (got?.exceptionDetails) {
           const detail = got.exceptionDetails.exception?.description;
           throw new Error(detail || got.exceptionDetails.text || 'fetch Edge lỗi');
@@ -355,21 +356,33 @@ async function startChrome() {
 function makeTransport(warnings) {
   let mode = 'node';
   let chrome = null;
+  async function viaChrome(url) {
+    if (!chrome) {
+      chrome = await startChrome();
+      mode = 'chrome';
+    }
+    try {
+      return await chrome.text(url);
+    } catch (err) {
+      const msg = err.message || String(err);
+      if (!/CDP quá hạn|AbortError|timeout|treo|rỗng/i.test(msg)) throw err;
+      warnings.push(`Edge treo, mở lại (${msg})`);
+      try { chrome.stop(); } catch { /* đã tắt */ }
+      chrome = await startChrome();
+      return chrome.text(url);
+    }
+  }
   return {
     async text(url) {
-      if (mode === 'chrome' && chrome) return chrome.text(url);
+      if (mode === 'chrome') return viaChrome(url);
       try {
         return await nodeText(url);
       } catch (err) {
         if (typeof WebSocket !== 'function') {
           throw new Error(`REST lỗi (${err.message}); cần Node 22 hoặc --experimental-websocket để bật Edge headless`);
         }
-        if (!chrome) {
-          warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Edge headless riêng`);
-          chrome = await startChrome();
-          mode = 'chrome';
-        }
-        return chrome.text(url);
+        warnings.push(`REST trực tiếp lỗi (${err.message}); dùng Edge headless riêng`);
+        return viaChrome(url);
       }
     },
     async close() {
@@ -598,10 +611,13 @@ function isBoundaryName(name) {
   return /ranh gioi/.test(s) && !/hanh chinh/.test(s);
 }
 
-/** Ranh/SDD đã có trên projects; sơ đồ tổ chức không gian và lớp nền (không gian *, cây xanh điểm). Cắt lô dùng loadProjectBoundary. */
+/**
+ * Bỏ lớp nền / sơ đồ không gian. Không bỏ «Ranh giới» — cần tải để cắt lô SDD và ghi catalog.
+ * «Định vị ranh» vẫn bỏ (không phải polygon ranh đồ án).
+ */
 function skipKeptOrBackground(name) {
   const key = strip(name);
-  if (/ranh gioi|dinh vi ranh/.test(key)) return 'ranh đã có trên projects';
+  if (/dinh vi ranh/.test(key)) return 'định vị ranh';
   if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
   if (/^khong gian\b/.test(key) || /^cay xanh$/.test(key)) return 'lớp nền';
   return null;
@@ -1059,7 +1075,9 @@ async function importMap(transport, mapid, dry, noGcs = false) {
   }
   const loaded = [];
   for (const layer of selected) {
+    console.log(`… tải ${layer.ten} (${layer.bang})`);
     const doc = await fetchLayer(transport, mapid, layer);
+    console.log(`… xong ${layer.ten}: ${doc.total} doi tuong`);
     loaded.push({ layer, doc });
   }
   const boundarySrc = loaded.find((item) => item.layer.kind === 'polygon' && isBoundaryName(item.layer.ten))
@@ -1074,14 +1092,6 @@ async function importMap(transport, mapid, dry, noGcs = false) {
   if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
     boundary = loadSchemeBoundaryFile(mapid);
     if (boundary) warnings.push('dùng schemes.boundaryFile để cắt lô');
-  }
-  // Map không có lớp «Ranh giới»: thử khép phân khu chức năng; không được thì bỏ cắt lô.
-  if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
-    const pk = loaded.find((item) => item.layer.kind === 'polygon' && /phan khu chuc nang/.test(strip(item.layer.ten)));
-    if (pk) {
-      boundary = schemeBoundaryOf(featuresFrom(pk.doc.rows).features);
-      if (boundary) warnings.push('không có lớp ranh; dùng phân khu chức năng để cắt lô');
-    }
   }
   if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
     warnings.push(`mapid ${mapid}: không khép được ranh — giữ nguyên lô SDD (không cắt)`);
