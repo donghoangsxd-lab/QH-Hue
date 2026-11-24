@@ -38,8 +38,9 @@ import { loadCongSuat } from './congSuat.js';
 import { capacityPanelHtml, initCapacityEditor, mountCapacityHosts } from './congSuatUi.js';
 import { initXahoiList, paintXahoiList } from './xahoiList.js';
 import {
-  loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocLegendHtml, capNuocPopupExtra, capNuocPointStyle,
-  capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, setCapNuocZones, setCapNuocZoneOn, capNuocPlantLayer
+  loadCapNuocDoc, initCapNuocMap, capNuocDossierHtml, capNuocLegendHtml, capNuocPopupExtra, capNuocPopupTitle,
+  capNuocPointStyle, capNuocPlant, syncCapNuoc, pickCapNuocPlant, pickCapNuocZone, setCapNuocZones,
+  setCapNuocZoneOn, capNuocPlantLayer
 } from './capNuocQhc.js';
 import { htktPointIcon, htktDropSvg, htktSectorLook } from './htktMarkers.js';
 import { rasterRowsHtml, rasterSectorHas } from './qhcRasterLayer.js';
@@ -169,23 +170,28 @@ function featureTitle(props, layer) {
 }
 
 function popupHtml(layer, props) {
-  const title = featureTitle(props, layer);
+  const baseName = featureTitle(props, layer);
+  const title = capNuocPopupTitle(layer, props, baseName) || baseName;
+  const waterExtra = capNuocPopupExtra(layer, props);
+  let html = `<b>${escapeHtml(String(title || layer.name))}</b>`;
+  if (geomKind(layer) === 'point') {
+    html += `<br>Bán kính phục vụ: ${escapeHtml(formatRadius(planRadiusM(getPlanRadii(), layer)))}`;
+  }
+  if (waterExtra) {
+    html += waterExtra;
+    return html;
+  }
   const bits = [];
   if (props.loai) bits.push(props.loai);
   if (props.capDuong) bits.push(props.capDuong);
   if (props.loGioi) bits.push(`lộ giới ${props.loGioi}`);
   if (props.matCat) bits.push(`mặt cắt ${props.matCat}`);
-  let html = `<b>${escapeHtml(String(title || layer.name))}</b>`;
-  if (geomKind(layer) === 'point') {
-    html += `<br>Bán kính phục vụ: ${escapeHtml(formatRadius(planRadiusM(getPlanRadii(), layer)))}`;
-  }
   if (bits.length) html += `<br>${escapeHtml(bits.join(' · '))}`;
   if (props.tam_thoi) {
     const scale = props.nguon_ty_le ? `1/${Number(props.nguon_ty_le).toLocaleString('vi-VN')}` : '';
     const src = [props.nguon_ten || props.nguon_do_an, props.nguon_nam, scale].filter(Boolean);
     html += `<br><small>Tạm thời. Nguồn: ${escapeHtml(src.join(' · ') || 'không rõ đồ án')}</small>`;
-  } else if (!bits.length && !capNuocPlant(layer, props)) html += `<br>${escapeHtml(layer.name)}`;
-  html += capNuocPopupExtra(layer, props);
+  } else if (!bits.length) html += `<br>${escapeHtml(layer.name)}`;
   return html;
 }
 
@@ -223,7 +229,8 @@ async function showFile(layer, frame) {
         const src = props.nguon_ten || props.nguon_do_an || 'đồ án';
         l.bindTooltip(`Nguồn: ${src}`, { sticky: true, opacity: 0.95 });
       } else if (plant) {
-        l.bindTooltip(plant.ten, { sticky: true, direction: 'top', opacity: 0.95 });
+        const tip = capNuocPopupTitle(layer, props, plant.ten) || plant.ten;
+        l.bindTooltip(tip, { sticky: true, direction: 'top', opacity: 0.95 });
       }
       l.bindPopup(popupHtml(layer, props));
     }

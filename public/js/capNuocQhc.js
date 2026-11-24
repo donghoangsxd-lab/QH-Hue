@@ -25,8 +25,36 @@ let pin = null;
 
 const TRANG = { giu: 'Hiện có, giữ hoặc nâng', 'xay-moi': 'Xây mới', ngung: 'Ngừng sau 2022', 'quy-mo-nho': 'Quy mô nhỏ, gộp' };
 
+// Domain lớp đầu mối cấp nước (gisHue). 8 chưa có nhãn xác nhận trên schema public.
+const LOAI_CT = {
+  1: 'Trạm bơm',
+  2: 'Nhà máy nước',
+  4: 'Bể chứa',
+  5: 'Họng cứu hỏa',
+  7: 'Trạm bơm cấp'
+};
+const TRANG_QH = { 1: 'Hiện có', 2: 'Quy hoạch', 3: 'Dự kiến' };
+
 function hosts() {
   return [map, planMap].filter(Boolean);
+}
+
+function domainLabel(map, raw) {
+  if (raw == null || raw === '') return '';
+  const key = String(raw).trim();
+  return map[key] || (map[Number(key)] || '');
+}
+
+function propText(props, key) {
+  const v = props && props[key];
+  if (v == null) return '';
+  const s = String(v).trim();
+  return s;
+}
+
+function line(label, value) {
+  if (value == null || value === '') return '';
+  return `<br>${escapeHtml(label)}: ${escapeHtml(String(value))}`;
 }
 
 export function loadCapNuocDoc() {
@@ -90,22 +118,63 @@ function num(n) {
   return n == null ? '—' : FMT.format(n);
 }
 
-export function capNuocPopupExtra(layer, props) {
-  const plant = capNuocPlant(layer, props);
-  if (!plant) return '';
+function loaiCongTrinhLabel(props) {
+  const loaiRaw = propText(props, 'loaicongtrinh');
+  return domainLabel(LOAI_CT, loaiRaw) || (loaiRaw ? `mã ${loaiRaw}` : '');
+}
+
+/** Tiêu đề gộp loại + tên (vd. Nhà máy nước A Lưới); không phải lớp đầu mối thì ''. */
+export function capNuocPopupTitle(layer, props, name) {
+  if (!isPlantLayer(layer)) return '';
+  const loai = loaiCongTrinhLabel(props);
+  const ten = String(name || propText(props, 'tencongtrinh') || '').trim();
+  if (loai && ten) return `${loai} ${ten}`;
+  return loai || ten || '';
+}
+
+function webgisBlock(props) {
+  const ttRaw = propText(props, 'trangthaiquyhoach');
+  const tt = domainLabel(TRANG_QH, ttRaw) || ttRaw;
+  const cs = propText(props, 'congsuat');
+  const dt = propText(props, 'dientich');
+  let html = '';
+  if (cs !== '') html += line('Công suất', cs);
+  html += line('Trạng thái quy hoạch', tt);
+  html += line('Thời hạn quy hoạch', propText(props, 'thoihanquyhoach'));
+  if (dt !== '') {
+    const n = Number(dt);
+    html += line('Diện tích', Number.isFinite(n) ? `${FMT.format(n)} m²` : dt);
+  }
+  html += line('Ghi chú', propText(props, 'ghichu'));
+  html += line('Trình bày dữ liệu', propText(props, 'trinhbaydulieu'));
+  return html;
+}
+
+function enrichBlock(plant) {
   const bits = [
     `2022: ${cell(plant, 2022)}`,
     `2030: ${cell(plant, 2030)}`,
     `2045: ${cell(plant, 2045)}`,
     doc.donVi
   ];
-  let html = `<br><b>${escapeHtml(plant.ten)}</b>`;
+  let html = `<br><br><b>Bổ sung thuyết minh QHC</b>`;
   html += `<br>${escapeHtml(bits.join(' · '))}`;
   if (plant.nguon) html += `<br>Nguồn: ${escapeHtml(plant.nguon)}`;
   if (plant.phamVi) html += `<br>Phạm vi: ${escapeHtml(plant.phamVi)}`;
-  if (plant.dienTich) html += `<br>Diện tích khu đất: ${escapeHtml(FMT.format(plant.dienTich))} m²`;
+  if (plant.dienTich != null) html += `<br>Diện tích khu đất: ${escapeHtml(FMT.format(plant.dienTich))} m²`;
   if (plant.ghiChu) html += `<br>${escapeHtml(plant.ghiChu)}`;
+  if (plant.trangThai && TRANG[plant.trangThai]) {
+    html += `<br>Hướng xử lý: ${escapeHtml(TRANG[plant.trangThai])}`;
+  }
   html += `<br><small>Mục 9.3.5 thuyết minh QHC. Mã đối tượng ${escapeHtml(String(plant.ma || ''))} trên lớp đầu mối QHC 1/25.000.</small>`;
+  return html;
+}
+
+export function capNuocPopupExtra(layer, props) {
+  if (!isPlantLayer(layer)) return '';
+  let html = webgisBlock(props || {});
+  const plant = doc ? byMa(props && props.madoituong) : null;
+  if (plant) html += enrichBlock(plant);
   return html;
 }
 

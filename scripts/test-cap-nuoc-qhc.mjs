@@ -44,3 +44,15 @@ const group = doc.nhaMay.filter(row => ['a-lin', 'a-sap', 'lam-dot'].includes(ro
 assert.equal(sum(group, 'cs2030'), 4000);
 assert.equal(sum(group, 'cs2045'), 12000);
 assert.equal(doc.congSuat.congO['2045'], 783500);
+
+const popupSrc = fs.readFileSync(new URL('../public/js/capNuocQhc.js', import.meta.url), 'utf8');
+assert.match(popupSrc, /2: 'Nhà máy nước'/);
+assert.match(popupSrc, /1: 'Hiện có'/);
+assert.match(popupSrc, /Bổ sung thuyết minh QHC/);
+assert.match(popupSrc, /export function capNuocPopupTitle/);
+assert.doesNotMatch(popupSrc, /line\('Loại công trình'/);
+assert.match(popupSrc, /function webgisBlock/);
+assert.ok(popupSrc.indexOf('webgisBlock') < popupSrc.indexOf('enrichBlock'));
+const popupWire = fs.readFileSync(new URL('../public/js/chuyenNganh.js', import.meta.url), 'utf8');
+assert.match(popupWire, /capNuocPopupTitle\(layer, props/);
+assert.match(popupWire, /const waterExtra = capNuocPopupExtra/);
