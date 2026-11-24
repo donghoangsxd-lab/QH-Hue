@@ -39,6 +39,16 @@ Một PR gồm file catalog và lớp mới. Không chạy thêm lệnh chờ CI
 6. Không upload lại SDD thô lên `chuyen-nganh/v1/`; chỉ lớp catalog vẫn cần bản nặng
 7. Khớp `index.json` / `su-dung-dat-index.json` / `projects/index` (`lands`)
 
+### Nơi lưu trữ (bắt buộc — thống nhất từ 2026-11)
+
+| Cấp | Số đồ án (trần làm việc) | Nơi giữ geom / lô chính | Ghi chú |
+|---|---|---|---|
+| **QHC** (quy hoạch chung) | **Tối đa ~40** | **Dữ liệu tĩnh** trong repo + deploy Worker: `data/chuyen-nganh/`, `public/data/qhc-*/`, catalog; pipeline `build-qhc-*.mjs` | Được rút gọn hình học (xem bảng dưới). Không vượt ~40 đồ án tĩnh — tránh phình asset Cloudflare. |
+| **QHPK** 1/2.000 | ~100 | **Bucket GCS** (`projects/<slug>/…`, lớp nặng `chuyen-nganh/v1/` khi cần) | **Không** commit geom đầy đủ vào `public/` / không pipeline slim kiểu QHC. App tải khi mở đồ án. |
+| **QHCT** 1/500 | ~400 | **Bucket GCS** (cùng cách QHPK) | Cùng QHPK: chỉ bucket, lazy-load. |
+
+Catalog / `schemes.json` / `index.json` vẫn liệt kê mọi cấp; khác nhau là **file hình học nằm đâu**. QHPK/QHCT: `file`/`ref` trỏ URL GCS hoặc `projects/…` trên bucket — không nhét hàng trăm GeoJSON vào git.
+
 ### Ràng buộc hình học (bắt buộc)
 
 Theo tỷ lệ đồ án — **không** lẫn quy tắc:
@@ -47,7 +57,7 @@ Theo tỷ lệ đồ án — **không** lẫn quy tắc:
 |---|---|---|
 | **QHC ~1/10.000** (và QHC thô hơn, vd. đồ án địa phương kiểu mapid Chân Mây / Phú Lộc) | **Được** — sai số hình học lớn chấp nhận được khi xem/quản lý | Script `build-qhc-*.mjs` (`TOL` ~0.00002) |
 | **QHC 1/25.000** | **Được** (cùng tinh thần tỷ lệ nhỏ) | `build-qhc2045.js` và tương tự |
-| **QHPK 1/2.000** | **Cấm** simplify hàng loạt | Giữ geom đầy đủ trên bucket/`projects/`; tối đa bỏ prop rác |
+| **QHPK 1/2.000** | **Cấm** simplify hàng loạt | Giữ geom đầy đủ trên **bucket**; tối đa bỏ prop rác |
 | **QHCT 1/500** | **Cấm** simplify hàng loạt | Cùng QHPK |
 
 Cắt lô theo ranh (`SCHEME_EDGE_M` = 5 m trong `clip-scheme-lots`) **không** phải simplify — vẫn dùng được ở mọi cấp. Không viết `build-qhpk-*` / `build-qhct-*` copy pipeline slim của QHC. Không gọi `simplify` trên lớp QHPK/QHCT trong import hay post-process.

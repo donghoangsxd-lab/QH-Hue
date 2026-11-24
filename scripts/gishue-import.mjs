@@ -598,6 +598,15 @@ function isBoundaryName(name) {
   return /ranh gioi/.test(s) && !/hanh chinh/.test(s);
 }
 
+/** Ranh/SDD đã có trên projects; sơ đồ tổ chức không gian và lớp nền (không gian *, cây xanh điểm). */
+function skipKeptOrBackground(name) {
+  const key = strip(name);
+  if (/ranh gioi|dinh vi ranh/.test(key)) return 'ranh đã có trên projects';
+  if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
+  if (/^khong gian\b/.test(key) || /^cay xanh$/.test(key)) return 'lớp nền';
+  return null;
+}
+
 function loadLandIndex() {
   const file = path.join(repo, 'public', 'data', 'su-dung-dat-index.json');
   if (!fs.existsSync(file)) return { layers: [], aliases: [] };
@@ -1022,6 +1031,12 @@ async function importMap(transport, mapid, dry, noGcs = false) {
     if (known) {
       summary.push({ name: layer.ten, tt: 'bo-qua', n: 0, bo: 0, cat: 0, hong: 0, skip: true });
       warnings.push(`bỏ qua ${layer.ten}: ${known.reason} (${known.path})`);
+      continue;
+    }
+    const kept = skipKeptOrBackground(layer.ten);
+    if (kept) {
+      summary.push({ name: layer.ten, tt: 'bo-qua', n: 0, bo: 0, cat: 0, hong: 0, skip: true });
+      warnings.push(`bỏ qua ${layer.ten}: ${kept}`);
       continue;
     }
     selected.push(layer);

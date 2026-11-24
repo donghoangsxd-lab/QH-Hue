@@ -913,31 +913,31 @@
     {
       "scheme": "qhpk-tt-phia-dong-26123071",
       "name": "QHPK TT phía Đông",
-      "mapid": null,
+      "mapid": 22873,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-tt-phia-dong-26123071/su-dung-dat.json",
-      "lands": 246,
+      "lands": 360,
       "source": "projects"
     },
     {
       "scheme": "qhpk-tt-phia-nam-0f29aa49",
       "name": "QHPK TT phía Nam",
-      "mapid": null,
+      "mapid": 22872,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-tt-phia-nam-0f29aa49/su-dung-dat.json",
-      "lands": 373,
+      "lands": 500,
       "source": "projects"
     },
     {
       "scheme": "qhpk-tt-phia-tay-8e910b7b",
       "name": "QHPK TT phía Tây",
-      "mapid": null,
+      "mapid": 23922,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-tt-phia-tay-8e910b7b/su-dung-dat.json",
-      "lands": 293,
+      "lands": 430,
       "source": "projects"
     },
     {

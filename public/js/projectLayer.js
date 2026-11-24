@@ -72,6 +72,8 @@ const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm (cùng kiểu CORE_WASH vùng trung tâm)
 const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0 };
+// QHPK 1/2.000: dày hơn nét mặc định một chút để đọc trên vệ tinh, vẫn mỏng hơn QHC
+const OUTLINE_QHPK = { weight: 2.4, opacity: 0.95, dashArray: null, fillOpacity: 0 };
 // Nền mờ theo cấp: QHC bằng wash trung tâm; QHPK / QHCT nhẹ hơn để phân biệt trên ảnh vệ tinh
 const OUTLINE_FILL = { QHC: 0.2, QHPK: 0.14, QHCT: 0.14 };
 // Họ màu theo cấp, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a) và đô thị loại I (#facc15).
@@ -2514,7 +2516,7 @@ function drawOutlinesOn(m, list, below) {
     const fillOp = open ? 0 : (OUTLINE_FILL[p.level] ?? 0.14);
     const style = {
       ...base,
-      ...(p.level === 'QHC' ? OUTLINE_QHC : null),
+      ...(p.level === 'QHC' ? OUTLINE_QHC : p.level === 'QHPK' ? OUTLINE_QHPK : null),
       color: p.color,
       fillColor: p.color,
       fillOpacity: fillOp
