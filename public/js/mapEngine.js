@@ -885,28 +885,13 @@ function disarmMeasureTool() {
   notifyMeasure();
 }
 
-/** Khép vùng đo khi bấm bên trong (≥ 3 đỉnh): ghi kết quả, chọn hình, tắt hẳn chế độ đo. */
-function finishAreaByInterior(host) {
-  const made = finishMeasureDraft();
-  if (made) selectMeasure(made, host);
-  disarmMeasureTool();
-  return made;
-}
-
-export function handleMeasureClick(latlng, hostMap) {
-  if (measureLive?.session.isEditing()) return;
-  if (performance.now() - measureGuardAt < 40) return;
+/** Thêm đỉnh đang chấm; khép vùng khi bấm gần đỉnh đầu (không tự khép khi bấm trong bao — để vẽ đa giác lõm). */
+function appendMeasurePoint(latlng, hostMap) {
   const host = hostMap || map;
   const type = state.activeMeasureType;
-  const editable = type === 'distance' || type === 'area';
-  const picked = topMeasureAt(host, latlng);
-  if (picked) {
-    measureGuardAt = performance.now();
-    selectMeasure(picked, host);
-    return;
-  }
+  if (type !== 'distance' && type !== 'area' || !latlng) return;
   const pts = state.measurePoints;
-  if (editable && pts.length && host) {
+  if (pts.length && host) {
     const last = pts[pts.length - 1];
     if (pxDist(host, latlng, L.latLng(last[1], last[0])) < MEASURE_DUP_PX) return;
   }
@@ -917,16 +902,43 @@ export function handleMeasureClick(latlng, hostMap) {
       return;
     }
   }
-  // Diện tích: bấm trong vùng đã có ≥ 3 đỉnh → khép và dừng đo (không thêm đỉnh).
-  if (type === 'area' && pts.length >= 3 && hitMeasureGeom(host, latlng, pts, type)) {
-    measureGuardAt = performance.now();
-    finishAreaByInterior(host);
-    return;
-  }
   if (type === 'distance' && pts.length >= 2 && hitMeasureGeom(host, latlng, pts, type)) {
     const made = finishMeasureDraft();
     if (made) selectMeasure(made, host);
     return;
+  }
+  state.measurePoints.push([latlng.lng, latlng.lat]);
+  measureCursor = latlng;
+  if (host) {
+    measureCursorMap = host;
+    measureHover = state.measurePoints.length - 1;
+    measureSnapHost = host;
+  }
+  drawMeasure();
+}
+
+export function handleMeasureClick(latlng, hostMap) {
+  if (measureLive?.session.isEditing()) return;
+  if (performance.now() - measureGuardAt < 40) return;
+  const host = hostMap || map;
+  const type = state.activeMeasureType;
+  if (!type) return;
+  const picked = topMeasureAt(host, latlng);
+  if (picked) {
+    measureGuardAt = performance.now();
+    selectMeasure(picked, host);
+    return;
+  }
+  if (type === 'distance' || type === 'area') {
+    appendMeasurePoint(latlng, host);
+    return;
+  }
+  // Lát cắt (profile): chỉ chấm đỉnh, không chọn / khép theo nét
+  if (type !== 'profile') return;
+  const pts = state.measurePoints;
+  if (pts.length && host) {
+    const last = pts[pts.length - 1];
+    if (pxDist(host, latlng, L.latLng(last[1], last[0])) < MEASURE_DUP_PX) return;
   }
   state.measurePoints.push([latlng.lng, latlng.lat]);
   measureCursor = latlng;
@@ -1341,12 +1353,11 @@ function onMeasureShapeClick(e, item, hostMap) {
   measureGuardAt = performance.now();
   if (measureLive?.session.isEditing()) return;
   if (item) { selectMeasure(item, hostMap); return; }
-  if (state.activeMeasureType === 'area') {
-    finishAreaByInterior(hostMap);
+  // Đang chấm: click trên vùng tô / nét = thêm đỉnh (đa giác lõm cần điểm trong bao lồi hiện tại)
+  if (state.activeMeasureType === 'area' || state.activeMeasureType === 'distance') {
+    appendMeasurePoint(e.latlng, hostMap);
     return;
   }
-  const made = finishMeasureDraft();
-  if (made) selectMeasure(made, hostMap);
 }
 
 function onMeasureShapeMenu(e, item, hostMap) {

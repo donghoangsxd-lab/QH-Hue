@@ -1150,9 +1150,13 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-pin { position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); z-index: 1; }
 .sketch-pin[hidden] { display: none !important; }
 .sketch-row { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
-/* Ba hàng chính cùng bề rộng: Đóng / Nhân bản / Chữ neo mép phải một cột */
-.sketch-palette > .sketch-row:not(.sketch-sub) { width: 100%; }
-.sketch-palette > .sketch-row:not(.sketch-sub) > .sketch-end { margin-left: auto; }
+/* Trái xếp sát; phải cột Đóng / Nhân bản / Chữ — không kéo rộng theo droplist «Vừa» */
+.sketch-body { display: flex; flex-direction: row; align-items: stretch; gap: 2px; }
+.sketch-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sketch-rail {
+  display: flex; flex-direction: column; gap: 2px; flex-shrink: 0;
+  padding-left: 2px; border-left: 1px solid var(--border-color);
+}
 .sketch-btn {
   width: 30px; height: 30px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1246,7 +1250,9 @@ body.compare-on .map-title-split { display: inline-flex; }
   height: 28px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main);
   background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm);
 }
-#sketchStrokeWeight.sketch-weight { width: auto; min-width: 4.5rem; margin-left: 2px; }
+#sketchStrokeWeight.sketch-weight {
+  width: auto; min-width: 3.25rem; max-width: 4.25rem; margin-left: 2px; padding: 0 2px;
+}
 .leaflet-interactive.sketch-edge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 3px #fff); cursor: pointer; }
 .leaflet-interactive.sketch-picked { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px rgb(var(--cyan-rgb))); }
 /* Bỏ ô focus đen của trình duyệt khi click chọn nét phác thảo / chữ / núm đỉnh */
