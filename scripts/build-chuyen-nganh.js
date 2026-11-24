@@ -35,7 +35,7 @@ const RULES = [
   [/thong tin|tram thong tin/, 'thong-tin-lien-lac'],
   [/cap nuoc|dau noi/, 'cap-nuoc'],
   [/cap dien|phan phoi dien|nang luong|chieu sang|den chieu sang|cot den/, 'cap-dien'],
-  [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|bo via|mat duong|mat cat|tim duong/, 'giao-thong'],
+  [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|\bcau\b|bo via|mat duong|mat cat|tim duong/, 'giao-thong'],
   [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen|dong chay/, 'san-nen-thoat-mua']
 ];
 

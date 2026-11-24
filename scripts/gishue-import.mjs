@@ -602,7 +602,7 @@ function isBoundaryName(name) {
 function skipKeptOrBackground(name) {
   const key = strip(name);
   if (/ranh gioi|dinh vi ranh/.test(key)) return 'ranh đã có trên projects';
-  if (/quy hoach khong gian/.test(key)) return 'sơ đồ tổ chức không gian';
+  if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
   if (/^khong gian\b/.test(key) || /^cay xanh$/.test(key)) return 'lớp nền';
   return null;
 }
