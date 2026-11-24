@@ -305,4 +305,38 @@ const afterAdopt = planRowsFromSoTay(adoptEdits, catalog);
 assert.ok(afterAdopt.some((r) => r.maDoAn === 'ZZ.ABC.01' && r.matched));
 assert.ok(!afterAdopt.some((r) => r.status === 'chi_ban_do' && /ABC/.test(r.name || r.fullName || '')));
 
+const { catalogLinkLevelTab, diffLinkFields, buildLinkPatch } = await import('../public/js/catalogLinkCore.js');
+assert.equal(catalogLinkLevelTab('QHC'), 'qhc10');
+assert.equal(catalogLinkLevelTab('QHPK'), 'qhpk');
+assert.equal(catalogLinkLevelTab('QHCT'), 'qhct');
+
+const diffs = diffLinkFields(
+  { ten: 'Dieu chinh QHPK Khu A', dienTichHa: 380, danSo: '18.000' },
+  'QHPK Khu A An Van Duong',
+  { full: 'QHPK Khu A An Van Duong', areaHa: 400, danSo: '' }
+);
+assert.ok(diffs.some((f) => f.key === 'ten'));
+assert.ok(diffs.some((f) => f.key === 'dienTich'));
+assert.ok(!diffs.some((f) => f.key === 'danSo')); // map trống → không ép resolve dân số
+
+const patch = buildLinkPatch(
+  'TH.B.019',
+  { ten: 'Dieu chinh QHPK Khu A', dienTichHa: 380, danSo: '18.000', quyetDinh: '1/QĐ', dvhc: 'Phường An Đông' },
+  'QHPK Khu A An Van Duong',
+  { full: 'QHPK Khu A An Van Duong', areaHa: 400 },
+  { ten: 'sheet', dienTich: 'map' }
+);
+assert.equal(patch.ten, 'Dieu chinh QHPK Khu A');
+assert.equal(patch.dienTichHa, 400);
+assert.equal(patch.danSo, '18.000');
+
+const { displayNameForTenQH, rebuildSoTayDisplayFromPlanRows } = await import('../public/js/soTayDisplay.js');
+rebuildSoTayDisplayFromPlanRows([
+  { hasBoundary: true, zoomKey: 'QHPK Khu A An Van Duong', name: 'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương' }
+]);
+assert.equal(
+  displayNameForTenQH('QHPK Khu A An Van Duong'),
+  'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương'
+);
+
 console.log('test-catalog-table: ok');

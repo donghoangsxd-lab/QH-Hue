@@ -8,6 +8,7 @@ import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecisi
 import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
+import { displayNameForTenQH, SOTAY_DISPLAY_EVENT } from './soTayDisplay.js';
 import { escapeHtml, fmtNum, fmtPct, ico } from './utils.js';
 import { QHC2045, QHC10_CENTER_BRIEF, QHC_CENTER_INFO_EVENT, isQhcStaticName } from './qhc2045.js';
 import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
@@ -165,10 +166,11 @@ function shareLabel(share) {
   return `${ha(share.used)} ha · ${fmtPct(share.pct)}`;
 }
 
-/** Tên cạnh tem cấp: bỏ tiền tố trùng QHPK/QHCT; override «QHPK TT phía Nam» → Trung tâm phía Nam TP Huế. */
+/** Tên cạnh tem cấp: ưu tiên tên sổ tay; bỏ tiền tố trùng QHPK/QHCT. */
 function briefTitle(name) {
-  const split = splitProjectName(name);
-  let title = split.tenDayDu || split.tenRutGon || name;
+  const alias = displayNameForTenQH(name);
+  const split = splitProjectName(alias || name);
+  let title = alias || split.tenDayDu || split.tenRutGon || name;
   title = String(title || '')
     .replace(/^Quy hoạch\s+(phân khu|chi tiết|chung)(\s+tỷ lệ\s+1\/[\d.]+)?\s+/i, '')
     .replace(/^(QHPK|QHCT|QHC)\b[\s.:–—-]*/i, '')
@@ -456,6 +458,9 @@ export function initProjectBrief() {
     if (decision) openInspectDecision(decision.getAttribute('data-brief-decision'));
   });
   document.addEventListener(PROJECT_INFO_EVENT, (e) => show(e.detail));
+  document.addEventListener(SOTAY_DISPLAY_EVENT, () => {
+    if (openName) void show(openName, { openDetail: detailOpen });
+  });
   document.addEventListener(LEVEL_EVENT, () => {
     if (openName !== QHC2045.short) return;
     const scale = getLevel() === 'qhc10' ? '10' : getLevel() === 'qhc25' ? '25' : '';

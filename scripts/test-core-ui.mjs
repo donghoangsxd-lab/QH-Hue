@@ -396,7 +396,16 @@ assert.match(read('public/js/catalogTable.js'), /wardCellHtml|Phường \/ xã/)
 assert.match(read('public/js/catalogTableCore.js'), /'Phường \/ xã'/);
 assert.match(read('public/js/projectLayer.js'), /export function zoomToProjectBoundary/);
 assert.match(read('public/js/catalogTable.js'), /zoomToProjectBoundary|catalog-bound-link|data-catalog-link-ma/);
+assert.match(read('public/js/catalogTable.js'), /openProjectByName|data-catalog-open-name|onOpenLinkedProject|openLinkPick|startLinkPick/);
+assert.match(read('public/js/catalogTable.js'), /catalog-relink-row|data-catalog-relink-ma|relink:\s*true/);
+assert.match(read('public/js/catalogLinkPick.js'), /consumeCatalogLinkPick|startLinkPick|relink/);
+assert.match(read('public/js/catalogLinkCore.js'), /diffLinkFields|buildLinkPatch|catalogLinkLevelTab/);
+assert.match(read('public/js/soTayDisplay.js'), /displayNameForTenQH|rebuildSoTayDisplayFromPlanRows/);
+assert.match(read('public/js/projectLayer.js'), /consumeCatalogLinkPick|displayNameForTenQH|refreshProjectLabels/);
+assert.match(read('public/css/style.css'), /catalog-relink-row/);
 assert.match(read('public/js/catalogTable.js'), /openAdoptSoTay|data-catalog-adopt-tenqh|catalogAdoptKind/);
+assert.match(read('public/index.html'), /catalogResolveBox|catalogResolveFields/);
+assert.match(read('docs/ui-spec.md'), /startLinkPick|displayNameForTenQH|openProject/);
 assert.match(read('public/index.html'), /id="catalogAdoptKind"|id="catalogEditSoTayMa"/);
 assert.match(read('public/js/catalogTableCore.js'), /links: \[\]|mapTenQH|patches: \[\]/);
 assert.match(read('public/js/catalogTable.js'), /openEditProject|data-catalog-edit-ma|mode === 'edit'/);
