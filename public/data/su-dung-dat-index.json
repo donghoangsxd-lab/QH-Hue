@@ -67,7 +67,7 @@
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhc-do-thi-moi-vinh-hung-8899f27b/su-dung-dat.json",
-      "lands": 303,
+      "lands": 321,
       "source": "projects"
     },
     {
@@ -1028,6 +1028,16 @@
       "role": "hien-trang",
       "path": "projects/qhc-tt-phu-loc-19e96a86/hien-trang.json",
       "lands": 2863,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "name": "QHC Đô thị mới Vinh Hưng",
+      "mapid": 22906,
+      "layer": "hien-trang",
+      "role": "hien-trang",
+      "path": "projects/qhc-do-thi-moi-vinh-hung-8899f27b/hien-trang.json",
+      "lands": 2433,
       "source": "projects"
     }
   ],

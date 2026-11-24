@@ -1,4 +1,5 @@
 // Gói tĩnh QHC Chân Mây – Lăng Cô: SDD + giao thông + QH hạ tầng rút gọn.
+// Chỉ dùng cho QHC ~1/10.000 (sai số hình học lớn được phép). Không áp simplify cho QHPK 1/2.000 / QHCT 1/500.
 // Nguồn: geojson đã xuất bởi gishue-import (mapid 23935).
 //   node scripts/build-qhc-chan-may.mjs [--upload]
 import fs from 'node:fs';
@@ -20,6 +21,7 @@ const CACHE_SDD = path.join(CACHE_OUT, 'chuc-nang-su-dung-dat', 'chuc-nang-su-du
 const CACHE_HT = path.join(CACHE_OUT, 'hien-trang-su-dung-dat', 'hien-trang-su-dung-dat.geojson');
 const ROAD = path.join(BASE, 'giao-thong', 'quy-hoach', 'mang-luoi-giao-thong-duong-bo.geojson');
 const RAIL = path.join(BASE, 'giao-thong', 'quy-hoach', 'mang-luoi-giao-thong-duong-sat.geojson');
+// ~vài mét — đủ QHC 1/10.000; không dùng TOL này cho QHPK/QHCT.
 const TOL = 0.00002;
 const SKIP_PROP = new Set(['geom', 's_geo', 'resultnumber', 's_xdaidien', 's_ydaidien', 'xdaidien', 'ydaidien']);
 

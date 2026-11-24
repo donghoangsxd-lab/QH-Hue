@@ -1,4 +1,5 @@
 // Gói tĩnh QHC TT Phú Lộc (mapid 20674): SDD + GT + slim mạng QH chuyên ngành.
+// Chỉ dùng cho QHC ~1/10.000 (sai số hình học lớn được phép). Không áp simplify cho QHPK 1/2.000 / QHCT 1/500.
 // Nguồn: data/chuyen-nganh/qhc-tt-phu-loc-19e96a86 (đã import; không cần cache gishue).
 //   node scripts/build-qhc-phu-loc.mjs [--upload]
 import fs from 'node:fs';
@@ -21,6 +22,7 @@ const SDD_QH = path.join(BASE, 'sdd', 'quy-hoach', 'chuc-nang-su-dung-dat.geojso
 const SDD_HT = path.join(BASE, 'sdd', 'hien-trang', 'hien-trang-su-dung-dat.geojson');
 const ROAD = path.join(BASE, 'giao-thong', 'quy-hoach', 'mang-luoi-giao-thong.geojson');
 const RAIL = path.join(BASE, 'giao-thong', 'quy-hoach', 'duong-sat-cao-toc.geojson');
+// ~vài mét — đủ QHC 1/10.000; không dùng TOL này cho QHPK/QHCT.
 const TOL = 0.00002;
 const SKIP_PROP = new Set(['geom', 's_geo', 'resultnumber', 's_xdaidien', 's_ydaidien', 'xdaidien', 'ydaidien']);
 
