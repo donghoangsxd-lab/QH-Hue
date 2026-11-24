@@ -1247,4 +1247,15 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseWkt, detectCrs, proposeName, exportDump, exportLayers, writeLayer, verifyOut, safeDirName, selftest };
+module.exports = {
+  parseWkt,
+  toGeojsonGeometry,
+  detectCrs,
+  proposeName,
+  exportDump,
+  exportLayers,
+  writeLayer,
+  verifyOut,
+  safeDirName,
+  selftest
+};

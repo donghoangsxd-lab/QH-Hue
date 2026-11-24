@@ -700,5 +700,6 @@ QHC Chân Mây – Lăng Cô (mapid 23935) chỉ có quy hoạch giao thông, fi
 ## Lưu trữ
 
 Từng file GeoJSON và zip đều dưới 5 MB, nằm trong git. Không đẩy file lớp lên GCS, không dựng pmtiles. Đồ án chưa có trong `projects/index.json` được thêm dạng mục danh mục (không có ranh lô).
+Rút gọn hình học (`turf.simplify`, script `build-qhc-*.mjs`): chỉ QHC ~1/10.000 trở lên thô hơn. QHPK 1/2.000 và QHCT 1/500 không simplify hàng loạt — giữ geom đầy đủ. Cắt lô ranh (`SCHEME_EDGE_M` 5 m) không tính là simplify.
 
 Worker chỉ phục vụ `public/`. `scripts/stage-chuyen-nganh.mjs` symlink từng thư mục đồ án từ `data/chuyen-nganh/` sang `public/data/chuyen-nganh/` (không nhân bản trong git) và bung thành bản sao lúc deploy.

@@ -6897,13 +6897,14 @@
         "shape_leng",
         "shape_area"
       ],
-      "file": "https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-moi-vinh-hung-8899f27b/sdd/hien-trang/hien-trang-su-dung-dat.geojson",
+      "file": "projects/qhc-do-thi-moi-vinh-hung-8899f27b/hien-trang.json",
       "bbox": [
         107.808189,
         16.331486,
         107.857979,
         16.409478
-      ]
+      ],
+      "ref": "projects/qhc-do-thi-moi-vinh-hung-8899f27b/hien-trang.json"
     },
     {
       "sector": "sdd",

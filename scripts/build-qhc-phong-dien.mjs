@@ -1,4 +1,5 @@
 // Rút gọn SDD QHC Phong Điền (mapid 20710) → projects/ + giữ lô INFRA sẵn có.
+// Chỉ dùng cho QHC ~1/10.000 (sai số hình học lớn được phép). Không áp simplify cho QHPK 1/2.000 / QHCT 1/500.
 // Nguồn: .cache/gishue/out/20710 sau gishue-import --no-gcs.
 //   node scripts/build-qhc-phong-dien.mjs [--upload]
 import fs from 'node:fs';
@@ -16,6 +17,7 @@ const TEN = 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến n�
 const MAPID = 20710;
 const OUT = path.join(repo, 'public', 'data', 'qhc-phong-dien');
 const CACHE_SDD = path.join(repo, '.cache', 'gishue', 'out', String(MAPID), 'chuc-nang-su-dung-dat', 'chuc-nang-su-dung-dat.geojson');
+// ~vài mét — đủ QHC 1/10.000; không dùng TOL này cho QHPK/QHCT.
 const TOL = 0.00002;
 const SKIP_PROP = new Set(['geom', 's_geo', 'resultnumber', 's_xdaidien', 's_ydaidien', 'xdaidien', 'ydaidien']);
 

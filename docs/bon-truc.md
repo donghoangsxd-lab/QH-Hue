@@ -35,3 +35,5 @@ PDF không nằm trong git và không đưa vào Workers Assets. Xem qua cùng o
 ## Phục vụ file
 
 `index.json` và `schemes.json` ghi đè tại chỗ, cache 300 giây. GeoJSON chuyên ngành cache 1 ngày, không `immutable`. Lớp hiện trạng tạm ghi đè cùng khóa, cache 300 giây. Kiến trúc cache 300 giây. Không endpoint mới. Tab Hạ tầng chỉ đọc GCS khi bật lớp Chân Mây (file bản vẽ đã có). Wrangler bung symlink GeoJSON lúc deploy (`--materialize`). Lớp catalog có sẵn `scheme` hoặc `level` thì kho dùng đúng trường đó, không suy lại từ tỷ lệ.
+
+**Rút gọn hình học:** chỉ áp cho **QHC ~1/10.000** (và thô hơn) — sai số lớn chấp nhận được khi xem bản đồ. **QHPK 1/2.000** và **QHCT 1/500** không `simplify` hàng loạt; giữ geom đầy đủ. Cắt lô theo ranh (`SCHEME_EDGE_M` 5 m) khác simplify. Chi tiết: skill `.cursor/skills/gishue-download/SKILL.md`.
