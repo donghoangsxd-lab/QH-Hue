@@ -643,11 +643,11 @@
     {
       "scheme": "qhpk-khu-do-thi-sinh-thai-thanh-tien-8298ff70",
       "name": "QHPK Khu đô thị sinh thái Thanh Tiên",
-      "mapid": null,
+      "mapid": 22876,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-khu-do-thi-sinh-thai-thanh-tien-8298ff70/su-dung-dat.json",
-      "lands": 356,
+      "lands": 468,
       "source": "projects"
     },
     {
@@ -663,11 +663,11 @@
     {
       "scheme": "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e",
       "name": "QHPK Khu đô thị ven biển Thuận An",
-      "mapid": null,
+      "mapid": 22863,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e/su-dung-dat.json",
-      "lands": 104,
+      "lands": 171,
       "source": "projects"
     },
     {
@@ -783,11 +783,11 @@
     {
       "scheme": "qhpk-phu-mau-phu-thanh-phu-duong-79657619",
       "name": "QHPK Phú Mậu - Phú Thanh - Phú Dương",
-      "mapid": null,
+      "mapid": 22856,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-phu-mau-phu-thanh-phu-duong-79657619/su-dung-dat.json",
-      "lands": 509,
+      "lands": 605,
       "source": "projects"
     },
     {
@@ -833,21 +833,21 @@
     {
       "scheme": "qhpk-thuan-an-f9e5ffc1",
       "name": "QHPK Thuận An",
-      "mapid": null,
+      "mapid": 22847,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-thuan-an-f9e5ffc1/su-dung-dat.json",
-      "lands": 141,
+      "lands": 192,
       "source": "projects"
     },
     {
       "scheme": "qhpk-thuy-bang-dinh-huong-thanh-lap-phuong-5b438d7f",
       "name": "QHPK Thủy Bằng (2024)",
-      "mapid": null,
+      "mapid": 22857,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-thuy-bang-dinh-huong-thanh-lap-phuong-5b438d7f/su-dung-dat.json",
-      "lands": 657,
+      "lands": 753,
       "source": "projects"
     },
     {
@@ -903,11 +903,11 @@
     {
       "scheme": "qhpk-thuy-xuan-38831d2c",
       "name": "QHPK Thủy Xuân",
-      "mapid": null,
+      "mapid": 23923,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-thuy-xuan-38831d2c/su-dung-dat.json",
-      "lands": 428,
+      "lands": 561,
       "source": "projects"
     },
     {
@@ -937,7 +937,7 @@
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-tt-phia-tay-8e910b7b/su-dung-dat.json",
-      "lands": 430,
+      "lands": 438,
       "source": "projects"
     },
     {

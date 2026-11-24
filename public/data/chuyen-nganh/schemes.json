@@ -377,6 +377,144 @@
       "decision": "2882/QĐ-UBND",
       "decisionDate": "2024-11-08",
       "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-tt-phia-dong-26123071",
+      "name": "QHPK TT phía Đông",
+      "level": "QHPK",
+      "mapid": 22873,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1846/QĐ-UBND",
+      "decisionDate": "2024-07-06",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-tt-phia-tay-8e910b7b",
+      "name": "QHPK TT phía Tây",
+      "level": "QHPK",
+      "mapid": 23922,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "2020/QĐ-UBND",
+      "decisionDate": "2025-06-30",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-thuy-xuan-38831d2c",
+      "name": "QHPK Thủy Xuân",
+      "level": "QHPK",
+      "mapid": 23923,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1769/QĐ-UBND",
+      "decisionDate": "2025-06-23",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-thuy-bang-dinh-huong-thanh-lap-phuong-5b438d7f",
+      "name": "QHPK Thủy Bằng (2024)",
+      "level": "QHPK",
+      "mapid": 22857,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1813/QĐ-UBND",
+      "decisionDate": "2024-07-03",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e",
+      "name": "QHPK Khu đô thị ven biển Thuận An",
+      "level": "QHPK",
+      "mapid": 22863,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1814/QĐ-UBND",
+      "decisionDate": "2024-07-03",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-thuan-an-f9e5ffc1",
+      "name": "QHPK Thuận An",
+      "level": "QHPK",
+      "mapid": 22847,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1844/QĐ-UBND",
+      "decisionDate": "2024-07-06",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-sinh-thai-thanh-tien-8298ff70",
+      "name": "QHPK Khu đô thị sinh thái Thanh Tiên",
+      "level": "QHPK",
+      "mapid": 22876,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1843/QĐ-UBND",
+      "decisionDate": "2024-07-06",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-phu-mau-phu-thanh-phu-duong-79657619",
+      "name": "QHPK Phú Mậu - Phú Thanh - Phú Dương",
+      "level": "QHPK",
+      "mapid": 22856,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1462/QĐ-UBND",
+      "decisionDate": "2024-06-03",
+      "authority": "UBND tỉnh",
+      "taskDecision": "11/QĐ-UBND",
+      "taskDecisionDate": "2023-04-01"
     }
   ]
 }

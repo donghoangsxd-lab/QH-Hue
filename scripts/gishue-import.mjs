@@ -598,13 +598,29 @@ function isBoundaryName(name) {
   return /ranh gioi/.test(s) && !/hanh chinh/.test(s);
 }
 
-/** Ranh/SDD đã có trên projects; sơ đồ tổ chức không gian và lớp nền (không gian *, cây xanh điểm). */
+/** Ranh/SDD đã có trên projects; sơ đồ tổ chức không gian và lớp nền (không gian *, cây xanh điểm). Cắt lô dùng loadProjectBoundary. */
 function skipKeptOrBackground(name) {
   const key = strip(name);
   if (/ranh gioi|dinh vi ranh/.test(key)) return 'ranh đã có trên projects';
   if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
   if (/^khong gian\b/.test(key) || /^cay xanh$/.test(key)) return 'lớp nền';
   return null;
+}
+
+/** Ranh Polygon từ schemes.boundaryFile (vd. KCN Phong Điền) khi projects/index chưa có. */
+function loadSchemeBoundaryFile(mapid) {
+  const hit = publishedRows(mapid);
+  const rel = hit && hit.scheme && hit.scheme.boundaryFile;
+  if (!rel) return null;
+  const file = path.isAbsolute(rel) ? rel : path.join(repo, rel);
+  if (!fs.existsSync(file)) return null;
+  try {
+    const fc = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const features = Array.isArray(fc.features) ? fc.features : [];
+    return schemeBoundaryOf(features);
+  } catch {
+    return null;
+  }
 }
 
 function loadLandIndex() {
@@ -1050,13 +1066,25 @@ async function importMap(transport, mapid, dry, noGcs = false) {
     || loaded.find((item) => isBoundaryName(item.layer.ten));
   const boundaryFeatures = boundarySrc ? featuresFrom(boundarySrc.doc.rows).features : [];
   let boundary = schemeBoundaryOf(boundaryFeatures);
-  // Map chỉ có SDD (vd. 20710 Phong Điền): lấy ranh đồ án đã có trên projects/index.
+  // Map chỉ có SDD (vd. 20710 Phong Điền): ranh trên projects/index hoặc schemes.boundaryFile.
   if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
     boundary = await loadProjectBoundary(mapid);
     if (boundary) warnings.push('dùng ranh đồ án sẵn có trên projects/index để cắt lô');
   }
   if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
-    throw new Error(`mapid ${mapid}: không khép được ranh để cắt lô`);
+    boundary = loadSchemeBoundaryFile(mapid);
+    if (boundary) warnings.push('dùng schemes.boundaryFile để cắt lô');
+  }
+  // Map không có lớp «Ranh giới»: thử khép phân khu chức năng; không được thì bỏ cắt lô.
+  if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
+    const pk = loaded.find((item) => item.layer.kind === 'polygon' && /phan khu chuc nang/.test(strip(item.layer.ten)));
+    if (pk) {
+      boundary = schemeBoundaryOf(featuresFrom(pk.doc.rows).features);
+      if (boundary) warnings.push('không có lớp ranh; dùng phân khu chức năng để cắt lô');
+    }
+  }
+  if (!boundary && loaded.some((item) => landUseName(item.layer.ten))) {
+    warnings.push(`mapid ${mapid}: không khép được ranh — giữ nguyên lô SDD (không cắt)`);
   }
   const metaRow = boundarySrc && boundarySrc.doc.rows[0];
   const knownScheme = publishedRows(mapid);
