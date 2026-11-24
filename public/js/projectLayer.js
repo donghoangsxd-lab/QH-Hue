@@ -44,6 +44,8 @@ import { openLayerPick, paintLayerDecisions, layerIdOfName } from './layerDecisi
 import { dossierAdjustments, adjustmentSiteCount, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
+import { consumeCatalogLinkPick } from './catalogLinkPick.js';
+import { displayNameForTenQH, SOTAY_DISPLAY_EVENT } from './soTayDisplay.js';
 import {
   dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
 } from './dossierAttach.js';
@@ -730,8 +732,10 @@ export function openLotsAtView(kind) {
  * Đang phóng gần và bấm đúng đồ án đang mở → giữ khung + mở/làm mới lô.
  * Bấm đồ án khác (kể cả khi đang phóng gần / đã chọn A) → chọn và phóng tới toàn ranh.
  * Nhìn rộng → phóng tới toàn đồ án.
+ * Admin đang gán ranh từ bảng danh mục → consumeCatalogLinkPick (không mở đồ án).
  */
 function openOutlineProject(p, m) {
+  if (consumeCatalogLinkPick(p.name, p)) return;
   const switching = !!(state.focusedProject && state.focusedProject !== p.name);
   if (atPlaceDetail(m) && !switching) {
     if (p.level === 'QHC') selectQhcScheme(p);
@@ -1537,14 +1541,26 @@ function layersHtml(p, idx, projectOn, admin) {
   return `<div class="project-layers">${body || '<div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div>'}${search}</div>`;
 }
 
-/** Tên dòng danh sách: tiền tố cấp (QHC/QHPK/QHCT) trước tên rút gọn — không nhân đôi nếu đã có. */
+/** Tên dòng danh sách: ưu tiên tên sổ tay (alias); tiền tố cấp trước tên — không nhân đôi nếu đã có. */
 function listLabelOf(p) {
-  const raw = String(p?.short || p?.name || '').trim();
+  const alias = displayNameForTenQH(p?.name || p?.full || '');
+  const raw = String(alias || p?.short || p?.name || '').trim();
   const key = String(p?.level || '').toUpperCase();
   const prefix = key === 'QHC' || key === 'QHPK' || key === 'QHCT' ? key : '';
   if (!prefix || !raw) return raw;
   if (new RegExp(`^${prefix}(?![A-Za-z])`, 'i').test(raw)) return raw;
   return `${prefix} ${raw}`;
+}
+
+/** Tooltip / nhãn ranh: tên sổ tay nếu đã gắn. */
+function outlineLabelOf(p) {
+  return displayNameForTenQH(p?.name) || String(p?.full || p?.name || '').trim();
+}
+
+/** Làm mới nhãn list + tooltip ranh sau khi Admin sửa/gán sổ tay (không tải lại GeoJSON). */
+export function refreshProjectLabels() {
+  renderList();
+  redrawOutlines();
 }
 
 function setAdjustOn(p, on) {
@@ -2532,7 +2548,7 @@ function drawOutlinesOn(m, list, below) {
     }
     const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
     if (focused) shapes.push(shape);
-    shape.bindTooltip(escapeHtml(p.full || p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
+    shape.bindTooltip(escapeHtml(outlineLabelOf(p)), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('mouseover', () => setHover(m, p.name));
     shape.on('mouseout', () => setHover(m, null));
     shape.on('click', (e) => {
@@ -3008,6 +3024,9 @@ export function openProjectDocByName(name, role) {
 export function initProjectLayer(opts = {}) {
   onDeleted = opts.onDeleted || null;
   loadHidden();
+  document.addEventListener(SOTAY_DISPLAY_EVENT, () => {
+    refreshProjectLabels();
+  });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.dossier-menu-wrap')) closeAllDossierMenus();
   });

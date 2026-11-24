@@ -5,13 +5,20 @@ import {
   setBottomPanelCollapsed, setBottomPanelMaximized, toggleBottomPanelMaximized
 } from './uiComponents.js';
 import { loadCatalog, projectAreaOf } from './projectFiles.js';
-import { zoomToProjectBoundary, openProjectDocByName } from './projectLayer.js';
+import { zoomToProjectBoundary, openProjectByName, openProjectDocByName } from './projectLayer.js';
 import {
   listInvestCatalogItems, focusInvest, ensureInvestCatalogLoaded
 } from './investLayer.js';
 import { postAdmin } from './wardRoads.js';
 import { gcsUrl } from './api.js';
 import { postEntry } from './entryKernel.js';
+import { setLevel } from './mapLevel.js';
+import {
+  startLinkPick, setCatalogLinkPickHandler, initCatalogLinkPickKeys,
+  cancelCatalogLinkPick, catalogLinkLevelTab, diffLinkFields, buildLinkPatch,
+  resolveFieldsHtml, readResolveChoices
+} from './catalogLinkPick.js';
+import { rebuildSoTayDisplayFromPlanRows, setSoTayDisplayName, displayNameForTenQH } from './soTayDisplay.js';
 import {
   planRowsFromSoTay, investRowsFromItems, filterCatalogRows,
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
@@ -21,6 +28,8 @@ import {
   mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf,
   newAdjustId, soTayMaForTenQH, tenQHOfSoTayItem
 } from './catalogTableCore.js';
+
+export { displayNameForTenQH };
 
 const $ = (id) => document.getElementById(id);
 /* ?v= đổi khi rebuild catalog để trình duyệt/SW không giữ bản JSON cũ. */
@@ -194,6 +203,13 @@ async function persistEdits(edits) {
 function closeEditPanel() {
   const panel = $('catalogEditPanel');
   if (panel) panel.hidden = true;
+  const resolveBox = $('catalogResolveBox');
+  if (resolveBox) resolveBox.hidden = true;
+}
+
+function syncDisplayNamesFromRows() {
+  if (source !== 'plan') return;
+  rebuildSoTayDisplayFromPlanRows(rowsCache);
 }
 
 function boundCatalogOptions() {
@@ -278,27 +294,32 @@ function setEditMode(mode, parentMa = '') {
   if (tenQHField) tenQHField.value = mode === 'adopt' ? (parentMa || '') : '';
   const isDccb = mode === 'dccb';
   const isLink = mode === 'link';
+  const isResolve = mode === 'resolve';
   const isAdopt = mode === 'adopt';
   const isEdit = mode === 'edit';
   const isProject = mode === 'project';
-  $('catalogEditTitle').textContent = isLink
-    ? `Gán ranh · ${parentMa}`
-    : (isAdopt
-      ? `Ghi sổ tay · ${parentMa}`
-      : (isEdit
-        ? `Sửa đồ án · ${parentMa}`
-        : (isDccb ? `Thêm ĐCCB · ${parentMa}` : 'Thêm đồ án quy hoạch')));
-  $('catalogEditHint').textContent = isLink
-    ? 'Chọn một ranh đồ án đã có trên bản đồ để gắn với mã sổ tay này.'
-    : (isAdopt
-      ? 'Đồ án đang có trên bản đồ nhưng chưa có trong sổ tay: ghép mã có sẵn hoặc thêm tên mới.'
-      : (isEdit
-        ? 'Sửa tên, phường/xã, quyết định, diện tích, dân số — lưu overlay, không đụng file sổ tay gốc.'
-        : (isDccb
-          ? (isAdmin()
-            ? 'Ghi ĐCCB text dưới mã đồ án cha. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.'
-            : 'Gửi ĐCCB text chờ Admin duyệt. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.')
-          : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).')));
+  $('catalogEditTitle').textContent = isResolve
+    ? `Đồng bộ sau gán · ${parentMa}`
+    : (isLink
+      ? `Gán ranh · ${parentMa}`
+      : (isAdopt
+        ? `Ghi sổ tay · ${parentMa}`
+        : (isEdit
+          ? `Sửa đồ án · ${parentMa}`
+          : (isDccb ? `Thêm ĐCCB · ${parentMa}` : 'Thêm đồ án quy hoạch'))));
+  $('catalogEditHint').textContent = isResolve
+    ? 'Chọn lần lượt giá trị giữ lại (sổ tay hoặc bản đồ). OK ghi liên kết và đồng bộ overlay.'
+    : (isLink
+      ? 'Chọn một ranh đồ án đã có trên bản đồ (droplist dự phòng). Ưu tiên: bấm tên đồ án chưa gán rồi chọn ranh trên bản đồ.'
+      : (isAdopt
+        ? 'Đồ án đang có trên bản đồ nhưng chưa có trong sổ tay: ghép mã có sẵn hoặc thêm tên mới.'
+        : (isEdit
+          ? 'Sửa tên, phường/xã, quyết định, diện tích, dân số — lưu overlay; tên hiển thị trên map theo sổ tay (không đổi tên file bucket).'
+          : (isDccb
+            ? (isAdmin()
+              ? 'Ghi ĐCCB text dưới mã đồ án cha. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.'
+              : 'Gửi ĐCCB text chờ Admin duyệt. File PDF/DXF/KML/GeoJSON dùng nút Đề xuất bên phải.')
+            : 'Admin ghi thêm đồ án vào sổ tay (đối soát với bản đồ sau).'))));
 
   panel.querySelectorAll('[data-edit="project"]').forEach((el) => {
     el.hidden = !(isProject || isEdit);
@@ -318,6 +339,9 @@ function setEditMode(mode, parentMa = '') {
   panel.querySelectorAll('[data-edit="link"]').forEach((el) => {
     el.hidden = !isLink;
   });
+  panel.querySelectorAll('[data-edit="resolve"]').forEach((el) => {
+    el.hidden = !isResolve;
+  });
   panel.querySelectorAll('[data-edit="adopt"]').forEach((el) => {
     el.hidden = !isAdopt;
   });
@@ -334,7 +358,7 @@ function setEditMode(mode, parentMa = '') {
   const tenInp = $('catalogEditTen');
   if (tenInp) {
     tenInp.required = isProject || isEdit || isDccb;
-    if (isLink || isAdopt) tenInp.removeAttribute('required');
+    if (isLink || isAdopt || isResolve) tenInp.removeAttribute('required');
   }
   const boundSel = $('catalogEditBound');
   if (boundSel) {
@@ -343,6 +367,7 @@ function setEditMode(mode, parentMa = '') {
       opts.map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')
     }`;
     boundSel.required = isLink;
+    if (!isLink) boundSel.removeAttribute('required');
   }
   const soTaySel = $('catalogEditSoTayMa');
   if (soTaySel) {
@@ -369,14 +394,18 @@ function setEditMode(mode, parentMa = '') {
     tenInp.placeholder = 'Tên đồ án quy hoạch';
   }
   const saveBtn = $('btnCatalogEditSave');
-  if (saveBtn) saveBtn.textContent = (isDccb && !isAdmin()) ? 'Gửi chờ duyệt' : 'Ghi';
+  if (saveBtn) saveBtn.textContent = (isDccb && !isAdmin())
+    ? 'Gửi chờ duyệt'
+    : (isResolve ? 'OK · Đồng bộ' : 'Ghi');
   panel.hidden = false;
-  if (isLink) boundSel?.focus();
+  if (isResolve) $('btnCatalogEditSave')?.focus();
+  else if (isLink) boundSel?.focus();
   else if (isAdopt) ($('catalogEditSoTayMa') || $('catalogAdoptKind'))?.focus();
   else if (isEdit) tenInp?.focus();
   else tenInp?.focus();
 }
 
+/** Droplist dự phòng — đường chính là startLinkPick (bấm ranh trên map). */
 function openLinkBound(ma) {
   if (!isAdmin()) {
     showToast('Cần đăng nhập Admin để gán ranh', 'info');
@@ -388,6 +417,84 @@ function openLinkBound(ma) {
     return;
   }
   setEditMode('link', ma);
+}
+
+/** Admin: mở tab cấp đúng tỷ lệ rồi bấm ranh trên bản đồ để gán / gán lại. */
+function openLinkPick(ma, level, { relink = false } = {}) {
+  if (!isAdmin()) {
+    showToast(relink ? 'Cần đăng nhập Admin để gán lại ranh' : 'Cần đăng nhập Admin để gán ranh', 'info');
+    return;
+  }
+  const code = String(ma || '').trim();
+  if (!code) return;
+  if (!boundCatalogOptions().length) {
+    showToast('Chưa có ranh đồ án nào trên bản đồ để gán', 'info');
+    return;
+  }
+  closeEditPanel();
+  startLinkPick({ ma: code, level: level || 'QHPK', relink: !!relink });
+}
+
+function openResolveLink(ma, tenQH, project) {
+  const item = (soTayItems || []).find((it) => it.ma === ma);
+  if (!item) {
+    showToast('Không tìm thấy đồ án trong sổ tay', 'error');
+    return;
+  }
+  const fields = diffLinkFields(item, tenQH, project);
+  setEditMode('resolve', ma);
+  const tenQHField = $('catalogEditTenQH');
+  if (tenQHField) tenQHField.value = tenQH;
+  const prevLink = String(item.mapTenQH || '').trim();
+  const lead = $('catalogResolveLead');
+  if (lead) {
+    const reassign = prevLink && prevLink !== tenQH
+      ? ` (thay «${prevLink}»)`
+      : '';
+    lead.textContent = fields.length
+      ? `Đã chọn ranh «${tenQH}»${reassign}. Có ${fields.length} trường lệch — chọn giá trị giữ lại:`
+      : `Đã chọn ranh «${tenQH}»${reassign}. Không có trường lệch — bấm OK để ghi liên kết.`;
+  }
+  const box = $('catalogResolveFields');
+  if (box) box.innerHTML = resolveFieldsHtml(fields);
+  const resolveBox = $('catalogResolveBox');
+  if (resolveBox) resolveBox.hidden = false;
+}
+
+async function commitLinkAndSync(ma, tenQH, project, choices) {
+  const item = (soTayItems || []).find((it) => it.ma === ma);
+  if (!item) {
+    showToast('Không tìm thấy đồ án trong sổ tay', 'error');
+    return;
+  }
+  const patch = buildLinkPatch(ma, item, tenQH, project, choices);
+  const next = {
+    v: 1,
+    saved: soTayEdits.saved || 0,
+    projects: [...(soTayEdits.projects || [])],
+    dccb: [...(soTayEdits.dccb || [])],
+    links: [...(soTayEdits.links || [])],
+    patches: [...(soTayEdits.patches || [])]
+  };
+  const li = next.links.findIndex((x) => String(x?.ma || '') === ma);
+  if (li >= 0) next.links[li] = { ma, tenQH };
+  else next.links.push({ ma, tenQH });
+  const pi = next.patches.findIndex((x) => String(x?.ma || '') === ma);
+  if (pi >= 0) next.patches[pi] = { ...next.patches[pi], ...patch };
+  else next.patches.push(patch);
+
+  const saved = await persistEdits(next);
+  soTayEdits = { ...next, saved: Date.now() };
+  writeLocalEdits(soTayEdits);
+  applyEditsToBase();
+  closeEditPanel();
+  setSoTayDisplayName(tenQH, patch.ten);
+  await refresh();
+  showToast(
+    saved.remote ? 'Đã gán ranh và đồng bộ lên máy chủ' : 'Đã gán ranh trên máy này (chưa đồng bộ bucket)',
+    saved.remote ? 'success' : 'info'
+  );
+  offerCatalogSchemeEntry(tenQH, 'add');
 }
 
 /** Đồ án ngoài sổ tay (chi_ban_do): ghép mã sổ tay có sẵn hoặc thêm tên mới + mapTenQH. */
@@ -591,7 +698,7 @@ async function submitEdit(e) {
   const qd = String($('catalogEditQd')?.value || '').trim();
   const ngay = String($('catalogEditNgay')?.value || '').trim();
   const coQuan = String($('catalogEditCoQuan')?.value || '').trim();
-  if (mode !== 'link' && mode !== 'adopt') {
+  if (mode !== 'link' && mode !== 'adopt' && mode !== 'resolve') {
     if (!ten) {
       showToast('Nhập tên quy hoạch / ĐCCB', 'info');
       return;
@@ -603,6 +710,18 @@ async function submitEdit(e) {
   }
   editBusy = true;
   try {
+    if (mode === 'resolve') {
+      const ma = String($('catalogEditParentMa')?.value || '').trim();
+      const tenQH = String($('catalogEditTenQH')?.value || '').trim();
+      if (!ma || !tenQH) {
+        showToast('Thiếu mã hoặc ranh đồ án', 'info');
+        return;
+      }
+      const choices = readResolveChoices($('catalogResolveFields'));
+      const project = (state.projectCatalog || []).find((p) => p && p.tenQH === tenQH) || null;
+      await commitLinkAndSync(ma, tenQH, project, choices);
+      return;
+    }
     const next = {
       v: 1,
       saved: soTayEdits.saved || 0,
@@ -773,6 +892,23 @@ async function submitEdit(e) {
     soTayEdits = { ...next, saved: Date.now() };
     writeLocalEdits(soTayEdits);
     applyEditsToBase();
+    if (mode === 'edit' || mode === 'link' || mode === 'adopt') {
+      const linkedTenQH = mode === 'link'
+        ? String($('catalogEditBound')?.value || '').trim()
+        : (mode === 'adopt'
+          ? String($('catalogEditTenQH')?.value || $('catalogEditParentMa')?.value || '').trim()
+          : '');
+      const editMa = mode === 'edit'
+        ? String($('catalogEditParentMa')?.value || $('catalogEditMa')?.value || '').trim()
+        : '';
+      if (mode === 'edit' && editMa && ten) {
+        const linked = (soTayItems || []).find((it) => it.ma === editMa);
+        const mapKey = String(linked?.mapTenQH || '').trim();
+        if (mapKey) setSoTayDisplayName(mapKey, ten);
+      } else if (linkedTenQH && ten) {
+        setSoTayDisplayName(linkedTenQH, ten);
+      }
+    }
     closeEditPanel();
     await refresh();
     const okRemote = saved.remote ? 'lên máy chủ' : 'trên máy này (chưa đồng bộ bucket)';
@@ -1002,9 +1138,35 @@ function areaCellHtml(text) {
   return `<td class="${cls}" title="${escapeHtml(s)}">${escapeHtml(s)}</td>`;
 }
 
-function nameCellHtml(name, extraClass = '') {
+function nameCellHtml(name, extraClass = '', row = null) {
   const s = String(name || '').trim() || '—';
   const cls = extraClass ? `st-name ${extraClass}` : 'st-name';
+  // Hàng ĐCCB / không có row: chỉ text.
+  if (!row || extraClass.includes('catalog-dccb-name')) {
+    return `<td class="${cls}" title="${escapeHtml(s)}"><span class="catalog-name-text">${escapeHtml(s)}</span></td>`;
+  }
+  const ma = String(row.maDoAn || '').trim();
+  const zoom = String(row.zoomKey || '').trim();
+  const level = String(row.level || '').trim();
+  const linked = !!(row.hasBoundary && zoom);
+  if (linked) {
+    const tip = isAdmin() && ma
+      ? `${s} — phóng tới đồ án và hiện lô. Shift+click hoặc nút liên kết: gán lại ranh khi khớp sai`
+      : `${s} — phóng tới đồ án và hiện lô`;
+    return `<td class="${cls}" title="${escapeHtml(tip)}">
+      <button type="button" class="catalog-name-btn" data-catalog-open-name="${escapeHtml(zoom)}" data-catalog-open-level="${escapeHtml(level)}"${ma ? ` data-catalog-relink-ma="${escapeHtml(ma)}" data-catalog-relink-level="${escapeHtml(level)}"` : ''}>
+        <span class="catalog-name-text">${escapeHtml(s)}</span>
+      </button>
+    </td>`;
+  }
+  if (ma) {
+    // data-catalog-link-ma giữ cho test/handler droplist; click chính → pick trên map.
+    return `<td class="${cls}" title="${escapeHtml(s)} — Admin: gán ranh trên bản đồ">
+      <button type="button" class="catalog-name-btn catalog-bound-link" data-catalog-link-ma="${escapeHtml(ma)}" data-catalog-link-level="${escapeHtml(level)}">
+        <span class="catalog-name-text">${escapeHtml(s)}</span>
+      </button>
+    </td>`;
+  }
   return `<td class="${cls}" title="${escapeHtml(s)}"><span class="catalog-name-text">${escapeHtml(s)}</span></td>`;
 }
 
@@ -1041,11 +1203,13 @@ function addDataCellHtml(r) {
   const tenQH = String(r.zoomKey || r.fullName || r.name || '').trim();
   const ma = String(r.maDoAn || '').trim();
   if (!ma) return '<td class="catalog-add-cell">—</td>';
+  const level = String(r.level || '').trim();
   const attrs = [
     tenQH ? `data-catalog-add-tenqh="${escapeHtml(tenQH)}"` : '',
     `data-catalog-add-ma="${escapeHtml(ma)}"`,
     r.status ? `data-catalog-add-status="${escapeHtml(r.status)}"` : '',
-    r.hasBoundary ? 'data-catalog-add-bound="1"' : ''
+    r.hasBoundary ? 'data-catalog-add-bound="1"' : '',
+    level ? `data-catalog-add-level="${escapeHtml(level)}"` : ''
   ].filter(Boolean).join(' ');
   return `<td class="catalog-add-cell"><button type="button" class="catalog-add-data" ${attrs} title="Bổ sung ĐCCB text (chờ Admin duyệt). File PDF/DXF/…: nút Đề xuất bên phải." aria-label="Bổ sung ĐCCB text">${ico('plus')}</button></td>`;
 }
@@ -1087,12 +1251,16 @@ function planRowHtml(r, stt) {
   const editBtn = (isAdmin() && ma)
     ? `<button type="button" class="catalog-edit-row" data-catalog-edit-ma="${escapeHtml(ma)}" title="Sửa tên, phường/xã, quyết định, diện tích, dân số (chỉ Admin)" aria-label="Sửa đồ án">${ico('pen')}</button>`
     : '';
+  // Admin: gán lại ranh khi khớp nhầm (ví dụ tên «Điều chỉnh» dính đồ án khác).
+  const relinkBtn = (isAdmin() && ma && r.hasBoundary)
+    ? `<button type="button" class="catalog-relink-row" data-catalog-relink-ma="${escapeHtml(ma)}" data-catalog-relink-level="${escapeHtml(String(r.level || '').trim())}" title="Gán lại ranh trên bản đồ (khi khớp sai)" aria-label="Gán lại ranh">${ico('link')}</button>`
+    : '';
   const kids = Array.isArray(r.children) ? r.children : [];
   const hasKids = kids.length > 0;
   const parent = `<tr class="catalog-parent-row${hasKids ? ' has-kids' : ''}" data-catalog-id="${escapeHtml(r.id)}" data-status="${escapeHtml(r.status || '')}">
     <td class="st-num">${stt}</td>
-    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${editBtn}</td>
-    ${nameCellHtml(name)}
+    <td class="catalog-ma" title="${escapeHtml(ma)}">${cellOrDash(ma)}${editBtn}${relinkBtn}</td>
+    ${nameCellHtml(name, '', r)}
     ${levelCellHtml(r)}
     ${wardCellHtml(r)}
     <td class="catalog-qd" title="${escapeHtml(r.quyetDinh || '')}">${cellOrDash(r.quyetDinh)}</td>
@@ -1416,6 +1584,7 @@ async function refresh() {
   paintFilterOptions();
   await ensureData();
   paintTable();
+  syncDisplayNamesFromRows();
 }
 
 export async function openCatalogTable(opts = {}) {
@@ -1454,6 +1623,7 @@ export async function openCatalogTable(opts = {}) {
 
 export function closeCatalogTable() {
   if (!document.body.classList.contains('catalog-table-on')) return;
+  cancelCatalogLinkPick();
   setCatalogMode(false);
   destroyCharts();
   syncMaxBtn();
@@ -1494,6 +1664,18 @@ async function exportPdf() {
   }).save().then(done, done);
 }
 
+/** Click tên đồ án đã gán: đổi tab cấp + openProject (zoom + lô + brief). */
+function onOpenLinkedProject(tenQH, level) {
+  const name = String(tenQH || '').trim();
+  if (!name) return;
+  setLevel(catalogLinkLevelTab(level), { keepView: false });
+  const ok = openProjectByName(name);
+  if (!ok) {
+    const zoomed = zoomToProjectBoundary(name);
+    if (!zoomed) showToast('Chưa mở được đồ án (thiếu ranh hoặc chưa tải catalog)', 'info');
+  }
+}
+
 async function onZoom(key) {
   if (!key) return;
   if (source === 'plan') {
@@ -1508,18 +1690,19 @@ async function onZoom(key) {
   }
 }
 
-/** Nút + cuối hàng: chỉ ĐCCB text. Admin thiếu ranh/sổ tay vẫn được gán trước; file bản vẽ → Đề xuất bên phải. */
+/** Nút + cuối hàng: chỉ ĐCCB text. Admin thiếu ranh → pick trên map; file bản vẽ → Đề xuất bên phải. */
 function onAddDataClick(btn) {
   const tenQH = String(btn.dataset.catalogAddTenqh || '').trim();
   const ma = String(btn.dataset.catalogAddMa || '').trim();
   const status = String(btn.dataset.catalogAddStatus || '').trim();
   const hasBound = btn.dataset.catalogAddBound === '1';
+  const level = String(btn.dataset.catalogAddLevel || '').trim();
   if (isAdmin() && status === 'chi_ban_do' && tenQH) {
     openAdoptSoTay(tenQH);
     return;
   }
   if (isAdmin() && !hasBound && ma) {
-    openLinkBound(ma);
+    openLinkPick(ma, level);
     return;
   }
   if (!ma) {
@@ -1615,9 +1798,26 @@ export function initCatalogTable() {
       openEditProject(edit.dataset.catalogEditMa);
       return;
     }
+    const relink = e.target.closest('[data-catalog-relink-ma]');
+    // Nút liên kết cạnh mã, hoặc Shift+click tên đã gắn → gán lại ranh.
+    if (relink && (relink.classList.contains('catalog-relink-row') || e.shiftKey)) {
+      if (!isAdmin()) {
+        showToast('Cần đăng nhập Admin để gán lại ranh', 'info');
+        return;
+      }
+      openLinkPick(relink.dataset.catalogRelinkMa, relink.dataset.catalogRelinkLevel, { relink: true });
+      return;
+    }
+    const openName = e.target.closest('[data-catalog-open-name]');
+    if (openName) {
+      onOpenLinkedProject(openName.dataset.catalogOpenName, openName.dataset.catalogOpenLevel);
+      return;
+    }
     const link = e.target.closest('[data-catalog-link-ma]');
     if (link) {
-      openLinkBound(link.dataset.catalogLinkMa);
+      // Click tên chưa gán → pick trên map; Shift+click giữ droplist dự phòng (openLinkBound).
+      if (e.shiftKey) openLinkBound(link.dataset.catalogLinkMa);
+      else openLinkPick(link.dataset.catalogLinkMa, link.dataset.catalogLinkLevel);
       return;
     }
     const adopt = e.target.closest('[data-catalog-adopt-tenqh]');
@@ -1651,4 +1851,8 @@ export function initCatalogTable() {
   document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => {
     closeCatalogTable();
   });
+  setCatalogLinkPickHandler(({ ma, tenQH, project }) => {
+    openResolveLink(ma, tenQH, project);
+  });
+  initCatalogLinkPickKeys();
 }
