@@ -2011,6 +2011,12 @@ export async function ensureInvestCatalogLoaded() {
   return listInvestCatalogItems();
 }
 
+/** Mở trục F: bật lớp + nạp sheet/ranh. Gọi từ showAxis/goMag (không chỉ qh:axis-tab). */
+export function ensureDauTuAxis() {
+  ensureInvestOn();
+  void ensureInvestList();
+}
+
 /**
  * Admin ghi dự án mới (thường từ phác thảo) vào nhóm Đang nghiên cứu.
  * Ghi GCS rồi gắn ranh vào pack cục bộ (không chờ soft-refresh CDN).
@@ -2213,8 +2219,7 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id === 'dautu') {
-      ensureInvestOn();
-      ensureInvestList();
+      ensureDauTuAxis();
       return;
     }
     // Đang kiểm tra QH (QHCT/QHPK/QHC): giữ thẻ dự án, kéo lại trục F nếu bị kéo sang B.
@@ -2228,7 +2233,6 @@ export function initInvestLayer() {
   });
   document.addEventListener('qh:dt-counts', () => paintDtCounts());
   if (document.querySelector('#layerPaneDauTu:not([hidden])')) {
-    ensureInvestOn();
-    ensureInvestList();
+    ensureDauTuAxis();
   } else if ($('chk_invest')?.checked) setVisible(true);
 }

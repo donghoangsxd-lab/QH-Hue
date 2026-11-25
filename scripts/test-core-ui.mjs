@@ -323,6 +323,8 @@ assert.match(dauTu, /class="dt-invest-check"/);
 assert.doesNotMatch(dauTu, /id="chk_invest"[^>]*\schecked\b/);
 assert.match(read('docs/ui-spec.md'), /tắt khi mở trang/);
 assert.match(read('public/js/investLayer.js'), /ensureInvestOn/);
+assert.match(read('public/js/investLayer.js'), /export function ensureDauTuAxis/);
+assert.match(read('public/js/chuyenNganh.js'), /if \(id === 'dautu'\) ensureDauTuAxis\(\)/);
 assert.match(read('public/js/investLayer.js'), /queueInvestDraw/);
 assert.match(read('public/js/investLayer.js'), /planMapLive/);
 assert.match(read('public/js/chuyenNganh.js'), /cur === id/);

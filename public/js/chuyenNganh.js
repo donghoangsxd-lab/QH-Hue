@@ -9,7 +9,7 @@ import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './pl
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
 import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers } from './projectLayer.js';
-import { investAxisAllOn, investAxisAllTip, toggleInvestAxisAll } from './investLayer.js';
+import { investAxisAllOn, investAxisAllTip, toggleInvestAxisAll, ensureDauTuAxis } from './investLayer.js';
 import { clearChamDiemMap } from './chamDiemMap.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -2088,6 +2088,8 @@ function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}
   openingAxis = false;
   if (openPanel) document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
   paint();
+  // Mag menu / vuốt track / dock gọi showAxis trực tiếp, không luôn có qh:axis-tab — vẫn nạp sheet+ranh F.
+  if (id === 'dautu') ensureDauTuAxis();
   scheduleSave();
   syncAdminBrowseClass();
   if (id === 'hanhchinh' && !keepCamera) requestAnimationFrame(() => centerOnCity({ animate: false }));
