@@ -5,11 +5,13 @@ import { TT16_STYLES } from './tt16Symbols.js';
 import { getWardDraw, sealWardDraw } from './wardSeam.js';
 
 export const state = {
-  // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
+  // Phân quyền: VIEWER | ADMIN (cấp 1) | AXIS_ADMIN (cấp 2 theo trục). Chỉ đặt sau khi server xác minh Google token.
   currentUserRole: "VIEWER",
   // Google ID token của Admin, gửi kèm mỗi thao tác phê duyệt để server kiểm tra lại
   authToken: null,
   authUser: null,
+  // Trục được giao khi AXIS_ADMIN (vd. ['dautu']); null khi ADMIN full hoặc chưa đăng nhập.
+  adminAxes: null,
   // Đơn vị cán bộ được phép gửi. null khi chưa đăng nhập hoặc đang là quản trị (không khóa).
   entryUnits: null,
 

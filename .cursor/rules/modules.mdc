@@ -71,7 +71,7 @@ Hợp đồng nhập theo sáu trục (`entryRegistry` / `entryKernel`); gắn p
 
 ## MOD-13 Xác thực admin
 
-`services/authService.js` `requireAdmin`, `verifyGoogleIdToken`, `isAdminEmail`. `uiComponents.js`: `initGoogleSignIn`, `restoreAdminSession`, `signOutAdmin`. `reviewQueue.js` `initReviewQueue` (tick lô đỏ giữ hình gốc). `api/gee.js` `action ===` `listChoDuyet`, `previewChoDuyet`, `getChoDuyetPdf`, `approveChoDuyet`, `rejectChoDuyet`. `wardCheck.js` `initWardCheck`. `api/gee.js`: `adminOrNull`; `action ===` `verifyAdmin`, `approvePoint`.
+`services/authService.js` `requireAdmin`, `requireAnyAdmin`, `requireAxisAdmin`, `axesOf`, `canAdminAxis`, `isAdminEmail` (`AXIS_ADMIN_EMAILS` trong `constants.js`). `public/js/authRole.js` `isFullAdmin` `canAdminAxis` `isAnyAdmin`. `uiComponents.js`: `initGoogleSignIn`, `restoreAdminSession`, `signOutAdmin` (role `AXIS_ADMIN` + `state.adminAxes`). `reviewQueue.js` `initReviewQueue` (cấp 2 F chỉ `du-an`). `api/gee.js` `action ===` `listChoDuyet`, `previewChoDuyet`, `getChoDuyetPdf`, `approveChoDuyet`, `rejectChoDuyet`, `saveInvestProject` / `saveInvestGroup` qua `requireAxisAdmin('dautu')`. `wardCheck.js` `initWardCheck`. `api/gee.js`: `adminOrNull`; `action ===` `verifyAdmin` (full hoặc axis), `approvePoint`. `scripts/test-axis-admin.mjs`.
 
 ## MOD-14 GCS, cache ETag
 

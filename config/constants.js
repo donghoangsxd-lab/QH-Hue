@@ -241,6 +241,10 @@ const constants = {
   GAS_SECRET: process.env.GAS_SECRET || "",
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com",
   ADMIN_EMAILS: ["donghoangsxd@gmail.com"],
+  // Admin cấp 2: chỉ một (hoặc vài) trục. Khóa = id trục facet (dautu = F).
+  AXIS_ADMIN_EMAILS: {
+    dautu: ["ncthanhttkt@gmail.com"]
+  },
   ALLOWED_ORIGINS: [
     PROD_ORIGIN,
     "http://localhost:5500", "http://127.0.0.1:5500",

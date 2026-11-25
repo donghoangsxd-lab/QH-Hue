@@ -4,6 +4,7 @@
 // Admin: «Dự án» ghi vùng (đa giác / vòng tròn) thành dự án F → Đang nghiên cứu rồi xóa toàn bộ hình phiên.
 // Mỗi hình gắn với bản đồ lúc vẽ: xem quy hoạch thì nằm trên bản đồ quy hoạch, xem hiện trạng thì trên bản đồ hiện trạng.
 import { state } from './state.js';
+import { canAdminAxis } from './authRole.js';
 import { map, deleteSelectedMeasure, drawToolRenderer, DRAW_TOOL_PANE, ensureDrawMarkPane, getSketchCloneSources } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, announceTool, announceFloat, showToast, FLOAT_OPEN_EVENT, TOOL_START_EVENT, DRAW_SELECT_EVENT } from './utils.js';
@@ -1109,7 +1110,7 @@ function areaGeometryFromShapes() {
 }
 
 function syncInvestUi() {
-  const admin = isAdmin();
+  const admin = canAdminAxis('dautu');
   const btn = $('btnSketchToInvest');
   if (btn) btn.hidden = !admin;
   const row = $('sketchInvestRow');
@@ -1117,8 +1118,8 @@ function syncInvestUi() {
 }
 
 async function saveSketchAsInvest() {
-  if (!isAdmin()) {
-    showToast('Cần đăng nhập quản trị để ghi dự án', 'error');
+  if (!canAdminAxis('dautu')) {
+    showToast('Cần quyền quản trị trục Dự án đầu tư để ghi dự án', 'error');
     return;
   }
   const name = String($('sketchInvestName')?.value || '').replace(/\s+/g, ' ').trim();
@@ -1610,8 +1611,8 @@ export function initSketchLayer() {
     }
     if (e.target.closest('#btnSketchToInvest')) {
       closeEditor(true);
-      if (!isAdmin()) {
-        showToast('Cần đăng nhập quản trị để ghi dự án', 'error');
+      if (!canAdminAxis('dautu')) {
+        showToast('Cần quyền quản trị trục Dự án đầu tư để ghi dự án', 'error');
         return;
       }
       if (!shapes.length) return;

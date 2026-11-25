@@ -7,7 +7,10 @@ const { popNhaStatusText } = require('../services/popNhaStatus');
 const popWatch = require('../services/popNhaWatch');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const gcsWrite = require('../services/gcsWrite');
-const { requireAdmin, httpError, verifyGoogleIdToken, readBearerToken, isAdminEmail } = require('../services/authService');
+const {
+  requireAdmin, requireAnyAdmin, requireAxisAdmin, httpError, verifyGoogleIdToken, readBearerToken,
+  isAdminEmail, canAdminAxis, axesOf, assertChoKindAccess, axisForChoKind
+} = require('../services/authService');
 const choDuyet = require('../services/choDuyetStore');
 const investBoundPending = require('../services/investBoundPending');
 const { stageSpec, applyPublication } = require('../services/reviewPublish');
@@ -432,7 +435,14 @@ function httpsLink(raw) {
 
 async function entryActor(req) {
   const user = await verifyGoogleIdToken(readBearerToken(req));
-  return { email: user.email, name: user.name, exp: user.exp, admin: isAdminEmail(user.email) };
+  const full = isAdminEmail(user.email);
+  return {
+    email: user.email,
+    name: user.name,
+    exp: user.exp,
+    admin: full,
+    axes: full ? [] : axesOf(user.email)
+  };
 }
 
 async function scriptEntry(action, payload) {
@@ -3160,8 +3170,17 @@ module.exports = async (req, res) => {
 
     if (action === 'verifyAdmin') {
       requirePostFromApp(req);
-      const user = await requireAdmin(req);
-      return res.status(200).json({ admin: true, email: user.email, name: user.name, exp: user.exp });
+      const user = await requireAnyAdmin(req);
+      const full = isAdminEmail(user.email);
+      const axes = full ? [] : axesOf(user.email);
+      return res.status(200).json({
+        admin: true,
+        fullAdmin: full,
+        axes,
+        email: user.email,
+        name: user.name,
+        exp: user.exp
+      });
     }
 
     if (action === 'getOfficer') {
@@ -3351,7 +3370,7 @@ module.exports = async (req, res) => {
 
     if (action === 'saveInvestProject') {
       requirePostFromApp(req);
-      await requireAdmin(req);
+      await requireAxisAdmin(req, 'dautu');
       const body = readJsonBody(req);
       const key = cleanInvestText(body.key, 200);
       const match = cleanInvestText(body.match, 200);
@@ -3385,7 +3404,9 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       checkAddPointRate(req);
       const actor = await entryActor(req);
-      if (actor.admin) return res.status(400).json({ error: true, message: 'Quản trị ghi thẳng bằng Lưu dự án, không gửi hàng chờ' });
+      if (actor.admin || canAdminAxis(actor.email, 'dautu')) {
+        return res.status(400).json({ error: true, message: 'Quản trị ghi thẳng bằng Lưu dự án, không gửi hàng chờ' });
+      }
       const body = readJsonBody(req);
       const name = cleanInvestText(body.key || body.name || body.tenQH, 200);
       const groupId = cleanInvestGroupId(body.groupId);
@@ -3432,7 +3453,7 @@ module.exports = async (req, res) => {
     // Gộp nhiều ranh KML thành một dự án. keys là khóa ranh; clear=true thì chỉ gỡ các khóa đó khỏi nhóm.
     if (action === 'saveInvestGroup') {
       requirePostFromApp(req);
-      await requireAdmin(req);
+      await requireAxisAdmin(req, 'dautu');
       const body = readJsonBody(req);
       const keys = [];
       const seen = new Set();
@@ -5079,19 +5100,28 @@ module.exports = async (req, res) => {
 
     if (action === 'listChoDuyet' || action === 'previewChoDuyet' || action === 'getChoDuyetPdf' || action === 'approveChoDuyet' || action === 'rejectChoDuyet') {
       requirePostFromApp(req);
-      const user = await requireAdmin(req);
+      const user = await requireAnyAdmin(req);
+      const fullAdmin = isAdminEmail(user.email);
       checkUrbanEntryRate(req);
       res.setHeader('Cache-Control', 'private, no-store');
       const body = readJsonBody(req);
       if (action === 'listChoDuyet') {
         const result = await scriptEntry('listChoDuyet', { action: 'listChoDuyet', admin: true, email: user.email });
-        return res.status(200).json({ success: true, rows: Array.isArray(result.rows) ? result.rows : [] });
+        let rows = Array.isArray(result.rows) ? result.rows : [];
+        if (!fullAdmin) {
+          rows = rows.filter(r => {
+            const axis = axisForChoKind(r && r.kind);
+            return axis && canAdminAxis(user.email, axis);
+          });
+        }
+        return res.status(200).json({ success: true, rows });
       }
       const id = String(body.id || '');
       if (!/^[a-f0-9]{32}$/.test(id)) return res.status(400).json({ error: true, message: 'Mã hàng chờ không hợp lệ' });
       const found = await scriptEntry('getChoDuyet', { action: 'getChoDuyet', admin: true, email: user.email, id });
       const row = found.row || {};
       if (row.status !== 'cho_duyet') return res.status(409).json({ error: true, message: 'Hồ sơ đã được xử lý' });
+      assertChoKindAccess(user.email, row.kind);
       if (action === 'previewChoDuyet' || action === 'getChoDuyetPdf') {
         const obj = await choDuyet.readJson(row.gcs);
         if (action === 'getChoDuyetPdf') {

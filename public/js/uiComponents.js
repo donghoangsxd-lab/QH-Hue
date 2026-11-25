@@ -3,6 +3,7 @@ import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js
 import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons, detailDisclosure } from './utils.js';
+import { isAnyAdmin, isFullAdmin, adminAxesLabel } from './authRole.js';
 import { refreshWardCheck } from './wardCheck.js';
 import {
   fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm,
@@ -75,7 +76,9 @@ export function toggleAuthModal() {
   modal.style.display = opening ? 'block' : 'none';
   if (!opening) return;
   if (state.authUser && state.authToken) {
-    const who = state.currentUserRole === 'ADMIN' ? 'quản trị' : 'cán bộ';
+    const who = state.currentUserRole === 'ADMIN'
+      ? 'quản trị'
+      : (state.currentUserRole === 'AXIS_ADMIN' ? `admin ${adminAxesLabel() || 'trục'}` : 'cán bộ');
     setAuthMsg(`✓ Đang đăng nhập ${who}: ${state.authUser.email}`, 'var(--accent-green)');
   } else {
     setAuthMsg('');
@@ -112,6 +115,12 @@ async function verifyAdminToken(token) {
   return data;
 }
 
+function sessionAxes(info) {
+  if (info?.fullAdmin) return null;
+  const axes = Array.isArray(info?.axes) ? info.axes.map(a => String(a || '').trim()).filter(Boolean) : [];
+  return axes.length ? axes : null;
+}
+
 function closeAuthModalSoon() {
   setTimeout(() => {
     const modal = document.getElementById('authModal');
@@ -124,7 +133,10 @@ async function handleGoogleCredentialResponse(response) {
   try {
     const info = await verifyAdminToken(response.credential);
     setAdminSession(response.credential, info);
-    setAuthMsg(`✓ Xin chào Admin (${info.name || info.email})`, 'var(--accent-green)');
+    const hello = info.fullAdmin
+      ? `Admin (${info.name || info.email})`
+      : `Admin · ${adminAxesLabel() || 'trục'} (${info.name || info.email})`;
+    setAuthMsg(`✓ Xin chào ${hello}`, 'var(--accent-green)');
     closeAuthModalSoon();
   } catch (err) {
     if (err.status !== 403) {
@@ -133,7 +145,7 @@ async function handleGoogleCredentialResponse(response) {
     }
     try {
       const info = await fetchOfficer(response.credential);
-      if (info.admin) setAdminSession(response.credential, info);
+      if (info.admin) setAdminSession(response.credential, { ...info, fullAdmin: true, axes: [] });
       else setOfficerSession(response.credential, info);
       const who = info.admin ? 'Admin' : (info.name || info.email);
       setAuthMsg(`✓ Xin chào ${who}`, 'var(--accent-green)');
@@ -145,12 +157,20 @@ async function handleGoogleCredentialResponse(response) {
 }
 
 function setAdminSession(token, info) {
-  state.currentUserRole = 'ADMIN';
+  const axes = sessionAxes(info);
+  const full = info?.fullAdmin === true || (info?.fullAdmin !== false && !axes);
+  state.currentUserRole = full ? 'ADMIN' : 'AXIS_ADMIN';
+  state.adminAxes = full ? null : axes;
   state.authToken = token;
   state.authUser = { email: info.email, name: info.name || info.email, exp: Number(info.exp) || 0 };
   state.entryUnits = null;
   try {
-    sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ token, ...state.authUser }));
+    sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({
+      token,
+      ...state.authUser,
+      fullAdmin: full,
+      axes: state.adminAxes || []
+    }));
     sessionStorage.removeItem(OFFICER_SESSION_KEY);
   } catch (e) {}
   updateAuthUi();
@@ -160,6 +180,7 @@ function setAdminSession(token, info) {
 
 function setOfficerSession(token, info) {
   state.currentUserRole = 'VIEWER';
+  state.adminAxes = null;
   state.authToken = token;
   state.authUser = { email: info.email, name: info.name || info.email, exp: Number(info.exp) || 0 };
   state.entryUnits = Array.isArray(info.units) ? info.units.slice() : [];
@@ -172,8 +193,9 @@ function setOfficerSession(token, info) {
 }
 
 export function signOutAdmin() {
-  const wasAdmin = state.currentUserRole === 'ADMIN';
+  const wasStaff = state.currentUserRole === 'ADMIN' || state.currentUserRole === 'AXIS_ADMIN';
   state.currentUserRole = 'VIEWER';
+  state.adminAxes = null;
   state.authToken = null;
   state.authUser = null;
   state.entryUnits = null;
@@ -184,7 +206,7 @@ export function signOutAdmin() {
   window.google?.accounts?.id?.disableAutoSelect?.();
   updateAuthUi();
   document.dispatchEvent(new CustomEvent('qh-admin-changed'));
-  if (wasAdmin) {
+  if (wasStaff) {
     map.closePopup();
     renderGroupedPoints();
   }
@@ -221,14 +243,17 @@ export async function restoreAdminSession() {
 }
 
 function updateAuthUi() {
-  const isAdmin = state.currentUserRole === 'ADMIN' && !!state.authUser;
+  const full = isFullAdmin() && !!state.authUser;
+  const staff = isAnyAdmin() && !!state.authUser;
   const signed = !!(state.authToken && state.authUser);
   const btnAuth = document.getElementById('btnAuth');
   if (btnAuth) {
-    btnAuth.classList.toggle('is-admin', isAdmin);
-    btnAuth.title = isAdmin
+    btnAuth.classList.toggle('is-admin', staff);
+    btnAuth.title = full
       ? `Đã đăng nhập: Admin (${state.authUser.name})`
-      : (signed ? `Đã đăng nhập: ${state.authUser.name}` : 'Đăng nhập');
+      : (staff
+        ? `Đã đăng nhập: Admin · ${adminAxesLabel() || 'trục'} (${state.authUser.name})`
+        : (signed ? `Đã đăng nhập: ${state.authUser.name}` : 'Đăng nhập'));
     btnAuth.setAttribute('aria-label', btnAuth.title);
     btnAuth.innerHTML = ico(signed ? 'user' : 'key');
   }
@@ -236,11 +261,11 @@ function updateAuthUi() {
   const signOut = document.getElementById('btnSignOut');
   if (signOut) signOut.style.display = signed ? '' : 'none';
   const wardRoadsBtn = document.getElementById('btnWardRoads');
-  if (wardRoadsBtn) wardRoadsBtn.style.display = isAdmin ? '' : 'none';
+  if (wardRoadsBtn) wardRoadsBtn.style.display = full ? '' : 'none';
   const roadModeBtn = document.getElementById('btnAddRoadMode');
   if (roadModeBtn) {
-    roadModeBtn.style.display = isAdmin ? '' : 'none';
-    if (!isAdmin && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
+    roadModeBtn.style.display = full ? '' : 'none';
+    if (!full && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
   }
   refreshRoadPanel();
   refreshPopPanel();

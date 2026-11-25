@@ -9,6 +9,7 @@ import { SECTORS, FACET_LEVELS, listAreas, setBrowseState } from './facetStore.j
 import {
   isAdminEntry, allowedEntryKeys, isEntrySignedIn, entryOfficerName, postEntry, assertOfficerUnit, stageOrPublish
 } from './entryKernel.js';
+import { canAdminAxis } from './authRole.js';
 import { FLOW_IDS as REGISTRY_FLOW_IDS } from './entryRegistry.js';
 import { allEntrySteps, visibleEntrySteps, PUBLISH_KIND } from './entrySteps.js';
 import { typeOptionsHtml } from './pointEntrySchema.js';
@@ -2675,8 +2676,9 @@ function renderDuAn() {
     ['UTM48_6', 'VN-2000 UTM 48, múi 6°'],
     ['WGS84', 'WGS84 (kinh, vĩ)']
   ].map(([id, label]) => `<option value="${id}"${id === crs ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
-  const note = isAdmin()
-    ? 'Quản trị ghi thẳng lớp dự án (tên và/hoặc ranh).'
+  const investAdmin = canAdminAxis('dautu');
+  const note = investAdmin
+    ? 'Quản trị (trục F) ghi thẳng lớp dự án (tên và/hoặc ranh).'
     : 'Đăng nhập Google để đề xuất: cần tên dự án hoặc file ranh (hoặc cả hai). Quản trị duyệt trong hàng chờ.';
   root.innerHTML = `<div class="entry-head">${tipHtml(note)}</div>
     <div class="entry-form">
@@ -2698,7 +2700,7 @@ function renderDuAn() {
       <span class="cad-drop-sub">DXF · KML · KMZ</span>
       <input type="file" id="daFile" accept=".dxf,.kml,.kmz" hidden>
     </label>
-    <button type="button" class="btn-submit" id="daSave">${isAdmin() ? 'Lưu dự án' : 'Gửi đề xuất'}</button>
+    <button type="button" class="btn-submit" id="daSave">${investAdmin ? 'Lưu dự án' : 'Gửi đề xuất'}</button>
     <div id="daStatus" class="rp-status" role="status"></div>`;
   $('daFile')?.addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -2755,7 +2757,7 @@ async function saveDuAn() {
   const fields = { 'Tên dự án': name, 'Nhóm dự án': investGroupLabel(groupId) };
   if (decision) fields['Quyết định pháp lý'] = decision;
   try {
-    if (isAdmin()) {
+    if (canAdminAxis('dautu')) {
       if (status) status.textContent = 'Đang ghi dự án…';
       const body = { key: name, match: name, groupId, fields };
       if (daGeom) body.geometry = daGeom;

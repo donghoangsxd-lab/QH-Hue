@@ -5,6 +5,8 @@ const constants = require('../config/constants');
 // token đã xác minh -> { email, name, exp }; tránh gọi Google cho mỗi thao tác của cùng 1 phiên đăng nhập
 const verifiedTokens = new Map();
 
+const AXIS_IDS = new Set(['hanhchinh', 'quyhoach', 'htkt', 'htxh', 'kientruc', 'dautu']);
+
 function httpError(status, message) {
   const err = new Error(message);
   err.status = status;
@@ -53,6 +55,29 @@ function isAdminEmail(email) {
   return constants.ADMIN_EMAILS.includes(String(email || '').toLowerCase());
 }
 
+function axesOf(email) {
+  const want = String(email || '').toLowerCase();
+  if (!want || isAdminEmail(want)) return [];
+  const map = constants.AXIS_ADMIN_EMAILS || {};
+  const axes = [];
+  Object.keys(map).forEach(axis => {
+    if (!AXIS_IDS.has(axis)) return;
+    const list = Array.isArray(map[axis]) ? map[axis] : [];
+    if (list.some(e => String(e || '').toLowerCase() === want)) axes.push(axis);
+  });
+  return axes;
+}
+
+function canAdminAxis(email, axis) {
+  if (!AXIS_IDS.has(String(axis || ''))) return false;
+  if (isAdminEmail(email)) return true;
+  return axesOf(email).includes(axis);
+}
+
+function isAnyAdminEmail(email) {
+  return isAdminEmail(email) || axesOf(email).length > 0;
+}
+
 async function requireAdmin(req) {
   const user = await verifyGoogleIdToken(readBearerToken(req));
   if (!isAdminEmail(user.email)) {
@@ -61,4 +86,47 @@ async function requireAdmin(req) {
   return user;
 }
 
-module.exports = { requireAdmin, httpError, verifyGoogleIdToken, readBearerToken, isAdminEmail };
+async function requireAnyAdmin(req) {
+  const user = await verifyGoogleIdToken(readBearerToken(req));
+  if (!isAnyAdminEmail(user.email)) {
+    throw httpError(403, `Tài khoản ${user.email} không có quyền quản trị`);
+  }
+  return user;
+}
+
+async function requireAxisAdmin(req, axis) {
+  const user = await verifyGoogleIdToken(readBearerToken(req));
+  if (!canAdminAxis(user.email, axis)) {
+    throw httpError(403, `Tài khoản ${user.email} không được quản lý trục ${axis}`);
+  }
+  return user;
+}
+
+/** kind cho-duyet → trục; null = chỉ admin cấp 1. */
+function axisForChoKind(kind) {
+  if (kind === 'du-an') return 'dautu';
+  return null;
+}
+
+function assertChoKindAccess(email, kind) {
+  if (isAdminEmail(email)) return;
+  const axis = axisForChoKind(kind);
+  if (!axis || !canAdminAxis(email, axis)) {
+    throw httpError(403, 'Không có quyền xử lý hồ sơ loại này');
+  }
+}
+
+module.exports = {
+  requireAdmin,
+  requireAnyAdmin,
+  requireAxisAdmin,
+  httpError,
+  verifyGoogleIdToken,
+  readBearerToken,
+  isAdminEmail,
+  isAnyAdminEmail,
+  axesOf,
+  canAdminAxis,
+  axisForChoKind,
+  assertChoKindAccess
+};

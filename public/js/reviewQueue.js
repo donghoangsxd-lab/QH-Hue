@@ -6,6 +6,7 @@ import { geeApi } from './api.js';
 import { escapeHtml } from './utils.js';
 import { DRAW_SUPPORTS } from './entrySteps.js';
 import { HTKT_POINT_CODES } from './pointEntrySchema.js';
+import { isAnyAdmin, isFullAdmin, canAdminAxis } from './authRole.js';
 
 const $ = (id) => document.getElementById(id);
 /** Cùng entryFlows / cadImportUi: preview lên bản đồ đang hiện. */
@@ -197,14 +198,22 @@ async function loadList() {
   if (!list) return;
   clearPreview();
   clearKeep();
+  if (!isAnyAdmin()) {
+    list.innerHTML = '<p class="entry-note">Cần đăng nhập quản trị để xem hàng chờ.</p>';
+    if (status) status.textContent = '';
+    return;
+  }
   if (status) status.textContent = 'Đang tải hàng chờ.';
   try {
     const data = await post('listChoDuyet', {});
-    const rows = data.rows || [];
-    const points = pendingPoints();
+    let rows = data.rows || [];
+    if (!isFullAdmin()) {
+      rows = rows.filter(r => r && r.kind === 'du-an' && canAdminAxis('dautu'));
+    }
+    const points = isFullAdmin() ? pendingPoints() : [];
     const parts = [];
     if (rows.length) {
-      parts.push('<p class="entry-note"><b>Hồ sơ cán bộ / đề xuất F</b></p>');
+      parts.push(`<p class="entry-note"><b>${isFullAdmin() ? 'Hồ sơ cán bộ / đề xuất F' : 'Đề xuất ranh / dự án đầu tư (F)'}</b></p>`);
       parts.push(rows.map(rowHtml).join(''));
     }
     if (points.length) {
@@ -235,6 +244,10 @@ async function onListClick(event) {
       return;
     }
     if (button.dataset.act === 'approve-point') {
+      if (!isFullAdmin()) {
+        if (status) status.textContent = 'Chỉ quản trị cấp 1 được duyệt điểm hạ tầng.';
+        return;
+      }
       if (status) status.textContent = 'Đang duyệt điểm.';
       await approvePointStatus(id);
       await loadList();
@@ -334,7 +347,7 @@ export function initReviewQueue() {
   $('btnChoLoad')?.addEventListener('click', loadList);
   $('choList')?.addEventListener('click', onListClick);
   document.addEventListener('qh-admin-changed', () => {
-    if (state.currentUserRole !== 'ADMIN') {
+    if (!isAnyAdmin()) {
       clearPreview();
       clearKeep();
     }

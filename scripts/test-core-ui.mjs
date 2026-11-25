@@ -494,6 +494,12 @@ assert.match(read('public/css/style.css'), /\.invest-meta|\.invest-bound|\.inves
 assert.match(read('docs/ui-spec.md'), /đề xuất ranh|Đồng ý|invest_bound_pending|Chờ duyệt ranh/);
 assert.match(read('services/investBoundPending.js'), /assertNoPending|upsertPending|removePendingById/);
 assert.match(read('config/constants.js'), /INVEST_BOUND_PENDING_URL/);
+assert.match(read('config/constants.js'), /AXIS_ADMIN_EMAILS[\s\S]*dautu[\s\S]*ncthanhttkt@gmail\.com/);
+assert.match(read('services/authService.js'), /requireAxisAdmin|requireAnyAdmin|axesOf|canAdminAxis/);
+assert.match(read('public/js/authRole.js'), /canAdminAxis|isFullAdmin|AXIS_ADMIN/);
+assert.match(read('public/js/investLayer.js'), /canAdminAxis\('dautu'\)/);
+assert.match(read('api/gee.js'), /requireAxisAdmin\(req, 'dautu'\)/);
+assert.match(read('docs/ui-spec.md'), /AXIS_ADMIN_EMAILS|ncthanhttkt@gmail\.com|Admin cấp 2/);
 assert.match(read('public/js/investLayer.js'), /SELECTED|#fde047/);
 assert.match(read('public/js/app.js'), /syncInvestInfoDock|investInfoSlot/);
 assert.match(read('public/css/style.css'), /body\.invest-info-open #investInfoSlot/);

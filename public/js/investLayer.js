@@ -6,6 +6,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { planMap, onCompareChange, isCompareOn, isSplitOn } from './planMap.js';
 import { geeApi, gcsUrl } from './api.js';
 import { state } from './state.js';
+import { canAdminAxis } from './authRole.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
@@ -282,7 +283,7 @@ function toolBusy() {
 }
 
 function isAdmin() {
-  return state.currentUserRole === 'ADMIN' && !!state.authToken;
+  return canAdminAxis('dautu');
 }
 
 function featureKey(feature) {
