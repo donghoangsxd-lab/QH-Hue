@@ -142,6 +142,7 @@ let hovered = null;
 let selected = null;
 let card = null;
 let highlight = null;
+let boundPreview = null;
 let landFill = null;
 let openSeq = 0;
 let drawToken = 0;
@@ -639,9 +640,72 @@ function areaTextOf(sheet, geom) {
   return '-';
 }
 
-function statHtml(label, value, icon, wide) {
+function metaRow(label, value) {
   if (!value) return '';
-  return `<div class="invest-stat${wide ? ' is-wide' : ''}"><small>${icon ? ico(icon) : ''}${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></div>`;
+  return `<div class="invest-meta-row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
+}
+
+function isSignedIn() {
+  return !!(state.authToken && state.authUser);
+}
+
+function pendingBoundHtml(st) {
+  const rows = Array.isArray(st.pendingBound) ? st.pendingBound : [];
+  if (!isAdmin() || !rows.length) return '';
+  return `<div class="invest-pending" data-invest-pending>
+    <b>Đề xuất ranh chờ duyệt (${rows.length})</b>
+    ${rows.map(r => {
+      const id = escapeHtml(r.id || '');
+      const who = escapeHtml(r.name || r.email || 'Người dùng');
+      const when = escapeHtml(String(r.time || '').slice(0, 16));
+      return `<div class="invest-pending-row" data-pending-id="${id}">
+        <span>${who}${when ? ` · ${when}` : ''}</span>
+        <div class="invest-pending-acts">
+          <button type="button" class="proof-btn invest-bound-preview" data-pending-id="${id}">Xem</button>
+          <button type="button" class="proof-btn invest-bound-approve" data-pending-id="${id}">Đồng ý</button>
+          <button type="button" class="proof-btn btn-secondary invest-bound-reject" data-pending-id="${id}">Từ chối</button>
+        </div>
+        <input class="invest-bound-reason" data-reason-id="${id}" maxlength="300" placeholder="Lý do từ chối">
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function boundToolsHtml(st) {
+  const pending = pendingBoundHtml(st);
+  if (st.geom) {
+    if (!isAdmin()) return '';
+    return `<div class="invest-bound">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>Đã gắn</span></div>
+      <label class="invest-bound-upload proof-btn">${ico('layers')}Thay ranh KML/DXF
+        <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
+      </label>
+    </div>`;
+  }
+  if (isAdmin()) {
+    return `<div class="invest-bound is-missing">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
+      <p class="invest-bound-note">Người dùng đề xuất ranh; bạn bấm Đồng ý hoặc tự tải KML/DXF.</p>
+      <div data-invest-pending-slot>${pending || '<span class="invest-bound-empty">Chưa có đề xuất chờ duyệt.</span>'}</div>
+      <label class="invest-bound-upload proof-btn">${ico('layers')}Tải ranh KML/DXF
+        <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
+      </label>
+    </div>`;
+  }
+  if (isSignedIn()) {
+    return `<div class="invest-bound is-missing">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
+      <p class="invest-bound-note">Tải KML/DXF để đề xuất ranh. Admin đồng ý rồi mới hiện trên bản đồ.</p>
+      <label class="invest-propose-upload proof-btn">${ico('layers')}Đề xuất ranh KML/DXF
+        <input type="file" class="invest-propose-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
+      </label>
+    </div>`;
+  }
+  return `<div class="invest-bound is-missing">
+    <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
+    <p class="invest-bound-note">Đăng nhập Google để đề xuất ranh (KML/DXF). Admin sẽ đồng ý hoặc tự tải ranh.</p>
+    <button type="button" class="proof-btn invest-bound-login">Đăng nhập</button>
+  </div>`;
 }
 
 function overviewHtml(st, props) {
@@ -659,17 +723,21 @@ function overviewHtml(st, props) {
   const chip = noBound
     ? '<span class="invest-chip">Chưa có ranh</span>'
     : (row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`);
-  const alert = noBound
-    ? '<div class="invest-alert">Dự án chưa có ranh giới. Admin có thể tải file KML hoặc DXF để bổ sung.</div>'
-    : row
-      ? ''
-      : ambiguous
-        ? '<div class="invest-alert">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</div>'
-        : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
+  const matchNote = noBound || row
+    ? ''
+    : ambiguous
+      ? '<p class="invest-bound-note">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</p>'
+      : '<p class="invest-bound-note">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</p>';
   const goalHtml = goal
-    ? `<div class="invest-lead"><small>Mục tiêu và nhu cầu đầu tư</small><p>${escapeHtml(goal)}</p></div>`
+    ? `<details class="invest-goal"><summary>Mục tiêu và nhu cầu đầu tư</summary><p>${escapeHtml(goal)}</p></details>`
     : '';
   const groupName = investGroupLabel(st.dtGroup || rowGroupId(row, titleOf(props)));
+  const meta = [
+    metaRow('Diện tích ranh', st.areaText || (noBound ? '—' : '')),
+    metaRow('Diện tích DS', listed),
+    metaRow('Địa điểm', place),
+    metaRow('Ưu tiên', priority)
+  ].filter(Boolean).join('');
   return `<div class="invest-head">
       <span class="invest-badge">${sectorDropSvg(sector)}</span>
       <div class="invest-head-main">
@@ -677,13 +745,8 @@ function overviewHtml(st, props) {
         <div class="lp-title">${escapeHtml(titleOf(props))}</div>
       </div>
     </div>
-    <div class="invest-stats">
-      ${statHtml('Diện tích ranh', st.areaText, 'area', false)}
-      ${statHtml('Diện tích danh sách', listed, 'parcel', false)}
-      ${statHtml('Địa điểm', place, 'pin', true)}
-      ${statHtml('Mức độ ưu tiên', priority, 'flag', !place)}
-    </div>
-    ${goalHtml}${alert}${adminToolsHtml(st)}${groupHtml(st)}`;
+    ${meta ? `<dl class="invest-meta">${meta}</dl>` : ''}
+    ${goalHtml}${matchNote}${boundToolsHtml(st)}${adminToolsHtml(st)}${groupHtml(st)}`;
 }
 
 function detailHtml(props) {
@@ -701,9 +764,6 @@ function adminToolsHtml(st) {
   return `<div class="invest-admin-tools">
     <label class="invest-group-move">Nhóm tab
       <select class="invest-group-select" aria-label="Chuyển nhóm dự án">${opts}</select>
-    </label>
-    <label class="invest-bound-upload proof-btn">${ico('layers')}Tải ranh KML/DXF
-      <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
     </label>
   </div>`;
 }
@@ -1219,10 +1279,17 @@ function syncSelectionStyle() {
   if (selected && card) selectLayer(selected, card.map, card.geom);
 }
 
+function clearBoundPreview() {
+  if (!boundPreview) return;
+  try { boundPreview.remove(); } catch { /* đã gỡ */ }
+  boundPreview = null;
+}
+
 function closeCard() {
   openSeq++;
   restoreInspectFocus();
   setQuietProjectOutline(false);
+  clearBoundPreview();
   card = null;
   selected = null;
   hovered = null;
@@ -1274,8 +1341,28 @@ function ensureCard() {
     if (e.target.closest('.invest-add')) { addEditRow(); return; }
     if (e.target.closest('.invest-cancel')) { paintCard(); return; }
     if (e.target.closest('.invest-save')) { saveEdit(); return; }
+    if (e.target.closest('.invest-bound-login')) {
+      document.getElementById('btnAuth')?.click();
+      return;
+    }
+    if (e.target.closest('.invest-bound-approve')) {
+      approvePendingBound(e.target.closest('.invest-bound-approve').dataset.pendingId);
+      return;
+    }
+    if (e.target.closest('.invest-bound-reject')) {
+      rejectPendingBound(e.target.closest('.invest-bound-reject').dataset.pendingId);
+      return;
+    }
+    if (e.target.closest('.invest-bound-preview')) {
+      previewPendingBound(e.target.closest('.invest-bound-preview').dataset.pendingId);
+      return;
+    }
     if (e.target.closest('.invest-bound-upload') && !e.target.closest('.invest-bound-file')) {
       el.querySelector('.invest-bound-file')?.click();
+      return;
+    }
+    if (e.target.closest('.invest-propose-upload') && !e.target.closest('.invest-propose-file')) {
+      el.querySelector('.invest-propose-file')?.click();
       return;
     }
     if (e.target.closest('.cad-card-x')) closeCard();
@@ -1287,6 +1374,12 @@ function ensureCard() {
     if (file?.files?.[0]) {
       uploadBoundary(file.files[0]);
       file.value = '';
+      return;
+    }
+    const propose = e.target.closest('.invest-propose-file');
+    if (propose?.files?.[0]) {
+      proposeBoundary(propose.files[0]);
+      propose.value = '';
     }
   });
   el.addEventListener('pls-pick', (e) => toggleLand(e.detail?.key, e.detail?.color));
@@ -1457,6 +1550,7 @@ function paintCard() {
   el.hidden = false;
   document.dispatchEvent(new CustomEvent('qh-invest-info'));
   if (planOpen && info === 'overview') showTab(st.tab, { syncMap: false });
+  if (isAdmin() && !st.geom) void loadPendingBound(st);
 }
 
 function beginEdit() {
@@ -1654,6 +1748,71 @@ function unionBoundary(features) {
   return polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys };
 }
 
+async function postInvestApi(action, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
+  const res = await fetch(geeApi(`action=${action}`), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 403) signOutAdmin();
+  if (!res.ok || data.error) throw new Error(data.message || `Lỗi ${res.status}`);
+  return data;
+}
+
+function projectNameKeys(st) {
+  const props = viewOf(st);
+  return [saveKeyOf(st), titleOf(props), sheetProjectName(st.sheet)]
+    .map(s => String(s || '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function fillPendingBoundSlot(st) {
+  const slot = $('investCard')?.querySelector('[data-invest-pending-slot]');
+  if (!slot) return;
+  const html = pendingBoundHtml(st);
+  slot.innerHTML = html || '<span class="invest-bound-empty">Chưa có đề xuất chờ duyệt.</span>';
+}
+
+async function loadPendingBound(st) {
+  if (!st || !isAdmin() || st.geom || st.pendingBoundLoading) return;
+  st.pendingBoundLoading = true;
+  try {
+    const data = await postInvestApi('listChoDuyet', {});
+    if (card !== st) return;
+    const names = new Set(projectNameKeys(st));
+    st.pendingBound = (data.rows || []).filter(r =>
+      r && r.kind === 'du-an' && names.has(String(r.tenQH || '').trim().toLowerCase())
+    );
+    fillPendingBoundSlot(st);
+  } catch {
+    if (card === st) {
+      st.pendingBound = [];
+      fillPendingBoundSlot(st);
+    }
+  } finally {
+    if (card === st) st.pendingBoundLoading = false;
+  }
+}
+
+function attachGeomToCard(st, geometry) {
+  const fields = {};
+  rowEntries(viewOf(st)).forEach(([k, v]) => { fields[k] = String(v); });
+  if (!sheetProjectName(fields)) fields['Tên dự án'] = titleOf(viewOf(st));
+  applySaved(st.feature, fields, { groupId: st.dtGroup, geometry });
+  st.geom = geometry;
+  st.cache.clear();
+  st.pendingBound = [];
+  let area = 0;
+  try { area = turf.area(turf.feature(geometry)); } catch { area = 0; }
+  st.areaText = area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`;
+  clearBoundPreview();
+  paintCard();
+  openCard(st.feature, findLayer(st.feature, st.map), st.map);
+}
+
 async function uploadBoundary(file) {
   const st = card;
   if (!st || !isAdmin() || !file || st.saving) return;
@@ -1676,17 +1835,114 @@ async function uploadBoundary(file) {
       groupId: st.dtGroup || undefined,
       geometry
     });
-    applySaved(st.feature, fields, { groupId: st.dtGroup, geometry });
-    st.geom = geometry;
-    st.cache.clear();
-    let area = 0;
-    try { area = turf.area(turf.feature(geometry)); } catch { area = 0; }
-    st.areaText = area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`;
-    paintCard();
-    openCard(st.feature, findLayer(st.feature, st.map), st.map);
+    attachGeomToCard(st, geometry);
     showToast('Đã gắn ranh dự án');
   } catch (err) {
     showToast(err.message || 'Không tải được ranh', 'error');
+  } finally {
+    st.saving = false;
+  }
+}
+
+async function proposeBoundary(file) {
+  const st = card;
+  if (!st || isAdmin() || !isSignedIn() || !file || st.saving || st.geom) return;
+  st.saving = true;
+  showToast('Đang gửi đề xuất ranh…');
+  try {
+    const drawn = await readDrawingFile(file, 'boundary');
+    if (drawn.error) throw new Error(drawn.error);
+    const geometry = unionBoundary(drawn.features);
+    if (!geometry) throw new Error('File không có polygon ranh');
+    const key = saveKeyOf(st) || titleOf(viewOf(st));
+    if (!key) throw new Error('Dự án chưa có tên để đề xuất ranh');
+    const fields = {};
+    rowEntries(viewOf(st)).forEach(([k, v]) => { fields[k] = String(v); });
+    if (!sheetProjectName(fields)) fields['Tên dự án'] = key;
+    const data = await postInvestApi('submitInvestProposal', {
+      key,
+      name: key,
+      groupId: st.dtGroup || '',
+      fields,
+      geometry
+    });
+    showToast(data.id
+      ? `Đã gửi đề xuất ranh (mã ${String(data.id).slice(0, 8)}…). Chờ admin đồng ý.`
+      : 'Đã gửi đề xuất ranh. Chờ admin đồng ý.');
+  } catch (err) {
+    showToast(err.message || 'Không gửi được đề xuất ranh', 'error');
+  } finally {
+    st.saving = false;
+  }
+}
+
+async function previewPendingBound(id) {
+  const st = card;
+  if (!st || !isAdmin() || !id) return;
+  try {
+    const data = await postInvestApi('previewChoDuyet', { id });
+    const geom = (data.features || []).find(f => f?.geometry)?.geometry;
+    if (!geom) {
+      showToast('Đề xuất này không có ranh polygon', 'error');
+      return;
+    }
+    clearBoundPreview();
+    const host = st.map || map;
+    if (!host) return;
+    boundPreview = L.geoJSON(geom, {
+      style: { color: '#fbbf24', weight: 3, dashArray: '6 4', fillColor: '#fbbf24', fillOpacity: 0.18 }
+    }).addTo(host);
+    try {
+      const bounds = boundPreview.getBounds();
+      if (bounds.isValid()) host.fitBounds(bounds.pad(0.2));
+    } catch { /* ranh rỗng */ }
+    showToast('Đang xem đề xuất ranh (chưa công bố)');
+  } catch (err) {
+    showToast(err.message || 'Không xem được đề xuất', 'error');
+  }
+}
+
+async function approvePendingBound(id) {
+  const st = card;
+  if (!st || !isAdmin() || !id || st.saving) return;
+  st.saving = true;
+  showToast('Đang duyệt đề xuất ranh…');
+  try {
+    const preview = await postInvestApi('previewChoDuyet', { id });
+    const geometry = (preview.features || []).find(f => f?.geometry)?.geometry || null;
+    await postInvestApi('approveChoDuyet', { id, keepIds: [] });
+    if (geometry) {
+      attachGeomToCard(st, geometry);
+      showToast('Đã đồng ý và gắn ranh dự án');
+    } else {
+      st.pendingBound = (st.pendingBound || []).filter(r => r.id !== id);
+      fillPendingBoundSlot(st);
+      showToast('Đã duyệt đề xuất (không có polygon để gắn)');
+    }
+  } catch (err) {
+    showToast(err.message || 'Không duyệt được đề xuất', 'error');
+  } finally {
+    st.saving = false;
+  }
+}
+
+async function rejectPendingBound(id) {
+  const st = card;
+  if (!st || !isAdmin() || !id || st.saving) return;
+  const reason = $('investCard')?.querySelector(`[data-reason-id="${CSS.escape(id)}"]`)?.value.trim() || '';
+  if (!reason) {
+    showToast('Nhập lý do từ chối', 'error');
+    return;
+  }
+  st.saving = true;
+  try {
+    await postInvestApi('rejectChoDuyet', { id, reason });
+    clearBoundPreview();
+    st.pendingBound = (st.pendingBound || []).filter(r => r.id !== id);
+    fillPendingBoundSlot(st);
+    showToast('Đã từ chối đề xuất ranh');
+  } catch (err) {
+    showToast(err.message || 'Không từ chối được', 'error');
   } finally {
     st.saving = false;
   }
@@ -1817,7 +2073,8 @@ function openCard(feature, layer, targetMap) {
     seq, tab, infoTab: 'overview', cache: new Map(), map: targetMap || map, feature, members, geom, sheet,
     areaText, pieces: members.filter(m => m.geometry).length || 1, recorded: recordedM2(sheet), bounds: null,
     landKey: null, editing: false, saving: false, grouping: false, picks: new Set(),
-    dtGroup: rowGroupId(sheet, title)
+    dtGroup: rowGroupId(sheet, title),
+    pendingBound: [], pendingBoundLoading: false
   };
   paintCard();
   document.dispatchEvent(new CustomEvent('qh-invest-info'));

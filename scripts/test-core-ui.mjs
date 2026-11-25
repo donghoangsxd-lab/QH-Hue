@@ -487,6 +487,10 @@ assert.match(read('public/js/loadProgress.js'), /export function startLoadMeter/
 assert.match(read('public/js/apartmentLayer.js'), /data-apt-expand/);
 assert.match(read('public/js/investLayer.js'), /data-invest-expand/);
 assert.match(read('public/js/investLayer.js'), /invest-info-open|qh-invest-info/);
+assert.match(read('public/js/investLayer.js'), /invest-meta|boundToolsHtml|proposeBoundary|approvePendingBound/);
+assert.match(read('public/js/investLayer.js'), /Đề xuất ranh KML\/DXF|Đồng ý|submitInvestProposal/);
+assert.match(read('public/css/style.css'), /\.invest-meta|\.invest-bound|\.invest-pending/);
+assert.match(read('docs/ui-spec.md'), /đề xuất ranh|Đồng ý/);
 assert.match(read('public/js/investLayer.js'), /SELECTED|#fde047/);
 assert.match(read('public/js/app.js'), /syncInvestInfoDock|investInfoSlot/);
 assert.match(read('public/css/style.css'), /body\.invest-info-open #investInfoSlot/);
