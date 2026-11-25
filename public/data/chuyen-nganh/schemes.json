@@ -515,6 +515,99 @@
       "authority": "UBND tỉnh",
       "taskDecision": "11/QĐ-UBND",
       "taskDecisionDate": "2023-04-01"
+    },
+    {
+      "slug": "qhpk-a-6cfacf24",
+      "name": "QHPK Khu A - ĐTM An Vân Dương",
+      "level": "QHPK",
+      "mapid": 20599,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "432/QĐ-UBND",
+      "decisionDate": "2019-02-21",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-b-thuoc-khu-do-thi-mo-943a92bb",
+      "name": "QHPK Khu B - ĐTM An Vân Dương",
+      "level": "QHPK",
+      "mapid": 20745,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "497/QĐ-UBND",
+      "decisionDate": "2023-03-09",
+      "authority": "UBND tỉnh",
+      "taskDecision": "1355/QĐ-UBND",
+      "taskDecisionDate": "2017-19-06"
+    },
+    {
+      "slug": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d",
+      "name": "QHPK Khu C - ĐTM An Vân Dương (2024)",
+      "level": "QHPK",
+      "mapid": 22899,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "197/QĐ-UBND",
+      "decisionDate": "2024-01-17",
+      "authority": "UBND tỉnh",
+      "taskDecision": "2711/QĐ-UBND",
+      "taskDecisionDate": "2022-09-11"
+    },
+    {
+      "slug": "qhpk-d-do-thi-moi-an-van-duong-44e6f969",
+      "name": "QHPK Khu D - An Vân Dương (2025)",
+      "level": "QHPK",
+      "mapid": 22903,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "1974/QĐ-UBND",
+      "decisionDate": "2024-07-20",
+      "authority": "UBND tỉnh",
+      "taskDecision": "570 /QĐ-UBND",
+      "taskDecisionDate": "2024-07-03"
+    },
+    {
+      "slug": "qhpk-thuy-bieu-3c2fbc98",
+      "name": "QHPK Thủy Biều",
+      "level": "QHPK",
+      "mapid": 20719,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thuan-hoa"
+      },
+      "decision": "2424/QĐ-UBND",
+      "decisionDate": "2022-10-05",
+      "authority": "UBND tỉnh",
+      "taskDecision": "Số: 1928 /QĐ-UBND",
+      "taskDecisionDate": "2020-30-07"
     }
   ]
 }

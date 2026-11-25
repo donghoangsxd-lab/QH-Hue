@@ -334,8 +334,8 @@ async function startChrome() {
     return {
       stop() { cdp.close(); stop(); },
       async text(url) {
-        // Abort trong trang — CDP awaitPromise không hủy được fetch treo phía máy chủ.
-        const expr = `fetch(${JSON.stringify(url)},{signal:AbortSignal.timeout(60000)}).then(async (r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); })`;
+        // AbortController thủ công — AbortSignal.timeout có thể thiếu trên Edge cũ; CDP không hủy fetch treo.
+        const expr = `(async () => { const c = new AbortController(); const t = setTimeout(() => c.abort(), 60000); try { const r = await fetch(${JSON.stringify(url)}, { signal: c.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); } finally { clearTimeout(t); } })()`;
         const got = await cdp.send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, 75000);
         if (got?.exceptionDetails) {
           const detail = got.exceptionDetails.exception?.description;
@@ -619,7 +619,8 @@ function skipKeptOrBackground(name) {
   const key = strip(name);
   if (/dinh vi ranh/.test(key)) return 'định vị ranh';
   if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
-  if (/^khong gian\b/.test(key) || /^cay xanh$/.test(key)) return 'lớp nền';
+  // Cây xanh điểm / cảnh quan = lớp nền trang trí, không phải HTKT.
+  if (/^khong gian\b/.test(key) || /^cay xanh\b/.test(key)) return 'lớp nền';
   return null;
 }
 

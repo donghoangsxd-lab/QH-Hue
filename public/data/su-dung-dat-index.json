@@ -333,11 +333,11 @@
     {
       "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-b-thuoc-khu-do-thi-mo-943a92bb",
       "name": "QHPK Điều chỉnh quy hoạch phân khu, khu B thuộc khu đô thị mới An Vân Dương",
-      "mapid": null,
+      "mapid": 20745,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-khu-b-thuoc-khu-do-thi-mo-943a92bb/su-dung-dat.json",
-      "lands": 129,
+      "lands": 208,
       "source": "projects"
     },
     {
@@ -593,31 +593,31 @@
     {
       "scheme": "qhpk-a-6cfacf24",
       "name": "QHPK Khu A - ĐTM An Vân Dương",
-      "mapid": null,
+      "mapid": 20599,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-a-6cfacf24/su-dung-dat.json",
-      "lands": 163,
+      "lands": 212,
       "source": "projects"
     },
     {
       "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d",
       "name": "QHPK Khu C - ĐTM An Vân Dương (2024)",
-      "mapid": null,
+      "mapid": 22899,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d/su-dung-dat.json",
-      "lands": 176,
+      "lands": 306,
       "source": "projects"
     },
     {
       "scheme": "qhpk-d-do-thi-moi-an-van-duong-44e6f969",
       "name": "QHPK Khu D - An Vân Dương (2025)",
-      "mapid": null,
+      "mapid": 22903,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-d-do-thi-moi-an-van-duong-44e6f969/su-dung-dat.json",
-      "lands": 160,
+      "lands": 220,
       "source": "projects"
     },
     {
@@ -853,11 +853,11 @@
     {
       "scheme": "qhpk-thuy-bieu-3c2fbc98",
       "name": "QHPK Thủy Biều",
-      "mapid": null,
+      "mapid": 20719,
       "layer": "su-dung-dat",
       "role": "quy-hoach",
       "path": "projects/qhpk-thuy-bieu-3c2fbc98/su-dung-dat.json",
-      "lands": 198,
+      "lands": 275,
       "source": "projects"
     },
     {
