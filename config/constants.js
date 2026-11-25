@@ -216,6 +216,8 @@ const constants = {
   INVEST_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/invest_calls.json",
   // Hiệu chỉnh admin ghi đè lên danh sách sheet. Apps Script không ghi file này.
   INVEST_EDITS_URL: "https://storage.googleapis.com/hue-infra-data-us/invest_edits.json",
+  // Ranh đề xuất đang chờ duyệt (chỉ mục công khai, client đọc để hiện trạng / chặn ghi đè).
+  INVEST_BOUND_PENDING_URL: "https://storage.googleapis.com/hue-infra-data-us/invest_bound_pending.json",
   // Danh mục đồ án + ranh tổng: projects/index.json. Client nhận URL này từ API, không gắn cứng.
   PROJECTS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/projects/",
   // Hồ sơ file chờ duyệt do người dùng chưa đăng nhập gửi (Apps Script ghi: index.json + <id>.<dxf|kml|geojson>)

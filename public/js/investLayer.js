@@ -30,6 +30,11 @@ const INVEST_SHEET_URL = './data/invest-sheet.json';
 const INVEST_BOUND_URL = './data/invest-boundary.geojson';
 const INVEST_GCS_SHEET = 'invest_calls.json';
 const INVEST_GCS_EDITS = 'invest_edits.json';
+const INVEST_GCS_PENDING = 'invest_bound_pending.json';
+const PENDING_BOUND_STYLE = {
+  color: '#fbbf24', weight: 2.5, opacity: 0.95, dashArray: '7 5',
+  fillColor: '#fbbf24', fillOpacity: 0.14, interactive: true
+};
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -143,6 +148,10 @@ let selected = null;
 let card = null;
 let highlight = null;
 let boundPreview = null;
+let pendingBoundItems = [];
+let pendingBoundGroupLeft = null;
+let pendingBoundGroupRight = null;
+let pendingBoundLoadToken = 0;
 let landFill = null;
 let openSeq = 0;
 let drawToken = 0;
@@ -322,7 +331,8 @@ export function investLegendHtml() {
   const row = (look, label, nested = false) =>
     `<div class="htkt-legend-row invest-legend-row${nested ? ' is-sub' : ''}">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${escapeHtml(label)}</span></div>`;
   const bound = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch" aria-hidden="true"></i><span>Ranh dự án</span></div>`;
-  let html = `<div class="invest-legend-block"><b class="invest-legend-h">Ký hiệu chung</b>${bound}</div>`;
+  const pending = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch is-pending" aria-hidden="true"></i><span>Ranh đề xuất (chờ duyệt)</span></div>`;
+  let html = `<div class="invest-legend-block"><b class="invest-legend-h">Ký hiệu chung</b>${bound}${pending}</div>`;
   html += '<div class="invest-legend-block"><b class="invest-legend-h">Nhóm dự án</b>';
   for (const g of INVEST_GROUPS) {
     const look = GROUP_LOOK[g.id] || lookOf('layers', '#64748b', '#334155', g.label);
@@ -649,61 +659,106 @@ function isSignedIn() {
   return !!(state.authToken && state.authUser);
 }
 
+function normPendingKey(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function pendingForKeys(keys) {
+  const names = new Set((keys || []).map(normPendingKey).filter(Boolean));
+  if (!names.size) return [];
+  return pendingBoundItems.filter(it =>
+    names.has(normPendingKey(it.key)) || names.has(normPendingKey(it.tenQH))
+  );
+}
+
+function pendingForProject(stOrProject) {
+  if (!stOrProject) return [];
+  if (stOrProject.feature || stOrProject.sheet != null || stOrProject.pendingBound != null) {
+    return pendingForKeys(projectNameKeys(stOrProject));
+  }
+  return pendingForKeys([
+    stOrProject.title,
+    sheetProjectName(stOrProject.sheet),
+    stOrProject.feature?.properties?._adminKey,
+    stOrProject.feature?.properties?.name
+  ]);
+}
+
 function pendingBoundHtml(st) {
-  const rows = Array.isArray(st.pendingBound) ? st.pendingBound : [];
-  if (!isAdmin() || !rows.length) return '';
+  const rows = Array.isArray(st.pendingBound) && st.pendingBound.length
+    ? st.pendingBound
+    : pendingForProject(st);
+  if (!rows.length) return '';
+  const adminActs = isAdmin();
   return `<div class="invest-pending" data-invest-pending>
-    <b>Đề xuất ranh chờ duyệt (${rows.length})</b>
+    <b>${rows[0]?.replace ? 'Đề xuất thay ranh chờ duyệt' : 'Đề xuất ranh chờ duyệt'} (${rows.length})</b>
     ${rows.map(r => {
       const id = escapeHtml(r.id || '');
       const who = escapeHtml(r.name || r.email || 'Người dùng');
       const when = escapeHtml(String(r.time || '').slice(0, 16));
+      const kind = r.replace ? 'Thay ranh' : 'Gắn ranh mới';
       return `<div class="invest-pending-row" data-pending-id="${id}">
-        <span>${who}${when ? ` · ${when}` : ''}</span>
+        <span>${who}${when ? ` · ${when}` : ''} · ${kind}</span>
         <div class="invest-pending-acts">
           <button type="button" class="proof-btn invest-bound-preview" data-pending-id="${id}">Xem</button>
-          <button type="button" class="proof-btn invest-bound-approve" data-pending-id="${id}">Đồng ý</button>
-          <button type="button" class="proof-btn btn-secondary invest-bound-reject" data-pending-id="${id}">Từ chối</button>
+          ${adminActs ? `<button type="button" class="proof-btn invest-bound-approve" data-pending-id="${id}">Đồng ý</button>
+          <button type="button" class="proof-btn btn-secondary invest-bound-reject" data-pending-id="${id}">Từ chối</button>` : ''}
         </div>
-        <input class="invest-bound-reason" data-reason-id="${id}" maxlength="300" placeholder="Lý do từ chối">
+        ${adminActs ? `<input class="invest-bound-reason" data-reason-id="${id}" maxlength="300" placeholder="Lý do từ chối">` : ''}
       </div>`;
     }).join('')}
   </div>`;
 }
 
 function boundToolsHtml(st) {
-  const pending = pendingBoundHtml(st);
-  if (st.geom) {
-    if (!isAdmin()) return '';
-    return `<div class="invest-bound">
-      <div class="invest-bound-head"><b>Ranh giới</b><span>Đã gắn</span></div>
-      <label class="invest-bound-upload proof-btn">${ico('layers')}Thay ranh KML/DXF
+  const pending = pendingForProject(st);
+  st.pendingBound = pending;
+  const pendingBlock = pendingBoundHtml(st);
+  const hasPending = pending.length > 0;
+  const statusLabel = hasPending
+    ? (pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh')
+    : (st.geom ? 'Đã gắn' : 'Chưa có');
+  const boxClass = hasPending ? 'is-pending' : (st.geom ? '' : 'is-missing');
+
+  if (hasPending) {
+    return `<div class="invest-bound ${boxClass}">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>${escapeHtml(statusLabel)}</span></div>
+      <p class="invest-bound-note">Đã có đề xuất đang chờ duyệt (hiện nét đứt vàng trên bản đồ). Không gửi thêm ranh khác cho đến khi admin xử lý.</p>
+      <div data-invest-pending-slot>${pendingBlock}</div>
+      ${isAdmin() ? `<label class="invest-bound-upload proof-btn">${ico('layers')}${st.geom ? 'Tự tải ranh thay thế' : 'Tự tải ranh KML/DXF'}
         <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
-      </label>
+      </label>` : ''}
     </div>`;
   }
+
   if (isAdmin()) {
-    return `<div class="invest-bound is-missing">
-      <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
-      <p class="invest-bound-note">Người dùng đề xuất ranh; bạn bấm Đồng ý hoặc tự tải KML/DXF.</p>
-      <div data-invest-pending-slot>${pending || '<span class="invest-bound-empty">Chưa có đề xuất chờ duyệt.</span>'}</div>
-      <label class="invest-bound-upload proof-btn">${ico('layers')}Tải ranh KML/DXF
+    return `<div class="invest-bound ${boxClass}">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>${escapeHtml(statusLabel)}</span></div>
+      <p class="invest-bound-note">${st.geom
+    ? 'Có thể tự tải ranh mới (ghi thẳng). Người dùng cũng có thể đề xuất thay ranh.'
+    : 'Người dùng đề xuất ranh; bạn bấm Đồng ý hoặc tự tải KML/DXF.'}</p>
+      <div data-invest-pending-slot><span class="invest-bound-empty">Chưa có đề xuất chờ duyệt.</span></div>
+      <label class="invest-bound-upload proof-btn">${ico('layers')}${st.geom ? 'Thay ranh KML/DXF' : 'Tải ranh KML/DXF'}
         <input type="file" class="invest-bound-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
       </label>
     </div>`;
   }
+
   if (isSignedIn()) {
-    return `<div class="invest-bound is-missing">
-      <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
-      <p class="invest-bound-note">Tải KML/DXF để đề xuất ranh. Admin đồng ý rồi mới hiện trên bản đồ.</p>
-      <label class="invest-propose-upload proof-btn">${ico('layers')}Đề xuất ranh KML/DXF
+    return `<div class="invest-bound ${boxClass}">
+      <div class="invest-bound-head"><b>Ranh giới</b><span>${escapeHtml(statusLabel)}</span></div>
+      <p class="invest-bound-note">${st.geom
+    ? 'Tải KML/DXF để đề xuất thay ranh. Admin đồng ý rồi mới thay trên bản đồ.'
+    : 'Tải KML/DXF để đề xuất ranh. Admin đồng ý rồi mới hiện trên bản đồ.'}</p>
+      <label class="invest-propose-upload proof-btn">${ico('layers')}${st.geom ? 'Đề xuất thay ranh KML/DXF' : 'Đề xuất ranh KML/DXF'}
         <input type="file" class="invest-propose-file" accept=".kml,.kmz,.dxf,application/vnd.google-earth.kml+xml" hidden>
       </label>
     </div>`;
   }
-  return `<div class="invest-bound is-missing">
-    <div class="invest-bound-head"><b>Ranh giới</b><span>Chưa có</span></div>
-    <p class="invest-bound-note">Đăng nhập Google để đề xuất ranh (KML/DXF). Admin sẽ đồng ý hoặc tự tải ranh.</p>
+
+  return `<div class="invest-bound ${boxClass}">
+    <div class="invest-bound-head"><b>Ranh giới</b><span>${escapeHtml(statusLabel)}</span></div>
+    <p class="invest-bound-note">Đăng nhập Google để đề xuất ${st.geom ? 'thay ranh' : 'ranh'} (KML/DXF). Admin sẽ đồng ý hoặc tự tải ranh.</p>
     <button type="button" class="proof-btn invest-bound-login">Đăng nhập</button>
   </div>`;
 }
@@ -720,9 +775,12 @@ function overviewHtml(st, props) {
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
   const ambiguous = !row && !!props._ambiguous;
   const noBound = !st.geom;
-  const chip = noBound
-    ? '<span class="invest-chip">Chưa có ranh</span>'
-    : (row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`);
+  const pending = pendingForProject(st);
+  const chip = pending.length
+    ? `<span class="invest-chip is-pending">${pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh'}</span>`
+    : noBound
+      ? '<span class="invest-chip">Chưa có ranh</span>'
+      : (row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`);
   const matchNote = noBound || row
     ? ''
     : ambiguous
@@ -1550,7 +1608,7 @@ function paintCard() {
   el.hidden = false;
   document.dispatchEvent(new CustomEvent('qh-invest-info'));
   if (planOpen && info === 'overview') showTab(st.tab, { syncMap: false });
-  if (isAdmin() && !st.geom) void loadPendingBound(st);
+  void refreshCardPending(st);
 }
 
 function beginEdit() {
@@ -1585,6 +1643,7 @@ function redrawMaps() {
   if (visible && pack && map) leftGroup = drawOn(map, pack);
   // Chỉ vẽ bản đồ phải khi đang so sánh / chia đôi — tránh dựng đôi lớp mỗi lần đổi tab.
   if (visible && pack && planMapLive()) rightGroup = drawOn(planMap, pack);
+  redrawPendingBounds();
   if (feature && host && card) selectLayer(findLayer(feature, host), host, geom);
 }
 
@@ -1772,29 +1831,84 @@ function projectNameKeys(st) {
 function fillPendingBoundSlot(st) {
   const slot = $('investCard')?.querySelector('[data-invest-pending-slot]');
   if (!slot) return;
+  st.pendingBound = pendingForProject(st);
   const html = pendingBoundHtml(st);
   slot.innerHTML = html || '<span class="invest-bound-empty">Chưa có đề xuất chờ duyệt.</span>';
 }
 
-async function loadPendingBound(st) {
-  if (!st || !isAdmin() || st.geom || st.pendingBoundLoading) return;
+async function refreshCardPending(st) {
+  if (!st || st.pendingBoundLoading) return;
   st.pendingBoundLoading = true;
   try {
-    const data = await postInvestApi('listChoDuyet', {});
+    await loadPendingBoundIndex({ quietList: true });
     if (card !== st) return;
-    const names = new Set(projectNameKeys(st));
-    st.pendingBound = (data.rows || []).filter(r =>
-      r && r.kind === 'du-an' && names.has(String(r.tenQH || '').trim().toLowerCase())
-    );
-    fillPendingBoundSlot(st);
-  } catch {
-    if (card === st) {
-      st.pendingBound = [];
-      fillPendingBoundSlot(st);
+    const next = pendingForProject(st);
+    const sig = next.map(r => r.id).join(',');
+    if (sig !== st._pendingSig) {
+      st._pendingSig = sig;
+      st.pendingBound = next;
+      paintCard();
+      return;
     }
+    st.pendingBound = next;
+    fillPendingBoundSlot(st);
   } finally {
     if (card === st) st.pendingBoundLoading = false;
   }
+}
+
+function clearPendingBoundLayers() {
+  try { pendingBoundGroupLeft?.remove(); } catch { /* */ }
+  try { pendingBoundGroupRight?.remove(); } catch { /* */ }
+  pendingBoundGroupLeft = null;
+  pendingBoundGroupRight = null;
+}
+
+function drawPendingBoundsOn(host) {
+  if (!host || typeof L === 'undefined' || !pendingBoundItems.length) return null;
+  const group = L.layerGroup();
+  pendingBoundItems.forEach(it => {
+    if (!it?.geometry) return;
+    const layer = L.geoJSON(it.geometry, {
+      pane: PANE,
+      style: PENDING_BOUND_STYLE,
+      onEachFeature: (_f, ly) => {
+        ly.bindTooltip(
+          `${it.replace ? 'Đề xuất thay ranh' : 'Đề xuất ranh'} · ${it.tenQH || it.key || ''} (chờ duyệt)`,
+          { sticky: true, className: 'invest-tip', opacity: 0.95 }
+        );
+        ly.on('click', () => {
+          const hit = projectList().find(p => pendingForProject(p).some(row => row.id === it.id));
+          if (hit) openCard(hit.feature, findLayer(hit.feature, host), host);
+        });
+      }
+    });
+    group.addLayer(layer);
+  });
+  group.addTo(host);
+  return group;
+}
+
+function redrawPendingBounds() {
+  clearPendingBoundLayers();
+  if (!visible) return;
+  if (map) pendingBoundGroupLeft = drawPendingBoundsOn(map);
+  if (planMapLive() && planMap) pendingBoundGroupRight = drawPendingBoundsOn(planMap);
+}
+
+async function loadPendingBoundIndex(opts = {}) {
+  const token = ++pendingBoundLoadToken;
+  try {
+    const url = `${gcsUrl(INVEST_GCS_PENDING)}?v=${Date.now()}`;
+    const data = await fetchJsonOk(url);
+    if (token !== pendingBoundLoadToken) return pendingBoundItems;
+    pendingBoundItems = Array.isArray(data?.items) ? data.items.filter(it => it?.id && it?.geometry) : [];
+  } catch {
+    if (token === pendingBoundLoadToken) pendingBoundItems = [];
+  }
+  redrawPendingBounds();
+  if (!opts.quietList) paintInvestList({ counts: false });
+  return pendingBoundItems;
 }
 
 function attachGeomToCard(st, geometry) {
@@ -1835,6 +1949,7 @@ async function uploadBoundary(file) {
       groupId: st.dtGroup || undefined,
       geometry
     });
+    await loadPendingBoundIndex();
     attachGeomToCard(st, geometry);
     showToast('Đã gắn ranh dự án');
   } catch (err) {
@@ -1846,9 +1961,14 @@ async function uploadBoundary(file) {
 
 async function proposeBoundary(file) {
   const st = card;
-  if (!st || isAdmin() || !isSignedIn() || !file || st.saving || st.geom) return;
+  if (!st || isAdmin() || !isSignedIn() || !file || st.saving) return;
+  if (pendingForProject(st).length) {
+    showToast('Dự án đang có đề xuất ranh chờ duyệt. Không gửi thêm.', 'error');
+    return;
+  }
+  const replace = !!st.geom;
   st.saving = true;
-  showToast('Đang gửi đề xuất ranh…');
+  showToast(replace ? 'Đang gửi đề xuất thay ranh…' : 'Đang gửi đề xuất ranh…');
   try {
     const drawn = await readDrawingFile(file, 'boundary');
     if (drawn.error) throw new Error(drawn.error);
@@ -1864,11 +1984,17 @@ async function proposeBoundary(file) {
       name: key,
       groupId: st.dtGroup || '',
       fields,
-      geometry
+      geometry,
+      replace
     });
+    await loadPendingBoundIndex();
+    if (card === st) {
+      st.pendingBound = pendingForProject(st);
+      paintCard();
+    }
     showToast(data.id
-      ? `Đã gửi đề xuất ranh (mã ${String(data.id).slice(0, 8)}…). Chờ admin đồng ý.`
-      : 'Đã gửi đề xuất ranh. Chờ admin đồng ý.');
+      ? `Đã gửi ${replace ? 'đề xuất thay ranh' : 'đề xuất ranh'} (mã ${String(data.id).slice(0, 8)}…). Chờ admin đồng ý.`
+      : `Đã gửi ${replace ? 'đề xuất thay ranh' : 'đề xuất ranh'}. Chờ admin đồng ý.`);
   } catch (err) {
     showToast(err.message || 'Không gửi được đề xuất ranh', 'error');
   } finally {
@@ -1878,10 +2004,13 @@ async function proposeBoundary(file) {
 
 async function previewPendingBound(id) {
   const st = card;
-  if (!st || !isAdmin() || !id) return;
+  if (!st || !id) return;
   try {
-    const data = await postInvestApi('previewChoDuyet', { id });
-    const geom = (data.features || []).find(f => f?.geometry)?.geometry;
+    let geom = pendingBoundItems.find(it => it.id === id)?.geometry || null;
+    if (!geom && isAdmin()) {
+      const data = await postInvestApi('previewChoDuyet', { id });
+      geom = (data.features || []).find(f => f?.geometry)?.geometry || null;
+    }
     if (!geom) {
       showToast('Đề xuất này không có ranh polygon', 'error');
       return;
@@ -1890,7 +2019,7 @@ async function previewPendingBound(id) {
     const host = st.map || map;
     if (!host) return;
     boundPreview = L.geoJSON(geom, {
-      style: { color: '#fbbf24', weight: 3, dashArray: '6 4', fillColor: '#fbbf24', fillOpacity: 0.18 }
+      style: { color: '#f59e0b', weight: 3, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.22 }
     }).addTo(host);
     try {
       const bounds = boundPreview.getBounds();
@@ -1911,12 +2040,13 @@ async function approvePendingBound(id) {
     const preview = await postInvestApi('previewChoDuyet', { id });
     const geometry = (preview.features || []).find(f => f?.geometry)?.geometry || null;
     await postInvestApi('approveChoDuyet', { id, keepIds: [] });
+    await loadPendingBoundIndex();
     if (geometry) {
       attachGeomToCard(st, geometry);
       showToast('Đã đồng ý và gắn ranh dự án');
     } else {
-      st.pendingBound = (st.pendingBound || []).filter(r => r.id !== id);
-      fillPendingBoundSlot(st);
+      st.pendingBound = pendingForProject(st);
+      paintCard();
       showToast('Đã duyệt đề xuất (không có polygon để gắn)');
     }
   } catch (err) {
@@ -1938,8 +2068,8 @@ async function rejectPendingBound(id) {
   try {
     await postInvestApi('rejectChoDuyet', { id, reason });
     clearBoundPreview();
-    st.pendingBound = (st.pendingBound || []).filter(r => r.id !== id);
-    fillPendingBoundSlot(st);
+    await loadPendingBoundIndex();
+    if (card === st) paintCard();
     showToast('Đã từ chối đề xuất ranh');
   } catch (err) {
     showToast(err.message || 'Không từ chối được', 'error');
@@ -2074,7 +2204,9 @@ function openCard(feature, layer, targetMap) {
     areaText, pieces: members.filter(m => m.geometry).length || 1, recorded: recordedM2(sheet), bounds: null,
     landKey: null, editing: false, saving: false, grouping: false, picks: new Set(),
     dtGroup: rowGroupId(sheet, title),
-    pendingBound: [], pendingBoundLoading: false
+    pendingBound: pendingForKeys([title, sheetProjectName(sheet), feature.properties?._adminKey, feature.properties?.name]),
+    pendingBoundLoading: false,
+    _pendingSig: ''
   };
   paintCard();
   document.dispatchEvent(new CustomEvent('qh-invest-info'));
@@ -2126,7 +2258,10 @@ function investRow(p, n) {
   const open = investOpen.has(id);
   const shown = !investHidden.has(id);
   const rows = investDossierRows(p);
-  const badge = p.hasBoundary ? '' : ' <small class="layer-hint">Chưa có ranh</small>';
+  const pending = pendingForProject(p);
+  const badge = pending.length
+    ? ` <small class="layer-hint is-pending">${pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh'}</small>`
+    : (p.hasBoundary ? '' : ' <small class="layer-hint">Chưa có ranh</small>');
   const area = p.areaText || areaTextOf(p.sheet, p.geom) || '-';
   const blob = [p.title, area, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
   return `<div class="project-row${shown ? '' : ' is-off'}${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
@@ -2354,12 +2489,15 @@ async function setVisible(on) {
     leftGroup = null;
     rightGroup?.remove();
     rightGroup = null;
+    clearPendingBoundLayers();
     return;
   }
   const needDraw = !leftGroup;
   let features;
   try { features = await loadPack(); } catch { return; }
   if (!visible || token !== drawToken || !features) return;
+  await loadPendingBoundIndex();
+  if (!visible || token !== drawToken) return;
   paintInvestList();
   if (!visible || token !== drawToken) return;
   if (needDraw) {
@@ -2368,6 +2506,7 @@ async function setVisible(on) {
   } else if (planMapLive() && !rightGroup) {
     rightGroup = drawOn(planMap, features);
   }
+  redrawPendingBounds();
 }
 
 export function initInvestLayer() {

@@ -9,6 +9,7 @@ const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTex
 const gcsWrite = require('../services/gcsWrite');
 const { requireAdmin, httpError, verifyGoogleIdToken, readBearerToken, isAdminEmail } = require('../services/authService');
 const choDuyet = require('../services/choDuyetStore');
+const investBoundPending = require('../services/investBoundPending');
 const { stageSpec, applyPublication } = require('../services/reviewPublish');
 const { limitPublicGet, geeLimitOpts } = require('../services/getRate');
 const roads = require('../services/roadsService');
@@ -3370,6 +3371,9 @@ module.exports = async (req, res) => {
       }
       try {
         const written = await writeInvestEdit({ key, match, fields, groupId, geometry });
+        if (geometry) {
+          try { await investBoundPending.removePendingByKey(key); } catch { /* chỉ mục chờ không chặn ghi admin */ }
+        }
         return res.status(200).json({ success: true, groupId: written.groupId || null, hasGeometry: !!written.hasGeometry });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được dự án' });
@@ -3393,17 +3397,33 @@ module.exports = async (req, res) => {
       if (body.geometry != null && !geometry) {
         return res.status(400).json({ error: true, message: 'Ranh chỉ nhận Polygon hoặc MultiPolygon' });
       }
+      const replace = body.replace === true;
       try {
+        if (geometry && name) await investBoundPending.assertNoPending(name);
         const staged = await stageChoDuyet(actor, {
           kind: 'du-an',
           unit: 'tp:TP',
           tenQH: name,
-          summary: name || (geometry ? 'Đề xuất ranh dự án' : ''),
+          summary: geometry
+            ? (replace ? `Đề xuất thay ranh: ${name}` : `Đề xuất ranh: ${name}`)
+            : (name || ''),
           fields,
           groupId,
           geometry: geometry || undefined
         });
-        return res.status(200).json({ success: true, staged: true, id: staged.id });
+        if (geometry && name) {
+          await investBoundPending.upsertPending({
+            id: staged.id,
+            key: name,
+            tenQH: name,
+            name: actor.name || '',
+            email: actor.email || '',
+            time: new Date().toISOString(),
+            replace,
+            geometry
+          });
+        }
+        return res.status(200).json({ success: true, staged: true, id: staged.id, pendingBound: !!geometry });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gửi được đề xuất dự án' });
       }
@@ -5112,6 +5132,9 @@ module.exports = async (req, res) => {
         if (!reason) return res.status(400).json({ error: true, message: 'Cần lý do từ chối' });
         await scriptEntry('setChoDuyet', { action: 'setChoDuyet', admin: true, email: user.email, id, status: 'tu_choi', lyDo: reason });
         await dropChoDuyetFiles(id, row.gcs);
+        if (row.kind === 'du-an') {
+          try { await investBoundPending.removePendingById(id); } catch { /* chỉ mục chờ */ }
+        }
         return res.status(200).json({ success: true, id, status: 'tu_choi' });
       }
       const obj = await choDuyet.readJson(row.gcs);
@@ -5175,6 +5198,9 @@ module.exports = async (req, res) => {
         lyDo: [done.note, keepNote].filter(Boolean).join(' ').slice(0, 300)
       });
       await dropChoDuyetFiles(id, row.gcs);
+      if (row.kind === 'du-an' || (obj && obj.kind === 'du-an')) {
+        try { await investBoundPending.removePendingById(id); } catch { /* chỉ mục chờ */ }
+      }
       return res.status(200).json({ success: true, id, status: 'da_duyet', published: !!done.published, skipped: !!done.skipped, note: done.note || '' });
     }
 

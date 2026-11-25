@@ -5978,6 +5978,9 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   flex: none; margin-left: auto; padding: 1px 6px; border-radius: 99px;
   background: rgba(239, 68, 68, 0.16); color: #fecaca; letter-spacing: 0; text-transform: none; font-weight: 700;
 }
+.invest-chip.is-pending {
+  background: rgba(245, 158, 11, 0.2); color: #fde68a;
+}
 .invest-card .invest-head .lp-title { padding-right: 0; margin-top: 2px; }
 .invest-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; padding-right: 22px; }
 .invest-switch button {
@@ -6023,6 +6026,7 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   display: flex; flex-direction: column; gap: 6px;
 }
 .invest-bound.is-missing { border-color: rgba(248, 113, 113, 0.45); background: rgba(239, 68, 68, 0.08); }
+.invest-bound.is-pending { border-color: rgba(245, 158, 11, 0.55); background: rgba(245, 158, 11, 0.1); }
 .invest-bound-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font-size: var(--fs-sm);
@@ -6030,10 +6034,13 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-bound-head b { font-size: var(--fs-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
 .invest-bound-head span { font-weight: 700; color: var(--text-main); }
 .invest-bound.is-missing .invest-bound-head span { color: #fecaca; }
+.invest-bound.is-pending .invest-bound-head span { color: #fde68a; }
 .invest-bound-note, .invest-bound-empty {
   margin: 0; color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.35;
 }
 .invest-bound.is-missing .invest-bound-note { color: #fecaca; }
+.invest-bound.is-pending .invest-bound-note { color: #fde68a; }
+.project-name .layer-hint.is-pending { color: #fbbf24; font-weight: 600; }
 .invest-pending { display: flex; flex-direction: column; gap: 6px; }
 .invest-pending > b { font-size: var(--fs-xs); color: var(--accent-cyan); letter-spacing: 0.03em; text-transform: uppercase; }
 .invest-pending-row {
@@ -8835,6 +8842,10 @@ body.project-review.la-page #projectReviewHost {
   border: 2px dashed #ff00ff;
   background: rgba(255, 0, 255, 0.14);
   border-radius: 2px;
+}
+#legendDauTu .invest-bound-swatch.is-pending {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.18);
 }
 #tabLegend.is-dt .legend-display,
 #tabLegend.is-dt .legend-main,
