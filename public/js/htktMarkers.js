@@ -8,6 +8,10 @@ const GLYPH = {
   water: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5s5.2 5.4 5.2 9.1a5.2 5.2 0 0 1-10.4 0C6.8 8.9 12 3.5 12 3.5z"/><path d="M9.2 13.2c.8 1.4 2.2 2.1 2.8 2.1"/></g>',
   bolt: '<path fill="C" stroke="E" stroke-width="0.8" stroke-linejoin="round" d="M13.2 2.2 5.2 13.4h6L10.4 21.8 19 10.4h-6.2z"/>',
   road: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M9 3.2 5.6 20.8M15 3.2l3.4 17.6"/><path d="M12 5.2v2.4M12 11v2.4M12 16.8v2.4"/></g>',
+  // Đồng bộ chữ P với icons/Parking.png (HTXH 2-BDX).
+  parking: '<text x="12" y="17.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="C">P</text>',
+  // Thuyền buồm (thân + hai cánh) — rõ hơn glyph đường khi điểm là bến thuyền / bến đò.
+  boat: '<g fill="C" stroke="E" stroke-width="0.7" stroke-linejoin="round"><path d="M5 17.6h14l-1.1 2.2H6.1z"/><path d="M11.2 4.2v13"/><path d="M11.2 5.2 18.4 15.4H11.2z"/><path d="M11.2 8.2 6.2 15.4h5z"/></g>',
   drain: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.2h16M6.2 7.2c0 5.2 1.8 7.2 5.8 7.2s5.8-2 5.8-7.2"/><path d="M12 14.4v5.2M9.2 17.2 12 20.2l2.8-3"/></g>',
   wastewater: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><rect x="5" y="8" width="14" height="10" rx="1.4"/><path d="M8 8V6.2h8V8M8 13h3.2M12.8 13H16"/><circle cx="12" cy="18.6" r="1.1" fill="C" stroke="none"/></g>',
   waste: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M8.2 8.2h7.6l-.8 11.2H9z"/><path d="M7 8.2h10M10 8.2V6.4h4v1.8M10.8 11.2v5.2M13.2 11.2v5.2"/></g>',
@@ -52,6 +56,20 @@ function darken(hex) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
+function facilityGlyph(layer, props) {
+  const t = foldName([
+    props && props.tencongtrinh,
+    props && props.loaicongtrinh,
+    props && props.tendoituong,
+    props && props.ghichu,
+    props && props.loai,
+    layer && layer.name
+  ].filter(Boolean).join(' '));
+  if (/bai[-_ ]?do[-_ ]?xe|do[-_ ]?xe|parking|\bbdx\b/.test(t)) return 'parking';
+  if (/ben[-_ ]?thuyen|ben[-_ ]?do|\bthuyen\b|cang[-_ ]?thuyen|wharf|jetty/.test(t)) return 'boat';
+  return '';
+}
+
 function subtypeGlyph(layer) {
   const n = foldName(`${layer && layer.name || ''} ${layer && layer.file || ''}`);
   if (/nang[-_ ]?luong|dien[-_ ]?mat[-_ ]?troi|nang[-_ ]?luong[-_ ]?tai[-_ ]?tao/.test(n)) return 'energy';
@@ -72,7 +90,16 @@ export function htktPointLook(layer, props = {}, styled = null) {
   const nhom = NHOM_LOOK[props && props.nhom];
   let fill = (styled && styled.fill) || (nhom && nhom.fill) || base.fill;
   let edge = (nhom && nhom.edge) || base.edge;
-  let glyph = (nhom && nhom.glyph) || subtypeGlyph(layer) || base.glyph;
+  const facility = facilityGlyph(layer, props);
+  let glyph = facility || (nhom && nhom.glyph) || subtypeGlyph(layer) || base.glyph;
+  if (facility === 'parking') {
+    // Cùng tông xanh pin Parking.png (HTXH).
+    fill = '#0284c7';
+    edge = '#0c4a6e';
+  } else if (facility === 'boat') {
+    fill = '#0e7490';
+    edge = '#155e75';
+  }
   if (isHydrantLayer(layer)) {
     fill = '#dc2626';
     edge = '#7f1d1d';
@@ -96,15 +123,18 @@ export function htktDropSvg(look, className = 'htkt-drop') {
   </svg>`;
 }
 
-/** Leaflet divIcon giọt nước; tip chạm tọa độ công trình. */
+/** Leaflet divIcon giọt nước; tip chạm tọa độ công trình. Bãi đỗ xe dùng cùng Parking.png với HTXH. */
 export function htktPointIcon(layer, props, styled) {
   const look = htktPointLook(layer, props, styled);
   const scale = look.scale || 1;
   const w = Math.round(26 * scale);
   const h = Math.round(36 * scale);
+  const html = look.glyph === 'parking'
+    ? `<img src="./icons/Parking.png" alt="" width="${w}" height="${h}" style="display:block;width:${w}px;height:${h}px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))"/>`
+    : htktDropSvg(look);
   return L.divIcon({
-    className: 'htkt-pin',
-    html: htktDropSvg(look),
+    className: look.glyph === 'parking' ? 'htkt-pin htkt-pin-png' : 'htkt-pin',
+    html,
     iconSize: [w, h],
     iconAnchor: [Math.round(w / 2), h],
     popupAnchor: [0, -Math.round(h * 0.72)]

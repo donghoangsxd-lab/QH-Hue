@@ -35,6 +35,20 @@ const hydrant = htktPointLook(
 assert.equal(hydrant.glyph, 'hydrant');
 assert.equal(hydrant.fill, '#dc2626');
 
+const parking = htktPointLook(
+  { sector: 'giao-thong', name: 'Công trình đầu mối giao thông', file: 'cong-trinh-dau-moi-giao-thong.geojson' },
+  { tencongtrinh: 'Bãi đỗ xe P15', loaicongtrinh: 'Bãi đỗ xe' }
+);
+assert.equal(parking.glyph, 'parking');
+assert.equal(parking.fill, '#0284c7');
+
+const boat = htktPointLook(
+  { sector: 'giao-thong', name: 'Công trình đầu mối giao thông', file: 'cong-trinh-dau-moi-giao-thong.geojson' },
+  { tencongtrinh: 'Bến thuyền', loaicongtrinh: 'Bến thuyền' }
+);
+assert.equal(boat.glyph, 'boat');
+assert.match(htktDropSvg(boat), /M5 17\.6h14/);
+
 const svg = htktDropSvg(water, 'htkt-drop');
 assert.match(svg, /viewBox="0 0 70 96"/);
 assert.match(svg, /#0369a1/);
@@ -43,6 +57,10 @@ assert.match(svg, /htkt-drop/);
 const status = htktWaterStatusDrop('xay-moi');
 assert.match(status, /#d97706/);
 
+const markersSrc = fs.readFileSync(new URL('../public/js/htktMarkers.js', import.meta.url), 'utf8');
+assert.match(markersSrc, /icons\/Parking\.png/);
+assert.match(markersSrc, /glyph === 'parking'/);
+
 const cn = fs.readFileSync(new URL('../public/js/chuyenNganh.js', import.meta.url), 'utf8');
 assert.match(cn, /htktPointIcon/);
 assert.match(cn, /L\.marker\(latlng/);
@@ -50,6 +68,12 @@ assert.doesNotMatch(
   cn.slice(cn.indexOf('pointToLayer:'), cn.indexOf('onEachFeature:')),
   /circleMarker/
 );
+assert.match(cn, /TT16_GT_LINE/);
+assert.match(cn, /tim-duong[\s\S]*#ff0000/);
+assert.match(cn, /long-duong[\s\S]*#1a1a1a/);
+assert.match(cn, /he-duong[\s\S]*#0000ff/);
+assert.match(cn, /gtRoadRole/);
+assert.match(cn, /featureStyle\(/);
 
 const css = fs.readFileSync(new URL('../public/css/style.css', import.meta.url), 'utf8');
 assert.match(css, /\.htkt-pin/);

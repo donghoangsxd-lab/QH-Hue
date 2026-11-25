@@ -98,6 +98,14 @@ const NHOM_COLOR = {
   'mat-cat': '#64748b',
   'nang-luong': '#ea580c'
 };
+// TT 16/2025/TT-BXD — HTKT giao thông: Tim ACI 1 nét đứt, Lòng ACI 7 liền, Hè/bó vỉa ACI 5 liền.
+// ACI 7 trên nền sáng hiển thị đen (cùng quy ước CAD giấy trắng).
+const TT16_GT_LINE = {
+  'tim-duong': { color: '#ff0000', weight: 2.2, dashArray: '12 5 2 5', fillOpacity: 0 },
+  'long-duong': { color: '#1a1a1a', weight: 2.4, dashArray: null, fillColor: '#4a4a4a', fillOpacity: 0.32 },
+  'he-duong': { color: '#0000ff', weight: 2.2, dashArray: null, fillColor: '#2563eb', fillOpacity: 0.22 },
+  'mat-cat': { color: '#64748b', weight: 1.5, dashArray: null, fillOpacity: 0 }
+};
 const fileCache = new Map();
 const drawn = new Map();
 const openSchemes = new Set([
@@ -167,6 +175,56 @@ function featureColor(layer, props) {
   return NHOM_COLOR[props && props.nhom] || SECTOR_COLOR[layer.sector] || '#94a3b8';
 }
 
+function foldGt(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase();
+}
+
+/** Vai trò nét GT theo lớp + thuộc tính (tim / lòng / hè) — TT16 Phụ lục HTKT_GT_*. */
+function gtRoadRole(layer, props = {}) {
+  if (!layer || layer.sector !== 'giao-thong') return '';
+  if (props.nhom === 'mat-cat') return 'mat-cat';
+  const layerKey = foldGt(`${layer.name || ''} ${layer.file || ''}`);
+  const propKey = foldGt([
+    props.loaimatduong, props.loaidoituong, props.ghichu, props.thanhphanduong, props.loai
+  ].filter(Boolean).join(' '));
+  if (/mat[-_ ]?cat/.test(layerKey)) return 'mat-cat';
+  if (/mang[-_ ]?luoi[-_ ]?giao[-_ ]?thong|tim[-_ ]?duong/.test(layerKey)) return 'tim-duong';
+  if (/long[-_ ]?duong/.test(propKey)) return 'long-duong';
+  if (/le[-_ ]?duong|he[-_ ]?duong|via[-_ ]?he|bo[-_ ]?via|le duong/.test(propKey)) return 'he-duong';
+  if (/dai[-_ ]?phan[-_ ]?cach|bung[-_ ]?binh/.test(propKey)) return 'long-duong';
+  if (/bo[-_ ]?via|he[-_ ]?duong|via[-_ ]?he/.test(layerKey)) return 'he-duong';
+  if (/mat[-_ ]?duong|long[-_ ]?duong/.test(layerKey)) return 'long-duong';
+  return '';
+}
+
+function featureStyle(layer, props, { dashQh, polygon } = {}) {
+  const role = gtRoadRole(layer, props);
+  if (role && TT16_GT_LINE[role]) {
+    const base = TT16_GT_LINE[role];
+    return {
+      color: base.color,
+      weight: base.weight,
+      opacity: 0.95,
+      dashArray: base.dashArray,
+      fillColor: base.fillColor || base.color,
+      fillOpacity: polygon ? (base.fillOpacity || 0.18) : 0
+    };
+  }
+  const color = featureColor(layer, props);
+  return {
+    color,
+    weight: props.nhom === 'mat-cat' ? 1.5 : 2.6,
+    opacity: 0.95,
+    dashArray: dashQh || null,
+    fillColor: color,
+    fillOpacity: polygon ? 0.18 : 0
+  };
+}
+
 function featureTitle(props, layer) {
   return props.tencongtrinh || props.tendoituong || props.tenduong || props.ten || props.name || layer.name;
 }
@@ -202,17 +260,13 @@ async function showFile(layer, frame) {
   const fc = await loadFile(layer.file);
   if (!isLayerOn(layer.id)) return;
   clearDrawn(layer.id);
-  const dash = layer.kind === 'quy-hoach' ? '8 6' : null;
+  const dashQh = layer.kind === 'quy-hoach' ? '8 6' : null;
   const groups = hosts().map(m => L.geoJSON(fc, {
     renderer: L.canvas({ padding: 0.3 }),
     style: (f) => {
       const props = f.properties || {};
-      const color = featureColor(layer, props);
       const polygon = /Polygon/.test(f.geometry && f.geometry.type || '');
-      return {
-        color, weight: props.nhom === 'mat-cat' ? 1.5 : 2.6, opacity: 0.95, dashArray: dash,
-        fillColor: color, fillOpacity: polygon ? 0.18 : 0
-      };
+      return featureStyle(layer, props, { dashQh, polygon });
     },
     pointToLayer: (f, latlng) => {
       const props = f.properties || {};
