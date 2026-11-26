@@ -156,8 +156,8 @@ export function initLegendPanel() {
   const legendTab = document.getElementById('btnDockLegend');
   const baseTab = document.getElementById('btnDockBase');
   const envTab = document.getElementById('btnDockEnv');
-  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn tab Chú giải. Lớp nền và Lớp môi trường vẫn dùng được.
-  const LEGEND_OFF = new Set(['hanhchinh', 'kientruc']);
+  // Kiến trúc không có ký hiệu lớp: ẩn tab Chú giải. Trục A hiện Chú giải (DVHC / đô thị).
+  const LEGEND_OFF = new Set(['kientruc']);
   const legendOff = () => LEGEND_OFF.has(document.getElementById('layerMain')?.dataset.active || '');
   const applyDock = () => {
     const off = legendOff();
@@ -194,6 +194,7 @@ export function initLegendPanel() {
   const checked = (id) => !!document.getElementById(id)?.checked;
   const anyOn = (ids) => ids.some(checked);
   const SET_ON = {
+    DVHC: ['chk_dvhc'],
     URBAN: ['chk_urban'],
     QHC25: ['chk_qhc25', 'chk_gt25', 'chk_qhc25head'],
     QHC: ['chk_qhc10', 'chk_gt10', 'chk_qhc10head'],
@@ -238,24 +239,48 @@ export function initLegendPanel() {
   const syncLegend = () => {
     if (!frame) return;
     applyDock();
+    const axisNow = document.getElementById('layerMain')?.dataset.active || '';
+    const adminTab = document.querySelector('[data-admin-tab].active')?.dataset.adminTab
+      || document.querySelector('[data-admin-tab][aria-selected="true"]')?.dataset.adminTab
+      || 'dvhc';
+    const hanhchinh = axisNow === 'hanhchinh';
+    // Trục A: ưu tiên bộ chú giải theo tab Hành chính / Đô thị.
+    if (hanhchinh) {
+      if (adminTab === 'dothi') prefer = 'URBAN';
+      else if (adminTab === 'dvhc') prefer = 'DVHC';
+    }
     const visible = new Set();
     tabs.forEach(t => {
       const set = t.dataset.legendSet;
-      const show = set === 'SECTOR' ? sectorOn : (anyOn(SET_ON[set] || []) || prefer === set);
+      let show = set === 'SECTOR' ? sectorOn : (anyOn(SET_ON[set] || []) || prefer === set);
+      if (hanhchinh) {
+        if (set === 'DVHC') show = adminTab === 'dvhc';
+        else if (set === 'URBAN') show = adminTab === 'dothi';
+        else if (set !== 'SECTOR') show = false;
+      } else if (set === 'DVHC') {
+        show = false;
+      }
       t.hidden = !show;
+      if (show) visible.add(set);
+    });
+    // Pane URBAN/DVHC không luôn có chip [data-legend-set]: vẫn hiện qua data-legend-pane.
+    host.querySelectorAll('[data-legend-pane="DVHC"], [data-legend-pane="URBAN"]').forEach((p) => {
+      const set = p.dataset.legendPane;
+      const show = visible.has(set) || (hanhchinh && prefer === set);
+      p.hidden = !show;
       if (show) visible.add(set);
     });
     if (prefer && visible.has(prefer)) selectSet(prefer);
     else if (!visible.has(active)) selectSet([...visible][0]);
     const symbols = visible.size > 0;
     const land = anyOn(LAND);
-    const axisNow = document.getElementById('layerMain')?.dataset.active || '';
     const hatang = axisNow === 'hatang';
     const xahoi = axisNow === 'xahoi';
     const dautu = axisNow === 'dautu';
     frame.classList.toggle('is-htkt', hatang);
     frame.classList.toggle('is-xh', xahoi);
     frame.classList.toggle('is-dt', dautu);
+    frame.classList.toggle('is-admin', hanhchinh);
     const htktLegend = document.getElementById('legendHtkt');
     if (htktLegend) htktLegend.hidden = !hatang;
     const xhLegend = document.getElementById('legendXh');
@@ -273,9 +298,12 @@ export function initLegendPanel() {
       }
     }
     const main = frame.querySelector('.legend-main');
-    if (main) main.hidden = (xahoi || dautu) ? true : (hatang ? false : !symbols);
+    if (main) main.hidden = (xahoi || dautu) ? true : (hatang || hanhchinh ? false : !symbols);
     const display = document.querySelector('#tabLegend .legend-display');
-    if (display) display.hidden = hatang || xahoi || dautu || !land;
+    if (display) display.hidden = hatang || xahoi || dautu || hanhchinh || !land;
+    // Trục A: ẩn ô tìm ký hiệu đất (không dùng bộ TT16).
+    if (search) search.hidden = hanhchinh || !LEGEND_SETS[active];
+    if (toggle) toggle.style.visibility = hanhchinh || !LEGEND_SETS[active] ? 'hidden' : '';
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
     const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]

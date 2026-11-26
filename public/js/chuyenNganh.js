@@ -5,6 +5,9 @@ import {
   highlightWardNames, isShiftClick, renderGroupedPoints, refreshHeatmapOnly
 } from './mapEngine.js';
 import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
+import {
+  setDvhcClassMode, setDvhcClassVisible
+} from './dvhcClassLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
@@ -48,7 +51,7 @@ import { rasterRowsHtml, rasterSectorHas } from './qhcRasterLayer.js';
 const STORE_KEY = 'qh_axes_v1';
 // Không còn lưu / khôi phục lớp trên máy. Xóa khóa cũ khi mở trang.
 try { localStorage.removeItem(STORE_KEY); } catch (e) { /* chế độ riêng tư */ }
-const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
+const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_dvhc', 'chk_projects', 'chk_qhct'];
 const SHARE_KEYS = ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'];
 const KIND_LABEL = { 'hien-trang': 'Hiện trạng khi lập đồ án', 'quy-hoach': 'Quy hoạch' };
 const QHC25_SCHEME = 'qhc-hue-2045';
@@ -1667,6 +1670,13 @@ function paintXaHoi() {
   if (scope) scope.textContent = `Phạm vi: ${areaLabel(getAreaFilter() || AREA_TP)}`;
 }
 
+function adminClassChk() {
+  const tab = adminTabId();
+  if (tab === 'dothi') return document.getElementById('chk_urban');
+  if (tab === 'dvhc') return document.getElementById('chk_dvhc');
+  return null;
+}
+
 function paintAxisAll() {
   const btn = document.getElementById('btnAxisAll');
   if (!btn) return;
@@ -1680,6 +1690,15 @@ function paintAxisAll() {
   if (browseState().axis === 'dautu') {
     const on = investAxisAllOn();
     const tip = investAxisAllTip();
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = tip;
+    btn.setAttribute('aria-label', tip);
+    return;
+  }
+  if (browseState().axis === 'hanhchinh') {
+    const el = adminClassChk();
+    const on = !!el?.checked;
+    const tip = on ? 'Tắt lớp phân loại đang xem' : 'Bật lớp phân loại đang xem';
     btn.setAttribute('aria-pressed', String(on));
     btn.title = tip;
     btn.setAttribute('aria-label', tip);
@@ -1883,7 +1902,7 @@ function isHatangLayerOn(l) {
 }
 
 function axisHasOpenLayers(axisId) {
-  if (axisId === 'hanhchinh') return chkOn('chk_urban');
+  if (axisId === 'hanhchinh') return chkOn('chk_urban') || chkOn('chk_dvhc');
   if (axisId === 'quyhoach') return anyPlanLayerOn();
   if (axisId === 'hatang') return getLayers().some(isHatangLayerOn);
   if (axisId === 'xahoi') {
@@ -1902,6 +1921,7 @@ function axisHasOpenLayers(axisId) {
 function clearAxisLayers(axisId) {
   if (axisId === 'hanhchinh') {
     setChk('chk_urban', false);
+    setChk('chk_dvhc', false);
     clearChamDiemMap();
     return;
   }
@@ -1994,6 +2014,15 @@ function toggleAxisAll() {
     paintForeignAxes();
     return;
   }
+  if (browseState().axis === 'hanhchinh') {
+    const el = adminClassChk();
+    if (!el) return;
+    el.checked = !el.checked;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    paintAxisAll();
+    paintForeignAxes();
+    return;
+  }
   const boxes = paneLayerBoxes(browseState().axis);
   if (!boxes.length) return;
   const turnOn = boxes.some(el => !el.checked);
@@ -2066,6 +2095,49 @@ function setUrbanLayer(on) {
   urban.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+function setDvhcLayer(on) {
+  const el = document.getElementById('chk_dvhc');
+  if (!el || el.checked === on) return;
+  el.checked = on;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Đồng bộ lớp bản đồ trục A theo tab Hành chính / Đô thị / Chấm điểm. */
+function syncAdminClassMaps() {
+  if (!adminMapOn) {
+    setDvhcClassVisible(false);
+    return;
+  }
+  const tab = adminTabId();
+  setDvhcClassMode(adminColumn === 'QH' ? 'QH' : 'HT');
+  if (tab === 'dvhc') {
+    // Tab Hành chính: bản đồ phân loại phường/xã; tắt lớp đô thị.
+    setUrbanLayer(false);
+    showUrbanPlanOnBase(false);
+    if (!document.getElementById('chk_dvhc')?.checked) setDvhcLayer(true);
+    else setDvhcClassVisible(true);
+    document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'DVHC' } }));
+    return;
+  }
+  if (tab === 'dothi') {
+    setDvhcLayer(false);
+    setDvhcClassVisible(false);
+    if (isSplitOn()) {
+      applyAdminUrbanSplit(true);
+    } else {
+      if (!document.getElementById('chk_urban')?.checked) setUrbanLayer(true);
+      showUrbanPlanOnBase(adminColumn === 'QH');
+    }
+    document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
+    return;
+  }
+  // Chấm điểm: không chồng lớp phân loại.
+  setUrbanLayer(false);
+  setDvhcLayer(false);
+  showUrbanPlanOnBase(false);
+  setDvhcClassVisible(false);
+}
+
 /**
  * Chia đôi mặc định: hệ thống đô thị HT (trái, QĐ 614) | QH (phải, QĐ 756), tắt nền QHC.
  * Trục A giữ khóa droplist; mọi trục đều áp cặp này khi vừa bật chia đôi.
@@ -2077,7 +2149,7 @@ function applyAdminUrbanSplit(on) {
     setClassicSplitSides();
     return;
   }
-  if (adminMapOn) showUrbanPlanOnBase(adminColumn === 'QH');
+  if (adminMapOn && adminTabId() === 'dothi') showUrbanPlanOnBase(adminColumn === 'QH');
 }
 
 function enterAdminMap() {
@@ -2089,14 +2161,16 @@ function enterAdminMap() {
   if (urban && adminUrbanHeld == null) adminUrbanHeld = urban.checked;
   // setLevel('urban') tắt QHC 1/25.000 (và các cấp QH khác) đang bị giữ từ trục B.
   setLevel('urban', { keepView: true });
-  if (isSplitOn()) applyAdminUrbanSplit(true);
-  else showUrbanPlanOnBase(false);
+  if (isSplitOn() && adminTabId() === 'dothi') applyAdminUrbanSplit(true);
+  else syncAdminClassMaps();
   refreshSplitPair();
 }
 
 function leaveAdminMap() {
   adminMapOn = false;
   adminColumn = 'HT';
+  setDvhcLayer(false);
+  setDvhcClassVisible(false);
   if (adminUrbanHeld === false) setUrbanLayer(false);
   else showUrbanPlanOnBase(false);
   adminUrbanHeld = null;
@@ -2270,9 +2344,18 @@ export function initChuyenNganh() {
       if (browseState().axis === 'hanhchinh') {
         adminColumn = mode;
         if (getViewMode() !== 'HT') setViewMode('HT');
-        // Đang chia đôi: giữ cặp đô thị HT|QH trên hai bản đồ; cột HT/QH chỉ đổi danh sách.
-        showUrbanPlanOnBase(mode === 'QH' && !isSplitOn());
+        setDvhcClassMode(mode === 'QH' ? 'QH' : 'HT');
+        // Đang chia đôi + tab Đô thị: giữ cặp đô thị HT|QH; cột HT/QH đổi danh sách + lớp ĐVHC.
+        if (adminTabId() === 'dothi' && !isSplitOn()) {
+          showUrbanPlanOnBase(mode === 'QH');
+        } else if (adminTabId() === 'dothi' && isSplitOn()) {
+          showUrbanPlanOnBase(false);
+        } else {
+          showUrbanPlanOnBase(false);
+        }
+        paintAdminList();
         paintViewSwitch();
+        document.dispatchEvent(new CustomEvent('qh:legend-sync'));
         return;
       }
       setViewMode(mode);
@@ -2348,7 +2431,7 @@ export function initChuyenNganh() {
       document.querySelectorAll('[data-admin-pane]').forEach(pane => { pane.hidden = pane.dataset.adminPane !== id; });
       if (id !== 'dvhc') clearDvhcMulti({ paint: true });
       syncAdminBrowseClass();
-      if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
+      syncAdminClassMaps();
       return;
     }
     const waterPlant = e.target.closest('[data-cnu-plant]');

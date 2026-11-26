@@ -3,7 +3,6 @@
 // phường, xã tô riêng theo ranh thị trấn, xã cũ). Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND
 // (urbanVision.js, ranh dựng bằng scripts/build-urban-vision.js). Cùng một checkbox, mỗi bản đồ vẽ nội dung của mình.
 import { map } from './mapEngine.js';
-import { getWardDraw } from './wardSeam.js';
 import { planMap, isCompareOn, isSplitOn, whenMapsIdle } from './planMap.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { state } from './state.js';
@@ -23,7 +22,6 @@ const LINE_PANE = 'urbanLinePane';
 const HIT_WEIGHT = 14;
 const WARD_HOVER_MAX_ZOOM = 12;
 const LEVEL_FILL = { II: '#ef4444', III: '#fb923c' };
-const RURAL_FILL = '#4ade80';
 const LINE_STYLE = {
   I: { color: '#facc15', weight: 3.5, dashArray: null },
   II: { color: '#f8fafc', weight: 3, dashArray: null },
@@ -222,28 +220,17 @@ function createUrbanLayer(content) {
     if (!m.hasLayer(wardHover.tip)) m.openTooltip(wardHover.tip);
   }
 
+  // Tô phường/xã theo trình độ đã tách sang dvhcClassLayer (tab Hành chính).
+  // Lớp đô thị chỉ vẽ ranh + ký hiệu đô thị; vẫn giữ hit tip khi rê nền ở zoom nhỏ.
   function drawWards() {
     groups.wards.clearLayers();
     clearWardHover();
     wardHits = [];
-    syncFillOpacity();
-    const pack = getWardDraw();
-    const pending = [];
     (state.wardLabelsList || []).forEach(w => {
       if (!w.geometry) return;
-      const level = content.wardLevel(w.name);
-      const geometry = (pack && pack.byName.get(w.name)) || w.geometry;
-      const rural = !level;
-      const layer = L.geoJSON(geometry, {
-        pane: FILL_PANE, renderer: rural ? ruralRenderer : urbanRenderer, interactive: false, smoothFactor: 0,
-        style: { stroke: false, fill: true, fillColor: level ? LEVEL_FILL[level] : RURAL_FILL, fillOpacity: 1 }
-      });
-      pending.push({ rural, layer });
       const feat = { type: 'Feature', properties: {}, geometry: w.geometry };
       wardHits.push({ name: w.name, feat, bbox: turf.bbox(feat) });
     });
-    pending.filter(p => p.rural).forEach(p => groups.wards.addLayer(p.layer));
-    pending.filter(p => !p.rural).forEach(p => groups.wards.addLayer(p.layer));
   }
 
   function drawUrbans(fc) {

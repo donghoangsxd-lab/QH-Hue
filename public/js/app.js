@@ -106,6 +106,7 @@ import { initOverview } from './overview.js';
 import { initMobileShell } from './mobileShell.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urbanAreaLayer.js';
+import { initDvhcClassLayer, refreshDvhcClassLayer } from './dvhcClassLayer.js';
 import { initLayerDecisions } from './layerDecisions.js';
 import { initBasemapUi } from './basemap.js';
 import { hasSharedCamera, initViewLink } from './viewLink.js';
@@ -642,6 +643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initInvestLayer();
   initCatalogTable();
   initUrbanAreaLayer();
+  initDvhcClassLayer();
   initLayerDecisions();
   initQhc2045Layer();
   initQhcRasterLayer();
@@ -1568,7 +1570,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setProgress(10, STEP_LABEL.urban);
     // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
     const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
-    boundaryReady.then(refreshUrbanAreaLayer).catch(() => {});
+    boundaryReady.then(() => {
+      refreshUrbanAreaLayer();
+      refreshDvhcClassLayer();
+    }).catch(() => {});
     Promise.all([boundaryReady, urbanAreaReady()]).then(() => stepDone('urban'), () => stepDone('urban'));
     const statsReady = ensureWardStats();
     statsReady.catch(() => {});

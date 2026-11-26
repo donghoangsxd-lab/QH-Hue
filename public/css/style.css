@@ -2328,7 +2328,26 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 /* LOẠI ĐÔ THỊ HIỆN TRẠNG (urbanAreaLayer.js) */
 .ua-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 4px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .ua-legend-pane { padding: 2px 0 6px; }
+.ua-legend-pane .ua-legend-toggle {
+  margin: 0 0 6px;
+  padding: 0 2px;
+  min-height: var(--axis-row-h);
+}
+.ua-legend-pane .ua-legend-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.ua-legend-pane .tt16-row.ua-legend-item {
+  gap: 8px;
+}
 .ua-legend-pane .tt16-legend { margin: 0; }
+#tabLegend.is-admin .legend-find { display: none; }
+#tabLegend.is-admin .tt16-set { display: none; }
+body.dvhc-zoom-low .dvhc-badge-icon .ua-badge:not(.ua-badge-I) {
+  width: 22px; height: 22px; border-width: 2px; font-size: 9px;
+}
 .ua-legend-pane .tt16-row > i {
   width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;

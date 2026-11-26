@@ -545,9 +545,6 @@
           <div class="layer-main-pane" id="layerPaneHanhChinh" data-main-pane="hanhchinh" role="tabpanel" hidden>
             <div id="axisHanhChinh">
               <div id="adminPaneDoThi" data-admin-pane="dothi" hidden>
-            <div class="urban-static">
-              <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint" id="urbanLockHint"></small></label></div><span class="layer-decisions"><button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="QĐ 614"></button><button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756"></button></span></div>
-            </div>
             <div id="gpList" class="gp-list"></div>
               </div>
               <div id="adminPaneDvhc" data-admin-pane="dvhc">
@@ -825,7 +822,8 @@
       </div>
       <div class="dock-fold" id="legendFold" role="tabpanel" aria-labelledby="btnDockLegend">
         <span class="legend-level-chips" id="legendLevelChips" hidden>
-            <button type="button" class="layer-main-tab" role="tab" data-legend-set="URBAN" aria-selected="false" title="Ký hiệu lớp Phân loại đô thị: hiện trạng theo Quyết định 614/QĐ-UBND, quy hoạch theo Quyết định 756/QĐ-UBND; xem quyết định phê duyệt"><span class="layer-main-label"><small>PHÂN LOẠI</small>Đô thị</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="DVHC" aria-selected="false" title="Ký hiệu phân loại phường/xã (tab Hành chính): phường loại II/III và xã"><span class="layer-main-label"><small>PHÂN LOẠI</small>Phường, xã</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="URBAN" aria-selected="false" title="Ký hiệu phân loại đô thị (tab Đô thị): hiện trạng theo Quyết định 614/QĐ-UBND, quy hoạch theo Quyết định 756/QĐ-UBND"><span class="layer-main-label"><small>PHÂN LOẠI</small>Đô thị</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC25" aria-selected="false" title="Ký hiệu sơ đồ tổ chức không gian đồ án quy hoạch chung tỷ lệ 1/25.000 (sẽ bổ sung)"><span class="layer-main-label"><small>QHC</small>1/25.000</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC" aria-selected="false" title="Ký hiệu chức năng sử dụng đất đồ án quy hoạch chung đô thị theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 02 (PL1, tỷ lệ 1/10.000)"><span class="layer-main-label"><small>QHC</small>1/10.000</span></button>
             <button type="button" class="layer-main-tab active" role="tab" data-legend-set="QHPK" aria-selected="true" title="Ký hiệu sử dụng đất đồ án quy hoạch phân khu theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000) — bộ đang dùng cho toàn bộ đồ án hiện có. Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label"><small>QHPK</small>1/2.000</span></button>
@@ -884,7 +882,46 @@
             <div class="tt16-legend road-net" id="roadNet10" data-legend-pane="QHC" hidden></div>
             <div class="tt16-legend road-sections" id="roadSections" data-legend-pane="QHC" hidden></div>
             <div class="tt16-legend" id="legendSector" data-legend-pane="SECTOR" hidden></div>
+            <div class="ua-legend-pane" data-legend-pane="DVHC" hidden>
+              <div class="layer-row ua-legend-toggle">
+                <div>
+                  <input type="checkbox" id="chk_dvhc">
+                  <label for="chk_dvhc" title="Bản đồ phân loại phường/xã theo trình độ phát triển đô thị (tab Hành chính). HT: QĐ 614; QH: QĐ 756. Phường loại II đỏ, loại III cam; xã nền xanh không số.">
+                    <svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại phường, xã
+                    <small class="layer-hint" id="dvhcLockHint"></small>
+                  </label>
+                </div>
+                <span class="layer-decisions">
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="QĐ 614"></button>
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756"></button>
+                </span>
+              </div>
+              <div class="tt16-legend" id="dvhcLegend">
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Phường</span><span class="tt16-group-count">2</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><i class="ua-sw" style="background:#ef4444"></i><span>Phường loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><i class="ua-sw" style="background:#fb923c"></i><span>Phường loại III</span></div>
+                </details>
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Xã</span><span class="tt16-group-count">1</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.7"></i><span>Xã (không ký hiệu số)</span></div>
+                </details>
+              </div>
+            </div>
             <div class="ua-legend-pane" data-legend-pane="URBAN" hidden>
+              <div class="layer-row ua-legend-toggle">
+                <div>
+                  <input type="checkbox" id="chk_urban" checked>
+                  <label for="chk_urban" title="Bản đồ phân loại đô thị (tab Đô thị). Hiện trạng: QĐ 614/QĐ-UBND. Quy hoạch: QĐ 756/QĐ-UBND. Trỏ chuột vào ranh hoặc ký hiệu để xem thông tin.">
+                    <svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị
+                    <small class="layer-hint" id="urbanLockHint"></small>
+                  </label>
+                </div>
+                <span class="layer-decisions">
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="QĐ 614"></button>
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756"></button>
+                </span>
+              </div>
               <div class="tt16-legend" id="urbanLegend">
                 <details class="tt16-group" open>
                   <summary><span class="tt16-group-name">Cấp đô thị</span><span class="tt16-group-count">3</span></summary>
@@ -896,12 +933,6 @@
                   <summary><span class="tt16-group-name">Ranh đô thị</span><span class="tt16-group-count">2</span></summary>
                   <div class="tt16-row ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i><span>Ranh đô thị loại II</span></div>
                   <div class="tt16-row ua-legend-item"><i class="ua-sw-line"></i><span>Ranh đô thị loại III</span></div>
-                </details>
-                <details class="tt16-group" open>
-                  <summary><span class="tt16-group-name">Phường, xã</span><span class="tt16-group-count">3</span></summary>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i><span>Phường, xã trình độ loại II</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i><span>Phường, xã trình độ loại III</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i><span>Nông thôn</span></div>
                 </details>
               </div>
             </div>
