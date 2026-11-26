@@ -608,6 +608,523 @@
       "authority": "UBND tỉnh",
       "taskDecision": "Số: 1928 /QĐ-UBND",
       "taskDecisionDate": "2020-30-07"
+    },
+    {
+      "slug": "qhpk-vy-da-1b5f0ef9",
+      "name": "QHPK Vỹ Dạ",
+      "level": "QHPK",
+      "mapid": 20605,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "vy-da"
+      },
+      "decision": "2923/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "214/1998/QĐ-UB",
+      "taskDecisionDate": "1998-13-02",
+      "decisionDate": "2015-16-12"
+    },
+    {
+      "slug": "2-dieu-chinh-quy-hoach-phan-khu-trung-tam-van-hoa-tay-nam-86b103c6",
+      "name": "QHPK TT Văn hóa Tây Nam",
+      "level": "QHPK",
+      "mapid": 19550,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "an-cuu"
+      },
+      "decision": "2454/QĐ-UBND",
+      "authority": "UBND Thành Phố Huế",
+      "decisionDate": "2017-23-10"
+    },
+    {
+      "slug": "qhct-qh-chi-tiet-xd-khu-vuc-doi-vong-canh-va-vung-phu-can-7118ac5a",
+      "name": "QHCT (1/2000) đồi Vọng Cảnh (2015)",
+      "level": "QHCT",
+      "mapid": 20635,
+      "parent": null,
+      "overrides": [],
+      "priority": 3,
+      "scale": 500,
+      "area": {
+        "type": "xa",
+        "code": "thuy-xuan"
+      },
+      "decision": "2101/QĐ-UBND",
+      "authority": "UBND tỉnh TT Huế",
+      "taskDecision": "QĐ 228/QĐ-UBND",
+      "taskDecisionDate": "2206-18-01",
+      "decisionDate": "2015-13-10"
+    },
+    {
+      "slug": "qhct-dan-nam-giao-va-vung-phu-can-a07164ce",
+      "name": "QHCT (1/2000) Đàn Nam Giao",
+      "level": "QHCT",
+      "mapid": 20606,
+      "parent": null,
+      "overrides": [],
+      "priority": 3,
+      "scale": 500,
+      "area": {
+        "type": "xa",
+        "code": "thuy-xuan"
+      },
+      "decision": "23/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "2194/QĐ-UBND",
+      "taskDecisionDate": "2009-07-10",
+      "decisionDate": "2013-05-01"
+    },
+    {
+      "slug": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-vuc-phuong-huong-so-v-e6020b93",
+      "name": "QHPK Hương Sơ - An Hòa",
+      "level": "QHPK",
+      "mapid": 23927,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-an"
+      },
+      "authority": "UBND tỉnh",
+      "taskDecision": "1121/QĐ-UBND",
+      "taskDecisionDate": "2022-10-05"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-phia-bac-phuong-huong-long-phuong-an-hoa-phu-e3db3e41",
+      "name": "QHPK Đô thị Bắc Hương Long (2025)",
+      "level": "QHPK",
+      "mapid": 23929,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "authority": "UBND Thành phố Huế",
+      "taskDecision": "1394/QĐ-UBND",
+      "taskDecisionDate": "2022-06-11"
+    },
+    {
+      "slug": "qhpk-kinh-thanh-hue-ed57054e",
+      "name": "QHPK Kinh thành Huế",
+      "level": "QHPK",
+      "mapid": 22898,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-xuan"
+      },
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "decision": "3280/QĐ-UBND",
+      "taskDecision": "1047/QĐ-UBND",
+      "taskDecisionDate": "2022-29-04",
+      "decisionDate": "2024-19-12"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-phia-bac-phuong-an-hoa-huong-so-huong-vinh-3e6ba744",
+      "name": "QHPK Khu đô thị phía Bắc An Hòa - Hương Sơ - Hương Vinh",
+      "level": "QHPK",
+      "mapid": 22877,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-an"
+      },
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhpk-huong-vinh-b96cb01b",
+      "name": "QHPK Hương Vinh",
+      "level": "QHPK",
+      "mapid": 22875,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "hoa-chau"
+      },
+      "authority": "UBND Tỉnh Thừa Thiên Huế",
+      "decision": "1845/QĐ-UBND",
+      "taskDecision": "961/QĐ-UBND",
+      "taskDecisionDate": "2022-18-04",
+      "decisionDate": "2024-06-07"
+    },
+    {
+      "slug": "qhpk-huong-tho-d3f4a73d",
+      "name": "QHPK Hương Thọ",
+      "level": "QHPK",
+      "mapid": 22864,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "decision": "1812/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "962/QĐ-UBND",
+      "taskDecisionDate": "2022-18-04",
+      "decisionDate": "2024-03-07"
+    },
+    {
+      "slug": "qhpk-huong-an-a1028a1f",
+      "name": "QHPK Hương An",
+      "level": "QHPK",
+      "mapid": 22870,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-an"
+      },
+      "decision": "1633/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "399/QĐ-UBND",
+      "taskDecisionDate": "2022-10-02",
+      "decisionDate": "2024-19-06"
+    },
+    {
+      "slug": "qhpk-huong-ho-5f497092",
+      "name": "QHPK Hương Hồ",
+      "level": "QHPK",
+      "mapid": 22871,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "decision": "1365/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "398/QĐ-UBND",
+      "taskDecisionDate": "2022-10-02",
+      "decisionDate": "2024-27-05"
+    },
+    {
+      "slug": "qhpk-phu-hau-phu-hiep-phu-cat-a90b5eea",
+      "name": "QHPK Phú Hậu – Phú Hiệp – Phú Cát",
+      "level": "QHPK",
+      "mapid": 20680,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-xuan"
+      },
+      "decision": "297/QĐ-UBND",
+      "authority": "UBND tỉnh",
+      "taskDecision": "1330/QĐ-UBND",
+      "taskDecisionDate": "2016-17-06",
+      "decisionDate": "2021-02-03"
+    },
+    {
+      "slug": "qhpk-kim-long-b479902d",
+      "name": "QHPK Kim Long",
+      "level": "QHPK",
+      "mapid": 20607,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "decision": "1675/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "taskDecision": "2922/QĐ-UBND",
+      "taskDecisionDate": "2015-16-12",
+      "decisionDate": "2019-07-10"
+    },
+    {
+      "slug": "qhct-xay-dung-khu-vuc-huong-long-af939c14",
+      "name": "QHCT (1/2000) Hương Long",
+      "level": "QHCT",
+      "mapid": 19168,
+      "parent": null,
+      "overrides": [],
+      "priority": 3,
+      "scale": 500,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "decision": "950/QĐ-UBND",
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "decisionDate": "2016-10-05"
+    },
+    {
+      "slug": "qhpk-thuy-luong-fb46573d",
+      "name": "QHPK Thuỷ Lương",
+      "level": "QHPK",
+      "mapid": 20766,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-thuy"
+      },
+      "authority": "UBND Tỉnh Thừa Thiên Huế",
+      "decision": "3166/QĐ-UBND",
+      "taskDecision": "Số: 1167/QĐ-UBND",
+      "taskDecisionDate": "2019-13-05",
+      "decisionDate": "2022-27-12"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b",
+      "name": "QHPK Khu đô thị sinh thái Thanh Toàn",
+      "level": "QHPK",
+      "mapid": 20772,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "thanh-thuy"
+      },
+      "authority": "UBND tỉnh Thừa Thiên Huế",
+      "decision": "1304/QĐ-UBND",
+      "taskDecision": "843/QĐ-UBND",
+      "taskDecisionDate": "2021-16-04",
+      "decisionDate": "2023-06-06"
+    },
+    {
+      "slug": "qhpk-phu-bai-7a7efc45",
+      "name": "QHPK Phú Bài",
+      "level": "QHPK",
+      "mapid": 22883,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-bai"
+      },
+      "authority": "UBND tỉnh",
+      "decision": "1421/QĐ-UBND",
+      "decisionDate": "2024-31-05"
+    },
+    {
+      "slug": "qhpk-thuy-chau-b8d972ba",
+      "name": "QHPK Thuỷ Châu",
+      "level": "QHPK",
+      "mapid": 22884,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-thuy"
+      },
+      "authority": "UBND tỉnh",
+      "taskDecision": "788/QĐ-UBND",
+      "taskDecisionDate": "2020-25-03",
+      "decision": "1487/QĐ-UBND",
+      "decisionDate": "2024-06-06"
+    },
+    {
+      "slug": "qhpk-thuy-phu-c0bf3482",
+      "name": "QHPK Thủy Phù",
+      "level": "QHPK",
+      "mapid": 23931,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-bai"
+      },
+      "authority": "UBND thành phố Huế",
+      "taskDecision": "3108/QĐ-UBND",
+      "taskDecisionDate": "2022-23-12"
+    },
+    {
+      "slug": "qhpk-thuy-tan-92336420",
+      "name": "QHPK Thủy Tân",
+      "level": "QHPK",
+      "mapid": 23938,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-thuy"
+      },
+      "authority": "UBND thành phố Huế",
+      "decision": "1800/QĐ-UBND",
+      "taskDecision": "2571/QĐ-UBND",
+      "taskDecisionDate": "2022-22-10",
+      "decisionDate": "2025-25-06"
+    },
+    {
+      "slug": "qhpk-phu-son-1bef3f16",
+      "name": "QHPK Phú Sơn",
+      "level": "QHPK",
+      "mapid": 23932,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-bai"
+      },
+      "authority": "UBND thành phố Huế",
+      "taskDecision": "2330/QĐ-UBND",
+      "taskDecisionDate": "2023-03-10"
+    },
+    {
+      "slug": "qhpk-dieu-chinh-kcn-phu-bai-giai-doan-iv-dot-2-07d68e17",
+      "name": "QHPK KCN Phú Bài IV - Đợt 2",
+      "level": "QHPK",
+      "mapid": 20623,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-bai"
+      }
+    },
+    {
+      "slug": "qhpk-dieu-chinh-quy-hoach-phan-khu-xay-dung-khu-cong-nghiep-6ab36a63",
+      "name": "QHPK KCN Phú Bài I, II, III",
+      "level": "QHPK",
+      "mapid": 22853,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-bai"
+      },
+      "authority": "UBND Tỉnh Thừa Thiên Huế",
+      "decision": "2834/QĐ-UBND",
+      "taskDecision": "1458/QĐ-UBND",
+      "taskDecisionDate": "2022-21-06",
+      "decisionDate": "2024-11-01"
+    },
+    {
+      "slug": "qhpk-huong-van-89c88354",
+      "name": "QHPK Hương Vân",
+      "level": "QHPK",
+      "mapid": 22828,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-tra"
+      }
+    },
+    {
+      "slug": "qhpk-huong-xuan-c682ec7d",
+      "name": "QHPK Hương Xuân",
+      "level": "QHPK",
+      "mapid": 22866,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-tra"
+      },
+      "authority": "Ủy ban nhân dân tỉnh Thừa Thiên Huế",
+      "decision": "1632/QĐ-UBND",
+      "taskDecision": "1227/QĐ-UBND",
+      "taskDecisionDate": "2021-24-05",
+      "decisionDate": "2024-19-06"
+    },
+    {
+      "slug": "qhpk-huong-chu-f46c7752",
+      "name": "QHPK Hương Chữ",
+      "level": "QHPK",
+      "mapid": 22850,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-tra"
+      }
+    },
+    {
+      "slug": "qhpk-huong-van-3bf10273",
+      "name": "QHPK Hương Văn",
+      "level": "QHPK",
+      "mapid": 22865,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "huong-tra"
+      },
+      "decision": "1749/QĐ-UBND",
+      "taskDecision": "2744/QĐ-UBND",
+      "taskDecisionDate": "2022-14-11",
+      "decisionDate": "2024-27-06"
+    },
+    {
+      "slug": "qhpk-huong-toan-55617930",
+      "name": "QHPK Hương Toàn",
+      "level": "QHPK",
+      "mapid": 22920,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-tra"
+      },
+      "authority": "UBND Tỉnh Thừa Thiên Huế",
+      "decision": "3419/QĐ-UBND",
+      "taskDecision": "936/QĐ-UBND",
+      "taskDecisionDate": "2023-27-04",
+      "decisionDate": "2023-27-04"
     }
   ]
 }

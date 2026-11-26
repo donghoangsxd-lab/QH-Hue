@@ -452,12 +452,18 @@ async function fetchLayer(transport, mapid, src) {
   if (hasGeom && !fields.includes('geom')) fields.push('geom');
   if (!hasGeom && !fields.includes('s_geo')) fields.push('s_geo');
   const run = pool(CONC);
-  const chunks = await Promise.all(Array.from({ length: pages }, (_, i) => run(async () => {
-    const data = await getJson(transport, pageUrl(src, i, fields));
-    return (data.searchResult || []).map(keepGeom);
-  })));
-  const rows = [];
-  chunks.forEach((part) => part.forEach((row) => rows.push(row)));
+  async function pullPages(useFields) {
+    const chunks = await Promise.all(Array.from({ length: pages }, (_, i) => run(async () => {
+      const data = await getJson(transport, pageUrl(src, i, useFields ? fields : undefined));
+      return (data.searchResult || []).map(keepGeom);
+    })));
+    const out = [];
+    chunks.forEach((part) => part.forEach((row) => out.push(row)));
+    return out;
+  }
+  let rows = pages ? await pullPages(true) : [];
+  // Một số lớp gisHue trả rỗng khi hỏi fields=… — tải lại không lọc cột.
+  if (pages && rows.length !== total) rows = await pullPages(false);
   if (rows.length !== total) throw new Error(`${src.ten}: tải ${rows.length}/${total}`);
   const doc = { total, fields, rows };
   fs.mkdirSync(path.dirname(file), { recursive: true });
