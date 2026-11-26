@@ -880,6 +880,12 @@ function hideDvhcTip() {
 /** Tên phường/xã đang chọn trên tab ĐVHC (không gồm Thành phố Huế). Shift+click thêm/bớt. */
 let selectedDvhcNames = [];
 
+/** Cột sắp xếp danh sách ĐVHC (không gồm hàng TP Huế). */
+let dvhcSortKey = 'name';
+let dvhcSortDir = 1;
+
+const LOAI_SORT_RANK = { I: 1, II: 2, III: 3, 'PĐ III': 4 };
+
 export function getSelectedDvhcNames() {
   return selectedDvhcNames.slice();
 }
@@ -980,6 +986,32 @@ function onDvhcMouseMove(e) {
   showDvhcTip(e.latlng, name);
 }
 
+function dvhcLoaiRank(label, htMode) {
+  const marks = wardMarks(label);
+  const v = htMode ? marks.ht : marks.plan;
+  return LOAI_SORT_RANK[v] ?? 99;
+}
+
+function sortDvhcWards(wards, htMode) {
+  const dir = dvhcSortDir;
+  const key = dvhcSortKey;
+  return wards.slice().sort((a, b) => {
+    let cmp = 0;
+    if (key === 'pop') {
+      cmp = (Number(dvhcOf(a.name)?.pop) || 0) - (Number(dvhcOf(b.name)?.pop) || 0);
+    } else if (key === 'km') {
+      cmp = (Number(dvhcOf(a.name)?.km2) || 0) - (Number(dvhcOf(b.name)?.km2) || 0);
+    } else if (key === 'loai') {
+      cmp = dvhcLoaiRank(a.name, htMode) - dvhcLoaiRank(b.name, htMode);
+      if (!cmp) cmp = a.name.localeCompare(b.name, 'vi');
+    } else {
+      cmp = shortPlaceName(a.name).localeCompare(shortPlaceName(b.name), 'vi')
+        || a.name.localeCompare(b.name, 'vi');
+    }
+    return cmp * dir;
+  });
+}
+
 function paintAdminList() {
   const wardsHost = document.getElementById('axisWardList');
   const tools = document.getElementById('axisAreaTools');
@@ -1013,15 +1045,34 @@ function paintAdminList() {
     const loai = htMode ? lvCell(marks.ht, marks.htTitle) : lvCell(marks.plan, marks.planTitle);
     return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(label)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(shown)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${loai}</button>`;
   };
-  const wards = listAreas('xa');
+  const sortBtn = (key, cls, label, title) => {
+    const on = dvhcSortKey === key;
+    const tip = title ? ` title="${escapeHtml(title)}"` : '';
+    const pressed = on ? 'true' : 'false';
+    return `<button type="button" class="axis-sort ${cls}${on ? ' is-on' : ''}" data-dvhc-sort="${key}" aria-pressed="${pressed}"${tip}>${escapeHtml(label)}</button>`;
+  };
+  const wards = sortDvhcWards(listAreas('xa'), htMode);
   const tp = listAreas('tp')[0] || { ...AREA_TP, name: DVHC_CITY.name };
-  const loaiHead = htMode
-    ? '<span class="axis-lv" title="Trình độ phát triển đô thị hiện trạng theo QĐ 614">Loại HT</span>'
-    : '<span class="axis-lv" title="Trình độ định hướng đến 2030 theo QĐ 756">Loại 2030</span>';
-  const rows = [`<div class="axis-area-head axis-dvhc"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span>${loaiHead}</div>`];
-  if (hit(DVHC_CITY.name, shortPlaceName(DVHC_CITY.name), tp.name, 'TP')) rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
-  wards.forEach((area, i) => {
-    if (hit(area.name, shortPlaceName(area.name), area.code)) rows.push(button(area, area.name, i + 1));
+  const loaiTip = htMode
+    ? 'Loại HT — trình độ phát triển đô thị hiện trạng theo QĐ 614'
+    : 'Loại 2030 — trình độ định hướng đến 2030 theo QĐ 756';
+  const head = `<div class="axis-area-head axis-dvhc"><span class="axis-num"></span>${
+    sortBtn('name', 'axis-area-name', 'Đơn vị hành chính', 'Sắp xếp theo tên')
+  }${
+    sortBtn('pop', 'axis-area-pop', 'Dân số (người)', 'Sắp xếp theo dân số')
+  }${
+    sortBtn('km', 'axis-area-km', 'DT (km2)', 'Sắp xếp theo diện tích')
+  }${
+    sortBtn('loai', 'axis-lv', 'Loại', loaiTip)
+  }</div>`;
+  const rows = [head];
+  if (hit(DVHC_CITY.name, shortPlaceName(DVHC_CITY.name), tp.name, 'TP')) {
+    rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
+  }
+  let n = 0;
+  wards.forEach((area) => {
+    if (!hit(area.name, shortPlaceName(area.name), area.code)) return;
+    rows.push(button(area, area.name, ++n));
   });
   const onlyHead = rows.length === 1;
   const footNote = htMode ? 'Theo QĐ 614; loại trước chuyển tiếp' : PLAN_FOOT;
@@ -2369,6 +2420,18 @@ export function initChuyenNganh() {
       const slug = capBtn.dataset.csOpen;
       if (capOpen.has(slug)) capOpen.delete(slug); else capOpen.add(slug);
       paint();
+      return;
+    }
+    const sortBtn = e.target.closest('[data-dvhc-sort]');
+    if (sortBtn) {
+      const key = sortBtn.dataset.dvhcSort;
+      if (key === dvhcSortKey) dvhcSortDir *= -1;
+      else {
+        dvhcSortKey = key;
+        // Tên A→Z; dân số / diện tích / loại: lớn → nhỏ lần bấm đầu.
+        dvhcSortDir = key === 'name' ? 1 : -1;
+      }
+      paintAdminList();
       return;
     }
     const kvBtn = e.target.closest('[data-kv]');

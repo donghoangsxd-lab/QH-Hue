@@ -28,6 +28,34 @@ export function closeAdminInfoCard() {
   infoEl = null;
 }
 
+/** Kéo thẻ theo thanh tiêu đề (giống Street View / 3D). */
+function enableInfoCardDrag(el, handle) {
+  if (!el || !handle) return;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    const dx = e.clientX - r.left;
+    const dy = e.clientY - r.top;
+    el.classList.add('is-dragging');
+    handle.setPointerCapture(e.pointerId);
+    const move = (m) => {
+      el.style.left = `${Math.max(0, Math.min(m.clientX - dx, innerWidth - r.width))}px`;
+      el.style.top = `${Math.max(0, Math.min(m.clientY - dy, innerHeight - 40))}px`;
+      el.style.right = el.style.bottom = 'auto';
+    };
+    const up = () => {
+      el.classList.remove('is-dragging');
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  });
+}
+
 export function closeAdminChooser() {
   chooserEl?.remove();
   chooserEl = null;
@@ -184,8 +212,11 @@ function fmtPct(pct) {
   return '0%';
 }
 
-/** Tổng hợp nhiều phường/xã (Shift): bảng Đơn vị | Dân số | Diện tích | Tỷ lệ + hàng TỔNG CỘNG. */
+/** Tổng hợp nhiều phường/xã (Shift): bảng Đơn vị | Dân số | Diện tích | Tỷ lệ + hàng TỔNG CỘNG.
+ * Giữ mở khi pan/zoom; kéo theo tiêu đề; đóng bằng nút X hoặc Esc / đổi trục. */
 export function openMultiWardInfoCard(names, ev) {
+  const keepLeft = infoEl?.classList.contains('admin-info-multi') ? infoEl.style.left : '';
+  const keepTop = infoEl?.classList.contains('admin-info-multi') ? infoEl.style.top : '';
   closeAdminInfoCard();
   const list = [...new Set((names || []).map(s => String(s || '').trim()).filter(Boolean))];
   if (list.length < 2) {
@@ -214,7 +245,6 @@ export function openMultiWardInfoCard(names, ev) {
   el.setAttribute('aria-label', 'Tổng hợp đơn vị hành chính');
   el.innerHTML = `<header class="place-head"><span>${ico('locate')}Đã chọn ${list.length} đơn vị</span>
       <button type="button" class="place-x" title="Đóng" aria-label="Đóng">${ico('close')}</button></header>
-    <p class="admin-multi-hint">Giữ Shift và bấm phường/xã để thêm hoặc bỏ chọn. Tỷ lệ theo diện tích.</p>
     <table class="admin-multi-table">
       <thead><tr><th scope="col">Đơn vị</th><th scope="col">Dân số</th><th scope="col">Diện tích<br><span>km²</span></th><th scope="col">Tỷ lệ</th></tr></thead>
       <tbody>${body}</tbody>
@@ -227,7 +257,13 @@ export function openMultiWardInfoCard(names, ev) {
     </table>`;
   document.body.appendChild(el);
   infoEl = el;
+  if (keepLeft) {
+    el.style.left = keepLeft;
+    el.style.top = keepTop || el.style.top;
+    el.style.right = 'auto';
+  }
   el.querySelector('.place-x')?.addEventListener('click', closeAdminInfoCard);
+  enableInfoCardDrag(el, el.querySelector('.place-head'));
 }
 
 export function openAdminInfoCard(payload, ev) {
@@ -314,6 +350,8 @@ export function adminContextMenuHtml(hits) {
 
 document.addEventListener('pointerdown', (e) => {
   if (chooserEl && !chooserEl.contains(e.target)) closeAdminChooser();
+  // Thẻ nhiều ĐVHC: không đóng khi pan/zoom bản đồ — chỉ X / Esc / đổi trục.
+  if (infoEl?.classList.contains('admin-info-multi')) return;
   if (infoEl && !infoEl.contains(e.target) && !e.target.closest?.('#axisWardList, [data-admin-tab]')) {
     closeAdminInfoCard();
   }

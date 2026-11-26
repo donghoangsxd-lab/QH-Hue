@@ -2366,6 +2366,8 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 }
 .ua-badge-I + .ua-badge-name { top: 24px; font-size: 12px; }
 .ua-badge-II + .ua-badge-name { top: 21px; }
+/* Tab ĐVHC: ẩn tên đô thị trên bản đồ (giữ ký hiệu I/II/III) để tem 40 phường/xã đọc được */
+body.dvhc-browse .ua-badge-name { display: none; }
 /* Toàn thành phố (zoom ≤ 10) các ký hiệu sát nhau: thu nhỏ, chỉ giữ tên đô thị loại I, tên còn lại xem khi trỏ chuột */
 .ua-zoom-low .ua-badge:not(.ua-badge-I) { width: 22px; height: 22px; border-width: 2px; font-size: 9px; box-shadow: 0 0 0 1.5px #fff, 0 1px 4px rgba(0, 0, 0, 0.5); }
 .ua-zoom-low .ua-badge:not(.ua-badge-I) + .ua-badge-name { display: none; }
@@ -7651,7 +7653,7 @@ body.project-review.la-page #projectReviewHost {
   white-space: pre-line; line-height: 1.35;
 }
 .admin-info-card { width: min(360px, calc(100vw - 16px)); }
-/* Tổng hợp nhiều ĐVHC (Shift): neo cột thông tin trái, cuộn danh sách */
+/* Tổng hợp nhiều ĐVHC (Shift): neo cột trái mặc định; kéo tiêu đề để đổi chỗ; không tự đóng khi pan */
 .admin-info-card.admin-info-multi {
   left: var(--info-left);
   top: var(--info-top);
@@ -7661,11 +7663,10 @@ body.project-review.la-page #projectReviewHost {
   overflow: auto;
   z-index: 1200;
 }
-.admin-multi-hint {
-  margin: 0 0 6px;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  line-height: 1.35;
+.admin-info-card.admin-info-multi .place-head {
+  cursor: move;
+  user-select: none;
+  touch-action: none;
 }
 .admin-multi-table {
   width: 100%;
@@ -8960,10 +8961,48 @@ body.project-review.la-page #projectReviewHost {
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis-area.axis-dvhc,
 .axis-area-head.axis-dvhc {
-  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 9ch;
+  grid-template-columns: 2em minmax(0, 1.35fr) minmax(7.5ch, 1fr) 6.2ch 4.2ch;
   column-gap: 3px;
   padding-right: 1px;
 }
+.axis-area-head.axis-dvhc {
+  height: auto;
+  min-height: var(--axis-row-h);
+  align-items: end;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.axis-area-head .axis-sort {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.15;
+  cursor: pointer;
+  min-width: 0;
+  text-align: inherit;
+}
+.axis-area-head .axis-sort.axis-area-name {
+  text-align: left;
+  white-space: normal;
+}
+.axis-area-head .axis-sort.axis-area-pop,
+.axis-area-head .axis-sort.axis-area-km {
+  text-align: right;
+  white-space: normal;
+}
+.axis-area-head .axis-sort.axis-lv {
+  text-align: center;
+  white-space: nowrap;
+}
+.axis-area-head .axis-sort.is-on,
+.axis-area-head .axis-sort[aria-pressed="true"] {
+  color: var(--accent-orange);
+}
+.axis-area-head .axis-sort:hover { color: var(--accent-orange); }
 .axis-lv { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis-lv.is-muted { color: var(--axis-color-muted); }
 .axis-area-city,

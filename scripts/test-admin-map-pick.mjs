@@ -16,6 +16,8 @@ assert.match(pick, /if \(isDothiBrowse\(\)\)/);
 assert.match(pick, /clearUrbanMapPick\(\)/);
 assert.match(pick, /openMultiWardInfoCard|admin-info-multi|TỔNG CỘNG|admin-multi-table/);
 assert.match(pick, /isShiftClick|getSelectedDvhcNames/);
+assert.match(pick, /enableInfoCardDrag|admin-info-multi/);
+assert.doesNotMatch(pick, /admin-multi-hint|Giữ Shift và bấm phường\/xã để thêm hoặc bỏ chọn/);
 assert.doesNotMatch(pick, /openChooser\(hits/);
 
 const ctx = read('public/js/mapContext.js');
@@ -54,8 +56,16 @@ assert.match(cn, /getSelectedDvhcNames|selectedDvhcNames|qh:dvhc-multi/);
 assert.match(cn, /highlightWardNames|isShiftClick/);
 
 assert.match(spec, /Shift và bấm|nhiều phường\/xã|admin-info-multi/);
+assert.match(spec, /giữ mở khi pan|kéo thanh tiêu đề|wardLabelPane/);
 
 const css = read('public/css/style.css');
 assert.match(css, /admin-info-multi|admin-multi-table/);
+assert.match(css, /body\.dvhc-browse\s+\.ua-badge-name/);
+assert.doesNotMatch(css, /\.admin-multi-hint\s*\{/);
+
+const mapJs = read('public/js/mapEngine.js');
+assert.match(mapJs, /wardLabelPane/);
+const planJs = read('public/js/planMap.js');
+assert.match(planJs, /wardLabelPane/);
 
 console.log('admin map pick ok');

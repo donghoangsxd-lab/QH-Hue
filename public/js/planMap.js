@@ -178,10 +178,19 @@ export function renderPlanBoundaries() {
     group.addLayer(outline);
     group.addLayer(line);
   }
+  // Pane trên marker đô thị (ua-badge) — đồng bộ mapEngine, tên ĐVHC không bị che.
+  const WARD_LABEL_PANE = 'wardLabelPane';
+  if (planMap && !planMap.getPane(WARD_LABEL_PANE)) {
+    const pane = planMap.createPane(WARD_LABEL_PANE);
+    pane.style.zIndex = '620';
+    pane.style.pointerEvents = 'none';
+  }
   wards.forEach(item => {
     if (item.lat == null || item.lng == null) return;
     const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${escapeHtml(item.name)}</span>`, iconSize: [0, 0] });
-    group.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
+    group.addLayer(L.marker([item.lat, item.lng], {
+      icon, interactive: false, pane: planMap ? WARD_LABEL_PANE : undefined
+    }));
   });
   boundaryPainted.forEach(fn => { try { fn(); } catch (err) { console.warn('ranh phường:', err); } });
 }

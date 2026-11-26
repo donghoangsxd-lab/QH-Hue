@@ -402,13 +402,22 @@ export async function loadBoundaryLayer() {
     wardBBoxes.clear();
     window.dispatchEvent(new CustomEvent(WARD_BOUNDS_EVENT));
 
+    // Pane trên marker đô thị (ua-badge ~600) để tên 40 ĐVHC không bị tem đô thị che.
+    const WARD_LABEL_PANE = 'wardLabelPane';
+    if (!map.getPane(WARD_LABEL_PANE)) {
+      const pane = map.createPane(WARD_LABEL_PANE);
+      pane.style.zIndex = '620';
+      pane.style.pointerEvents = 'none';
+    }
     labels.forEach(item => {
       const icon = L.divIcon({
         className: 'ward-label-icon',
         html: `<span class="ward-label-text">${escapeHtml(item.name)}</span>`,
         iconSize: [0, 0]
       });
-      layers.boundary.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
+      layers.boundary.addLayer(L.marker([item.lat, item.lng], {
+        icon, interactive: false, pane: WARD_LABEL_PANE
+      }));
     });
     leftRenderer.refreshPoints();
     planRenderer.refreshPoints();
