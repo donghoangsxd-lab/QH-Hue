@@ -1127,9 +1127,13 @@ assert.match(read('public/js/sketchLayer.js'), /cloneSelectionToSketch|btnSketch
 assert.match(read('public/js/sketchLayer.js'), /textMapLock|mapLock|refreshMapLockedTexts|heightM/);
 assert.match(html, /id="sketchTextMapLock"/);
 assert.match(html, /sketch-end/);
-assert.match(html, /class="sketch-body"|class="sketch-main"|class="sketch-rail"/);
-assert.match(read('public/css/style.css'), /sketch-rail|sketch-body|sketch-lock/);
-assert.doesNotMatch(read('public/css/style.css'), /\.sketch-end\s*\{\s*margin-left:\s*auto/);
+assert.match(html, /sketch-row-draw[\s\S]*data-tool="text"[\s\S]*id="btnSketchClose"/);
+assert.match(html, /sketch-row-style[\s\S]*id="sketchStrokeWeight"/);
+assert.match(html, /sketch-row-file[\s\S]*id="btnSketchSize"[\s\S]*id="btnSketchClone"/);
+assert.doesNotMatch(html, /sketch-rail/);
+assert.match(read('public/css/style.css'), /sketch-row-draw|sketch-body|sketch-lock/);
+assert.doesNotMatch(read('public/css/style.css'), /sketch-rail|\.sketch-end\s*\{\s*margin-left:\s*auto/);
+assert.match(read('docs/ui-spec.md'), /hàng vẽ \(đường cong, gấp khúc, đa giác, mũi tên, vòng tròn, chữ, Đóng\)/);
 assert.match(read('public/js/mapEngine.js'), /DRAW_TOOL_Z = 690|DRAW_MARK_PANE|ensureDrawMarkPane/);
 assert.match(read('public/js/mapEngine.js'), /DRAW_TIP_Z|ensureDrawOverlayPanes|tooltipPane/);
 assert.match(read('public/js/mapEngine.js'), /getSketchCloneSources|setSketchCloneSources/);

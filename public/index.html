@@ -367,20 +367,23 @@
       <div class="sketch-palette" id="sketchPalette" role="toolbar" aria-label="Công cụ phác thảo" hidden>
         <div class="sketch-body">
           <div class="sketch-main">
-            <div class="sketch-row">
-              <button type="button" class="sketch-btn" id="btnSketchImport" title="Nhập file KML, KMZ, DXF" aria-label="Nhập file KML, KMZ, DXF"><svg class="ico"><use href="#i-folder"/></svg></button>
-              <button type="button" class="sketch-btn" id="btnSketchUndo" title="Hoàn tác" aria-label="Hoàn tác"><svg class="ico"><use href="#i-undo"/></svg></button>
-              <button type="button" class="sketch-btn" id="btnSketchSave" title="Lưu file KML, KMZ, DXF" aria-label="Lưu file KML, KMZ, DXF" aria-expanded="false" aria-controls="sketchSaveRow"><svg class="ico"><use href="#i-save"/></svg></button>
-              <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình" aria-label="Xóa toàn bộ hình"><svg class="ico"><use href="#i-trash"/></svg></button>
-              <button type="button" class="sketch-btn" id="btnSketchSize" title="Cỡ chữ / đầu mũi tên: Vừa" aria-label="Cỡ chữ và đầu mũi tên"><svg class="ico"><use href="#i-sk-size"/></svg></button>
+            <div class="sketch-row sketch-row-draw" aria-label="Công cụ vẽ">
+              <button type="button" class="sketch-btn" data-tool="spline" title="Đường cong" aria-label="Đường cong" aria-pressed="false"><svg class="ico"><use href="#i-sk-spline"/></svg></button>
+              <button type="button" class="sketch-btn" data-tool="polyline" title="Đường gấp khúc" aria-label="Đường gấp khúc" aria-pressed="false"><svg class="ico"><use href="#i-sk-polyline"/></svg></button>
+              <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
+              <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
+              <button type="button" class="sketch-btn" data-tool="circle" title="Vòng tròn" aria-label="Vòng tròn" aria-pressed="false"><svg class="ico"><use href="#i-sk-circle"/></svg></button>
+              <button type="button" class="sketch-btn sketch-end" data-tool="text" title="Chữ" aria-label="Chữ" aria-pressed="false"><svg class="ico"><use href="#i-sk-text"/></svg></button>
+              <button type="button" class="sketch-btn sketch-end" id="btnSketchClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
             </div>
-            <div class="sketch-row">
-              <button type="button" class="sketch-color" data-color="#f43f5e" title="Đỏ" aria-label="Màu đỏ"></button>
-              <button type="button" class="sketch-color" data-color="#facc15" title="Vàng" aria-label="Màu vàng"></button>
-              <button type="button" class="sketch-color" data-color="#22d3ee" title="Xanh lơ" aria-label="Màu xanh lơ"></button>
-              <button type="button" class="sketch-color" data-color="#a3e635" title="Xanh lá" aria-label="Màu xanh lá"></button>
-              <button type="button" class="sketch-color" data-color="#ffffff" title="Trắng" aria-label="Màu trắng"></button>
-              <span class="sketch-sep"></span>
+            <div class="sketch-row sketch-row-style" aria-label="Màu và nét">
+              <span class="sketch-colors">
+                <button type="button" class="sketch-color" data-color="#f43f5e" title="Đỏ" aria-label="Màu đỏ"></button>
+                <button type="button" class="sketch-color" data-color="#facc15" title="Vàng" aria-label="Màu vàng"></button>
+                <button type="button" class="sketch-color" data-color="#22d3ee" title="Xanh lơ" aria-label="Màu xanh lơ"></button>
+                <button type="button" class="sketch-color" data-color="#a3e635" title="Xanh lá" aria-label="Màu xanh lá"></button>
+                <button type="button" class="sketch-color" data-color="#ffffff" title="Trắng" aria-label="Màu trắng"></button>
+              </span>
               <button type="button" class="sketch-btn" data-dash="0" title="Nét liền" aria-label="Nét liền" aria-pressed="true"><svg class="ico"><use href="#i-sk-solid"/></svg></button>
               <button type="button" class="sketch-btn" data-dash="1" title="Nét đứt" aria-label="Nét đứt" aria-pressed="false"><svg class="ico"><use href="#i-sk-dash"/></svg></button>
               <select id="sketchStrokeWeight" class="sketch-weight" aria-label="Độ dày nét" title="Độ dày nét (đa giác, đường, vòng tròn)">
@@ -390,18 +393,14 @@
                 <option value="8">Rất đậm</option>
               </select>
             </div>
-            <div class="sketch-row">
-              <button type="button" class="sketch-btn" data-tool="spline" title="Đường cong" aria-label="Đường cong" aria-pressed="false"><svg class="ico"><use href="#i-sk-spline"/></svg></button>
-              <button type="button" class="sketch-btn" data-tool="polyline" title="Đường gấp khúc" aria-label="Đường gấp khúc" aria-pressed="false"><svg class="ico"><use href="#i-sk-polyline"/></svg></button>
-              <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
-              <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
-              <button type="button" class="sketch-btn" data-tool="circle" title="Vòng tròn" aria-label="Vòng tròn" aria-pressed="false"><svg class="ico"><use href="#i-sk-circle"/></svg></button>
+            <div class="sketch-row sketch-row-file" aria-label="Tệp và phiên">
+              <button type="button" class="sketch-btn" id="btnSketchImport" title="Nhập file KML, KMZ, DXF" aria-label="Nhập file KML, KMZ, DXF"><svg class="ico"><use href="#i-folder"/></svg></button>
+              <button type="button" class="sketch-btn" id="btnSketchUndo" title="Hoàn tác" aria-label="Hoàn tác"><svg class="ico"><use href="#i-undo"/></svg></button>
+              <button type="button" class="sketch-btn" id="btnSketchSave" title="Lưu file KML, KMZ, DXF" aria-label="Lưu file KML, KMZ, DXF" aria-expanded="false" aria-controls="sketchSaveRow"><svg class="ico"><use href="#i-save"/></svg></button>
+              <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình" aria-label="Xóa toàn bộ hình"><svg class="ico"><use href="#i-trash"/></svg></button>
+              <button type="button" class="sketch-btn" id="btnSketchSize" title="Cỡ chữ / đầu mũi tên: Vừa" aria-label="Cỡ chữ và đầu mũi tên"><svg class="ico"><use href="#i-sk-size"/></svg></button>
+              <button type="button" class="sketch-btn sketch-end" id="btnSketchClone" title="Nhân bản ranh đang chọn thành đa giác phác thảo" aria-label="Nhân bản ranh đang chọn thành đa giác phác thảo"><svg class="ico"><use href="#i-sk-clone"/></svg></button>
             </div>
-          </div>
-          <div class="sketch-rail" aria-label="Đóng, nhân bản, chữ">
-            <button type="button" class="sketch-btn sketch-end" id="btnSketchClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
-            <button type="button" class="sketch-btn sketch-end" id="btnSketchClone" title="Nhân bản ranh đang chọn thành đa giác phác thảo" aria-label="Nhân bản ranh đang chọn thành đa giác phác thảo"><svg class="ico"><use href="#i-sk-clone"/></svg></button>
-            <button type="button" class="sketch-btn sketch-end" data-tool="text" title="Chữ" aria-label="Chữ" aria-pressed="false"><svg class="ico"><use href="#i-sk-text"/></svg></button>
           </div>
         </div>
         <div class="sketch-row sketch-sub" id="sketchTextRow" hidden>

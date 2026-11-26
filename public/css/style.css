@@ -1149,15 +1149,26 @@ body.compare-on .map-title-split { display: inline-flex; }
 /* Công cụ đang bật: một nút ngay cạnh nút Phác thảo, cùng cỡ nút thanh công cụ */
 .sketch-pin { position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); z-index: 1; }
 .sketch-pin[hidden] { display: none !important; }
-.sketch-row { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
-/* Trái xếp sát; phải cột Đóng / Nhân bản / Chữ — không kéo rộng theo droplist «Vừa» */
-.sketch-body { display: flex; flex-direction: row; align-items: stretch; gap: 2px; }
-.sketch-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sketch-rail {
-  display: flex; flex-direction: column; gap: 2px; flex-shrink: 0;
-  padding-left: 2px; border-left: 1px solid var(--border-color);
+/* Ba hàng cùng bề rộng: vẽ (7 ô), nét (màu + liền/đứt + độ dày), phiên (6 ô giãn đều). */
+.sketch-row { display: grid; align-items: center; gap: 2px; }
+.sketch-body { display: block; }
+.sketch-main {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%;
+  min-width: calc(7 * 30px + 6 * 2px);
+}
+.sketch-row-draw { grid-template-columns: repeat(7, minmax(30px, 1fr)); }
+.sketch-row-style { grid-template-columns: minmax(94px, 3fr) minmax(30px, 1fr) minmax(30px, 1fr) minmax(62px, 2fr); }
+.sketch-row-file { grid-template-columns: repeat(6, minmax(30px, 1fr)); }
+.sketch-row-draw .sketch-btn,
+.sketch-row-style .sketch-btn,
+.sketch-row-file .sketch-btn { width: 100%; }
+.sketch-colors {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-width: 0;
 }
 .sketch-btn {
+  box-sizing: border-box;
   width: 30px; height: 30px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; color: var(--text-main);
@@ -1167,12 +1178,12 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-btn.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.55); }
 .sketch-btn:disabled { opacity: 0.35; cursor: default; }
 .sketch-color {
-  width: 18px; height: 18px; margin: 0 2px; padding: 0;
+  box-sizing: border-box;
+  width: 16px; height: 16px; margin: 0; padding: 0; flex: 0 0 16px;
   background: var(--c); border: 2px solid rgba(15, 23, 42, 0.9); border-radius: 50%;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); cursor: pointer;
 }
 .sketch-color.active { box-shadow: 0 0 0 2px var(--accent-cyan); }
-.sketch-sep { width: 1px; height: 20px; margin: 0 3px; background: var(--border-color); }
 #map.sketch-mode, #mapPlan.sketch-mode { cursor: crosshair !important; }
 #map.sketch-text-mode, #mapPlan.sketch-text-mode { cursor: text !important; }
 .sketch-popup .leaflet-popup-content { margin: 6px; }
@@ -1251,7 +1262,9 @@ body.compare-on .map-title-split { display: inline-flex; }
   background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm);
 }
 #sketchStrokeWeight.sketch-weight {
-  width: auto; min-width: 3.25rem; max-width: 4.25rem; margin-left: 2px; padding: 0 2px;
+  box-sizing: border-box;
+  width: 100%; min-width: 0; max-width: none; height: 30px; margin: 0; padding: 0 2px;
+  font-size: var(--fs-xs);
 }
 .leaflet-interactive.sketch-edge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 3px #fff); cursor: pointer; }
 .leaflet-interactive.sketch-picked { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px rgb(var(--cyan-rgb))); }
@@ -8299,7 +8312,13 @@ body.project-review.la-page #projectReviewHost {
     bottom: calc(50dvh + max(8px, var(--safe-bottom)));
     max-height: calc(50dvh - var(--info-top) - 16px);
   }
-  .sketch-palette { right: auto; width: min(280px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px)); flex-direction: column; flex-wrap: nowrap; }
+  .sketch-palette {
+    right: auto;
+    width: max-content;
+    max-width: min(280px, calc(100vw - var(--phone-tool-left) - var(--tb-btn) - 16px));
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
   body .urban-focus-bar { top: calc(var(--info-top) + var(--stack-urban, 0px)) !important; }
   body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
   body #mapArea > .project-brief,
@@ -8562,6 +8581,7 @@ body.project-review.la-page #projectReviewHost {
     width: auto;
     max-height: calc(100dvh - var(--info-top) - 12px);
   }
+  .sketch-palette { left: auto; width: max-content; max-width: calc(100vw - var(--info-left) - var(--tb-btn) - 28px); }
   body.right-collapsed .faq-panel,
   body.right-collapsed .review-panel,
   body.right-collapsed .sketch-palette {
