@@ -926,8 +926,14 @@
                 <details class="tt16-group" open>
                   <summary><span class="tt16-group-name">Cấp đô thị</span><span class="tt16-group-count">3</span></summary>
                   <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i><span>Đô thị loại I (toàn thành phố)</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><span>Đô thị loại II</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><span>Đô thị loại III</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><i class="ua-sw" style="background:#ef4444"></i><span>Đô thị loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><i class="ua-sw" style="background:#fb923c"></i><span>Đô thị loại III</span></div>
+                </details>
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Nền theo trình độ</span><span class="tt16-group-count">3</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i><span>Phường/xã trình độ loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i><span>Phường/xã trình độ loại III</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.7"></i><span>Xã / chưa xếp loại (nền xanh)</span></div>
                 </details>
                 <details class="tt16-group" open>
                   <summary><span class="tt16-group-name">Ranh đô thị</span><span class="tt16-group-count">2</span></summary>
@@ -955,8 +961,8 @@
           </div>
         </div>
         <div class="layer-row lot-opacity-row">
-          <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
-          <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
+          <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền. Trên trục A: điều khiển nền tô phân loại đô thị / phường·xã."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
+          <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt">
           <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
         </div>
         </div>

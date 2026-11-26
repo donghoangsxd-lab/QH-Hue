@@ -1038,15 +1038,15 @@ function paintAdminList() {
     const stats = area.type === 'tp' ? DVHC_CITY : dvhcOf(label);
     const pop = statText(stats && stats.pop, POP_FMT);
     const km = statText(stats && stats.km2, KM_FMT);
-    const numHtml = num ? `${num}.` : '';
     const marks = wardMarks(label);
     const shown = shortPlaceName(label);
+    const nameHtml = num ? `${num}. ${escapeHtml(shown)}` : escapeHtml(shown);
     const bits = [`${label}: dân số ${pop}, diện tích ${km} km²`];
     if (marks.ht !== '—') bits.push(`HT ${marks.ht}${marks.htTitle ? ` (${marks.htTitle})` : ''}`);
     if (marks.plan !== '—') bits.push(`2030 ${marks.plan}${marks.planTitle ? ` (${marks.planTitle})` : ''}`);
     if (marks.note) bits.push(`Ghi chú: ${marks.note}`);
     const loai = htMode ? lvCell(marks.ht, marks.htTitle) : lvCell(marks.plan, marks.planTitle);
-    return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(label)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(shown)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${loai}</button>`;
+    return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(label)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-area-name">${nameHtml}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${loai}</button>`;
   };
   const sortBtn = (key, cls, label, title) => {
     const on = dvhcSortKey === key;
@@ -1059,10 +1059,10 @@ function paintAdminList() {
   const loaiTip = htMode
     ? 'Loại HT — trình độ phát triển đô thị hiện trạng theo QĐ 614'
     : 'Loại 2030 — trình độ định hướng đến 2030 theo QĐ 756';
-  const head = `<div class="axis-area-head axis-dvhc"><span class="axis-num"></span>${
+  const head = `<div class="axis-area-head axis-dvhc">${
     sortBtn('name', 'axis-area-name', 'Đơn vị hành chính', 'Sắp xếp theo tên')
   }${
-    sortBtn('pop', 'axis-area-pop', 'Dân số (người)', 'Sắp xếp theo dân số')
+    sortBtn('pop', 'axis-area-pop', 'Dân số (ng)', 'Sắp xếp theo dân số')
   }${
     sortBtn('km', 'axis-area-km', 'DT (km2)', 'Sắp xếp theo diện tích')
   }${

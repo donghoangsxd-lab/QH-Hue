@@ -13,7 +13,9 @@ const LEVEL_FILL = { II: '#ef4444', III: '#fb923c' };
 const XA_FILL = '#4ade80';
 const BADGE_MAX_ZOOM = 15;
 const BADGE_SMALL_ZOOM = 10;
-const fillOpacity = (z) => (z <= 10 ? 0.55 : z <= 11 ? 0.42 : z <= 12 ? 0.3 : z <= 14 ? 0.14 : 0.06);
+let userFillMul = 1;
+const zoomFill = (z) => (z <= 10 ? 0.55 : z <= 11 ? 0.42 : z <= 12 ? 0.3 : z <= 14 ? 0.14 : 0.06);
+const fillOpacity = (z) => zoomFill(z) * userFillMul;
 
 const SealCanvas = L.Canvas.extend({
   onAdd(host) {
@@ -181,6 +183,14 @@ export async function setDvhcClassVisible(on) {
 
 export function refreshDvhcClassLayer() {
   if (visible) draw();
+}
+
+/** Hệ số độ đục nền tô phân loại phường/xã (0–1); gắn thanh Độ trong suốt trục A. */
+export function setDvhcClassFillOpacity(v) {
+  const next = Math.max(0, Math.min(1, Number(v)));
+  if (!Number.isFinite(next)) return;
+  userFillMul = next;
+  syncOpacity();
 }
 
 export function initDvhcClassLayer() {

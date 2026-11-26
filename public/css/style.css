@@ -8980,9 +8980,14 @@ body.project-review.la-page #projectReviewHost {
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis-area.axis-dvhc,
 .axis-area-head.axis-dvhc {
-  grid-template-columns: 2em minmax(0, 1.35fr) minmax(7.5ch, 1fr) 6.2ch 4.2ch;
-  column-gap: 3px;
-  padding-right: 1px;
+  grid-template-columns: minmax(0, 1fr) 10ch 8ch 3.4ch;
+  column-gap: 4px;
+  padding-left: 0;
+  padding-right: 2px;
+}
+.axis-area.axis-dvhc .axis-area-pop,
+.axis-area.axis-dvhc .axis-area-km {
+  text-align: left;
 }
 .axis-area-head.axis-dvhc {
   height: auto;
@@ -9012,6 +9017,11 @@ body.project-review.la-page #projectReviewHost {
 .axis-area-head .axis-sort.axis-area-km {
   text-align: right;
   white-space: normal;
+}
+.axis-area-head.axis-dvhc .axis-sort.axis-area-pop,
+.axis-area-head.axis-dvhc .axis-sort.axis-area-km {
+  text-align: left;
+  white-space: nowrap;
 }
 .axis-area-head .axis-sort.axis-lv {
   text-align: center;

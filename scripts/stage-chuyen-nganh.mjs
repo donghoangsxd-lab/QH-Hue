@@ -29,7 +29,20 @@ for (const name of schemes) {
   const rel = path.relative(root, target);
   const exists = fs.existsSync(link) || fs.lstatSync(link, { throwIfNoEntry: false });
   if (!exists) {
-    fs.symlinkSync(rel, link, 'dir');
+    // Deploy/materialize: copy thẳng (Windows thường không tạo được symlink dir).
+    if (materialize) {
+      fs.cpSync(target, link, { recursive: true });
+      console.log('Đã bung', name);
+    } else {
+      try {
+        fs.symlinkSync(rel, link, 'dir');
+      } catch (err) {
+        if (err && (err.code === 'EPERM' || err.code === 'EINVAL')) {
+          fs.cpSync(target, link, { recursive: true });
+          console.log('Đã copy (khong symlink)', name);
+        } else throw err;
+      }
+    }
     continue;
   }
   const st = fs.lstatSync(link);

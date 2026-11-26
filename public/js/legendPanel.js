@@ -4,7 +4,8 @@
 // thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Chỉ hiện bộ của lớp đang bật. Mọi phần tử [data-legend-pane] hiện theo bộ đang xem.
 // Chọn lớp ở panel phải (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
 // (qhcRoads.js); 1/10.000 thêm nhóm mặt cắt ngang đường (roadSections.js).
-// + Viền lô theo giai đoạn; thanh Độ trong suốt ở cuối khung Chú giải.
+// + Viền lô theo giai đoạn; thanh Độ trong suốt ở cuối khung Chú giải
+//   (trục A: nền phân loại đô thị / phường·xã; trục khác: tô lô đất).
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';
 import { LEVEL_EVENT } from './mapLevel.js';
 import { renderRoadSections } from './roadSections.js';
@@ -12,11 +13,15 @@ import { renderTrafficLegend } from './qhcRoads.js';
 import { BUFFER_COLORS, BUFFER_KEYS } from './state.js';
 import { investLegendHtml } from './investLayer.js';
 import { paintAptLegendMarks } from './apartmentLayer.js';
+import { setUrbanClassFillOpacity } from './urbanAreaLayer.js';
+import { setDvhcClassFillOpacity } from './dvhcClassLayer.js';
 
 const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
-// Kéo thanh trượt: số % đổi ngay, tô lại lô sau khi dừng kéo một nhịp (vẽ lại hàng nghìn lô mỗi bước rất nặng)
+// Kéo thanh trượt: số % đổi ngay, tô lại sau khi dừng kéo một nhịp (vẽ lại hàng nghìn lô mỗi bước rất nặng)
 const OPACITY_DELAY_MS = 80;
+const LOT_OPACITY_TIP = 'Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền';
+const ADMIN_OPACITY_TIP = 'Độ trong suốt nền tô phân loại trên trục A (đô thị hoặc phường/xã). Viền ranh và ký hiệu giữ nguyên.';
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 
@@ -304,6 +309,8 @@ export function initLegendPanel() {
     // Trục A: ẩn ô tìm ký hiệu đất (không dùng bộ TT16).
     if (search) search.hidden = hanhchinh || !LEGEND_SETS[active];
     if (toggle) toggle.style.visibility = hanhchinh || !LEGEND_SETS[active] ? 'hidden' : '';
+    const opLabel = document.querySelector('.lot-opacity-row label[for="lotOpacity"]');
+    if (opLabel) opLabel.title = hanhchinh ? ADMIN_OPACITY_TIP : LOT_OPACITY_TIP;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
     const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]
@@ -388,6 +395,14 @@ export function initLegendPanel() {
   const out = document.getElementById('lotOpacityValue');
   if (!slider) return;
   const show = (v) => { if (out) out.textContent = `${v}%`; };
+  const applyOpacity = (ratio) => {
+    if (document.getElementById('layerMain')?.dataset.active === 'hanhchinh') {
+      setUrbanClassFillOpacity(ratio);
+      setDvhcClassFillOpacity(ratio);
+      return;
+    }
+    setLotOpacity(ratio);
+  };
   const initial = Math.round(getLotOpacity() * 100);
   slider.value = String(initial);
   show(initial);
@@ -395,13 +410,13 @@ export function initLegendPanel() {
   slider.addEventListener('input', () => {
     show(Number(slider.value));
     clearTimeout(timer);
-    timer = setTimeout(() => setLotOpacity(Number(slider.value) / 100), OPACITY_DELAY_MS);
+    timer = setTimeout(() => applyOpacity(Number(slider.value) / 100), OPACITY_DELAY_MS);
   });
-  // Bấm số % để trả về mặc định (đúng mẫu ký hiệu)
+  // Bấm số % để trả về mặc định (đúng mẫu ký hiệu / nền phân loại)
   out?.addEventListener('click', () => {
     slider.value = '100';
     show(100);
     clearTimeout(timer);
-    setLotOpacity(1);
+    applyOpacity(1);
   });
 }
