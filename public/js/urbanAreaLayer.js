@@ -24,11 +24,9 @@ const HIT_WEIGHT = 14;
 const WARD_HOVER_MAX_ZOOM = 12;
 const LEVEL_FILL = { II: '#ef4444', III: '#fb923c' };
 const RURAL_FILL = '#4ade80';
-const LINE_STYLE = {
-  I: { color: '#facc15', weight: 3.5, dashArray: null },
-  II: { color: '#f8fafc', weight: 3, dashArray: null },
-  III: { color: '#f8fafc', weight: 2.5, dashArray: '7 5' }
-};
+// Một kiểu ranh nét đứt cho mọi cấp đô thị (không phân solid/dash theo loại).
+const URBAN_LINE = { color: '#f8fafc', weight: 2.5, dashArray: '7 5' };
+const LINE_STYLE = { I: URBAN_LINE, II: URBAN_LINE, III: URBAN_LINE };
 const CLS_RANK = { I: 0, II: 1, III: 2 };
 // Thu nhỏ (≤ 12) tô đậm như bản đồ phân vùng; phóng to thì nhạt dần để không che công trình.
 // userFillMul: thanh Độ trong suốt trên trục A (Chú giải).

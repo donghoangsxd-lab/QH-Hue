@@ -212,7 +212,7 @@ function fmtPct(pct) {
   return '0%';
 }
 
-/** Tổng hợp nhiều phường/xã (Shift): bảng Đơn vị | Dân số | Diện tích | Tỷ lệ + hàng TỔNG CỘNG.
+/** Tổng hợp nhiều phường/xã (Shift): bảng Đơn vị hành chính | Dân số (ng) | Diện tích (km2) | Tỷ lệ + TỔNG CỘNG.
  * Giữ mở khi pan/zoom; kéo theo tiêu đề; đóng bằng nút X hoặc Esc / đổi trục. */
 export function openMultiWardInfoCard(names, ev) {
   const keepLeft = infoEl?.classList.contains('admin-info-multi') ? infoEl.style.left : '';
@@ -229,7 +229,9 @@ export function openMultiWardInfoCard(names, ev) {
   }).sort((a, b) => b.km2 - a.km2 || a.name.localeCompare(b.name, 'vi'));
   const totalPop = rows.reduce((s, r) => s + r.pop, 0);
   const totalKm = rows.reduce((s, r) => s + r.km2, 0);
-  // Tỷ lệ theo diện tích trên tổng đã chọn (cột gọn một số %).
+  const countLabel = String(list.length).padStart(2, '0');
+  const title = `Phân tích tổng hợp ${countLabel} đơn vị hành chính`;
+  // Tỷ lệ theo diện tích trên tổng đã chọn.
   const body = rows.map(r => {
     const kmPct = pctOf(r.km2, totalKm);
     return `<tr title="${escapeHtml(r.name)}">
@@ -242,11 +244,16 @@ export function openMultiWardInfoCard(names, ev) {
   const el = document.createElement('aside');
   el.className = 'place-card admin-info-card admin-info-multi';
   el.setAttribute('role', 'dialog');
-  el.setAttribute('aria-label', 'Tổng hợp đơn vị hành chính');
-  el.innerHTML = `<header class="place-head"><span>${ico('locate')}Đã chọn ${list.length} đơn vị</span>
+  el.setAttribute('aria-label', title);
+  el.innerHTML = `<header class="place-head"><span>${ico('locate')}${escapeHtml(title)}</span>
       <button type="button" class="place-x" title="Đóng" aria-label="Đóng">${ico('close')}</button></header>
     <table class="admin-multi-table">
-      <thead><tr><th scope="col">Đơn vị</th><th scope="col">Dân số</th><th scope="col">Diện tích<br><span>km²</span></th><th scope="col">Tỷ lệ</th></tr></thead>
+      <thead><tr>
+        <th scope="col">Đơn vị hành chính</th>
+        <th scope="col">Dân số (ng)</th>
+        <th scope="col">Diện tích (km2)</th>
+        <th scope="col">Tỷ lệ</th>
+      </tr></thead>
       <tbody>${body}</tbody>
       <tfoot><tr>
         <th scope="row">TỔNG CỘNG</th>

@@ -909,37 +909,22 @@
               </div>
             </div>
             <div class="ua-legend-pane" data-legend-pane="URBAN" hidden>
-              <div class="layer-row ua-legend-toggle">
-                <div>
-                  <input type="checkbox" id="chk_urban" checked>
-                  <label for="chk_urban" title="Bản đồ phân loại đô thị (tab Đô thị). Hiện trạng: QĐ 614/QĐ-UBND. Quy hoạch: QĐ 756/QĐ-UBND. Trỏ chuột vào ranh hoặc ký hiệu để xem thông tin.">
-                    <svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị
-                    <small class="layer-hint" id="urbanLockHint"></small>
-                  </label>
+              <!-- chk_urban ẩn: bật/tắt lớp qua thanh Độ trong suốt (0% = tắt, &gt;0% = bật). -->
+              <input type="checkbox" id="chk_urban" checked hidden>
+              <small class="layer-hint" id="urbanLockHint" hidden></small>
+              <div class="tt16-legend ua-legend-flat" id="urbanLegend">
+                <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i><span>Đô thị loại I (toàn thành phố)</span></div>
+                <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><i class="ua-sw" style="background:#ef4444"></i><span>Đô thị loại II</span></div>
+                <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><i class="ua-sw" style="background:#fb923c"></i><span>Đô thị loại III</span></div>
+                <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.7"></i><span>Xã / chưa xếp loại (nền xanh)</span></div>
+                <div class="tt16-row ua-legend-item ua-legend-doc">
+                  <span title="Quyết định công bố danh mục đô thị">Quyết định 614 về công bố danh mục đô thị</span>
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="Xem file" title="Xem Quyết định 614"></button>
                 </div>
-                <span class="layer-decisions">
-                  <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="QĐ 614"></button>
-                  <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756"></button>
-                </span>
-              </div>
-              <div class="tt16-legend" id="urbanLegend">
-                <details class="tt16-group" open>
-                  <summary><span class="tt16-group-name">Cấp đô thị</span><span class="tt16-group-count">3</span></summary>
-                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i><span>Đô thị loại I (toàn thành phố)</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><i class="ua-sw" style="background:#ef4444"></i><span>Đô thị loại II</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><i class="ua-sw" style="background:#fb923c"></i><span>Đô thị loại III</span></div>
-                </details>
-                <details class="tt16-group" open>
-                  <summary><span class="tt16-group-name">Nền theo trình độ</span><span class="tt16-group-count">3</span></summary>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i><span>Phường/xã trình độ loại II</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i><span>Phường/xã trình độ loại III</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.7"></i><span>Xã / chưa xếp loại (nền xanh)</span></div>
-                </details>
-                <details class="tt16-group" open>
-                  <summary><span class="tt16-group-name">Ranh đô thị</span><span class="tt16-group-count">2</span></summary>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i><span>Ranh đô thị loại II</span></div>
-                  <div class="tt16-row ua-legend-item"><i class="ua-sw-line"></i><span>Ranh đô thị loại III</span></div>
-                </details>
+                <div class="tt16-row ua-legend-item ua-legend-doc">
+                  <span title="QĐ 756/QĐ-UBND — quy hoạch thành phố">Quyết định 756 phê duyệt QH thành phố</span>
+                  <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="Xem file" title="Xem Quyết định 756"></button>
+                </div>
               </div>
             </div>
           </div>

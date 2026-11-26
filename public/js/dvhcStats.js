@@ -58,7 +58,7 @@ export function dvhcOf(name) {
 
 export function shortPlaceName(name) {
   const s = String(name || '');
-  if (s === DVHC_CITY.name) return 'TP Huế';
+  if (s === DVHC_CITY.name) return 'Thành phố Huế';
   if (s.startsWith('Phường ')) return `P. ${s.slice(7)}`;
   if (s.startsWith('Xã ')) return `X. ${s.slice(3)}`;
   return s;

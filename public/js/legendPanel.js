@@ -399,6 +399,17 @@ export function initLegendPanel() {
     if (document.getElementById('layerMain')?.dataset.active === 'hanhchinh') {
       setUrbanClassFillOpacity(ratio);
       setDvhcClassFillOpacity(ratio);
+      // Tab Đô thị: 0% = tắt lớp (#chk_urban), >0% = bật (thay cho checkbox đã bỏ khỏi chú giải).
+      const adminTab = document.querySelector('[data-admin-tab].active')?.dataset.adminTab
+        || document.querySelector('[data-admin-tab][aria-selected="true"]')?.dataset.adminTab;
+      if (adminTab === 'dothi') {
+        const urban = document.getElementById('chk_urban');
+        const on = ratio > 0;
+        if (urban && urban.checked !== on) {
+          urban.checked = on;
+          urban.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
       return;
     }
     setLotOpacity(ratio);

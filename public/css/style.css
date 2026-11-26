@@ -2343,6 +2343,37 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   gap: 8px;
 }
 .ua-legend-pane .tt16-legend { margin: 0; }
+.ua-legend-flat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ua-legend-flat .tt16-row.ua-legend-item {
+  display: flex;
+  align-items: center;
+  min-height: var(--axis-row-h);
+  padding: 2px 2px;
+  white-space: normal;
+}
+.ua-legend-flat .tt16-row.ua-legend-item > span:last-of-type {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ua-legend-flat .ua-legend-doc {
+  justify-content: space-between;
+  gap: 8px;
+}
+.ua-legend-flat .ua-legend-doc > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-main);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+}
+.ua-legend-flat .ua-legend-doc .layer-decision {
+  flex: 0 0 auto;
+}
 #tabLegend.is-admin .legend-find { display: none; }
 #tabLegend.is-admin .tt16-set { display: none; }
 body.dvhc-zoom-low .dvhc-badge-icon .ua-badge:not(.ua-badge-I) {
@@ -7677,65 +7708,78 @@ body.project-review.la-page #projectReviewHost {
   left: var(--info-left);
   top: var(--info-top);
   right: auto;
-  width: var(--info-card-w);
+  width: min(420px, calc(100vw - 16px));
   max-height: calc(100% - var(--info-top) - var(--info-bottom));
   overflow: auto;
   z-index: 1200;
+  padding-bottom: 6px;
 }
 .admin-info-card.admin-info-multi .place-head {
   cursor: move;
   user-select: none;
   touch-action: none;
+  gap: 8px;
+  align-items: flex-start;
+}
+.admin-info-card.admin-info-multi .place-head > span {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1.25;
+  white-space: normal;
 }
 .admin-multi-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-sm);
   table-layout: fixed;
+  margin-top: 2px;
 }
 .admin-multi-table th,
 .admin-multi-table td {
-  padding: 5px 4px;
+  padding: 6px 6px;
   border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
-  overflow-wrap: anywhere;
 }
 .admin-multi-table thead th {
-  font-size: var(--fs-xs);
+  font-family: var(--axis-font);
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  line-height: 1.2;
-}
-.admin-multi-table thead th span {
-  font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--text-muted);
-  opacity: 0.85;
+  line-height: 1.2;
+  white-space: nowrap;
+  padding-top: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 .admin-multi-table th[scope="row"] {
   font-weight: 700;
   color: var(--text-strong);
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.admin-multi-table td { text-align: right; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.admin-multi-table td { text-align: right; color: var(--text-main); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .admin-multi-table thead th:nth-child(1),
 .admin-multi-table tbody th,
-.admin-multi-table tfoot th { width: 36%; }
+.admin-multi-table tfoot th { width: 34%; }
 .admin-multi-table thead th:nth-child(2),
-.admin-multi-table td:nth-child(2) { width: 24%; }
+.admin-multi-table td:nth-child(2) { width: 22%; }
 .admin-multi-table thead th:nth-child(3),
-.admin-multi-table td:nth-child(3) { width: 24%; }
+.admin-multi-table td:nth-child(3) { width: 28%; }
 .admin-multi-table thead th:nth-child(4),
 .admin-multi-table td:nth-child(4) { width: 16%; }
 .admin-multi-table thead th:nth-child(n+2) { text-align: right; }
+.admin-multi-table tbody tr:hover th,
+.admin-multi-table tbody tr:hover td { background: var(--axis-bg-hover, rgba(255, 255, 255, 0.04)); }
 .admin-multi-table tfoot th,
 .admin-multi-table tfoot td {
   border-bottom: 0;
   border-top: 1px solid var(--border-color);
-  padding-top: 7px;
+  padding-top: 8px;
   font-weight: 800;
   color: var(--text-strong);
 }
@@ -8904,6 +8948,8 @@ body.project-review.la-page #projectReviewHost {
 .project-htkt[hidden] { display: none; }
 .project-htkt .cn-scheme { margin-left: 0; }
 .project-htkt .cn-scheme-row .cn-ico { flex: none; width: 14px; height: 14px; }
+.project-htkt .cn-scheme-row .project-btn { width: 20px; height: 20px; }
+.project-htkt .cn-scheme-row .project-btn .ico { width: 12px; height: 12px; }
 #gt25Park[hidden], #qhc25SpacePark[hidden] { display: none !important; }
 .qhc25-space-mount { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 .qhc25-space-label {
@@ -8987,7 +9033,7 @@ body.project-review.la-page #projectReviewHost {
 }
 .axis-area.axis-dvhc .axis-area-pop,
 .axis-area.axis-dvhc .axis-area-km {
-  text-align: left;
+  text-align: right;
 }
 .axis-area-head.axis-dvhc {
   height: auto;
@@ -9020,7 +9066,7 @@ body.project-review.la-page #projectReviewHost {
 }
 .axis-area-head.axis-dvhc .axis-sort.axis-area-pop,
 .axis-area-head.axis-dvhc .axis-sort.axis-area-km {
-  text-align: left;
+  text-align: right;
   white-space: nowrap;
 }
 .axis-area-head .axis-sort.axis-lv {
