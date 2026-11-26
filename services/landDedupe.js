@@ -44,18 +44,39 @@ function polygonFeatures(features) {
   });
 }
 
+function propText(props, keys) {
+  for (const key of keys) {
+    const v = String(props?.[key] ?? '').trim();
+    if (v) return v;
+  }
+  return '';
+}
+
+/** Ưu tiên chức năng chữ; bỏ loaidat thuần số (gisHue) khi đã có chucnangsudungdat. */
+function landLayerOf(props) {
+  const chu = propText(props, ['chucnangsudungdat', 'chucnangsu', 'tendoituong', 'loai', 'layer']);
+  if (chu && !/^\d+(\.\d+)?$/.test(chu)) return chu.slice(0, 120);
+  const loai = propText(props, ['loaidat', 'loai', 'layer']);
+  if (loai && !/^\d+(\.\d+)?$/.test(loai)) return loai.slice(0, 120);
+  return chu.slice(0, 120) || loai.slice(0, 120);
+}
+
 function landsFromFeatures(features, phase) {
   const want = phase === 'QH' ? 'QH' : 'HT';
   return polygonFeatures(features).map(feature => {
     const props = feature.props && typeof feature.props === 'object'
       ? feature.props
       : (feature.properties || {});
-    return {
+    const layer = landLayerOf(props);
+    const code = propText(props, ['kyhieulodat', 'solo', 'nhan']);
+    const row = {
       phase: want,
       geometry: feature.geometry,
-      layer: String(props.loai || props.layer || '').slice(0, 80),
-      name: String(props.nhan || feature.name || '').slice(0, 120)
+      layer,
+      name: String(code || feature.name || layer || '').slice(0, 120)
     };
+    if (code) row.lotCode = code.slice(0, 40);
+    return row;
   });
 }
 

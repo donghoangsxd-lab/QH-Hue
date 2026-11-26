@@ -822,6 +822,9 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
   assert.doesNotMatch(drawOut, /open \|\| !below/);
   assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
+  // Canvas ranh và canvas lô không chung pane: đã mở lô thì tắt pointer-events pane ranh.
+  assert.match(pl, /projectOutlinePane/);
+  assert.match(drawOut, /pointerEvents = lotsDrawn \? 'none'/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
 }

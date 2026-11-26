@@ -242,6 +242,7 @@ export function byProjectAreaDesc(a, b) {
 }
 
 // Lớp sử dụng đất + ranh. Bản vẽ hạ tầng (NET_LAYERS) là file riêng projects/<slug>/<key>.json, bật/tắt bổ trợ lớp đất.
+// UI ẩn slot net trống khi catalog đã có cùng ngành (projectLayer.catalogCoversNet).
 // Không gồm ht-dat-hoso, qh-dat-hoso, ranh-hoso: file cũ, không bật thành lớp. Form nhập ghi su-dung-dat, hien-trang, ranh-gioi.
 // Mỗi lớp = 1 file. Khớp LAYER_ROLES / NET_ROLES trong services/projectStore.js.
 export const NET_LAYERS = [

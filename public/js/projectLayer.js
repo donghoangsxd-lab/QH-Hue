@@ -27,7 +27,8 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
+  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog,
+  PROJECT_LAYERS
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -51,13 +52,36 @@ import {
   dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
 } from './dossierAttach.js';
 import { enabledSchemes, schemeDetailOpen, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } from './schemeVisibility.js';
-import { getAreaFilter, onFacet, schemeRecords as catalogSchemeRecords } from './facetStore.js';
+import { getAreaFilter, onFacet, schemeRecords as catalogSchemeRecords, layersFor } from './facetStore.js';
+import { isCotDenLayer } from './htktModel.js';
 import {
   STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, HIDDEN_PROJECTS_KEY,
   parseNameList, durableLayerKeys, isBoundaryLayerKey
 } from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 import { sameLevelOverlaps } from './qhpkOverlap.js';
+
+/** group NET_LAYERS → sector catalog HTKT (facetStore). */
+const NET_GROUP_SECTOR = {
+  'giao-thong': 'giao-thong',
+  'cap-nuoc': 'cap-nuoc',
+  'cap-dien': 'cap-dien',
+  'thoat-nuoc': 'san-nen-thoat-mua',
+  'san-nen': 'san-nen-thoat-mua',
+  'thoat-thai': 'thoat-nuoc-thai',
+  'chat-thai': 'chat-thai-ran-nghia-trang',
+  'vien-thong': 'thong-tin-lien-lac'
+};
+/** sector catalog → group NET (một ngành catalog ↔ một slot net). */
+const SECTOR_TO_NET_GROUP = {
+  'giao-thong': 'giao-thong',
+  'cap-nuoc': 'cap-nuoc',
+  'cap-dien': 'cap-dien',
+  'san-nen-thoat-mua': 'san-nen',
+  'thoat-nuoc-thai': 'thoat-thai',
+  'chat-thai-ran-nghia-trang': 'chat-thai',
+  'thong-tin-lien-lac': 'vien-thong'
+};
 
 const HIDDEN_KEY = HIDDEN_PROJECTS_KEY;
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -75,8 +99,8 @@ const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm (cùng kiểu CORE_WASH vùng trung tâm)
 const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0 };
-// QHPK 1/2.000: dày hơn nét mặc định một chút để đọc trên vệ tinh, vẫn mỏng hơn QHC
-const OUTLINE_QHPK = { weight: 2.4, opacity: 0.95, dashArray: null, fillOpacity: 0 };
+// QHPK 1/2.000: nét mỏng đứt — đọc trên vệ tinh, không thô như viền liền dày
+const OUTLINE_QHPK = { weight: 1.4, opacity: 0.9, dashArray: '6 4', fillOpacity: 0 };
 // Nền mờ theo cấp: QHC bằng wash trung tâm; QHPK / QHCT nhẹ hơn để phân biệt trên ảnh vệ tinh
 const OUTLINE_FILL = { QHC: 0.2, QHPK: 0.14, QHCT: 0.14 };
 // Họ màu theo cấp, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a) và đô thị loại I (#facc15).
@@ -1520,8 +1544,9 @@ function layerRowHtml(p, idx, projectOn, admin, g, li, { note = false } = {}) {
   const noteHtml = note
     ? '<div class="project-net-note">Bản vẽ hạ tầng theo đồ án — bật để xem cùng lớp sử dụng đất</div>'
     : '';
+  const netEdit = g.kind === 'net' && (g.present || catalogCoversNet(p, g));
   const addNet = admin && g.kind === 'net' && !p.legacy
-    ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${g.present ? 'Thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${g.present ? 'Thay bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico('save')}</button>`
+    ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${netEdit ? 'Sửa / thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${netEdit ? 'Sửa bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico(netEdit ? 'pen' : 'save')}</button>`
     : '';
   const kmlBtn = admin && g.kind === 'boundary' && !p.legacy
     ? `<button type="button" class="project-kml-btn" data-kml-boundary="${idx}" title="Nhập file KML hoặc KMZ (WGS84) làm ranh đồ án. Không ghi lại các lô."${layerBusy || busy ? ' disabled' : ''}>Nhập KML/KMZ</button>`
@@ -1583,7 +1608,38 @@ function htktHostHtml(p, phase) {
   const level = catalogLevelOfProject(p);
   if (!slug || !level) return '';
   const kind = phase === 'HT' ? 'hien-trang' : 'quy-hoach';
-  return `<div class="project-htkt qhc25-htkt" data-scheme-htkt data-slug="${escapeHtml(slug)}" data-level="${escapeHtml(level)}" data-kind="${kind}" hidden></div>`;
+  return `<div class="project-htkt qhc25-htkt" data-scheme-htkt data-slug="${escapeHtml(slug)}" data-level="${escapeHtml(level)}" data-kind="${kind}" data-ten-qh="${escapeHtml(p.name)}" data-phase="${phase}" hidden></div>`;
+}
+
+/**
+ * Admin: mở chọn GeoJSON để ghi / thay bản vẽ net theo ngành catalog (cùng putProjectNet).
+ * Gọi từ dòng HTKT đã có lớp (nút bút chì).
+ */
+export function editProjectNetForSector(tenQH, sector, phase) {
+  if (!isAdmin() || busy || layerBusy) return;
+  const p = projects.find((row) => row && row.name === tenQH);
+  if (!p || p.legacy) return;
+  const group = SECTOR_TO_NET_GROUP[sector];
+  if (!group) return;
+  const key = `${phase === 'HT' ? 'ht' : 'qh'}-${group}`;
+  const listed = layerInfo.get(p.name)?.list;
+  const hit = Array.isArray(listed) ? listed.find((row) => row && row.key === key) : null;
+  const base = PROJECT_LAYERS.find((row) => row.key === key);
+  const g = hit || (base ? { ...base, present: false, count: 0 } : null);
+  if (!g) return;
+  pickNetFile(p, g);
+}
+
+/** Đã có lớp catalog HTKT cùng ngành + phase → không hiện slot nhập bản vẽ net trống. */
+function catalogCoversNet(p, g) {
+  if (!g || g.kind !== 'net') return false;
+  const sector = NET_GROUP_SECTOR[g.group];
+  const slug = catalogSlugOfProject(p);
+  const level = catalogLevelOfProject(p);
+  if (!sector || !slug || !level) return false;
+  const kind = g.phase === 'HT' ? 'hien-trang' : 'quy-hoach';
+  return layersFor(sector, level, slug, { filter: false })
+    .some((layer) => layer && layer.kind === kind && !isCotDenLayer(layer));
 }
 
 function layersHtml(p, idx, projectOn, admin) {
@@ -1599,6 +1655,8 @@ function layersHtml(p, idx, projectOn, admin) {
   const body = groups.map(({ phase, title, open }) => {
     const rows = list.map((g, li) => {
       if (g.phase !== phase) return '';
+      // Catalog đã có ngành → bỏ slot net trống (Admin không nhập trùng).
+      if (g.kind === 'net' && !g.present && catalogCoversNet(p, g)) return '';
       const html = layerRowHtml(p, idx, projectOn, admin, g, li, {
         note: g.kind === 'net' && !netNoted
       });
@@ -2055,13 +2113,19 @@ function layoutLabels(m) {
 
 // ============================ VIỀN SÁNG KHI RÊ / BẤM TÊN ============================
 
+// Ranh tổng dưới overlayPane (400 = canvas lô). Hai canvas cùng pane thì cái thêm sau nuốt
+// hover/click cả khi layer interactive:false — tách pane + tắt pointer-events khi đã mở lô.
+const OUTLINE_PANE = 'projectOutlinePane';
+const OUTLINE_Z = 390;
+
 // Pane riêng trên lô (pane lô ~400–440), dưới khung tìm lô (450); không bắt chuột
 const GLOW_PANE = 'projectGlowPane';
 const GLOW_Z = 445;
 const GLOW_PIN_MS = 3000;
+// Viền sáng nhẹ khi rê / ghim tên — quầng trắng mỏng, không nét đen kẹp
 const GLOW_STYLES = [
-  { color: '#ffffff', weight: 9, opacity: 0.22 },
-  { color: '#ffffff', weight: 2.6, opacity: 1 }
+  { color: '#ffffff', weight: 5, opacity: 0.2 },
+  { color: '#ffffff', weight: 1.5, opacity: 0.85 }
 ];
 const glows = new Map();
 const hovered = new Map();
@@ -2119,9 +2183,10 @@ function pinGlow(p) {
 const FOCUS_PANE = 'projectFocusPane';
 const FOCUS_Z = 620;
 const FOCUS_MASK = { stroke: false, fill: true, fillColor: '#020617', fillOpacity: 0.275, interactive: false };
+// Đồ án đang mở: quầng sáng mỏng (không nét đen ngoài + trắng trong)
 const FOCUS_LINES = [
-  { color: '#020617', weight: 9, opacity: 0.7 },
-  { color: '#ffffff', weight: 3.6, opacity: 1 }
+  { color: '#ffffff', weight: 5, opacity: 0.22 },
+  { color: '#ffffff', weight: 1.6, opacity: 0.9 }
 ];
 const WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
 const focusLayers = new Map();
@@ -2573,6 +2638,15 @@ function paintQhpkOverlaps(m, list) {
   applyOverlapHatch(m);
 }
 
+function ensureOutlinePane(m) {
+  let pane = m.getPane(OUTLINE_PANE);
+  if (!pane) {
+    pane = m.createPane(OUTLINE_PANE);
+    pane.style.zIndex = String(OUTLINE_Z);
+  }
+  return pane;
+}
+
 function drawOutlinesOn(m, list, below) {
   clearOverlaps(m);
   const old = outlineGroups.get(m);
@@ -2590,10 +2664,7 @@ function drawOutlinesOn(m, list, below) {
   }
   labelLists.set(m, list);
   layoutLabels(m);
-  if (!list.length) return;
-  const group = L.featureGroup();
-  const shapes = [];
-  const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
+  const outlinePane = ensureOutlinePane(m);
   // Đồ án đã hiện lô: ranh không bắt chuột để click rơi xuống lô; bỏ nền mờ để không che lô TT16.
   const lotsOpen = (p) => {
     if (p.level === 'QHPK' || p.level === 'QHCT') {
@@ -2602,6 +2673,14 @@ function drawOutlinesOn(m, list, below) {
     if (p.level === 'QHC') return p.name === state.focusedProject || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
     return false;
   };
+  // Đã mở lô: tắt cả pane ranh (không chỉ interactive:false) — canvas ranh nếu còn bắt chuột sẽ che canvas lô.
+  // Chuyển đồ án lân cận: map click → leaveScopeFocus → trySwitchProjectAt.
+  const lotsDrawn = list.some(lotsOpen) || state.lotProjects.size > 0;
+  outlinePane.style.pointerEvents = lotsDrawn ? 'none' : '';
+  if (!list.length) return;
+  const group = L.featureGroup();
+  const shapes = [];
+  const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = shownOutline(p);
@@ -2617,15 +2696,16 @@ function drawOutlinesOn(m, list, below) {
       fillOpacity: fillOp
     };
     const shown = open && quietOutline ? { ...style, opacity: 0, fillOpacity: 0 } : style;
+    const paneOpt = { pane: OUTLINE_PANE };
     // Chỉ ranh đồ án đã mở lô (hoặc đang focus khi tắt lớp QHPK) không bắt chuột — click rơi xuống lô.
-    // Ranh đồ án khác vẫn bấm được khi phóng gần để chuyển sang và fitBounds toàn ranh.
+    // Ranh đồ án khác vẫn bấm được khi phóng gần (khi chưa mở lô) để chuyển sang và fitBounds toàn ranh.
     if (open || (!state.showProjects && p.name === state.focusedProject)) {
-      const shape = L.geoJSON(geom, { style: shown, interactive: false });
+      const shape = L.geoJSON(geom, { style: shown, interactive: false, ...paneOpt });
       shapes.push(shape);
       group.addLayer(shape);
       return;
     }
-    const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
+    const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false, ...paneOpt });
     if (focused) shapes.push(shape);
     shape.bindTooltip(escapeHtml(outlineLabelOf(p)), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('mouseover', () => setHover(m, p.name));

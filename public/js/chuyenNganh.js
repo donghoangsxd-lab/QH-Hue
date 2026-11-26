@@ -11,7 +11,10 @@ import {
 import { planMap, getViewMode, setViewMode, onViewChange, isSplitOn } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
-import { planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers } from './projectLayer.js';
+import {
+  planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers,
+  editProjectNetForSector
+} from './projectLayer.js';
 import { investAxisAllOn, investAxisAllTip, toggleInvestAxisAll, ensureDauTuAxis } from './investLayer.js';
 import { clearChamDiemMap } from './chamDiemMap.js';
 import { state } from './state.js';
@@ -669,7 +672,7 @@ function projectHtktKey(slug, kind, sector) {
 }
 
 /** Accordion ngành cho đồ án nhập trên trục B (cùng markup QHC 1/25.000, không raster/chk_gt25). */
-function schemeHtktSectorBlock(sec, kind, level, slug) {
+function schemeHtktSectorBlock(sec, kind, level, slug, { admin = false } = {}) {
   const rows = schemeSectorLayers(sec.id, level, slug, kind);
   if (!rows.length) return '';
   const key = projectHtktKey(slug, kind, sec.id);
@@ -680,9 +683,14 @@ function schemeHtktSectorBlock(sec, kind, level, slug) {
   const body = open
     ? `<div class="cn-groups">${rows.map((layer) => layerRow(layer, false)).join('')}</div>`
     : '';
+  // Admin: bút chì sửa / thay bản vẽ net theo ngành (không hiện với user thường).
+  const editBtn = admin
+    ? `<button type="button" class="project-btn" data-htkt-net-edit="${escapeHtml(sec.id)}" title="Sửa / thay bản vẽ GeoJSON ngành này" aria-label="Sửa bản vẽ ${escapeHtml(label)}">${ico('pen')}</button>`
+    : '';
   return `<div class="cn-scheme qhc25-sector" data-htkt-sector-row="${escapeHtml(sec.id)}">
     <div class="cn-scheme-row">
       <label><input type="checkbox" data-htkt-sector="${escapeHtml(sec.id)}"${on ? ' checked' : ''}${some && !on ? ' data-mixed="1"' : ''}><span>${icon(sec.id)}${escapeHtml(label)}</span></label>
+      ${editBtn}
       <button type="button" class="cn-fold" data-htkt-fold="${escapeHtml(sec.id)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>
     </div>
     ${body}
@@ -698,12 +706,16 @@ export function paintSchemeHtkt(host) {
   const slug = String(host.dataset.slug || '').trim();
   const level = String(host.dataset.level || '').trim();
   const kind = host.dataset.kind === 'hien-trang' ? 'hien-trang' : 'quy-hoach';
+  const admin = state.currentUserRole === 'ADMIN' && !!state.authToken;
   if (!ready || !slug || !level) {
     host.hidden = true;
     host.innerHTML = '';
     return;
   }
-  const sectors = QHC25_SECTORS.map((sec) => schemeHtktSectorBlock(sec, kind, level, slug)).filter(Boolean).join('');
+  const sectors = QHC25_SECTORS
+    .map((sec) => schemeHtktSectorBlock(sec, kind, level, slug, { admin }))
+    .filter(Boolean)
+    .join('');
   if (!sectors) {
     host.hidden = true;
     host.innerHTML = '';
@@ -2482,6 +2494,15 @@ export function initChuyenNganh() {
       if (qhc25OpenSectors.has(id)) qhc25OpenSectors.delete(id); else qhc25OpenSectors.add(id);
       paintQhc25Htkt();
       applyLayerQuery();
+      return;
+    }
+    const htktNetEdit = e.target.closest('[data-htkt-net-edit]');
+    if (htktNetEdit) {
+      const host = htktNetEdit.closest('[data-scheme-htkt]');
+      const sector = htktNetEdit.dataset.htktNetEdit;
+      const tenQH = host?.dataset.tenQh || '';
+      const phase = host?.dataset.phase === 'HT' ? 'HT' : 'QH';
+      if (tenQH && sector) editProjectNetForSector(tenQH, sector, phase);
       return;
     }
     const htktFold = e.target.closest('[data-htkt-fold]');
