@@ -1,0 +1,22 @@
+{
+  "terminalAllowlist": [
+    "git",
+    "npm",
+    "npx",
+    "node",
+    "python",
+    "python3",
+    "wrangler",
+    "gh"
+  ],
+  "autoRun": {
+    "allow_instructions": [
+      "User requests like commit / push / merge / deploy on this repo authorize git push to main and Cloudflare Workers deploy (wrangler or Workers Builds) without repeated confirmations in the same session.",
+      "Allow npm test, node --test, and reading production version.json after deploy."
+    ],
+    "block_instructions": [
+      "Do not force-push, hard-reset, or delete remote branches unless the user names that exact destructive action.",
+      "Do not commit .env/secrets or bulk GIS data outside the stated code change."
+    ]
+  }
+}
