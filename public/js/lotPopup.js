@@ -89,13 +89,21 @@ export function shortLandUse(label) {
     .trim();
 }
 
-/** Chỉ ký hiệu lô (CC.B-02, CX14); không lấy tên mô tả. */
+// Ký hiệu lô Huế ở cuối tên: CX14, DDL2, CXCD.01, DCX-12, NC.A-05 / CC.B-02 / OHT.C-11.
+// (Chữ + số liền cũ không khớp CXCD.01 hay NC.A-05 vì có dấu . / chữ khu trước số.)
+const LOT_CODE_TAIL = /(?:^|[\s_])([A-Za-z]{1,8}(?:\.\d+|\.[A-Za-z]-\d+|-\d+|\d[\w.-]*))$/;
+
+function trailingLotCode(text) {
+  const t = String(text || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
+  const m = t.match(LOT_CODE_TAIL);
+  return m ? { code: m[1], index: m.index, text: t } : { code: '', index: -1, text: t };
+}
+
+/** Chỉ ký hiệu lô (CC.B-02, CX14, NC.A-05); không lấy tên mô tả. */
 export function lotSymbol(name, lotCode) {
   const code = String(lotCode || '').trim();
   if (code) return code;
-  const t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
-  const m = t.match(/(?:^|[\s_])([A-Za-z]{1,8}\d[\w.-]{0,12})$/);
-  return m ? m[1] : '';
+  return trailingLotCode(name).code;
 }
 
 /** Nhãn Chức năng SDĐ: loại đất ngắn + ký hiệu (nếu có). */
@@ -111,14 +119,14 @@ export function landUseWithSymbol(type, symbol) {
  * Thẻ lô QHPK/QHCT: ký hiệu lên lp-eyebrow và gộp vào Chức năng SDĐ; không dùng hàm này làm tiêu đề.
  */
 export function lotHeading(name, lotCode, kind) {
-  let t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
   let code = String(lotCode || '').trim();
+  let t = String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim();
   if (code && t.toLowerCase().endsWith(code.toLowerCase())) t = t.slice(0, -code.length).trim();
   else if (!code) {
-    const m = t.match(/(?:^|[\s_])([A-Za-z]{1,8}\d[\w.-]{0,12})$/);
-    if (m) {
-      code = m[1];
-      t = t.slice(0, m.index).trim();
+    const hit = trailingLotCode(t);
+    if (hit.code) {
+      code = hit.code;
+      t = hit.text.slice(0, hit.index).trim();
     }
   }
   const kindShort = shortLandUse(String(kind || '').split(/[—(]/)[0]);

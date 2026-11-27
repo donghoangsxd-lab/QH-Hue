@@ -8,6 +8,11 @@ import {
 
 assert.equal(lotSymbol('Trung tâm dịch vụ, thương mại CC.B-02', 'CC.B-02'), 'CC.B-02');
 assert.equal(lotSymbol('Đất cây xanh CX14 – QHPK Khu A #3', ''), 'CX14');
+assert.equal(lotSymbol('Trung tâm dịch vụ, thương mại CC.B-02', ''), 'CC.B-02');
+assert.equal(lotSymbol('HT_DAT_DaotaoNC NC.A-05 – QHPK TT phía Nam #401', ''), 'NC.A-05');
+assert.equal(lotSymbol('Đất cây xanh CXCD.01', ''), 'CXCD.01');
+assert.equal(lotSymbol('Đất bãi xe DCX-12', ''), 'DCX-12');
+assert.equal(lotSymbol('HT_DAT_O_Nhomnhao – QHPK TT phía Nam #39', ''), '');
 assert.equal(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02'), 'Đất công cộng - dịch vụ · CC.B-02');
 assert.equal(landUseWithSymbol('Đất ở', ''), 'Đất ở');
 assert.match(landUseBannerHtml(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02')), /CC\.B-02/);

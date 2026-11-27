@@ -1047,7 +1047,8 @@ const TYPE_CODE_PATTERN = { CV: '1-CV', BDX: '2-BDX', MN: '3-MN', TH: '4-TH', TH
 const SCHOOL_LEVELS = [['6-THPT', /THPT|TRUNGHOCPHOTHONG/], ['5-THCS', /THCS|TRUNGHOCCOSO/], ['4-TH', /TIEUHOC/], ['3-MN', /MAMNON|MAUGIAO|NHATRE/]];
 const PHRASE_RULES = [
   ['CX-HC', /CAYXANH(SUDUNG)?HANCHE/],
-  ['CX-CD', /CAYXANH(CHUYENDUNG|CACHLY|PHONGHO)/],
+  // Công viên chủ đề / cây xanh cách ly = chuyên dụng (CXCD); phải trước rule CONGVIEN → 1-CV.
+  ['CX-CD', /CAYXANH(CHUYENDUNG|CACHLY|PHONGHO)|CONGVIENCHUDE/],
   ['1-CV', /CAYXANH|CONGVIEN|VUONHOA|DIEMXANH/],
   ['2-BDX', /BAI(DO)?XE|DOXE|TRAMSAC/],
   // "quảng trường" không phải trường học: chữ TRUONG phải đứng sau ĐẤT / KHU
@@ -1165,7 +1166,8 @@ function lotNameText(lotName, layerName) {
 }
 
 /** Khóa hoa văn TT16 của tên layer đất (bỏ tiền tố giai đoạn và hậu tố cấp; tên tự do theo từ khóa), '' nếu không có.
- *  lotName: layer không cho biết loại đất (VD shapefile không có trường chức năng, layer = tên file) thì dò ký hiệu / tên lô */
+ *  lotName: layer không cho biết loại đất (VD shapefile không có trường chức năng, layer = tên file) thì dò ký hiệu / tên lô.
+ *  Ký hiệu lô (CXCD.01…) rõ chức năng hơn mô tả layer kèm theo (vd. «công viên chủ đề» vẫn chứa chữ công viên). */
 export function landPatternKey(layerName, lotName = '') {
   const t = foldLayer(layerName).split(/[_\s.-]+/).filter(Boolean);
   const core = LAYER_STAGE.has(t[0]) ? t.slice(1) : t.slice();
@@ -1176,7 +1178,8 @@ export function landPatternKey(layerName, lotName = '') {
     core.pop();
   }
   const own = lotName ? lotNameText(lotName, layerName) : '';
-  return freePatternKey(layerName) || (own ? lotCodeKey(own) || freePatternKey(own) : '');
+  const fromCode = own ? lotCodeKey(own) : '';
+  return fromCode || freePatternKey(layerName) || (own ? freePatternKey(own) : '');
 }
 
 /** Các loại đất chọn được khi Admin đổi lớp 1 lô (thứ tự chú giải Mục 04) */

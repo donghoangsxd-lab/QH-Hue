@@ -2361,7 +2361,7 @@ const LAND_LEVEL_EYEBROW = {
 
 function landPopupHtml(p, opts) {
   const facility = opts?.facility || null;
-  const key = landPatternKey(p.layer, p.name) || (facility ? infraStyleKey(layerType(facility), p.layer, facility.name) : null);
+  const key = landPatternKey(p.layer, p.name || p.lotCode) || (facility ? infraStyleKey(layerType(facility), p.layer, facility.name) : null);
   const style = key && TT16_STYLES[key];
   // Ưu tiên nhãn TT16 (O-HH → Hỗn hợp…) — không gom về nhóm thống kê «Đất ở» / «Đất khác».
   const rawType = (style && style.label) || p.nhom || landLabel(p.layer);
@@ -2494,10 +2494,11 @@ function lotHitsView(p, m) {
 }
 
 function infraLotShape(lot, item, m, detailed) {
-  const style = item && !landPatternKey(lot.layer, lot.name)
+  const lotName = lot.name || lot.lotCode || item?.name;
+  const style = item && !landPatternKey(lot.layer, lotName)
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name, geometry: lot.geometry })
     : landParcelStyle(lot.layer, {
-      detailed, phase: lot.phase, name: lot.name || item?.name, geometry: lot.geometry
+      detailed, phase: lot.phase, name: lotName, geometry: lot.geometry
     });
   const shape = L.geoJSON(lot.geometry, { style, renderer: landRenderer(m), bubblingMouseEvents: false });
   bindLotHover(shape);
@@ -2613,7 +2614,7 @@ function landLotTypeMeta(p) {
     const label = shortLandUse(p.mixLabel) || p.mixLabel;
     return { id: p.mixId || label, label, color: p.mixColor || '#94a3b8' };
   }
-  const key = landPatternKey(p.layer, p.name);
+  const key = landPatternKey(p.layer, p.name || p.lotCode);
   const style = key && TT16_STYLES[key];
   const rawType = (style && style.label) || p.nhom || landLabel(p.layer);
   const label = shortLandUse(expandPlanWords(rawType)) || 'Đất khác';
@@ -3129,7 +3130,7 @@ function landNeedsStampDot(p) {
   if (!p || p.phase !== 'QH') return false;
   if (p.kind && p.kind !== 'DXF') return false;
   // Đất giao thông không ghép tem → bỏ qua.
-  if (landPatternKey(p.layer, p.name) === 'GT') return false;
+  if (landPatternKey(p.layer, p.name || p.lotCode) === 'GT') return false;
   const lv = planLevelOf(p.file);
   if (lv !== 'QHPK' && lv !== 'QHCT') return false;
   return lotMissingStampAttrs(p);
@@ -3166,7 +3167,7 @@ function drawLandsOn(m, list, infra = []) {
   const group = L.featureGroup();
   const detailed = tt16Detailed(m.getZoom());
   const ordered = [
-    ...list.map(p => ({ p, rank: landPatternKey(p.layer, p.name) === 'GT' ? LOT_RANK_TRAFFIC : LOT_RANK_LAND })),
+    ...list.map(p => ({ p, rank: landPatternKey(p.layer, p.name || p.lotCode) === 'GT' ? LOT_RANK_TRAFFIC : LOT_RANK_LAND })),
     ...infra.map(p => ({ p, rank: LOT_RANK_INFRA }))
   ].sort((a, b) => byProjectAreaDesc(a.p.file, b.p.file) || a.rank - b.rank);
   // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
