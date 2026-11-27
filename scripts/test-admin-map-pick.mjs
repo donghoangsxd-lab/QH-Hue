@@ -64,6 +64,7 @@ assert.match(cn, /highlightWardNames|isShiftClick/);
 
 assert.match(spec, /Shift và bấm|nhiều phường\/xã|admin-info-multi/);
 assert.match(spec, /giữ mở khi pan|kéo thanh tiêu đề|wardLabelPane/);
+assert.match(spec, /mở trục A thì tắt tem|#btnWardNames|z 650/);
 
 const css = read('public/css/style.css');
 assert.match(css, /admin-info-multi|admin-multi-table/);
@@ -72,7 +73,12 @@ assert.doesNotMatch(css, /\.admin-multi-hint\s*\{/);
 
 const mapJs = read('public/js/mapEngine.js');
 assert.match(mapJs, /wardLabelPane/);
+assert.match(mapJs, /zIndex = '650'/);
 const planJs = read('public/js/planMap.js');
 assert.match(planJs, /wardLabelPane/);
+assert.match(planJs, /zIndex = '650'/);
+assert.match(cn, /ward-names-off/);
+assert.match(cn, /btnWardNames/);
+assert.match(read('public/js/basemap.js'), /export function setWardNames/);
 
 console.log('admin map pick ok');

@@ -2113,10 +2113,10 @@ function layoutLabels(m) {
 
 // ============================ VIỀN SÁNG KHI RÊ / BẤM TÊN ============================
 
-// Ranh tổng dưới overlayPane (400 = canvas lô). Hai canvas cùng pane thì cái thêm sau nuốt
-// hover/click cả khi layer interactive:false — tách pane + tắt pointer-events khi đã mở lô.
+// Ranh tổng trên overlayPane (400 = canvas lô): nếu để dưới 400 thì canvas lô (kể cả trống) nuốt click.
+// Khi đã mở lô: tắt pointer-events pane này để click rơi xuống lô; chuyển đồ án qua map click → trySwitchProjectAt.
 const OUTLINE_PANE = 'projectOutlinePane';
-const OUTLINE_Z = 390;
+const OUTLINE_Z = 405;
 
 // Pane riêng trên lô (pane lô ~400–440), dưới khung tìm lô (450); không bắt chuột
 const GLOW_PANE = 'projectGlowPane';
@@ -2639,11 +2639,8 @@ function paintQhpkOverlaps(m, list) {
 }
 
 function ensureOutlinePane(m) {
-  let pane = m.getPane(OUTLINE_PANE);
-  if (!pane) {
-    pane = m.createPane(OUTLINE_PANE);
-    pane.style.zIndex = String(OUTLINE_Z);
-  }
+  const pane = m.getPane(OUTLINE_PANE) || m.createPane(OUTLINE_PANE);
+  pane.style.zIndex = String(OUTLINE_Z);
   return pane;
 }
 
@@ -2673,9 +2670,9 @@ function drawOutlinesOn(m, list, below) {
     if (p.level === 'QHC') return p.name === state.focusedProject || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
     return false;
   };
-  // Đã mở lô: tắt cả pane ranh (không chỉ interactive:false) — canvas ranh nếu còn bắt chuột sẽ che canvas lô.
-  // Chuyển đồ án lân cận: map click → leaveScopeFocus → trySwitchProjectAt.
-  const lotsDrawn = list.some(lotsOpen) || state.lotProjects.size > 0;
+  // Chỉ khi đồ án trong list đang mở lô mới tắt pane — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
+  // Chuyển đồ án lân cận khi pane tắt: map click → leaveScopeFocus → trySwitchProjectAt.
+  const lotsDrawn = list.some(lotsOpen);
   outlinePane.style.pointerEvents = lotsDrawn ? 'none' : '';
   if (!list.length) return;
   const group = L.featureGroup();

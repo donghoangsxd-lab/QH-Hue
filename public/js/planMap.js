@@ -178,12 +178,12 @@ export function renderPlanBoundaries() {
     group.addLayer(outline);
     group.addLayer(line);
   }
-  // Pane trên marker đô thị (ua-badge) — đồng bộ mapEngine, tên ĐVHC không bị che.
+  // Đồng bộ mapEngine: trên tem đô thị và dvhcBadgePane (625).
   const WARD_LABEL_PANE = 'wardLabelPane';
-  if (planMap && !planMap.getPane(WARD_LABEL_PANE)) {
-    const pane = planMap.createPane(WARD_LABEL_PANE);
-    pane.style.zIndex = '620';
-    pane.style.pointerEvents = 'none';
+  if (planMap) {
+    const wardLabelPane = planMap.getPane(WARD_LABEL_PANE) || planMap.createPane(WARD_LABEL_PANE);
+    wardLabelPane.style.zIndex = '650';
+    wardLabelPane.style.pointerEvents = 'none';
   }
   wards.forEach(item => {
     if (item.lat == null || item.lng == null) return;

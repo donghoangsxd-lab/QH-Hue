@@ -402,13 +402,11 @@ export async function loadBoundaryLayer() {
     wardBBoxes.clear();
     window.dispatchEvent(new CustomEvent(WARD_BOUNDS_EVENT));
 
-    // Pane trên marker đô thị (ua-badge ~600) để tên 40 ĐVHC không bị tem đô thị che.
+    // Trên tem đô thị (~600) và ký hiệu ĐVHC (dvhcBadgePane 625) để tên phường/xã nổi trên lớp trục A.
     const WARD_LABEL_PANE = 'wardLabelPane';
-    if (!map.getPane(WARD_LABEL_PANE)) {
-      const pane = map.createPane(WARD_LABEL_PANE);
-      pane.style.zIndex = '620';
-      pane.style.pointerEvents = 'none';
-    }
+    const wardLabelPane = map.getPane(WARD_LABEL_PANE) || map.createPane(WARD_LABEL_PANE);
+    wardLabelPane.style.zIndex = '650';
+    wardLabelPane.style.pointerEvents = 'none';
     labels.forEach(item => {
       const icon = L.divIcon({
         className: 'ward-label-icon',

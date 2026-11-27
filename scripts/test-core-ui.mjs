@@ -143,6 +143,9 @@ assert.match(dock, /id="chk_terrain"/);
 assert.match(dock, /id="legendLevelChips"[^>]*hidden/);
 assert.match(dock, /id="basemapSelect"/);
 assert.match(dock, /id="chk_bound"/);
+assert.match(dock, /id="btnWardNames"/);
+assert.match(read('public/js/chuyenNganh.js'), /prevAxis !== 'hanhchinh'[\s\S]*ward-names-off/);
+assert.match(read('docs/ui-spec.md'), /mở trục A thì tắt tem|#btnWardNames/);
 assert.match(dock, /id="chk_roads"/);
 assert.match(dock, /id="chk_cadastre"/);
 const plan = innerById(html, 'layerPaneQuyHoach');
@@ -822,9 +825,12 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
   assert.doesNotMatch(drawOut, /open \|\| !below/);
   assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
-  // Canvas ranh và canvas lô không chung pane: đã mở lô thì tắt pointer-events pane ranh.
+  // Ranh trên canvas lô (z 405 > overlay 400); đã mở lô thì tắt pointer-events để click xuống lô.
   assert.match(pl, /projectOutlinePane/);
+  assert.match(pl, /OUTLINE_Z = 405/);
   assert.match(drawOut, /pointerEvents = lotsDrawn \? 'none'/);
+  assert.match(drawOut, /lotsDrawn = list\.some\(lotsOpen\)/);
+  assert.doesNotMatch(drawOut, /lotsDrawn = list\.some\(lotsOpen\) \|\| state\.lotProjects\.size/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
 }
@@ -1257,8 +1263,8 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES|data-xh-level/);
 assert.match(read('public/js/xahoiList.js'), /project-row xh-item/);
 assert.match(read('docs/ui-spec.md'), /đánh số thứ tự/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261124u/);
-assert.match(html, /js\/app\.js\?v=20261124u/);
+assert.match(html, /css\/style\.css\?v=20261126b/);
+assert.match(html, /js\/app\.js\?v=20261126b/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -1394,7 +1400,7 @@ assert.match(read('public/js/xahoiList.js'), /SOCIAL_TYPES/);
 assert.match(read('docs/ui-spec.md'), /Ba droplist cùng kiểu HTKT/);
 assert.match(read('docs/ui-spec.md'), /Bản đồ nhiệt mức độ đáp ứng hạ tầng/);
 assert.match(read('docs/ui-spec.md'), /Trạng thái điểm:.*Đã phê duyệt|Giả lập bán kính chung/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261124u'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261126b'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);

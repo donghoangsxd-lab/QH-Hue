@@ -383,8 +383,8 @@ export function detachBasemap(m) {
   if (labels) { labels.remove(); labelLayers.delete(m); }
 }
 
-// Tên phường xã (nhãn ward-label-icon của mapEngine.js / planMap.js) ẩn bằng class trên body
-function setWardNames(on) {
+/** Tên phường/xã (`ward-label-icon`): ẩn bằng class trên body. Trục A gọi tắt khi mới mở. */
+export function setWardNames(on) {
   document.body.classList.toggle('ward-names-off', !on);
   const btn = document.getElementById('btnWardNames');
   if (btn) {

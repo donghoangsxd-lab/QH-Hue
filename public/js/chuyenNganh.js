@@ -2212,10 +2212,23 @@ function releaseAdminAnchor() {
 
 function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}) {
   if (!AXES.some(a => a.id === id)) return;
+  const prevAxis = browseState().axis;
   if (id !== 'hanhchinh') {
     leaveAdminMap();
     releaseAdminAnchor();
-  } else enterAdminMap();
+  } else {
+    enterAdminMap();
+    // Mặc định tắt tem tên phường/xã khi mới vào A (nút Aa Lớp nền); bật lại thì pane 650 nằm trên lớp A.
+    // Không import basemap (tránh cache module cũ / vòng import làm đen trang).
+    if (prevAxis !== 'hanhchinh') {
+      document.body.classList.add('ward-names-off');
+      const btn = document.getElementById('btnWardNames');
+      if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      }
+    }
+  }
   if (id === 'quyhoach') ensurePlanTab('qhc25');
   placeIsoRadius();
   setBrowseState({ axis: id }, { url });
