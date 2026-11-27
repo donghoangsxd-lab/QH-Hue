@@ -36,7 +36,7 @@ import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { bindNotchZoom } from './wheelZoom.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, landUseWithSymbol, shortLandUse, limitsHtml, projectValueHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, lotEyebrowLabel, landUseWithSymbol, shortLandUse, limitsHtml, projectValueHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml, bindLandCardTabs,
   summarizeLotAreas, multiLandCardHtml,
   pointToken, landToken, parseLotToken
@@ -2372,8 +2372,8 @@ function landPopupHtml(p, opts) {
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   // Badge chỉ khi khác eyebrow: Hiện trạng hoặc giai đoạn đợt đầu/dài hạn — không lặp «Quy hoạch».
   const phase = p.phase === 'QH' ? (stage || '') : 'Hiện trạng';
-  // Eyebrow = ký hiệu lô (CC.B-02); thiếu mã mới hiện cấp QH.
-  const eyebrow = code || LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch';
+  // Eyebrow = «Lô đất ký hiệu CC.B-02»; thiếu mã mới hiện cấp QH.
+  const eyebrow = lotEyebrowLabel(code, LAND_LEVEL_EYEBROW[planLevelOf(p.file || facility?.tenQH)] || 'Quy hoạch');
   const place = placeField(p.ward || facility?.ward);
   const projectFile = p.file || facility?.tenQH || '';
   const entry = opts?.hideProject ? null : catalogEntry(projectFile);
@@ -2882,16 +2882,17 @@ function decisionFile(d, fallbackName) {
 }
 
 /**
- * Bấm ô đất: bảng thông tin đồ án (#projectBrief) theo đúng đồ án của lô, không phóng khung.
- * QHC / QHPK / QHCT cùng luật: đổi đồ án → mở keepView; cùng đồ án (kể cả đã focus) → vẫn mở lại brief.
+ * Bấm ô đất: chỉ đồng bộ brief khi đang chế độ xem thông tin đồ án.
+ * Chế độ xem lô phẳng (tick, không focus) → không mở / chuyển brief (tránh xung đột với thẻ lô).
  */
 export function syncFocusedProjectToLot(projectName) {
   const name = String(projectName || '').trim();
-  if (!name) return;
+  if (!name || !state.focusedProject) return;
   if (state.focusedProject === name) {
     document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
     return;
   }
+  // Đang info A mà bấm lô B: chuyển info sang B, giữ khung nhìn.
   document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: { name, keepView: true } }));
 }
 

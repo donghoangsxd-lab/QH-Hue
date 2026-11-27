@@ -420,16 +420,18 @@ body.compare-on .map-title {
 #mapArea.print-staging .esc-hint,
 #mapArea.print-staging .print-preview { display: none; }
 
-/* Bảng đồ án: đầu cột trái, dưới ghi chú đô thị và thẻ trình diễn. --brief-stack đẩy bảng lô xuống dưới. */
+/* Bảng đồ án (chế độ info): giữa #mapArea, tách khỏi panel trục B. --brief-stack đẩy bảng lô xuống dưới. */
 .project-brief {
   --brief: var(--cyan-rgb);
   position: absolute;
-  z-index: 1100;
-  top: calc(var(--info-top) + var(--stack-brief, 0px));
+  z-index: 1200;
+  top: max(12px, calc(var(--info-top) + 8px));
   bottom: auto;
-  left: var(--info-left);
-  width: var(--info-card-w);
-  max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, calc(100% - var(--info-left) - var(--tb-btn) - 48px));
+  max-width: min(360px, 92vw);
+  max-height: min(56%, calc(100% - var(--info-top) - var(--info-bottom) - 48px));
   overflow: auto;
   box-sizing: border-box;
   padding: 6px 8px;
@@ -8326,10 +8328,15 @@ body.project-review.la-page #projectReviewHost {
   body .ovd-card { top: calc(var(--info-top) + var(--stack-demo, 0px)) !important; }
   body #mapArea > .project-brief,
   body.project-review:not(.project-view) #mapArea > .project-brief {
-    top: calc(var(--info-top) + var(--stack-brief, 0px)) !important;
+    top: max(12px, calc(var(--info-top) + 8px)) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(340px, calc(100vw - 32px)) !important;
+    max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - 48px);
+    height: auto;
+    overflow: auto;
+    bottom: auto !important;
   }
-  body #mapArea > .project-brief,
-  body.project-review:not(.project-view) #mapArea > .project-brief,
   body .urban-focus-bar,
   body .ovd-card {
     bottom: auto !important;

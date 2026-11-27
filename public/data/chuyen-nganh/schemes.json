@@ -1402,6 +1402,218 @@
       "decision": "2330/QĐ-UBND",
       "decisionDate": "2021-20-09",
       "authority": "Sở Xây dựng tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-vuc-phia-bac-truc-trung-tam-lang-co-den-khu-vuc-nui-0eb3a44c",
+      "name": "QHPK Khu vực phía Bắc trục Trung tâm Lăng Cô đến khu vực núi Giòn, tại xã Lộc Vĩnh và thị trấn Lăng Cô",
+      "level": "QHPK",
+      "mapid": 20758,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "chan-may-lang-co"
+      },
+      "taskDecision": "Số: 457 /QĐ-UBND",
+      "taskDecisionDate": "2023-03-03",
+      "decision": "Số: 456 /QĐ-UBND",
+      "decisionDate": "2023-03-03",
+      "authority": "UBND tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-cong-nghiep-so-02-03-tai-khu-kinh-te-chan-may-lang-ad384d67",
+      "name": "QHPK Khu công nghiệp số 02, 03 tại khu kinh tế Chân mây – Lăng cô",
+      "level": "QHPK",
+      "mapid": 20769,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "chan-may-lang-co"
+      },
+      "taskDecision": "1420 /QĐ-UBND",
+      "taskDecisionDate": "2021-10-06",
+      "decision": "1972 /QĐ-UBND",
+      "decisionDate": "2023-21-08",
+      "authority": "UBND Tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-cac-diem-du-lich-phan-tan-thuoc-khu-kinh-te-chan-may-la-02646094",
+      "name": "QHPK Các điểm du lịch phân tán thuộc khu Kinh tế Chân Mây Lăng Cô",
+      "level": "QHPK",
+      "mapid": 22827,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "chan-may-lang-co"
+      }
+    },
+    {
+      "slug": "qhpk-xay-dung-khu-du-lich-nghi-duong-thuong-mai-dich-vu-vui-08dff2d3",
+      "name": "QHPK xây dựng Khu du lịch nghỉ dưỡng, thương mại dịch vụ vui chơi thể thao Lộc Bình",
+      "level": "QHPK",
+      "mapid": 22874,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-loc"
+      },
+      "decision": "3077/QĐ-UBND",
+      "decisionDate": "2024-28-11",
+      "authority": "UBND tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-du-lich-ven-bien-vinh-my-dcd6cfa4",
+      "name": "QHPK Khu du lịch ven biển Vinh Mỹ",
+      "level": "QHPK",
+      "mapid": 22911,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "vinh-loc"
+      },
+      "taskDecision": "1175/QĐ-UBND",
+      "taskDecisionDate": "2023-24-05",
+      "decision": "743/QĐ-UBND",
+      "decisionDate": "2025-18-03",
+      "authority": "ỦY BAN NHÂN DÂN THÀNH PHỐ HUẾ"
+    },
+    {
+      "slug": "qhpk-khu-cong-nghiep-huong-lam-khu-kinh-te-cua-khau-a-dot-xa-197be5c8",
+      "name": "QHPK Khu công nghiệp Hương Lâm – Khu kinh tế cửa khẩu A Đớt, xã A Lưới 4",
+      "level": "QHPK",
+      "mapid": 23940,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "a-luoi-4"
+      },
+      "decision": "2246 /QĐ-UBND",
+      "decisionDate": "2025-16-07"
+    },
+    {
+      "slug": "qhpk-khu-trung-tam-tiep-van-hang-hoa-va-thuong-mai-dich-vu-d-1813547b",
+      "name": "QHPK Khu trung tâm tiếp vận hàng hóa và thương mại dịch vụ đầu mối",
+      "level": "QHPK",
+      "mapid": 20750,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "chan-may-lang-co"
+      },
+      "decision": "405 /QĐ-UBND",
+      "decisionDate": "2023-24-02",
+      "authority": "UBND Tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-do-thi-du-lich-sinh-thai-bien-canh-duong-19ffb613",
+      "name": "QHPK Khu đô thị du lịch sinh thái biển Cảnh Dương",
+      "level": "QHPK",
+      "mapid": 20765,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phu-vang"
+      },
+      "taskDecision": "1390 /QĐ-UBND",
+      "taskDecisionDate": "2019-10-06",
+      "decision": "1258/QĐ-UBND",
+      "decisionDate": "2023-02-06",
+      "authority": "UBND Tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-cong-nghiep-la-son-ac1fa391",
+      "name": "QHPK Khu công nghiệp La Sơn",
+      "level": "QHPK",
+      "mapid": 23943,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "area": {
+        "type": "xa",
+        "code": "hung-loc"
+      },
+      "decision": "2806/QĐ-UBND",
+      "decisionDate": "2025-04-09",
+      "authority": "UBND thành phố Huế"
+    },
+    {
+      "slug": "qhpk-khu-du-lich-san-gon-phuong-kim-long-va-xa-binh-dien-31db0c10",
+      "name": "QHPK Khu du lịch sân gôn phường Kim Long và xã Bình Điền",
+      "level": "QHPK",
+      "mapid": 23957,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "kim-long"
+      },
+      "taskDecision": "1000/QĐ-UBND",
+      "taskDecisionDate": "2024-15-04",
+      "decision": "3843 /QĐ-UBND",
+      "decisionDate": "2025-17-12",
+      "authority": "UBND thành phố Huế"
+    },
+    {
+      "slug": "qhpk-cang-chan-may-xa-chan-may-lang-co-c8ee30a0",
+      "name": "QHPK Cảng Chân Mây, xã Chân Mây -Lăng Cô",
+      "level": "QHPK",
+      "mapid": 23947,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "area": {
+        "type": "xa",
+        "code": "chan-may-lang-co"
+      },
+      "taskDecision": "3121/QĐ-UBND",
+      "taskDecisionDate": "2022-23-12",
+      "decision": "308 /QĐ-UBND",
+      "decisionDate": "2026-21-01",
+      "authority": "UBND thành phố Huế"
+    },
+    {
+      "slug": "qhpk-khu-du-lich-nghi-duong-va-san-gon-la-van-055fac54",
+      "name": "QHPK Khu du lịch nghỉ dưỡng và sân gôn La Vân",
+      "level": "QHPK",
+      "mapid": 23965,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "nam-dong"
+      },
+      "taskDecision": "2590/QĐ-UBND",
+      "taskDecisionDate": "2025-13-08",
+      "decision": "468 /QĐ-UBND",
+      "decisionDate": "2026-28-01",
+      "authority": "UỶ BAN NHÂN DÂN XÃ NAM ĐÔNG"
     }
   ]
 }

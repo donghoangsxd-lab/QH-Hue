@@ -680,13 +680,19 @@ assert.match(read('public/js/chuyenNganh.js'), /function syncMainPane/);
 assert.match(read('public/js/chuyenNganh.js'), /setMagMenu\(false\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /openingAxis = true;\s*document\.querySelector\(`\[data-main-tab="\$\{id\}"\]`\)\?\.click\(\)/);
 assert.doesNotMatch(read('public/js/projectLayer.js'), /\[data-main-tab="quyhoach"\]`\)\?\.click\(/);
-// Bấm ô đất đồ án khác: brief/hồ sơ theo đúng đồ án của lô (keepView).
-// QHC / QHPK / QHCT: cùng đồ án vẫn mở lại brief; lớp tĩnh QHC/QHCT cũng gọi sync.
+// Bấm ô đất: chỉ đồng bộ brief khi đang chế độ info (focusedProject); tick = lô phẳng không mở brief.
 assert.match(read('public/js/mapEngine.js'), /syncFocusedProjectToLot/);
+assert.match(read('public/js/mapEngine.js'), /!state\.focusedProject/);
 assert.match(read('public/js/mapEngine.js'), /keepView:\s*true/);
 assert.match(read('public/js/mapEngine.js'), /PROJECT_INFO_EVENT/);
 assert.match(read('public/js/projectLayer.js'), /keepView/);
-assert.match(read('public/js/projectLayer.js'), /openSchemeDetail[\s\S]*PROJECT_INFO_EVENT/);
+assert.match(read('public/js/projectLayer.js'), /export function exitProjectInfo/);
+{
+  const pl = read('public/js/projectLayer.js');
+  const tickFn = pl.slice(pl.indexOf('function openSchemeDetail'), pl.indexOf('function closeSchemeDetail'));
+  assert.doesNotMatch(tickFn, /PROJECT_INFO_EVENT|focusedProject\s*=/);
+  assert.match(tickFn, /lotProjects\.add/);
+}
 assert.match(read('public/js/qhc2045Layer.js'), /syncQhcCityBrief/);
 assert.match(read('public/js/qhc2045Layer.js'), /QHC2045\.short/);
 assert.match(read('public/js/projectBrief.js'), /qhcScaleBriefHtml|qhcCity/);
@@ -700,6 +706,9 @@ assert.match(read('public/index.html'), /id="planBriefSlot"/);
 assert.match(read('public/index.html'), /id="planListPane"/);
 assert.match(read('public/index.html'), /id="planInfoSlot"/);
 assert.match(read('public/css/style.css'), /body\.plan-brief-open #planBriefSlot/);
+assert.match(read('public/css/style.css'), /\.project-brief[\s\S]{0,200}left:\s*50%/);
+assert.match(read('public/css/style.css'), /\.project-brief[\s\S]{0,240}translateX\(-50%\)/);
+assert.match(read('public/js/app.js'), /Brief đồ án giữa #mapArea|không dock vào #planBriefSlot/);
 assert.match(read('public/css/style.css'), /z-index: 4/);
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planInfoSlot/);
 assert.match(read('public/css/style.css'), /body\.plan-info-open #planListPane > :not\(#planInfoSlot\)/);
@@ -818,24 +827,29 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
 {
   const pl = read('public/js/projectLayer.js');
   const outlineFn = pl.slice(pl.indexOf('function openOutlineProject'), pl.indexOf('function smallestProjectAt'));
-  assert.match(outlineFn, /switching/);
   assert.match(outlineFn, /openProject\(p\)/);
+  assert.match(outlineFn, /PROJECT_INFO_EVENT/);
   assert.match(pl, /export function trySwitchProjectAt/);
+  assert.match(pl, /export function tryEnterProjectInfoAt/);
   // Ranh đồ án khác vẫn bấm được khi phóng gần: không khóa interactive bằng !below.
   const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
   assert.doesNotMatch(drawOut, /open \|\| !below/);
   assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
-  // Ranh trên canvas lô (z 405 > overlay 400); đã mở lô thì tắt pointer-events pane + canvas (tránh con ghi đè).
+  // Info: giữ hit ranh. Lot mode (không focus): tắt pointer-events pane + canvas.
   assert.match(pl, /projectOutlinePane/);
   assert.match(pl, /OUTLINE_Z = 405/);
   assert.match(pl, /function syncOutlinePointer/);
   assert.match(pl, /outline-lots-open/);
   assert.match(drawOut, /syncOutlinePointer\(m, lotsDrawn\)/);
-  assert.match(drawOut, /lotsDrawn = list\.some\(lotsOpen\)/);
-  assert.doesNotMatch(drawOut, /lotsDrawn = list\.some\(lotsOpen\) \|\| state\.lotProjects\.size/);
+  assert.match(drawOut, /infoMode/);
+  assert.match(drawOut, /lotsDrawn = !infoMode && list\.some\(lotsOpen\)/);
   assert.match(read('public/css/style.css'), /leaflet-projectOutline-pane\.outline-lots-open/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
+  assert.match(flow, /tryEnterProjectInfoAt\(latlng\)/);
+  assert.match(flow, /exitProjectInfo/);
+  assert.match(read('public/js/projectBrief.js'), /exitProjectInfo/);
+  assert.match(read('docs/ui-spec.md'), /exitProjectInfo|Hai luồng tách biệt/);
 }
 assert.match(read('public/js/urbanFocus.js'), /current && !keepView\) fitFocus/);
 assert.match(read('public/js/chuyenNganh.js'), /keepCamera: !!e\.detail\?\.keepView/);

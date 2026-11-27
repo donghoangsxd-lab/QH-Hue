@@ -25,7 +25,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, exitProjectInfo, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt, tryEnterProjectInfoAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
@@ -305,22 +305,30 @@ function onProjectOpened(e) {
   syncEscHint();
 }
 
-// Bỏ đồ án đang mở, giữ lớp và khung nhìn hiện tại
+// Esc / thoát info: bỏ mask+brief, giữ lô đã tick (chế độ xem lô phẳng).
 function leaveProject() {
   closeProjectView();
-  clearProjectFocus();
+  exitProjectInfo();
   revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
   syncEscHint();
 }
 
-// Bấm nền ngoài đồ án đang mở: nếu điểm thuộc đồ án cùng cấp khác thì chọn + phóng tới; không thì thu gọn.
+// Bấm nền: info mode → chuyển đồ án lân cận hoặc thoát info; lot mode → vào info nếu trúng ranh đồ án.
 function leaveScopeFocus(latlng) {
-  if (state.focusedProject && !projectContains(state.focusedProject, latlng)) {
-    if (trySwitchProjectAt(latlng)) {
-      syncEscHint();
-      return;
+  if (state.focusedProject) {
+    if (!projectContains(state.focusedProject, latlng)) {
+      if (trySwitchProjectAt(latlng)) {
+        syncEscHint();
+        return;
+      }
+      leaveProject();
     }
-    leaveProject();
+    syncEscHint();
+    return;
+  }
+  if (tryEnterProjectInfoAt(latlng)) {
+    syncEscHint();
+    return;
   }
   if (isCoreOpen() && !coreContains(latlng)) setCoreOpen(false);
   syncEscHint();
@@ -452,9 +460,8 @@ function onEscape(e) {
   }
   if (state.focusedProject) {
     e.preventDefault();
-    // QHPK: chỉ bỏ chọn. Cấp khác về lớp gốc nếu có. Cả hai giữ khung nhìn.
-    if (planLevelOf(state.focusedProject) === 'QHPK') leaveProject();
-    else document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT));
+    // Mọi cấp: thoát info → chế độ xem lô phẳng (giữ tick), giữ khung nhìn.
+    leaveProject();
     return;
   }
   if (isCoreOpen()) {

@@ -1,10 +1,10 @@
-// Bảng thông tin đồ án: trên máy tính gắn vào #planBriefSlot trong panel Quy hoạch (danh sách đồ án dịch xuống);
-// điện thoại vào #phoneInfoSlot. Diện tích ranh, dân số, điều chỉnh cục bộ, phần đã có QHPK / QHCT.
-// Diện tích con là hợp các ranh cắt theo đồ án đang mở (chỗ chồng chỉ tính một lần). Ẩn khi bỏ chọn đồ án.
+// Bảng thông tin đồ án: giữa #mapArea (chế độ xem thông tin); điện thoại vào #phoneInfoSlot.
+// Diện tích ranh, dân số, điều chỉnh cục bộ, phần đã có QHPK / QHCT.
+// Diện tích con là hợp các ranh cắt theo đồ án đang mở (chỗ chồng chỉ tính một lần). Đóng × = thoát info (giữ lô).
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
-import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
+import { PROJECT_UNFOCUS_EVENT, exitProjectInfo, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
@@ -437,7 +437,10 @@ export function initProjectBrief() {
   el.setAttribute('aria-label', 'Thông tin đồ án quy hoạch');
   host.appendChild(el);
   el.addEventListener('click', (e) => {
-    if (e.target.closest('[data-brief-close]')) { hide(); return; }
+    if (e.target.closest('[data-brief-close]')) {
+      exitProjectInfo();
+      return;
+    }
     if (e.target.closest('[data-brief-help]')) { toggleDetail(); return; }
     const pdf = e.target.closest('[data-brief-pdf]');
     if (pdf && !pdf.disabled) {

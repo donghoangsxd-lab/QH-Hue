@@ -30,14 +30,16 @@ const SECTOR_LABEL = Object.fromEntries(SECTORS);
 // sdd đứng trước hạ tầng để ranh / sử dụng đất không bị nuốt. Thải đứng trước «thoát nước» mưa.
 const RULES = [
   // «Đáng giá» = lỗi chính tả WebGIS; nha / di tich = lớp hiện trạng đặt tên kỹ thuật.
-  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|dan[hg]? gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|xay dung|^nha$|khoi nha|di tich|ton giao|tin nguong|dinh huong phat trien|co cau phan lo|co cau quy hoach|phan o quy hoach|phan vung quy hoach|tieu khu quy hoach|moc gioi|hanh lang an toan|cay xanh|quan trac/, 'sdd'],
+  // «Công trình_A/L/P» đơn tên = khối kiến trúc/công trình tổng hợp → sdd (không nuốt «Công trình cấp điện…»).
+  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|dan[hg]? gia moi truong|danh gia tong hop|phan vung danh gia|lua chon dat|cong trinh ngam|xay dung ngam|xay dung|^nha$|khoi nha|di tich|ton giao|tin nguong|dinh huong phat trien|co cau phan lo|co cau quy hoach|phan o quy hoach|phan khu quy hoach|phan vung quy hoach|tieu khu quy hoach|moc gioi|hanh lang an toan|cay xanh|quan trac|^cong trinh(_[alp])?$/, 'sdd'],
   [/chat thai ran|nghia trang/, 'chat-thai-ran-nghia-trang'],
-  [/thoat nuoc thai|thoat muoc thai|xu ly nuoc thai|vsmt/, 'thoat-nuoc-thai'],
-  [/thong tin|tram thong tin/, 'thong-tin-lien-lac'],
+  // «thoát nữa thải» = lỗi chính tả WebGIS (nữa ← nước).
+  [/thoat nuoc thai|thoat muoc thai|thoat nua thai|xu ly nuoc thai|vsmt/, 'thoat-nuoc-thai'],
+  [/thong tin|tram thong tin|hao ky thuat|tuyen hao/, 'thong-tin-lien-lac'],
   [/cap nuoc|dau noi|hong cuu hoa|cuu hoa/, 'cap-nuoc'],
   [/cap dien|phan phoi dien|tram bien ap|bien ap|nang luong|chieu sang|den chieu sang|cot den|tu dien/, 'cap-dien'],
   [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|\bcau\b|bo via|mat duong|mat cat|tim duong/, 'giao-thong'],
-  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dap nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen|dong chay|cong qua duong/, 'san-nen-thoat-mua']
+  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dap nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen|dong chay|cong qua duong|ho ga/, 'san-nen-thoat-mua']
 ];
 
 // Slug trùng projects/index.json khi đồ án đã có. Đồ án mới dùng projectSlug(tên).

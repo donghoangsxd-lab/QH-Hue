@@ -1041,21 +1041,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (panelBeforeInvestInfo) setRightPanelCollapsed(true);
     panelBeforeInvestInfo = false;
   };
+  // Brief đồ án giữa #mapArea (không dock vào #planBriefSlot / panel B) — tách khỏi thẻ lô trong #planInfoSlot.
   const syncPlanBriefDock = () => {
     const slot = document.getElementById('planBriefSlot');
     const brief = document.getElementById('projectBrief');
     const host = document.getElementById('mapArea');
-    if (!slot || !brief) return;
-    const dock = planningPaneOn() && !brief.hidden;
-    if (dock) {
-      document.body.classList.add('plan-brief-open');
-      slot.hidden = false;
-      if (brief.parentElement !== slot) slot.appendChild(brief);
-      return;
+    if (!brief) return;
+    const open = !brief.hidden;
+    document.body.classList.toggle('plan-brief-open', open && planningPaneOn());
+    if (host && brief.parentElement !== host && !document.body.classList.contains('phone-info-dock')) {
+      host.appendChild(brief);
     }
-    document.body.classList.remove('plan-brief-open');
-    if (brief.parentElement === slot && host) host.appendChild(brief);
-    slot.hidden = true;
+    if (slot) slot.hidden = true;
   };
   const syncPlanInfoDock = () => {
     const slot = document.getElementById('planInfoSlot');

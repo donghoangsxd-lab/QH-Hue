@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, landUseWithSymbol, shortLandUse, limitItems, limitsHtml,
+  expandPlanWords, projectFullName, placeField, lotHeading, lotSymbol, lotEyebrowLabel, landUseWithSymbol, shortLandUse, limitItems, limitsHtml,
   metricGridHtml, landUseBannerHtml, landCardTabsHtml, regulationsPaneHtml,
   dossierButtons, projectValueHtml, pointToken, landToken, parseLotToken,
   summarizeLotAreas, multiLandCardHtml
@@ -13,6 +13,8 @@ assert.equal(lotSymbol('HT_DAT_DaotaoNC NC.A-05 – QHPK TT phía Nam #401', '')
 assert.equal(lotSymbol('Đất cây xanh CXCD.01', ''), 'CXCD.01');
 assert.equal(lotSymbol('Đất bãi xe DCX-12', ''), 'DCX-12');
 assert.equal(lotSymbol('HT_DAT_O_Nhomnhao – QHPK TT phía Nam #39', ''), '');
+assert.equal(lotEyebrowLabel('NC.A-05', 'Quy hoạch phân khu'), 'Lô đất ký hiệu NC.A-05');
+assert.equal(lotEyebrowLabel('', 'Quy hoạch phân khu'), 'Quy hoạch phân khu');
 assert.equal(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02'), 'Đất công cộng - dịch vụ · CC.B-02');
 assert.equal(landUseWithSymbol('Đất ở', ''), 'Đất ở');
 assert.match(landUseBannerHtml(landUseWithSymbol('Đất công cộng - dịch vụ', 'CC.B-02')), /CC\.B-02/);

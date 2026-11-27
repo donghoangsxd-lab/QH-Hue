@@ -106,6 +106,13 @@ export function lotSymbol(name, lotCode) {
   return trailingLotCode(name).code;
 }
 
+/** Eyebrow thẻ lô: «Lô đất ký hiệu NC.A-05» (CSS uppercase); thiếu mã thì dùng cấp QH. */
+export function lotEyebrowLabel(code, levelFallback = '') {
+  const c = String(code || '').trim();
+  if (c) return `Lô đất ký hiệu ${c}`;
+  return String(levelFallback || '').trim();
+}
+
 /** Nhãn Chức năng SDĐ: loại đất ngắn + ký hiệu (nếu có). */
 export function landUseWithSymbol(type, symbol) {
   const t = shortLandUse(type);

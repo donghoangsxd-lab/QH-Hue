@@ -126,7 +126,10 @@ export function projectLotsDrawn(name) {
     if (level === 'qhc10' || level === 'qhct' || level === 'qhpk') {
       if (level === 'qhc10' && kind === 'QHC') {
         if (!lotShown(name)) return false;
-        return name === state.focusedProject || qhcPeerLots(name);
+        // Tick lô phẳng hoặc đang info: hiện lô; qhcPeerLots giữ tra cứu nhiều đồ án.
+        return name === state.focusedProject
+          || state.lotProjects.has(name)
+          || qhcPeerLots(name);
       }
       if (level === 'qhct' && kind === 'QHCT') return schemeInteriorOn(name) && lotShown(name);
       if (level === 'qhpk' && kind === 'QHPK') return schemeInteriorOn(name);

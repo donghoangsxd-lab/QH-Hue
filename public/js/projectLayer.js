@@ -1,25 +1,13 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): 4 nhóm cấp theo droplist (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
 // QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập. Toàn thành phố: QHPK và QHCT
 // liệt kê phẳng, mỗi đồ án một dòng, xếp theo tên. Chỉ gom theo phường khi đang chọn phường hoặc phạm vi
-// đô thị / xã / tổ dân phố. QHC liệt kê thẳng. Mỗi đồ án (Ten_QH)
-// bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
-// Admin xóa / chuyển đồ án cũ.
-// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link xem được trong khung).
-// Mũi tên cuối tên đồ án xổ cây bản đồ: a. Hiện trạng / b. Quy hoạch (PROJECT_LAYERS + mạng hạ tầng).
-// Hồ sơ (quyết định, quy định, điều chỉnh, chỉ tiêu) nằm ở brief — bấm ? trên bảng thông tin đồ án.
-// Nút lưu: người dùng gửi hồ sơ PDF (Quyết định bắt buộc; Quy định quản lý / Thuyết minh tùy chọn; mỗi file ≤ 2 MB) để admin duyệt.
-// Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
-// Mỗi đồ án một màu viền + nền mờ nhẹ (cùng kiểu wash vùng trung tâm QHC), nhãn tên ở giữa ranh.
-// Đang hiện lô thì bỏ nền ranh để không che ký hiệu TT16.
-// QHC / QHPK / QHCT cùng một kiểu: mở cấp thì ranh mọi đồ án của cấp, kể cả khi đang chọn phường. Tick một dòng hiện lô dòng đó;
-// bỏ tick trở lại chỉ ranh, không ghi đồ án vào danh sách ẩn. Zoom ≥ PLACE_DETAIL_ZOOM: bỏ chế độ chỉ-ranh —
-// mở lô đồ án tại tâm khung (openLotsAtView); bấm lại ranh đồ án đang mở giữ khung. Đang chọn đồ án A: ranh đồ án
-// khác vẫn bắt chuột — bấm sang B thì chọn B và fitBounds toàn ranh (không cần Esc / zoom out).
-// Đang chọn đồ án: #projectList lọc theo khung nhìn; Esc / clearProjectFocus trả đủ danh sách cấp đang bật.
-// Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
-// trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
-// Lô QHC 1/10.000 (trung tâm và đồ án nhập) chỉ khi đang chọn: phủ tối ngoài ranh. Bỏ chọn thì ẩn lô và phủ tối, còn đường ranh.
-// Nút #btnAxisAll (cuối thanh tìm) bật / tắt cả cấp đang xem; không đổi khung nhìn.
+// đô thị / xã / tổ dân phố. QHC liệt kê thẳng.
+// Hai luồng: (1) Info — bấm tên / ranh → focusedProject + mask + #projectBrief giữa màn; đóng × / Esc =
+// exitProjectInfo (giữ lotProjects). (2) Lô phẳng — tick hộp → chỉ lotProjects, không mask/brief; nhiều đồ án
+// cùng cấp; khác cấp dùng chia đôi. Info: giữ hit ranh. Lot: outline-lots-open tắt pane+canvas.
+// Admin xóa / chuyển đồ án cũ. Nút file mở PDF quyết định. Mũi tên xổ cây a/b HT/QH. Hồ sơ ở brief (?).
+// Zoom ≥ PLACE_DETAIL_ZOOM: openLotsAtView. Đang info A: bấm ranh B → openProject(B). Esc / exitProjectInfo
+// trả đủ danh sách cấp. Ranh từ schemeVisibility.enabledSchemes. Nút #btnAxisAll bật/tắt cả cấp đang xem.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -467,15 +455,20 @@ function zoomTo(p) {
   focusProjectLots(p.name);
 }
 
-// Mở đồ án (tên, nút bảng hoặc ranh trên bản đồ): phóng tới, làm sáng ranh, bảng góc trái và thông tin ở panel dưới (projectReview)
+// Chế độ xem thông tin đồ án (tên trong list hoặc ranh trên bản đồ): phóng tới, mask, brief giữa màn hình.
+// Cũng đưa đồ án vào lotProjects để khi đóng brief vẫn còn chế độ xem lô phẳng.
 function openProject(p) {
-  // Bấm ranh là chọn đồ án, không còn là trạng thái tạm của bảng tra cứu
   inspectSnap = null;
   viewStash = null;
   focusExtra = null;
   levelPeers = [];
   inspectHostM2 = 0;
-  if (p.level === 'QHC') soleQhcLots(p.name);
+  // Giữ các đồ án đã tick cùng cấp; chỉ đảm bảo đồ án đang xem có trong lotProjects.
+  if (!state.lotProjects.has(p.name)) state.lotProjects.add(p.name);
+  if (p.level === 'QHC') {
+    // Không soleQhcLots — cho phép nhiều QHC tick song song ở chế độ lô.
+    if (state.hiddenProjects.delete(p.name)) saveHidden();
+  }
   zoomTo(p);
   focusName = p.name;
   drawFocus();
@@ -760,28 +753,32 @@ function atPlaceDetail(m = viewHost()) {
 }
 
 /**
- * Zoom lớn: mở lô đồ án nhỏ nhất cấp kind tại tâm khung nhìn, không phóng ra toàn đồ án.
+ * Zoom lớn: mở lô phẳng đồ án nhỏ nhất cấp kind tại tâm khung (tick tương đương) — không vào chế độ info/brief.
  * Không có đồ án tại tâm → null (giữ ranh).
  */
 export function openLotsAtView(kind) {
   const m = viewHost();
   if (!m || !kind || !atPlaceDetail(m)) return null;
-  return openProjectAt(m.getCenter(), kind);
+  const best = smallestProjectAt(m.getCenter(), kind);
+  if (!best) return null;
+  if (state.lotProjects.has(best.name) && !state.hiddenProjects.has(best.name)) return best.name;
+  openSchemeDetail(best);
+  return best.name;
 }
 
 /**
- * Bấm ranh trên bản đồ.
- * Đang phóng gần và bấm đúng đồ án đang mở → giữ khung + mở/làm mới lô.
- * Bấm đồ án khác (kể cả khi đang phóng gần / đã chọn A) → chọn và phóng tới toàn ranh.
- * Nhìn rộng → phóng tới toàn đồ án.
+ * Bấm ranh trên bản đồ → luôn vào chế độ xem thông tin đồ án (brief giữa màn + mask).
+ * Đang info đúng đồ án này và phóng gần → giữ khung, làm mới brief/mask.
  * Admin đang gán ranh từ bảng danh mục → consumeCatalogLinkPick (không mở đồ án).
  */
 function openOutlineProject(p, m) {
   if (consumeCatalogLinkPick(p.name, p)) return;
-  const switching = !!(state.focusedProject && state.focusedProject !== p.name);
-  if (atPlaceDetail(m) && !switching) {
-    if (p.level === 'QHC') selectQhcScheme(p);
-    else openSchemeDetail(p);
+  if (state.focusedProject === p.name && atPlaceDetail(m)) {
+    focusName = p.name;
+    drawFocus();
+    pinGlow(p);
+    markPicked(p.name);
+    document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
     return;
   }
   openProject(p);
@@ -808,8 +805,8 @@ function smallestProjectAt(latlng, kind) {
 }
 
 /**
- * Đang chọn đồ án A, bấm điểm thuộc đồ án B cùng cấp đang xem → mở B và phóng tới toàn ranh.
- * Không có B tại điểm → false (người gọi tự thu gọn A).
+ * Đang chọn đồ án A (info), bấm điểm thuộc đồ án B cùng cấp → chuyển info sang B.
+ * Không có B tại điểm → false (người gọi thoát info).
  */
 export function trySwitchProjectAt(latlng) {
   if (!latlng || !state.focusedProject) return false;
@@ -817,6 +814,20 @@ export function trySwitchProjectAt(latlng) {
   if (!kind) return false;
   const best = smallestProjectAt(latlng, kind);
   if (!best || best.name === state.focusedProject) return false;
+  openProject(best);
+  revealInList(best);
+  return true;
+}
+
+/**
+ * Chế độ xem lô (không info): bấm nền tại đồ án cùng cấp → vào chế độ xem thông tin đồ án đó.
+ */
+export function tryEnterProjectInfoAt(latlng) {
+  if (!latlng || state.focusedProject) return false;
+  const kind = levelScope();
+  if (!kind) return false;
+  const best = smallestProjectAt(latlng, kind);
+  if (!best) return false;
   openProject(best);
   revealInList(best);
   return true;
@@ -902,10 +913,29 @@ export function projectContains(name, latlng) {
   try { return turf.booleanPointInPolygon([latlng.lng, latlng.lat], turf.feature(geom)); } catch (e) { return false; }
 }
 
-// Bảng góc trái (projectBrief.js) ẩn theo sự kiện này
+// Brief giữa màn hình (projectBrief.js) ẩn theo sự kiện này
 export const PROJECT_UNFOCUS_EVENT = 'qh:project-unfocus';
 
-/** Bỏ đồ án đang chọn (về xem theo phường / toàn TP); người gọi tự vẽ lại */
+/**
+ * Thoát chế độ xem thông tin đồ án: bỏ highlight/mask/brief, giữ lô đã tick (chế độ xem lô phẳng).
+ * Đóng nút × trên brief hoặc Esc khi đang info.
+ */
+export function exitProjectInfo() {
+  const was = state.focusedProject || focusName;
+  state.focusedProject = null;
+  focusName = null;
+  focusExtra = null;
+  levelPeers = [];
+  inspectHostM2 = 0;
+  outsideMask = null;
+  drawFocus();
+  markPicked(null);
+  document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+  renderList();
+  if (was) refreshAll();
+}
+
+/** Bỏ focus info; QHC còn xóa lô đã mở. Dùng khi đổi cấp / thoát hẳn — không dùng cho đóng brief. */
 export function clearProjectFocus() {
   const was = state.focusedProject;
   const wasQhc = !!(was && projects.some(p => p.name === was && p.level === 'QHC'));
@@ -2764,8 +2794,8 @@ function lotsOpenOf(p) {
     return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
   }
   if (p.level === 'QHC') {
-    return p.name === state.focusedProject
-      || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
+    if (state.hiddenProjects.has(p.name)) return false;
+    return p.name === state.focusedProject || state.lotProjects.has(p.name);
   }
   return false;
 }
@@ -2826,9 +2856,9 @@ function drawOutlinesOn(m, rawList, below) {
   performance.mark?.('qhpk-outlines-start');
   const list = cullOutlinesForView(rawList || [], m);
   const lotsOpen = lotsOpenOf;
-  // Chỉ khi đồ án trong list đang mở lô mới tắt hit ranh — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
-  // Chuyển đồ án lân cận khi pane tắt: map click → leaveScopeFocus → trySwitchProjectAt.
-  const lotsDrawn = list.some(lotsOpen);
+  // Info mode: giữ hit ranh để chuyển đồ án lân cận. Lot mode (không focus): tắt pane+canvas để click/hover xuống lô.
+  const infoMode = !!state.focusedProject;
+  const lotsDrawn = !infoMode && list.some(lotsOpen);
   // Tạo renderer sớm; sync lại cuối hàm sau khi Leaflet gắn _container canvas.
   outlineRenderer(m);
   syncOutlinePointer(m, lotsDrawn);
@@ -3108,7 +3138,7 @@ function dropSchemeFromFocus(name) {
   if (wasPeer && still) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: state.focusedProject }));
 }
 
-// Tick một đồ án QHPK / QHCT: hiện lô, brief thông tin đồ án (cùng luật QHC selectQhcScheme), không phóng khung.
+// Tick danh sách (QHC 1/10.000 · QHPK · QHCT): chỉ mở lô phẳng cùng cấp — không mask, không brief, không focus.
 function openSchemeDetail(p) {
   if (state.hiddenProjects.delete(p.name)) saveHidden();
   state.lotProjects.add(p.name);
@@ -3116,11 +3146,12 @@ function openSchemeDetail(p) {
     if (!state.showProjects) setMaster(true);
   } else if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
   ensureFullLots();
-  state.focusedProject = p.name;
-  focusName = p.name;
+  // Không đụng focusedProject / focusName — tránh xung đột canvas ranh với chế độ info.
   refreshAll();
-  drawFocus();
-  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
+  if (!state.focusedProject) {
+    outsideMask = null;
+    drawFocus();
+  }
 }
 
 // Bỏ tick: tắt lô, giữ đường ranh. Không ghi qh_hidden_projects.
@@ -3128,11 +3159,9 @@ function closeSchemeDetail(p) {
   const focused = p.name === focusName || p.name === state.focusedProject;
   state.lotProjects.delete(p.name);
   dropSchemeFromFocus(p.name);
-  if (focused) {
-    document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: true } }));
-  }
+  if (focused) exitProjectInfo();
   refreshAll();
-  drawFocus();
+  if (!state.focusedProject) drawFocus();
 }
 
 // ============================ XÓA ĐỒ ÁN ============================
@@ -3464,13 +3493,14 @@ export function initProjectLayer(opts = {}) {
     const p = box && projects[Number(box.dataset.project)];
     if (!p) return;
     if (box.checked) {
-      if (qhcSelectMode() && p.level === 'QHC') { selectQhcScheme(p); return; }
+      // Tick = chế độ xem lô phẳng (mọi cấp QHC/QHPK/QHCT). Info chỉ qua tên / ranh.
+      if (qhcSelectMode() && p.level === 'QHC') { openSchemeDetail(p); return; }
       if (p.level === 'QHPK' || p.level === 'QHCT') { openSchemeDetail(p); return; }
       showProject(p);
       return;
     }
     // QHC 1/10.000, QHPK, QHCT: bỏ tick chỉ tắt lô. Đường ranh giữ nguyên, không ghi danh sách ẩn.
-    if (qhcSelectMode() && p.level === 'QHC') { unselectQhcScheme(p); return; }
+    if (qhcSelectMode() && p.level === 'QHC') { closeSchemeDetail(p); return; }
     if (p.level === 'QHPK' || p.level === 'QHCT') { closeSchemeDetail(p); return; }
     // Bỏ chọn: ẩn ranh, nhãn, lô đất và lô công trình của đúng đồ án. Đồ án kia trong tra cứu nhiều đồ án giữ nguyên.
     state.hiddenProjects.add(p.name);

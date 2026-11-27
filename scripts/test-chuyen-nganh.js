@@ -59,7 +59,14 @@ const cases = [
   ['Không gian cây xanh', 'sdd'],
   ['Không gian mặt nước', 'sdd'],
   ['Điểm đo quan trắc phân tích đánh giá chất lượng môi trường', 'sdd'],
-  ['Hướng dòng chảy của mặt nước', 'san-nen-thoat-mua']
+  ['Hướng dòng chảy của mặt nước', 'san-nen-thoat-mua'],
+  ['Mạng lưới thoát nữa thải(dạng đường)', 'thoat-nuoc-thai'],
+  ['Hố ga chuyển hướng(dạng điểm)', 'san-nen-thoat-mua'],
+  ['Tuyến hào kỹ thuật(dạng đường)', 'thong-tin-lien-lac'],
+  ['Phân khu quy hoạch_A', 'sdd'],
+  ['Công trình_A', 'sdd'],
+  ['Phân vùng đánh giá_A', 'sdd'],
+  ['Công trình cấp điện', 'cap-dien']
 ];
 
 cases.forEach(([name, sector]) => {

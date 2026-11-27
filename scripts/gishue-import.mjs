@@ -627,6 +627,8 @@ function skipKeptOrBackground(name) {
   if (/quy hoach khong gian|kien truc canh quan/.test(key)) return 'sơ đồ tổ chức không gian';
   // Cây xanh điểm / cảnh quan = lớp nền trang trí, không phải HTKT.
   if (/^khong gian\b/.test(key) || /^cay xanh\b/.test(key)) return 'lớp nền';
+  // Nhãn hành chính / sơ đồ thiết kế đô thị — không đưa vào tab hạ tầng.
+  if (/ten don vi hanh chinh|phoi canh|thiet ke do thi|diem nhan chinh/.test(key)) return 'sơ đồ / nhãn nền';
   return null;
 }
 
