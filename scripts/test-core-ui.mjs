@@ -850,6 +850,12 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   assert.match(flow, /exitProjectInfo/);
   assert.match(read('public/js/projectBrief.js'), /exitProjectInfo/);
   assert.match(read('docs/ui-spec.md'), /exitProjectInfo|Hai luồng tách biệt/);
+  assert.match(read('public/js/projectCover.js'), /computeProjectCover/);
+  assert.match(read('public/js/projectCover.js'), /clearProjectCover/);
+  assert.match(read('public/js/projectBrief.js'), /data-brief-cover/);
+  assert.match(read('public/js/projectLayer.js'), /clearProjectCover/);
+  assert.match(read('docs/ui-spec.md'), /data-brief-cover|projectCover\.js/);
+  assert.match(read('public/css/style.css'), /project-brief-cover/);
 }
 assert.match(read('public/js/urbanFocus.js'), /current && !keepView\) fitFocus/);
 assert.match(read('public/js/chuyenNganh.js'), /keepCamera: !!e\.detail\?\.keepView/);

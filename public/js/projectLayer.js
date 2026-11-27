@@ -48,6 +48,7 @@ import {
 } from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 import { sameLevelOverlaps } from './qhpkOverlap.js';
+import { clearProjectCover } from './projectCover.js';
 
 /** group NET_LAYERS → sector catalog HTKT (facetStore). */
 const NET_GROUP_SECTOR = {
@@ -930,6 +931,7 @@ export function exitProjectInfo() {
   outsideMask = null;
   drawFocus();
   markPicked(null);
+  clearProjectCover();
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
   renderList();
   if (was) refreshAll();

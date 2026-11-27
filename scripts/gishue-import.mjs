@@ -150,10 +150,12 @@ function parseArgs(argv) {
   let dry = false;
   let self = false;
   let noGcs = false;
+  let cacheSdd = false;
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') dry = true;
     else if (a === '--no-gcs') noGcs = true;
+    else if (a === '--cache-sdd') cacheSdd = true;
     else if (a === '--self-test') self = true;
     else if (a === '--mapid') {
       const n = Number(argv[++i]);
@@ -164,7 +166,7 @@ function parseArgs(argv) {
       mapids.length = 0;
     } else throw new Error(`Không hiểu ${a}`);
   }
-  return { mapids, dry, self, noGcs };
+  return { mapids, dry, self, noGcs, cacheSdd };
 }
 
 function parsePayload(text) {
@@ -1058,6 +1060,28 @@ function printMap(mapid, scheme, area, rows, warnings, published) {
   return { features, counted, ht, cn, mismatch: warnings.some((text) => text.includes('catalog')) };
 }
 
+/** Chỉ tải lớp SDD polygon vào .cache/gishue/<mapid>/ — không ghi catalog / projects. */
+async function cacheSddOnly(transport, mapid) {
+  const info = await getJson(transport, `${HOST}/gservices/rest/vectormaps/gsv_system/map/${mapid}`);
+  const tenBanDo = info.tenBanDo || '';
+  const listed = listDataLayers(info).filter((layer) => landUseName(layer.ten) && layer.kind === 'polygon');
+  console.log(`mapid ${mapid} | ${tenBanDo} | --cache-sdd | ${listed.length} lớp SDD`);
+  if (!listed.length) {
+    console.log(`! mapid ${mapid}: không thấy lớp chức năng / hiện trạng sử dụng đất`);
+    return;
+  }
+  for (const layer of listed) {
+    const file = cacheFile(mapid, layer.bang);
+    console.log(`… tải ${layer.ten} (${layer.bang})`);
+    // Xóa cache cũ/thiếu cột để buộc tải lại đủ kyhieulodat + chỉ tiêu.
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    const doc = await fetchLayer(transport, mapid, layer);
+    const withCode = (doc.rows || []).filter((row) => String(row.kyhieulodat || '').trim()).length;
+    const withPlan = (doc.rows || []).filter((row) => String(row.matdoxaydung || row.tangcao || row.hesosudungdat || '').trim()).length;
+    console.log(`… xong ${layer.ten}: ${doc.total} doi tuong; kyhieu ${withCode}; chi-tieu ${withPlan} → ${path.relative(repo, file)}`);
+  }
+}
+
 async function importMap(transport, mapid, dry, noGcs = false) {
   const warnings = [];
   const info = await getJson(transport, `${HOST}/gservices/rest/vectormaps/gsv_system/map/${mapid}`);
@@ -1216,7 +1240,7 @@ async function main() {
     return;
   }
   if (!args.mapids.length) {
-    console.error('Dùng: node scripts/gishue-import.mjs --mapid <id> [--mapid <id> ...] [--dry-run] [--no-gcs]');
+    console.error('Dùng: node scripts/gishue-import.mjs --mapid <id> [--mapid <id> ...] [--dry-run] [--no-gcs] [--cache-sdd]');
     process.exit(1);
   }
   const warnings = [];
@@ -1225,7 +1249,8 @@ async function main() {
   try {
     for (const mapid of args.mapids) {
       try {
-        await importMap(transport, mapid, args.dry, args.noGcs);
+        if (args.cacheSdd) await cacheSddOnly(transport, mapid);
+        else await importMap(transport, mapid, args.dry, args.noGcs);
       } catch (err) {
         failed = true;
         console.log(`! mapid ${mapid}: ${err.message || err}`);

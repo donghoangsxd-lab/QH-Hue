@@ -3,7 +3,7 @@
 // Diện tích con là hợp các ranh cắt theo đồ án đang mở (chỗ chồng chỉ tính một lần). Đóng × = thoát info (giữ lô).
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
-import { PROJECT_INFO_EVENT } from './projectFiles.js';
+import { PROJECT_INFO_EVENT, focusProject } from './projectFiles.js';
 import { PROJECT_UNFOCUS_EVENT, exitProjectInfo, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
@@ -14,6 +14,9 @@ import { QHC2045, QHC10_CENTER_BRIEF, QHC_CENTER_INFO_EVENT, isQhcStaticName } f
 import { loadQhc25Scale, qhcScaleBriefHtml } from './qhc25Scale.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { sddScanBriefHtml, syncSddScanBrief } from './schemeSddScan.js';
+import {
+  listCoverTypes, computeProjectCover, showProjectCover, clearProjectCover, coverLotsOf
+} from './projectCover.js';
 
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const WAIT = '<span class="project-brief-wait">…</span>';
@@ -23,6 +26,19 @@ let openName = '';
 let detailOpen = false;
 let lastCard = null;
 const coverCache = new Map();
+/** Loại hạ tầng đang xem độ phủ trong brief (info mode). */
+let coverTypeKey = '';
+let coverStats = null;
+let coverBusy = false;
+let coverSeq = 0;
+
+function resetInfraCover() {
+  coverTypeKey = '';
+  coverStats = null;
+  coverBusy = false;
+  coverSeq += 1;
+  clearProjectCover();
+}
 
 const ha = (m2) => HA.format((Number(m2) || 0) / 10000);
 const peopleHtml = (n) => (n > 0 ? `${fmtNum(n)}<small>người</small>` : '—');
@@ -219,6 +235,41 @@ function briefTools(card, { pdf = true, info = true } = {}) {
     </div>`;
 }
 
+function coverBlockHtml(card) {
+  const types = listCoverTypes(card.level, card.pop || { ht: 0, qh: 0 });
+  if (!types.length) return '';
+  const opts = [`<option value="">— Chọn loại —</option>`]
+    .concat(types.map(t => {
+      const sel = t.key === coverTypeKey ? ' selected' : '';
+      return `<option value="${escapeHtml(t.key)}"${sel}>${escapeHtml(t.label)} (${fmtNum(t.radius)} m)</option>`;
+    }))
+    .join('');
+  let body = '';
+  if (coverBusy) {
+    body = '<p class="project-brief-cover-note">Đang tính độ phủ…</p>';
+  } else if (coverTypeKey && coverStats) {
+    const pct = coverStats.housingCoverPct != null ? `${fmtNum(coverStats.housingCoverPct)}%` : '—';
+    const people = coverStats.peopleUnserved != null
+      ? `${fmtNum(coverStats.peopleUnserved)}<small>người</small>`
+      : '—';
+    body = `<div class="project-brief-cover-stats">
+      <div title="Số lô đất loại đã chọn trong đồ án"><span>Cơ sở</span><b>${fmtNum(coverStats.facilityCount)}</b></div>
+      <div title="Bán kính phục vụ theo QCVN"><span>Bán kính</span><b>${fmtNum(coverStats.radiusM)}&nbsp;m</b></div>
+      <div title="Diện tích đất ở nằm trong bán kính / tổng đất ở"><span>Đất ở được phủ</span><b>${pct}</b></div>
+      <div title="Dân số đồ án ÷ diện tích đất ở × đất ở ngoài bán kính"><span>Ước chưa tiếp cận</span><b>${people}</b></div>
+    </div>
+    <p class="project-brief-cover-note">Xanh = trong bán kính · Đỏ = ngoài bán kính (cắt theo ranh). Dân số ước trên đất ở.</p>`;
+  } else if (coverTypeKey) {
+    body = '<p class="project-brief-cover-note">Không tính được (thiếu ranh, lô hoặc dân số).</p>';
+  }
+  return `<div class="project-brief-cover">
+    <label class="project-brief-cover-label">Độ phủ hạ tầng
+      <select data-brief-cover aria-label="Chọn loại hạ tầng để xem độ phủ">${opts}</select>
+    </label>
+    ${body}
+  </div>`;
+}
+
 function detailBodyHtml(card) {
   if (card.qhcCity) {
     const scale = card.qhcScale || (getLevel() === 'qhc10' ? '10' : '25');
@@ -230,10 +281,50 @@ function detailBodyHtml(card) {
   return `<div class="project-brief-detail">
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
     ${popRows(card.pop || { ht: 0, qh: 0 })}
+    ${coverBlockHtml(card)}
     <div class="project-brief-meters">${metersOf(card).join('')}</div>
     ${dossier}
     ${sddScanBriefHtml()}
   </div>`;
+}
+
+async function applyInfraCover(typeKey) {
+  const name = openName;
+  const token = ++coverSeq;
+  coverTypeKey = String(typeKey || '');
+  if (!coverTypeKey) {
+    coverStats = null;
+    coverBusy = false;
+    clearProjectCover();
+    if (lastCard && lastCard.name === name) render(lastCard);
+    return;
+  }
+  coverBusy = true;
+  coverStats = null;
+  if (lastCard && lastCard.name === name) render(lastCard);
+  let lots = coverLotsOf(name);
+  if (!lots.length) {
+    try { await focusProject(name); } catch (e) { /* tải lô lỗi */ }
+    if (token !== coverSeq || openName !== name) return;
+    lots = coverLotsOf(name);
+  }
+  const entry = entryOf(name);
+  const pop = projectPopulation(name);
+  const types = listCoverTypes(planLevelOf(name), pop);
+  const label = types.find(t => t.key === coverTypeKey)?.label;
+  const stats = computeProjectCover({
+    boundary: entry?.boundary,
+    lots,
+    typeKey: coverTypeKey,
+    pop,
+    label
+  });
+  if (token !== coverSeq || openName !== name) return;
+  coverBusy = false;
+  coverStats = stats;
+  if (stats) showProjectCover(stats);
+  else clearProjectCover();
+  if (lastCard && lastCard.name === name) render(lastCard);
 }
 
 function popRows(pop) {
@@ -336,6 +427,7 @@ function hide() {
   openName = '';
   detailOpen = false;
   lastCard = null;
+  resetInfraCover();
   const el = document.getElementById('projectBrief');
   if (!el) return;
   el.hidden = true;
@@ -390,6 +482,7 @@ async function show(name, { openDetail = false } = {}) {
   if (!project) { hide(); return; }
   const sameBrief = project === openName
     || (isQhcStaticName(project) && openName === QHC2045.short);
+  if (!sameBrief) resetInfraCover();
   if (openDetail) detailOpen = true;
   else if (!sameBrief) detailOpen = false;
   const token = ++seq;
@@ -436,6 +529,11 @@ export function initProjectBrief() {
   el.setAttribute('role', 'region');
   el.setAttribute('aria-label', 'Thông tin đồ án quy hoạch');
   host.appendChild(el);
+  el.addEventListener('change', (e) => {
+    const sel = e.target.closest('[data-brief-cover]');
+    if (!sel) return;
+    void applyInfraCover(sel.value);
+  });
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-brief-close]')) {
       exitProjectInfo();
