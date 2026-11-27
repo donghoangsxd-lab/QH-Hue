@@ -144,6 +144,15 @@ let leftGroup = null;
 let rightGroup = null;
 let projectCache = null;
 const centerMemo = new WeakMap();
+const featureBoxMemo = new WeakMap();
+const investRenderers = new WeakMap();
+const drawSigByMap = new WeakMap();
+const INVEST_VIEW_PAD = 0.15;
+let investViewTimer = 0;
+/** Cache matchInvestDetail theo sheetSig + revision ranh — tránh O(n·m) mỗi soft-refresh không đổi. */
+let matchCache = { sheet: '', bound: '', detail: null };
+/** Tăng mỗi lần bindPack — bust signature khi soft-refresh tạo feature mới cùng _key. */
+let packGen = 0;
 let hovered = null;
 let selected = null;
 let card = null;
@@ -1008,10 +1017,24 @@ function cloneBoundBase() {
   }));
 }
 
+function boundRevOf(features) {
+  const n = features?.length || 0;
+  if (!n) return '0';
+  const a = features[0]?.properties?.name || '';
+  const b = features[n - 1]?.properties?.name || '';
+  return `${n}:${a}:${b}`;
+}
+
 function bindPack(features, rows, loaded = {}) {
   const list = rows || [];
   sheetRows = list;
-  const detail = matchInvestDetail(features, list);
+  const sheet = sheetSig(list);
+  const bound = boundRevOf(features);
+  let detail = matchCache.detail;
+  if (matchCache.sheet !== sheet || matchCache.bound !== bound || !detail || detail.length !== features.length) {
+    detail = matchInvestDetail(features, list);
+    matchCache = { sheet, bound, detail };
+  }
   features.forEach((f, i) => {
     f.properties = f.properties || {};
     f.properties._key = featureKey(f);
@@ -1021,6 +1044,7 @@ function bindPack(features, rows, loaded = {}) {
   });
   attachAdminBoundaries(features, list, loaded.boundaries);
   pack = features;
+  packGen += 1;
   adoptGroups(loaded.groups);
   stampGroups();
   rebuildSheetOnly(pack, list);
@@ -1110,6 +1134,76 @@ function ensurePane(m, name, z) {
   if (name === HL_PANE) pane.style.pointerEvents = 'none';
 }
 
+function investRenderer(m) {
+  let r = investRenderers.get(m);
+  if (!r) {
+    ensurePane(m, PANE, PANE_Z);
+    r = L.canvas({ pane: PANE, padding: 0.5 });
+    investRenderers.set(m, r);
+  }
+  return r;
+}
+
+function featureBbox(f) {
+  if (!f?.geometry) return null;
+  let box = featureBoxMemo.get(f);
+  if (box) return box;
+  try {
+    box = turf.bbox(f);
+    if (Array.isArray(box) && box.length === 4) featureBoxMemo.set(f, box);
+    else box = null;
+  } catch { box = null; }
+  return box;
+}
+
+function keepInvestFeature(f) {
+  if (!f) return false;
+  if (card?.feature === f) return true;
+  if (card?.members?.includes(f)) return true;
+  const key = f.properties?._key;
+  if (key && card?.picks?.has(key)) return true;
+  if (key && investPicked && (investPicked === key || investPicked === f.properties?.groupId)) return true;
+  return false;
+}
+
+/** Giữ card/picked; còn lại chỉ ranh giao khung nhìn (pad). */
+function cullInvestForView(features, m) {
+  if (!m || !features.length) return features;
+  let bounds;
+  try { bounds = m.getBounds().pad(INVEST_VIEW_PAD); } catch { return features; }
+  if (!bounds || !bounds.isValid?.()) return features;
+  const w = bounds.getWest();
+  const e = bounds.getEast();
+  const s = bounds.getSouth();
+  const n = bounds.getNorth();
+  return features.filter(f => {
+    if (keepInvestFeature(f)) return true;
+    const box = featureBbox(f);
+    if (!box) return true;
+    return box[0] <= e && box[2] >= w && box[1] <= n && box[3] >= s;
+  });
+}
+
+function pinInView(at, m) {
+  if (!at || !m) return true;
+  try {
+    return m.getBounds().pad(INVEST_VIEW_PAD).contains(at);
+  } catch { return true; }
+}
+
+function investDrawSig(drawFeatures) {
+  const keys = drawFeatures.map(f => f.properties?._key || '').join('\0');
+  return [
+    packGen,
+    keys,
+    activeDtTab(),
+    activeDtScope(),
+    card?.feature?.properties?._key || '',
+    investPicked || '',
+    investHidden.size
+  ].join('|');
+}
+
 function openFromMark(feature, layer, host, e) {
   if (toolBusy()) return;
   L.DomEvent.stopPropagation(e);
@@ -1144,15 +1238,18 @@ function shownPack(features) {
 }
 
 function drawOn(m, features) {
-  const drawFeatures = shownPack(features);
+  const drawFeatures = cullInvestForView(shownPack(features), m);
   ensurePane(m, PANE, PANE_Z);
   ensurePane(m, MARK_PANE, MARK_PANE_Z);
+  const renderer = investRenderer(m);
   const byFeature = new Map();
+  const drawn = new Set(drawFeatures);
   const tabProjects = projectsForTab();
   const titleByFeature = new Map();
   tabProjects.forEach(p => p.members.forEach(f => titleByFeature.set(f, p.title)));
   const group = L.geoJSON({ type: 'FeatureCollection', features: drawFeatures }, {
     pane: PANE,
+    renderer,
     keyboard: false,
     style: f => styleFor(f),
     onEachFeature: (f, layer) => {
@@ -1173,10 +1270,14 @@ function drawOn(m, features) {
   });
   group.addTo(m);
   tabProjects.filter(p => !investHidden.has(projectKey(p))).forEach(p => {
+    const keep = p.members.some(f => drawn.has(f)) || projectKey(p) === investPicked
+      || (card && (card.feature === p.feature || card.members?.includes(p.feature)));
+    if (!keep) return;
     let at = p.geom ? centerOf(p.geom) : null;
     if (!at && p.pin) at = L.latLng(p.pin[1], p.pin[0]);
     const layer = byFeature.get(p.feature);
     if (!at) return;
+    if (!keepInvestFeature(p.feature) && !pinInView(at, m)) return;
     if (!p.hasBoundary && p.pin) {
       const mark = L.marker(at, {
         pane: MARK_PANE,
@@ -1211,6 +1312,7 @@ function drawOn(m, features) {
     mark.on('click', (e) => openFromMark(p.feature, layer, m, e));
     mark.addTo(group);
   });
+  drawSigByMap.set(m, investDrawSig(drawFeatures));
   return group;
 }
 
@@ -1633,17 +1735,32 @@ function addEditRow() {
   anchor.previousElementSibling?.querySelector('input')?.focus();
 }
 
+function syncInvestDraw(m, prev) {
+  if (!m || !pack) return null;
+  const nextFeatures = cullInvestForView(shownPack(pack), m);
+  const sig = investDrawSig(nextFeatures);
+  if (prev && drawSigByMap.get(m) === sig && m.hasLayer(prev)) return prev;
+  prev?.remove();
+  return drawOn(m, pack);
+}
+
 function redrawMaps() {
   const host = card?.map;
   const feature = card?.feature;
   const geom = card?.geom;
-  leftGroup?.remove();
-  leftGroup = null;
-  rightGroup?.remove();
-  rightGroup = null;
-  if (visible && pack && map) leftGroup = drawOn(map, pack);
+  if (visible && pack && map) leftGroup = syncInvestDraw(map, leftGroup);
+  else {
+    leftGroup?.remove();
+    leftGroup = null;
+    if (map) drawSigByMap.delete(map);
+  }
   // Chỉ vẽ bản đồ phải khi đang so sánh / chia đôi — tránh dựng đôi lớp mỗi lần đổi tab.
-  if (visible && pack && planMapLive()) rightGroup = drawOn(planMap, pack);
+  if (visible && pack && planMapLive()) rightGroup = syncInvestDraw(planMap, rightGroup);
+  else {
+    rightGroup?.remove();
+    rightGroup = null;
+    if (planMap) drawSigByMap.delete(planMap);
+  }
   redrawPendingBounds();
   if (feature && host && card) selectLayer(findLayer(feature, host), host, geom);
 }
@@ -2369,6 +2486,16 @@ function queueInvestDraw() {
   });
 }
 
+/** Pan/zoom: chỉ vẽ lại khi tập ranh trong khung đổi (cull viewport). */
+function scheduleInvestForView() {
+  if (!visible || !pack) return;
+  clearTimeout(investViewTimer);
+  investViewTimer = setTimeout(() => {
+    investViewTimer = 0;
+    if (visible && pack) redrawMaps();
+  }, 120);
+}
+
 async function ensureInvestList() {
   const hosts = [$(`investList-${INVEST_TAB_ALL}`), ...INVEST_GROUPS.map(g => $(`investList-${g.id}`))];
   hosts.forEach(host => {
@@ -2486,10 +2613,14 @@ async function setVisible(on) {
   if (!map) return;
   if (!visible) {
     closeCard();
+    clearTimeout(investViewTimer);
+    investViewTimer = 0;
     leftGroup?.remove();
     leftGroup = null;
     rightGroup?.remove();
     rightGroup = null;
+    if (map) drawSigByMap.delete(map);
+    if (planMap) drawSigByMap.delete(planMap);
     clearPendingBoundLayers();
     return;
   }
@@ -2513,6 +2644,9 @@ async function setVisible(on) {
 export function initInvestLayer() {
   if (!map) return;
   fillDtScopePick();
+  [map, planMap].filter(Boolean).forEach(m => {
+    m.on('moveend zoomend', scheduleInvestForView);
+  });
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
   document.addEventListener('auth:change', () => {
     if (ready) void flushPending();

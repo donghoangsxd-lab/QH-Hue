@@ -1,4 +1,5 @@
-// Cold path trục F: asset tĩnh trước, không chặn getInvestCalls; meter ngắn; soft /gcs.
+// Cold path trục F: asset tĩnh trước, không chặn getInvestCalls; soft /gcs.
+// Vẽ: canvas + cull viewport + signature skip + debounce moveend (cùng nguyên tắc QHPK).
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
@@ -18,10 +19,17 @@ assert.match(layer, /INVEST_BOUND_URL\s*=\s*'\.\/data\/invest-boundary\.geojson'
 assert.match(layer, /softRefreshInvest/);
 assert.match(layer, /gcsUrl\(INVEST_GCS_SHEET\)/);
 assert.match(layer, /gcsUrl\(INVEST_GCS_EDITS\)/);
-assert.match(layer, /LOAD_MIN_MS\s*=\s*200/);
-assert.match(layer, /LOAD_DONE_HOLD_MS\s*=\s*300/);
 assert.doesNotMatch(layer, /getInvestCalls/, 'trục F không còn gọi getInvestCalls trên client');
+assert.match(layer, /L\.canvas\(\{ pane: PANE/);
+assert.match(layer, /cullInvestForView/);
+assert.match(layer, /scheduleInvestForView/);
+assert.match(layer, /syncInvestDraw/);
+assert.match(layer, /matchCache/);
 assert.match(api, /export function gcsUrl/);
+
+const qhct = read('public/js/qhctLayer.js');
+assert.match(qhct, /L\.canvas\(\{ pane: OUTLINE_PANE/);
+assert.doesNotMatch(qhct, /L\.svg\(\{ pane: OUTLINE_PANE/);
 
 const rowsA = [{ 'Tên dự án': 'A' }, { 'Tên dự án': 'B' }, { 'Tên dự án': 'C' }];
 const rowsB = [{ 'Tên dự án': 'A' }, { 'Tên dự án': 'B' }, { 'Tên dự án': 'D' }];

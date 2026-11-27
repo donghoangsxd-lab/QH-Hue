@@ -76,7 +76,7 @@ function outlineRenderer(m) {
   let r = outlineRenderers.get(m);
   if (!r) {
     if (!m.getPane(OUTLINE_PANE)) m.createPane(OUTLINE_PANE).style.zIndex = OUTLINE_Z;
-    r = L.svg({ pane: OUTLINE_PANE });
+    r = L.canvas({ pane: OUTLINE_PANE, padding: 0.5 });
     outlineRenderers.set(m, r);
   }
   return r;
