@@ -1055,6 +1055,7 @@ assert.equal(shortPlaceName('Khu vực đô thị A'), 'Khu vực đô thị A')
 
 const spec = read('docs/ui-spec.md');
 assert.match(spec, /## Phác thảo/);
+assert.match(spec, /Một lớp phủ phiên duy nhất|trục 7 tạm/);
 assert.match(spec, /## Đo khoảng cách và diện tích/);
 assert.match(spec, /Điều chỉnh/);
 assert.match(spec, /Xóa đỉnh/);
@@ -1077,6 +1078,12 @@ assert.match(sketch, /selectShape\(fg\)/);
 assert.match(sketch, /Điều chỉnh/);
 assert.match(sketch, /Xong/);
 assert.match(sketch, /createVertexHandles/);
+// Một lớp phủ phiên: mount lên cả map HT và planMap, không gắn một sketchHost cố định theo lúc vẽ.
+assert.match(sketch, /function sketchMaps\(\)/);
+assert.match(sketch, /function mountShape\(/);
+assert.match(sketch, /item\.views\.set\(m, fg\)/);
+assert.match(sketch, /relocateLiveEdit/);
+assert.doesNotMatch(sketch, /Mỗi hình gắn với bản đồ lúc vẽ/);
 // Menu «Xóa đỉnh» nằm ở vertexHandles / sketchEdit; sketchLayer chỉ mở phiên chỉnh.
 assert.match(handles, /Xóa đỉnh/);
 assert.match(sketch, /createInvestFromSketch|saveSketchAsInvest|dangnghien|Đang nghiên cứu/);
