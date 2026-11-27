@@ -65,6 +65,19 @@ const sliver = sameLevelOverlaps([
 ], { intersect, area: () => 10, focusedName: '' });
 assert.equal(sliver.length, 0);
 
+const onlyA = sameLevelOverlaps([
+  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west },
+  { name: 'pk-b', label: 'QHPK Thuận Hòa', level: 'QHPK', geom: east },
+  { name: 'pk-c', label: 'QHPK xa', level: 'QHPK', geom: far }
+], { intersect, area, focusedName: 'pk-a', onlyName: 'pk-a' });
+assert.equal(onlyA.length, 1);
+assert.deepEqual(onlyA[0].names, ['pk-a', 'pk-b']);
+assert.match(onlyA[0].tip, /Thuận Hòa/);
+assert.equal(sameLevelOverlaps([
+  { name: 'pk-a', label: 'A', level: 'QHPK', geom: west },
+  { name: 'pk-b', label: 'B', level: 'QHPK', geom: east }
+], { intersect, area, onlyName: 'missing' }).length, 0);
+
 function contains(geom, lng, lat) {
   const b = ringBox(geom);
   return lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];

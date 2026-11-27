@@ -299,6 +299,7 @@ function collectProjects() {
     shapes: [],
     source: p.boundarySource === 'gis' ? 'gis' : (p.boundary ? 'auto' : null),
     points: p.boundary ? [] : (pointsOf.get(p.tenQH) || []),
+    bbox: Array.isArray(p.bbox) && p.bbox.length === 4 ? p.bbox.map(Number) : null,
     area: p.boundary ? {
       id: p.tenQH,
       geometry: p.boundary,
@@ -403,7 +404,23 @@ export function focusedProjectSketchSource() {
   };
 }
 
+function projectBbox(p) {
+  if (Array.isArray(p?.bbox) && p.bbox.length === 4 && p.bbox.every(Number.isFinite)) return p.bbox;
+  const geom = outlineOf(p);
+  if (!geom || typeof turf === 'undefined') return null;
+  try {
+    const box = turf.bbox(turf.feature(geom));
+    if (Array.isArray(box) && box.length === 4) {
+      p.bbox = box;
+      return box;
+    }
+  } catch (e) { /* ranh lỗi */ }
+  return null;
+}
+
 function boundsOf(p) {
+  const box = projectBbox(p);
+  if (box) return L.latLngBounds([box[1], box[0]], [box[3], box[2]]);
   const geom = outlineOf(p);
   if (geom) return L.geoJSON(geom).getBounds();
   if (p.points.length) return L.latLngBounds(p.points.map(([lng, lat]) => [lat, lng]));
@@ -1221,6 +1238,16 @@ function scheduleListForView() {
   listViewTimer = setTimeout(() => {
     listViewTimer = 0;
     if (state.focusedProject) renderList();
+  }, 120);
+}
+
+let outlineViewTimer = 0;
+/** Pan/zoom: chỉ vẽ lại ranh khi tập đồ án trong khung đổi (cull viewport). */
+function scheduleOutlineForView() {
+  clearTimeout(outlineViewTimer);
+  outlineViewTimer = setTimeout(() => {
+    outlineViewTimer = 0;
+    redrawOutlines();
   }, 120);
 }
 
@@ -2059,7 +2086,13 @@ const zoomHooked = new WeakSet();
 function geomBounds(geom) {
   let b = boundsMemo.get(geom);
   if (!b) {
-    b = L.geoJSON(geom).getBounds();
+    if (typeof turf !== 'undefined') {
+      try {
+        const box = turf.bbox(turf.feature(geom));
+        b = L.latLngBounds([box[1], box[0]], [box[3], box[2]]);
+      } catch (e) { b = null; }
+    }
+    if (!b) b = L.geoJSON(geom).getBounds();
     boundsMemo.set(geom, b);
   }
   return b;
@@ -2427,6 +2460,19 @@ const HatchCanvas = L.Layer.extend({
   },
   _paint() {
     if (!this._map || !this._canvas) return;
+    if (!(this._rows || []).length) {
+      if (this._blank) return;
+      if (this._raf) cancelAnimationFrame(this._raf);
+      this._raf = 0;
+      const ctx = this._ctx;
+      if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+      }
+      this._blank = true;
+      return;
+    }
+    this._blank = false;
     if (this._raf) return;
     this._raf = requestAnimationFrame(() => {
       this._raf = 0;
@@ -2437,6 +2483,11 @@ const HatchCanvas = L.Layer.extend({
     const map = this._map;
     const canvas = this._canvas;
     if (!map || !canvas) return;
+    const rows = this._rows || [];
+    if (!rows.length) {
+      this._blank = true;
+      return;
+    }
     const size = map.getSize();
     const origin = map.containerPointToLayerPoint([0, 0]);
     L.DomUtil.setPosition(canvas, origin);
@@ -2450,8 +2501,6 @@ const HatchCanvas = L.Layer.extend({
     const ctx = this._ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const rows = this._rows || [];
-    if (!rows.length) return;
     const toPx = (coord) => {
       const p = map.latLngToLayerPoint([coord[1], coord[0]]);
       return { x: p.x - origin.x, y: p.y - origin.y };
@@ -2495,9 +2544,15 @@ function clearOverlapTip() {
   overlapTipMap = null;
 }
 
+const overlapShownName = new Map();
+const overlapSchemeLists = new Map();
+const overlapRowsForName = new Map();
+
 function clearOverlaps(m) {
   overlapGen.set(m, (overlapGen.get(m) || 0) + 1);
   overlapByMap.delete(m);
+  overlapSchemeLists.delete(m);
+  overlapRowsForName.delete(m);
   overlapShownName.delete(m);
   hatchLayers.get(m)?.setRows([]);
   if (overlapTipMap === m) clearOverlapTip();
@@ -2507,14 +2562,39 @@ function overlapFocusName(m) {
   return hovered.get(m) || state.focusedProject || '';
 }
 
-function shownOverlapRows(m) {
-  const rows = overlapByMap.get(m);
-  const name = overlapFocusName(m);
-  if (!rows || !rows.length || !name) return [];
-  return rows.filter(row => row.names && row.names.includes(name));
+function overlapCacheKey(schemes, name) {
+  return `${name}\0${(schemes || []).map(s => s.name).join('\0')}`;
 }
 
-const overlapShownName = new Map();
+function overlapsForFocus(m, name) {
+  if (!name) return [];
+  const schemes = overlapSchemeLists.get(m) || [];
+  const key = overlapCacheKey(schemes, name);
+  const hit = overlapRowsForName.get(m);
+  if (hit && hit.key === key) return hit.rows;
+  let rows = [];
+  if (schemes.length >= 2 && typeof turf !== 'undefined') {
+    try {
+      rows = sameLevelOverlaps(schemes, {
+        intersect: memoIntersect,
+        area: geomArea,
+        focusedName: name,
+        onlyName: name
+      });
+    } catch (err) {
+      console.warn('Không vẽ được giao QHPK:', err);
+      rows = [];
+    }
+  }
+  overlapRowsForName.set(m, { key, rows });
+  return rows;
+}
+
+function shownOverlapRows(m) {
+  const name = overlapFocusName(m);
+  if (!name) return [];
+  return overlapsForFocus(m, name);
+}
 
 function applyOverlapHatch(m) {
   const name = overlapFocusName(m);
@@ -2621,20 +2701,9 @@ function paintQhpkOverlaps(m, list) {
     if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
     schemes.push({ name: p.name, label: p.full || p.short || p.name, level: 'QHPK', geom });
   });
-  if (schemes.length < 2 || typeof turf === 'undefined') return;
-  let rows = [];
-  try {
-    rows = sameLevelOverlaps(schemes, {
-      intersect: memoIntersect,
-      area: geomArea,
-      focusedName: state.focusedProject || ''
-    });
-  } catch (err) {
-    console.warn('Không vẽ được giao QHPK:', err);
-    return;
-  }
-  if (!rows.length) return;
-  overlapByMap.set(m, rows);
+  overlapSchemeLists.set(m, schemes);
+  overlapRowsForName.delete(m);
+  overlapByMap.delete(m);
   applyOverlapHatch(m);
 }
 
@@ -2644,89 +2713,187 @@ function ensureOutlinePane(m) {
   return pane;
 }
 
-function drawOutlinesOn(m, list, below) {
-  clearOverlaps(m);
+const outlineRenderers = new WeakMap();
+const outlineShapeMaps = new Map();
+const outlineDrawSig = new Map();
+const OUTLINE_VIEW_PAD = 0.15;
+
+function outlineRenderer(m) {
+  let r = outlineRenderers.get(m);
+  if (!r) {
+    ensureOutlinePane(m);
+    r = L.canvas({ pane: OUTLINE_PANE, padding: 0.5 });
+    outlineRenderers.set(m, r);
+  }
+  return r;
+}
+
+function lotsOpenOf(p) {
+  if (p.level === 'QHPK' || p.level === 'QHCT') {
+    return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
+  }
+  if (p.level === 'QHC') {
+    return p.name === state.focusedProject
+      || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
+  }
+  return false;
+}
+
+/** Giữ đồ án đang mở / focus / hover dù ngoài khung; còn lại chỉ ranh giao viewport. */
+function cullOutlinesForView(list, m) {
+  if (!m || !list.length) return list;
+  let bounds;
+  try { bounds = m.getBounds().pad(OUTLINE_VIEW_PAD); } catch (e) { return list; }
+  if (!bounds || !bounds.isValid?.()) return list;
+  return list.filter(p => {
+    if (p.name === state.focusedProject) return true;
+    if (state.lotProjects.has(p.name)) return true;
+    if (hovered.get(m) === p.name) return true;
+    return projectInView(p, bounds);
+  });
+}
+
+function outlineEntrySig(p, open) {
+  const geom = shownOutline(p);
+  return [
+    p.name,
+    open ? 1 : 0,
+    p.color || '',
+    quietOutline ? 1 : 0,
+    p.level || '',
+    p.source || '',
+    p.area ? 1 : 0,
+    geom ? 1 : 0
+  ].join(':');
+}
+
+function outlineStyleOf(p, open) {
+  const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
+  const fillOp = open ? 0 : (OUTLINE_FILL[p.level] ?? 0.14);
+  const style = {
+    ...base,
+    ...(p.level === 'QHC' ? OUTLINE_QHC : p.level === 'QHPK' ? OUTLINE_QHPK : null),
+    color: p.color,
+    fillColor: p.color,
+    fillOpacity: fillOp
+  };
+  return open && quietOutline ? { ...style, opacity: 0, fillOpacity: 0 } : style;
+}
+
+function clearOutlineShapes(m) {
   const old = outlineGroups.get(m);
   if (old) {
     old.clearLayers();
     m.removeLayer(old);
     outlineGroups.delete(m);
   }
-  clearGlow(m);
-  hovered.delete(m);
+  outlineShapeMaps.delete(m);
+  outlineDrawSig.delete(m);
+}
+
+function drawOutlinesOn(m, rawList, below) {
+  performance.mark?.('qhpk-outlines-start');
+  const list = cullOutlinesForView(rawList || [], m);
+  const lotsOpen = lotsOpenOf;
+  const outlinePane = ensureOutlinePane(m);
+  // Chỉ khi đồ án trong list đang mở lô mới tắt pane — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
+  // Chuyển đồ án lân cận khi pane tắt: map click → leaveScopeFocus → trySwitchProjectAt.
+  const lotsDrawn = list.some(lotsOpen);
+  outlinePane.style.pointerEvents = lotsDrawn ? 'none' : '';
+
   if (!zoomHooked.has(m)) {
     zoomHooked.add(m);
     m.on('zoomend', () => layoutLabels(m));
     hookHover(m);
   }
   labelLists.set(m, list);
+
+  const sig = list.map(p => outlineEntrySig(p, lotsOpen(p))).join('|')
+    + `|b${below ? 1 : 0}|q${quietOutline ? 1 : 0}|s${state.showProjects ? 1 : 0}`;
+  if (outlineDrawSig.get(m) === sig && outlineGroups.has(m)) {
+    // Pan không đổi tập ranh: chỉ xếp lại nhãn theo pixel; không đụng GeoJSON / overlap.
+    layoutLabels(m);
+    performance.mark?.('qhpk-outlines-end');
+    performance.measure?.('qhpk-outlines', 'qhpk-outlines-start', 'qhpk-outlines-end');
+    return;
+  }
+  outlineDrawSig.set(m, sig);
   layoutLabels(m);
-  const outlinePane = ensureOutlinePane(m);
-  // Đồ án đã hiện lô: ranh không bắt chuột để click rơi xuống lô; bỏ nền mờ để không che lô TT16.
-  const lotsOpen = (p) => {
-    if (p.level === 'QHPK' || p.level === 'QHCT') {
-      return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
-    }
-    if (p.level === 'QHC') return p.name === state.focusedProject || (state.lotProjects.size > 1 && state.lotProjects.has(p.name) && state.lotProjects.has(state.focusedProject));
-    return false;
-  };
-  // Chỉ khi đồ án trong list đang mở lô mới tắt pane — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
-  // Chuyển đồ án lân cận khi pane tắt: map click → leaveScopeFocus → trySwitchProjectAt.
-  const lotsDrawn = list.some(lotsOpen);
-  outlinePane.style.pointerEvents = lotsDrawn ? 'none' : '';
-  if (!list.length) return;
-  const group = L.featureGroup();
-  const shapes = [];
-  const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
+
+  let group = outlineGroups.get(m);
+  let byName = outlineShapeMaps.get(m);
+  if (!group) {
+    group = L.featureGroup();
+    group.addTo(m);
+    outlineGroups.set(m, group);
+  }
+  if (!byName) {
+    byName = new Map();
+    outlineShapeMaps.set(m, byName);
+  }
+
+  const want = new Set();
+  const backShapes = [];
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = shownOutline(p);
     if (!geom) return;
-    const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
+    want.add(p.name);
     const open = lotsOpen(p);
-    const fillOp = open ? 0 : (OUTLINE_FILL[p.level] ?? 0.14);
-    const style = {
-      ...base,
-      ...(p.level === 'QHC' ? OUTLINE_QHC : p.level === 'QHPK' ? OUTLINE_QHPK : null),
-      color: p.color,
-      fillColor: p.color,
-      fillOpacity: fillOp
-    };
-    const shown = open && quietOutline ? { ...style, opacity: 0, fillOpacity: 0 } : style;
-    const paneOpt = { pane: OUTLINE_PANE };
-    // Chỉ ranh đồ án đã mở lô (hoặc đang focus khi tắt lớp QHPK) không bắt chuột — click rơi xuống lô.
-    // Ranh đồ án khác vẫn bấm được khi phóng gần (khi chưa mở lô) để chuyển sang và fitBounds toàn ranh.
-    if (open || (!state.showProjects && p.name === state.focusedProject)) {
-      const shape = L.geoJSON(geom, { style: shown, interactive: false, ...paneOpt });
-      shapes.push(shape);
-      group.addLayer(shape);
+    const entrySig = outlineEntrySig(p, open);
+    const prev = byName.get(p.name);
+    if (prev && prev.sig === entrySig && prev.geom === geom) {
+      if (prev.back) backShapes.push(prev.shape);
       return;
     }
-    const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false, ...paneOpt });
-    if (focused) shapes.push(shape);
-    shape.bindTooltip(escapeHtml(outlineLabelOf(p)), { sticky: true, direction: 'top', className: 'dot-tip' });
-    shape.on('mouseover', () => setHover(m, p.name));
-    shape.on('mouseout', () => setHover(m, null));
-    shape.on('click', (e) => {
-      if (passToolClick(m, e)) return;
-      openOutlineProject(p, m);
-      revealInList(p);
-    });
-    group.addLayer(shape);
+    if (prev) {
+      group.removeLayer(prev.shape);
+      byName.delete(p.name);
+    }
+    const made = makeOutlineShape(m, p, geom, open, below);
+    byName.set(p.name, { shape: made.shape, sig: entrySig, geom, back: made.back, open: made.open });
+    group.addLayer(made.shape);
+    if (made.back) backShapes.push(made.shape);
   });
-  group.addTo(m);
+
+  [...byName.keys()].forEach(name => {
+    if (want.has(name)) return;
+    const prev = byName.get(name);
+    if (prev) group.removeLayer(prev.shape);
+    byName.delete(name);
+  });
+
   // Ranh đang mở lô không bắt chuột và nằm dưới lô để không che ký hiệu TT16.
   // Đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới.
-  shapes.reverse().forEach(s => s.bringToBack());
-  outlineGroups.set(m, group);
+  backShapes.reverse().forEach(s => s.bringToBack());
   updateGlow(m);
-  const gen = (overlapGen.get(m) || 0) + 1;
-  overlapGen.set(m, gen);
-  const snapshot = list;
-  setTimeout(() => {
-    if (overlapGen.get(m) !== gen) return;
-    paintQhpkOverlaps(m, snapshot);
-  }, 0);
+  // Chỉ đăng ký geom + hatch theo focus (O(n)); không còn pairwise O(n²) mỗi lần vẽ.
+  paintQhpkOverlaps(m, list);
+  performance.mark?.('qhpk-outlines-end');
+  performance.measure?.('qhpk-outlines', 'qhpk-outlines-start', 'qhpk-outlines-end');
+}
+
+function makeOutlineShape(m, p, geom, open, below) {
+  const style = outlineStyleOf(p, open);
+  const renderer = outlineRenderer(m);
+  const paneOpt = { pane: OUTLINE_PANE, renderer };
+  const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
+  // Chỉ ranh đồ án đã mở lô (hoặc đang focus khi tắt lớp QHPK) không bắt chuột — click rơi xuống lô.
+  // Ranh đồ án khác vẫn bấm được khi phóng gần (khi chưa mở lô) để chuyển sang và fitBounds toàn ranh.
+  if (open || (!state.showProjects && p.name === state.focusedProject)) {
+    const shape = L.geoJSON(geom, { style, interactive: false, ...paneOpt });
+    return { shape, open, back: true };
+  }
+  const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false, ...paneOpt });
+  shape.bindTooltip(escapeHtml(outlineLabelOf(p)), { sticky: true, direction: 'top', className: 'dot-tip' });
+  shape.on('mouseover', () => setHover(m, p.name));
+  shape.on('mouseout', () => setHover(m, null));
+  shape.on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    openOutlineProject(p, m);
+    revealInList(p);
+  });
+  return { shape, open, back: focused };
 }
 
 // Ranh đồ án chưa mở lô bấm được cả khi phóng gần (kể cả đang chọn đồ án khác). Đồ án đã mở lô: ranh không bắt chuột.
@@ -2832,6 +2999,10 @@ function rebuild() {
   // Danh mục vừa tải lại (nhập / xóa đồ án): đọc lại lớp của các đồ án đang mở
   layerInfo.clear();
   [...expanded].forEach(name => { if (!names.has(name)) expanded.delete(name); });
+  shownMaps().forEach(m => {
+    clearOverlaps(m);
+    clearOutlineShapes(m);
+  });
   redrawOutlines();
   renderList();
   projects.filter(p => expanded.has(p.name)).forEach(p => loadLayers(p));
@@ -3453,7 +3624,10 @@ export function initProjectLayer(opts = {}) {
   };
   map?.on('zoomend', onHostZoom);
   planMap?.on('zoomend', onHostZoom);
-  [map, planMap].filter(Boolean).forEach(m => m.on('moveend zoomend', scheduleListForView));
+  [map, planMap].filter(Boolean).forEach(m => {
+    m.on('moveend zoomend', scheduleListForView);
+    m.on('moveend zoomend', scheduleOutlineForView);
+  });
   onCompareChange(redrawOutlines);
   onFacet((kind) => { if (kind === 'area') renderList(); });
   belowZoom = (() => {

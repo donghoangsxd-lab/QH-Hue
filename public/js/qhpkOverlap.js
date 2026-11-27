@@ -51,15 +51,36 @@ export function overlapTip(labelA, labelB, opts = {}) {
   return `Phạm vi thuộc đồ án QHPK ${xxx}, cần kiểm tra pháp lý theo đồ án được phê duyệt sau`;
 }
 
+function pushOverlap(rows, a, b, intersect, area, focusedName) {
+  if (!boxesHit(a.box, b.box)) return;
+  let geom = null;
+  try { geom = intersect(a.geom, b.geom); } catch { geom = null; }
+  if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+  const m2 = Number(area(geom)) || 0;
+  if (!(m2 > SLIVER_M2)) return;
+  rows.push({
+    geom,
+    m2,
+    names: [a.name, b.name],
+    tip: overlapTip(a.label || a.name, b.label || b.name, {
+      nameA: a.name,
+      nameB: b.name,
+      focusedName
+    })
+  });
+}
+
 /**
  * schemes: [{ name, label, level, geom }]. Chỉ cặp QHPK (hoặc không ghi level).
  * deps.intersect(geomA, geomB) → Polygon | MultiPolygon | null. deps.area(geom) → m².
+ * deps.onlyName: chỉ cặp chạm đồ án đó (O(n) thay vì O(n²)) — đủ cho hatch theo hover/focus.
  * Bỏ mảnh vụn ≤ 200 m². Trả về mảnh nhỏ trước để tooltip rê chuột lấy vùng hẹp hơn.
  */
 export function sameLevelOverlaps(schemes, deps) {
   const intersect = deps && deps.intersect;
   const area = deps && deps.area;
   const focusedName = (deps && deps.focusedName) || '';
+  const onlyName = (deps && deps.onlyName) || '';
   if (!intersect || !area) return [];
   const list = [];
   (schemes || []).forEach(s => {
@@ -68,26 +89,19 @@ export function sameLevelOverlaps(schemes, deps) {
     list.push({ ...s, box: bboxOf(s.geom) });
   });
   const rows = [];
-  for (let i = 0; i < list.length; i += 1) {
-    for (let j = i + 1; j < list.length; j += 1) {
-      const a = list[i];
-      const b = list[j];
-      if (!boxesHit(a.box, b.box)) continue;
-      let geom = null;
-      try { geom = intersect(a.geom, b.geom); } catch { geom = null; }
-      if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) continue;
-      const m2 = Number(area(geom)) || 0;
-      if (!(m2 > SLIVER_M2)) continue;
-      rows.push({
-        geom,
-        m2,
-        names: [a.name, b.name],
-        tip: overlapTip(a.label || a.name, b.label || b.name, {
-          nameA: a.name,
-          nameB: b.name,
-          focusedName
-        })
-      });
+  if (onlyName) {
+    const focus = list.find(s => s.name === onlyName);
+    if (!focus) return [];
+    for (let i = 0; i < list.length; i += 1) {
+      const other = list[i];
+      if (other.name === onlyName) continue;
+      pushOverlap(rows, focus, other, intersect, area, focusedName || onlyName);
+    }
+  } else {
+    for (let i = 0; i < list.length; i += 1) {
+      for (let j = i + 1; j < list.length; j += 1) {
+        pushOverlap(rows, list[i], list[j], intersect, area, focusedName);
+      }
     }
   }
   rows.sort((x, y) => x.m2 - y.m2);
