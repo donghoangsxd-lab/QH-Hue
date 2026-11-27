@@ -66,9 +66,10 @@ function buildSdd(fc) {
   for (const f of fc.features || []) {
     if (!f.geometry) continue;
     const p = f.properties || {};
-    // gisHue đôi khi cắt tên cột (chucnangsu ← chucnangsudungdat).
-    const label = text(p.chucnangsudungdat) || text(p.chucnangsu)
-      || text(p.loaidat) || text(p.tendoituong) || 'Khác';
+    // gisHue đôi khi cắt tên cột (chucnangsu ← chucnangsudungdat). Không dùng loaidat thuần số.
+    const loai = text(p.loaidat);
+    const label = text(p.chucnangsudungdat) || text(p.chucnangsu) || text(p.tendoituong)
+      || (loai && !/^\d+(\.\d+)?$/.test(loai) ? loai : '') || 'Khác';
     const i = labels.idx(label);
     const a = num(p.dientich, 1) || num(p.shape_area, 1);
     const t = Number(p.trangthai) === 1 ? 0 : 1;

@@ -91,7 +91,9 @@ function buildSdd(fc, phase = 'QH') {
   for (const f of fc.features || []) {
     if (!f.geometry) continue;
     const p = f.properties || {};
-    const label = text(p.chucnangsudungdat) || text(p.loaidat) || text(p.tendoituong) || 'Khác';
+    const loai = text(p.loaidat);
+    const label = text(p.chucnangsudungdat) || text(p.tendoituong)
+      || (loai && !/^\d+(\.\d+)?$/.test(loai) ? loai : '') || 'Khác';
     const i = labels.idx(label);
     const a = num(p.dientich, 1);
     const t = Number(p.trangthai) === 1 ? 0 : 1;

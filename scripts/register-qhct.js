@@ -292,8 +292,21 @@ function landUseFiles(lop, status) {
 }
 
 function lotLayer(props, fallback) {
-  const text = String(prop(props, 'chucnangsudungdat') || prop(props, 'loaidat') || prop(props, 'tendoituong') || fallback || '').trim();
-  return text.slice(0, 120);
+  const numeric = /^\d+(\.\d+)?$/;
+  const candidates = [
+    prop(props, 'chucnangsudungdat'),
+    prop(props, 'chucnangsu'),
+    prop(props, 'tendoituong'),
+    prop(props, 'loaidat'),
+    prop(props, 'ghichu'),
+    fallback
+  ];
+  for (const raw of candidates) {
+    const text = String(raw || '').trim();
+    if (!text || numeric.test(text)) continue;
+    return text.slice(0, 120);
+  }
+  return 'Khác';
 }
 
 function lotArea(feature) {

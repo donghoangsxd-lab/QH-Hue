@@ -31,6 +31,26 @@ assert.equal(lots[0].lotCode, 'GT-01');
 assert.equal(lots[0].area, 12.3);
 assert.equal(parcelsFromCollection(poly, 'HT')[0].phase, 'HT');
 
+const numericOnly = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    properties: { loaidat: '42', kyhieulodat: '1-O' },
+    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }
+  }]
+};
+assert.equal(parcelsFromCollection(numericOnly, 'QH')[0].layer, 'Khác');
+
+const numericWithNote = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    properties: { loaidat: '35', ghichu: 'Đất ở biệt thự' },
+    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }
+  }]
+};
+assert.equal(parcelsFromCollection(numericWithNote, 'QH')[0].layer, 'Đất ở biệt thự');
+
 assert.equal(
   linkedAssetHref('https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/a.geojson', '9'),
   '/gcs/chuyen-nganh/v1/a.geojson?v=9'

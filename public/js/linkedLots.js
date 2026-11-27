@@ -31,7 +31,17 @@ export function parcelsFromCollection(doc, phase) {
     const g = f && f.geometry;
     if (!g || !POLY.has(g.type)) return;
     n += 1;
-    const layer = prop(f.properties, ['chucnangsudungdat', 'loaidat', 'tendoituong']).slice(0, 120);
+    // Không lấy loaidat thuần số (gisHue) — TT16 không khớp → lô đen trên map.
+    const chu = prop(f.properties, ['chucnangsudungdat', 'chucnangsu', 'tendoituong']);
+    const loai = prop(f.properties, ['loaidat']);
+    const note = prop(f.properties, ['ghichu']);
+    const numeric = /^\d+(\.\d+)?$/;
+    let layer = '';
+    if (chu && !numeric.test(chu)) layer = chu;
+    else if (loai && !numeric.test(loai)) layer = loai;
+    else if (note && !numeric.test(note) && /đất|dat |nhóm|cay xanh|cây xanh|giao thông/i.test(note)) layer = note;
+    else layer = 'Khác';
+    layer = layer.slice(0, 120);
     const code = prop(f.properties, ['kyhieulodat', 'solo']).slice(0, 40);
     const area = Number(prop(f.properties, ['dientich']));
     const row = {

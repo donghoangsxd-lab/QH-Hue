@@ -36,6 +36,14 @@ const lands = landsFromFeatures([{ name: 'Đất ở', geometry: poly, props: { 
 assert.equal(lands.length, 1);
 assert.equal(lands[0].phase, 'QH');
 assert.equal(lands[0].layer, 'ODT');
+assert.equal(
+  landsFromFeatures([{ geometry: poly, props: { loaidat: '42' } }], 'QH')[0].layer,
+  'Khác'
+);
+assert.equal(
+  landsFromFeatures([{ geometry: poly, props: { loaidat: '17', chucnangsudungdat: 'Đất mặt nước' } }], 'QH')[0].layer,
+  'Đất mặt nước'
+);
 const boundary = boundaryFromFeatures([{ geometry: poly }, { geometry: poly }]);
 assert.equal(boundary.type, 'MultiPolygon');
 assert.equal(dxfCount({ parcels: [{ kind: 'DXF', phase: 'QH', geometry: poly }, { kind: 'DXF', phase: 'HT', geometry: poly }] }, 'QH'), 1);

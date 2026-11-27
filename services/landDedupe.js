@@ -52,13 +52,22 @@ function propText(props, keys) {
   return '';
 }
 
-/** Ưu tiên chức năng chữ; bỏ loaidat thuần số (gisHue) khi đã có chucnangsudungdat. */
+/** Mã loaidat gisHue thuần số không tô được TT16 → không dùng làm layer. */
+function isNumericLandCode(value) {
+  return /^\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+/** Ưu tiên chức năng chữ; bỏ loaidat thuần số (gisHue). Không fallback về số. */
 function landLayerOf(props) {
   const chu = propText(props, ['chucnangsudungdat', 'chucnangsu', 'tendoituong', 'loai', 'layer']);
-  if (chu && !/^\d+(\.\d+)?$/.test(chu)) return chu.slice(0, 120);
+  if (chu && !isNumericLandCode(chu)) return chu.slice(0, 120);
   const loai = propText(props, ['loaidat', 'loai', 'layer']);
-  if (loai && !/^\d+(\.\d+)?$/.test(loai)) return loai.slice(0, 120);
-  return chu.slice(0, 120) || loai.slice(0, 120);
+  if (loai && !isNumericLandCode(loai)) return loai.slice(0, 120);
+  const note = propText(props, ['ghichu']);
+  if (note && !isNumericLandCode(note) && /đất|dat |nhóm|cay xanh|cây xanh|giao thông/i.test(note)) {
+    return note.slice(0, 120);
+  }
+  return 'Khác';
 }
 
 function landsFromFeatures(features, phase) {

@@ -162,6 +162,21 @@ async function main() {
   const gcs = require('../services/gcsWrite');
   await gcs.putObject(GCS_KEY, Buffer.from(json), 'application/json', undefined, 180000);
   console.log(`GCS ${GCS_KEY}`);
+  // Bump saved trong projects/index.json để ?v= đổi — tránh CDN/trình duyệt giữ bản layer=số.
+  const got = await gcs.readJson('projects/index.json');
+  const entry = ((got && got.data && got.data.projects) || [])
+    .find((row) => row && row.slug === SLUG);
+  if (!entry) throw new Error('Không thấy đồ án trong projects/index.json');
+  entry.saved = Date.now();
+  entry.lands = parcels.length;
+  await gcs.putObject(
+    'projects/index.json',
+    Buffer.from(JSON.stringify(got.data)),
+    'application/json',
+    got.generation,
+    180000
+  );
+  console.log(`GCS projects/index.json saved=${entry.saved} lands=${entry.lands}`);
 }
 
 main().catch((err) => {

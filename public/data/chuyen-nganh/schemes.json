@@ -1125,6 +1125,101 @@
       "taskDecision": "936/QĐ-UBND",
       "taskDecisionDate": "2023-27-04",
       "decisionDate": "2023-27-04"
+    },
+    {
+      "slug": "qhpk-khu-vuc-dien-hoa-dien-loc-dinh-huong-thanh-lap-phuong-2179b27c",
+      "name": "QHPK   Khu vực Điền Hòa - Điền Lộc (Định hướng thành lập phường)",
+      "level": "QHPK",
+      "mapid": 20794,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phong-phu"
+      },
+      "taskDecision": "3235/QĐ-UBND",
+      "taskDecisionDate": "2022-12-10",
+      "decision": "254/QĐ-UBND",
+      "decisionDate": "2023-19-01",
+      "authority": "UBND tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-vuc-phong-hien-dinh-huong-thanh-lap-phuong-598cfb3b",
+      "name": "QHPK Khu vực Phong Hiền (định hướng thành lập phường)",
+      "level": "QHPK",
+      "mapid": 22832,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phong-thai"
+      },
+      "taskDecision": "3235/QĐ-UBND",
+      "taskDecisionDate": "2021-10-02",
+      "decision": "525/QĐ-UBND",
+      "decisionDate": "2024-04-03",
+      "authority": "ỦY BAN NHÂN DÂN TỈNH THỪA THIÊN HUẾ"
+    },
+    {
+      "slug": "qhpk-khu-vuc-phong-an-dinh-huong-thanh-lap-phuong-51480bc3",
+      "name": "QHPK Khu vực Phong An (Định hướng thành lập phường)",
+      "level": "QHPK",
+      "mapid": 22854,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phong-thai"
+      },
+      "taskDecision": "3245/QĐ-UBND",
+      "taskDecisionDate": "2021-10-12",
+      "decision": "139 /QĐ-UBND",
+      "decisionDate": "2024-10-01",
+      "authority": "UBND Tỉnh Thừa Thiên Huế"
+    },
+    {
+      "slug": "qhpk-khu-vuc-trung-tam-phong-dien-phong-thu-dinh-huong-thanh-7f55a7d8",
+      "name": "QHPK Khu vực Trung tâm Phong Điền – Phong Thu (định hướng thành lập phường)",
+      "level": "QHPK",
+      "mapid": 22831,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phong-dien"
+      },
+      "taskDecision": "3238/QĐ-UBND",
+      "taskDecisionDate": "2021-10-12",
+      "decision": "522 /QĐ-UBND",
+      "decisionDate": "2024-04-03",
+      "authority": "ỦY BAN NHÂN DÂN TỈNH THỪA THIÊN HUẾ"
+    },
+    {
+      "slug": "qhpk-quy-hoach-phan-khu-khu-vuc-phong-hoa-dinh-huong-thanh-l-8e72fc18",
+      "name": "QHPK Quy hoạch phân khu   Khu vực Phong Hòa (định hướng thành lập phường)",
+      "level": "QHPK",
+      "mapid": 22833,
+      "parent": null,
+      "overrides": [],
+      "priority": 2,
+      "scale": 2000,
+      "area": {
+        "type": "xa",
+        "code": "phong-dinh"
+      },
+      "taskDecision": "3239/QĐ-UBND",
+      "taskDecisionDate": "2021-10-12",
+      "decision": "523 /QĐ-UBND",
+      "decisionDate": "2024-04-03",
+      "authority": "ỦY BAN NHÂN DÂN TỈNH THỪA THIÊN HUẾ"
     }
   ]
 }

@@ -655,9 +655,9 @@
       "name": "QHPK Khu đô thị sinh thái Thanh Toàn",
       "mapid": 20772,
       "layer": "su-dung-dat",
-      "role": "quy-hoach",
       "path": "projects/qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b/su-dung-dat.json",
-      "lands": 210,
+      "role": "quy-hoach",
+      "lands": 217,
       "source": "projects"
     },
     {

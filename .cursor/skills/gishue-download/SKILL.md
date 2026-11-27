@@ -62,4 +62,23 @@ Theo tỷ lệ đồ án — **không** lẫn quy tắc:
 
 Cắt lô theo ranh (`SCHEME_EDGE_M` = 5 m trong `clip-scheme-lots`) **không** phải simplify — vẫn dùng được ở mọi cấp. Không viết `build-qhpk-*` / `build-qhct-*` copy pipeline slim của QHC. Không gọi `simplify` trên lớp QHPK/QHCT trong import hay post-process.
 
+### Màu lô SDD / `projects/*/su-dung-dat.json` (bắt buộc)
+
+App tô lô bằng TT16 từ trường **`layer`** (chuỗi tên chức năng tiếng Việt), không phải mã số.
+
+| Trường gisHue | Dùng làm `layer`? | Ghi chú |
+|---|---|---|
+| `chucnangsudungdat` / `chucnangsu` (cột bị cắt tên) | **Có** — ưu tiên | Ví dụ «Đất nhóm nhà ở», «Đất giao thông» |
+| `tendoituong`, `ghichu` (nếu là nhãn đất) | Có — fallback | |
+| `loaidat` **thuần số** (`17`, `42`, …) | **Cấm** | TT16 không khớp → cả đồ án một màu xám/đen (lỗi kiểu QHPK Thanh Toàn) |
+| `kyhieulodat` | `lotCode` / `name`, không thay `layer` | |
+
+Khi ghi hoặc rebuild `projects/<slug>/su-dung-dat.json` (và `hien-trang.json` lô):
+
+1. `layer` = nhãn chữ; nếu chỉ còn `loaidat` số thì `'Khác'` (hoặc dictionary nhãn), **không** ghi số vào `layer`.
+2. Code đường tô: `services/landDedupe.js` `landLayerOf`, `public/js/linkedLots.js` `parcelsFromCollection`, `scripts/register-qhct.js` `lotLayer`, pipeline `build-qhc-*.mjs`.
+3. Đồ án cũ đã đen trên bucket: `node scripts/fix-numeric-sdd-layers.mjs` (dry-run) rồi `--upload` — rebuild từ `.cache/gishue/<mapid>/*chucnang*|sudungdat*.json`, bump `projects/index.json` `saved`/`lands`. Một đồ án: `scripts/fix-qhpk-thanh-toan-sdd.mjs`.
+4. Sau import QHPK/QHCT, nếu mở đồ án mà SDD một màu tối: nghi `layer` số → chạy fix ở (3), không đoán style CSS.
+5. Sửa **chỉ trên GCS** (`projects/…`) thì **không** cần commit/push git; commit khi đổi script/skill/catalog repo.
+
 Chỉ khi lệnh thoát lỗi mới đọc `scripts/gserver-page-fetch.js`, `scripts/gserver-to-shp.js`, `scripts/clip-scheme-lots.mjs`. Không tự mở geditor.
