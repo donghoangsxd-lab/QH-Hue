@@ -1242,7 +1242,9 @@ function scheduleListForView() {
 }
 
 let outlineViewTimer = 0;
-/** Pan/zoom: chỉ vẽ lại ranh khi tập đồ án trong khung đổi (cull viewport). */
+const LABEL_LAYOUT_MS = 120;
+const labelLayoutTimers = new WeakMap();
+/** Pan/zoom: một pipeline — cull ranh + xếp nhãn (không gọi layoutLabels sync trên mỗi zoomend). */
 function scheduleOutlineForView() {
   clearTimeout(outlineViewTimer);
   outlineViewTimer = setTimeout(() => {
@@ -2098,8 +2100,8 @@ function geomBounds(geom) {
   return b;
 }
 
-// Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn. Đồ án cùng cấp lớp droplist
-// (QHC khi xem QHC 1/10.000) luôn có nhãn, ưu tiên trước. Chạy lại mỗi lần zoom.
+// Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn.
+// Cùng cấp droplist được ưu tiên sort — vẫn lọc theo kích thước pixel (không force bỏ lọc mỗi zoom).
 function layoutLabels(m) {
   const old = labelGroups.get(m);
   if (old) {
@@ -2111,6 +2113,9 @@ function layoutLabels(m) {
   if (!list.length || typeof turf === 'undefined') return;
   const cands = [];
   const scope = levelScope();
+  let size;
+  try { size = m.getSize(); } catch { size = null; }
+  const pad = 40;
   try {
     list.forEach(p => {
       const geom = shownOutline(p);
@@ -2122,11 +2127,13 @@ function layoutLabels(m) {
       const bw = se.x - nw.x;
       const bh = se.y - nw.y;
       const w = labelWidth(p.short);
-      const force = !!scope && p.level === scope;
-      if (!force && (bw < w * 0.75 || bh < LABEL_H * 1.5)) return;
+      // Ưu tiên cấp đang xem khi xếp chồng — vẫn ẩn khi khung ranh quá nhỏ.
+      const prefer = !!scope && p.level === scope;
+      if (bw < w * 0.75 || bh < LABEL_H * 1.5) return;
       const c = m.latLngToContainerPoint(at);
+      if (size && (c.x < -pad || c.y < -pad || c.x > size.x + pad || c.y > size.y + pad)) return;
       cands.push({
-        p, at, size: bw * bh, force,
+        p, at, size: bw * bh, force: prefer,
         box: [c.x - w / 2 - LABEL_GAP, c.y - LABEL_H / 2 - LABEL_GAP, c.x + w / 2 + LABEL_GAP, c.y + LABEL_H / 2 + LABEL_GAP]
       });
     });
@@ -2142,6 +2149,17 @@ function layoutLabels(m) {
   });
   group.addTo(m);
   labelGroups.set(m, group);
+}
+
+/** Coalesce xếp nhãn sau pan/zoom — tránh chặn nấc bánh xe. */
+function scheduleLayoutLabels(m) {
+  if (!m) return;
+  const prev = labelLayoutTimers.get(m);
+  if (prev) clearTimeout(prev);
+  labelLayoutTimers.set(m, setTimeout(() => {
+    labelLayoutTimers.delete(m);
+    layoutLabels(m);
+  }, LABEL_LAYOUT_MS));
 }
 
 // ============================ VIỀN SÁNG KHI RÊ / BẤM TÊN ============================
@@ -2803,7 +2821,7 @@ function drawOutlinesOn(m, rawList, below) {
 
   if (!zoomHooked.has(m)) {
     zoomHooked.add(m);
-    m.on('zoomend', () => layoutLabels(m));
+    // Nhãn xếp qua scheduleOutlineForView / scheduleLayoutLabels — không sync trên mỗi zoomend.
     hookHover(m);
   }
   labelLists.set(m, list);
@@ -2811,14 +2829,14 @@ function drawOutlinesOn(m, rawList, below) {
   const sig = list.map(p => outlineEntrySig(p, lotsOpen(p))).join('|')
     + `|b${below ? 1 : 0}|q${quietOutline ? 1 : 0}|s${state.showProjects ? 1 : 0}`;
   if (outlineDrawSig.get(m) === sig && outlineGroups.has(m)) {
-    // Pan không đổi tập ranh: chỉ xếp lại nhãn theo pixel; không đụng GeoJSON / overlap.
-    layoutLabels(m);
+    // Pan/zoom không đổi tập ranh: chỉ xếp lại nhãn (debounce), không đụng GeoJSON / overlap.
+    scheduleLayoutLabels(m);
     performance.mark?.('qhpk-outlines-end');
     performance.measure?.('qhpk-outlines', 'qhpk-outlines-start', 'qhpk-outlines-end');
     return;
   }
   outlineDrawSig.set(m, sig);
-  layoutLabels(m);
+  scheduleLayoutLabels(m);
 
   let group = outlineGroups.get(m);
   let byName = outlineShapeMaps.get(m);
@@ -3603,6 +3621,7 @@ export function initProjectLayer(opts = {}) {
     const host = viewHost();
     return host ? host.getZoom() >= PLACE_DETAIL_ZOOM : null;
   })();
+  let openLotsTimer = 0;
   const onHostZoom = () => {
     const host = viewHost();
     if (!host) return;
@@ -3613,10 +3632,16 @@ export function initProjectLayer(opts = {}) {
     if (!crossedParcel && !crossedPlace) return;
     belowZoom = below;
     placeZoom = place;
-    // Zoom lớn trên QHC / QHPK / QHCT: mở lô tại tâm khung, không chờ bấm ranh rồi fitBounds toàn đồ án.
+    // Zoom lớn trên QHC / QHPK / QHCT: mở lô tại tâm — defer để không chặn nấc bánh xe.
     if (place && crossedPlace) {
       const kind = levelKeyOf(getLevel());
-      if (kind) openLotsAtView(kind);
+      if (kind) {
+        clearTimeout(openLotsTimer);
+        openLotsTimer = setTimeout(() => {
+          openLotsTimer = 0;
+          openLotsAtView(kind);
+        }, 150);
+      }
     }
     // QHC / QHCT tắt lớp QHPK (showProjects = false) nhưng ranh cấp đang chọn vẫn phải vẽ lại khi qua ngưỡng lô
     redrawOutlines();

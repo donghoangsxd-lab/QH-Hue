@@ -282,7 +282,7 @@ export function initMap() {
   map.on('moveend', () => {
     refreshLeftSoon();
     scheduleLots();
-    if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+    scheduleRedrawLands();
   });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
   onChangeLots(() => { redrawParcels(); redrawLands(); });
@@ -319,7 +319,7 @@ function ensurePlanHooks() {
   planMap.on('zoomend', refreshMeasureSnap);
   planMap.on('moveend', () => {
     refreshPlanSoon();
-    if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+    scheduleRedrawLands();
   });
 }
 
@@ -327,6 +327,16 @@ function ensurePlanHooks() {
 const debounce = (fn, ms) => { let t = null; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
 const refreshLeftSoon = debounce(() => { leftRenderer.refreshPoints(); leftRenderer.refreshBuffers(); }, 60);
 const refreshPlanSoon = debounce(() => { planRenderer.refreshPoints(); planRenderer.refreshBuffers(); }, 60);
+/** moveend sau wheel: debounce redrawLands để không chặn nấc bánh xe trên trục B. */
+let landsViewTimer = 0;
+function scheduleRedrawLands() {
+  if (!(state.projectInfraLots.length || state.landParcels.length)) return;
+  clearTimeout(landsViewTimer);
+  landsViewTimer = setTimeout(() => {
+    landsViewTimer = 0;
+    if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+  }, 120);
+}
 
 function handleCompareChange(on) {
   ensurePlanHooks();

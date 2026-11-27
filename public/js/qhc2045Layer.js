@@ -317,8 +317,23 @@ function drawRoads(scale) {
   }
   const group = L.featureGroup(passes);
   group.feats = feats;
+  layers[`road${scale}`] = group.addTo(m);
+  paintRoadShields(scale);
+}
+
+/** Chỉ cập nhật tem CT/QL/ĐT theo zoom — không drop/recreate geom đường (zoomend wheel). */
+function paintRoadShields(scale) {
+  const group = layers[`road${scale}`];
+  const m = active?.m;
+  if (!group?.feats || !m) return;
+  const focus = roadFocus[scale];
+  const doomed = [];
+  group.eachLayer((layer) => {
+    if (layer instanceof L.Marker) doomed.push(layer);
+  });
+  doomed.forEach((layer) => group.removeLayer(layer));
   const labelPane = ensureRoadLabelPane(m);
-  pickRouteShields(feats, m.getZoom(), { focusKey: focus }).forEach(({ shield, lnglat }) => {
+  pickRouteShields(group.feats, m.getZoom(), { focusKey: focus }).forEach(({ shield, lnglat }) => {
     L.marker([lnglat[1], lnglat[0]], {
       icon: roadShieldIcon(shield),
       interactive: false,
@@ -326,7 +341,6 @@ function drawRoads(scale) {
       pane: labelPane
     }).addTo(group);
   });
-  layers[`road${scale}`] = group.addTo(m);
 }
 
 const loadRoads = (scale) => loadTraffic(scale)
@@ -1520,10 +1534,10 @@ export function initQhc2045Layer() {
       if (bare) setLand(true);
     }
     if (!host._animatingZoom && data.vision && qhcOn(host, 'qhc25', 'chk_qhc25') && !layers.vision) setVision(true);
-    // Tem CT/QL/ĐT theo zoom (ẩn ĐT khi xa, hiện khi phóng gần)
+    // Tem CT/QL/ĐT theo zoom — chỉ đổi shield, không rebuild mạng đường mỗi nấc bánh xe.
     if (!host._animatingZoom) {
       ['10', '25'].forEach(scale => {
-        if (active.layers[`road${scale}`] && $(ROAD_CHK[scale])?.checked) drawRoads(scale);
+        if (layers[`road${scale}`] && $(ROAD_CHK[scale])?.checked) paintRoadShields(scale);
       });
     }
   };
