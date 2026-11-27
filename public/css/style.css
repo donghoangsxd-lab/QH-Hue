@@ -1615,6 +1615,9 @@ body.plan-info-open #planInfoSlot .leaflet-popup-content {
 }
 .leaflet-qhpkOverlap-pane,
 .leaflet-qhpkOverlap-pane canvas { pointer-events: none; }
+/* Ranh QHPK z 405 trên lô: khi đã mở lô, canvas con không được ghi đè pointer-events của pane. */
+.leaflet-projectOutline-pane.outline-lots-open,
+.leaflet-projectOutline-pane.outline-lots-open canvas { pointer-events: none !important; }
 .rp-sheet-handle { display: none; }
 
 .rp-collapse-btn {

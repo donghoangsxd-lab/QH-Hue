@@ -825,12 +825,15 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
   assert.doesNotMatch(drawOut, /open \|\| !below/);
   assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
-  // Ranh trên canvas lô (z 405 > overlay 400); đã mở lô thì tắt pointer-events để click xuống lô.
+  // Ranh trên canvas lô (z 405 > overlay 400); đã mở lô thì tắt pointer-events pane + canvas (tránh con ghi đè).
   assert.match(pl, /projectOutlinePane/);
   assert.match(pl, /OUTLINE_Z = 405/);
-  assert.match(drawOut, /pointerEvents = lotsDrawn \? 'none'/);
+  assert.match(pl, /function syncOutlinePointer/);
+  assert.match(pl, /outline-lots-open/);
+  assert.match(drawOut, /syncOutlinePointer\(m, lotsDrawn\)/);
   assert.match(drawOut, /lotsDrawn = list\.some\(lotsOpen\)/);
   assert.doesNotMatch(drawOut, /lotsDrawn = list\.some\(lotsOpen\) \|\| state\.lotProjects\.size/);
+  assert.match(read('public/css/style.css'), /leaflet-projectOutline-pane\.outline-lots-open/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
 }

@@ -1752,7 +1752,7 @@ const flat = (s) => foldText(s).replace(/[^a-z0-9]+/g, '');
 
 function lotTypeLabel(lot) {
   // Cùng ưu tiên nhãn TT16 như thẻ Chức năng SDĐ (không lấy nhóm thống kê «Đất ở»).
-  return TT16_STYLES[landPatternKey(lot.layer, lot.name)]?.label || lot.nhom || landLabel(lot.layer);
+  return TT16_STYLES[landPatternKey(lot.layer, lot.name || lot.lotCode)]?.label || lot.nhom || landLabel(lot.layer);
 }
 
 function lotEntry(tenQH, lot) {
@@ -2746,6 +2746,19 @@ function outlineRenderer(m) {
   return r;
 }
 
+/**
+ * Ranh z 405 trên canvas lô (400). Canvas con có thể pointer-events:auto dù pane none
+ * (CSS cho phép hậu duệ ghi đè) → nuốt hover/click lô. Tắt cả pane + container canvas.
+ */
+function syncOutlinePointer(m, lotsDrawn) {
+  const pane = ensureOutlinePane(m);
+  const pe = lotsDrawn ? 'none' : '';
+  pane.style.pointerEvents = pe;
+  pane.classList.toggle('outline-lots-open', !!lotsDrawn);
+  const canvas = outlineRenderers.get(m)?._container;
+  if (canvas) canvas.style.pointerEvents = pe;
+}
+
 function lotsOpenOf(p) {
   if (p.level === 'QHPK' || p.level === 'QHCT') {
     return schemeDetailOpen(p.name, state.focusedProject, state.lotProjects, state.hiddenProjects);
@@ -2813,11 +2826,12 @@ function drawOutlinesOn(m, rawList, below) {
   performance.mark?.('qhpk-outlines-start');
   const list = cullOutlinesForView(rawList || [], m);
   const lotsOpen = lotsOpenOf;
-  const outlinePane = ensureOutlinePane(m);
-  // Chỉ khi đồ án trong list đang mở lô mới tắt pane — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
+  // Chỉ khi đồ án trong list đang mở lô mới tắt hit ranh — không lấy cả lotProjects (cấp khác) kẻo khóa click ranh QHPK.
   // Chuyển đồ án lân cận khi pane tắt: map click → leaveScopeFocus → trySwitchProjectAt.
   const lotsDrawn = list.some(lotsOpen);
-  outlinePane.style.pointerEvents = lotsDrawn ? 'none' : '';
+  // Tạo renderer sớm; sync lại cuối hàm sau khi Leaflet gắn _container canvas.
+  outlineRenderer(m);
+  syncOutlinePointer(m, lotsDrawn);
 
   if (!zoomHooked.has(m)) {
     zoomHooked.add(m);
@@ -2830,6 +2844,7 @@ function drawOutlinesOn(m, rawList, below) {
     + `|b${below ? 1 : 0}|q${quietOutline ? 1 : 0}|s${state.showProjects ? 1 : 0}`;
   if (outlineDrawSig.get(m) === sig && outlineGroups.has(m)) {
     // Pan/zoom không đổi tập ranh: chỉ xếp lại nhãn (debounce), không đụng GeoJSON / overlap.
+    syncOutlinePointer(m, lotsDrawn);
     scheduleLayoutLabels(m);
     performance.mark?.('qhpk-outlines-end');
     performance.measure?.('qhpk-outlines', 'qhpk-outlines-start', 'qhpk-outlines-end');
@@ -2887,6 +2902,8 @@ function drawOutlinesOn(m, rawList, below) {
   updateGlow(m);
   // Chỉ đăng ký geom + hatch theo focus (O(n)); không còn pairwise O(n²) mỗi lần vẽ.
   paintQhpkOverlaps(m, list);
+  // Sau addLayer: canvas đã có _container — bắt buộc sync lại (lần đầu dễ sót).
+  syncOutlinePointer(m, lotsDrawn);
   performance.mark?.('qhpk-outlines-end');
   performance.measure?.('qhpk-outlines', 'qhpk-outlines-start', 'qhpk-outlines-end');
 }
