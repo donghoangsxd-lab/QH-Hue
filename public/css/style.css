@@ -5830,7 +5830,7 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   pointer-events: all !important;
 }
 
-/* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
+/* Biểu đồ tròn (mapEngine gắn ward-pie-mode chỉ khi có pie): ẩn tên rời. Tắt Aa (#btnWardNames) cũng ẩn. */
 .ward-pie-mode .ward-label-text, .ward-names-off .ward-label-text { display: none; }
 .ward-pie-icon { background: transparent !important; border: none !important; }
 .ward-pie-name {
@@ -6151,8 +6151,54 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   background: rgba(245, 158, 11, 0.2); color: #fde68a;
 }
 .invest-card .invest-head .lp-title { padding-right: 0; margin-top: 2px; }
-.invest-card .lp-metrics { margin-top: 8px; }
-.invest-card .lp-landuse { margin-top: 6px; }
+/* Lưới 2×2 cùng kiểu thẻ lô trục B. */
+.invest-card .lp-metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px;
+}
+.invest-card .lp-metric {
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 6px;
+  border-radius: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft);
+}
+.invest-card .lp-metric-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px;
+}
+.invest-card .lp-metric-ico .ico { width: 12px; height: 12px; margin: 0; }
+.invest-card .lp-metric-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.invest-card .lp-metric-body small {
+  color: var(--text-muted); font-size: 9px; font-weight: 600; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.invest-card .lp-metric-body b {
+  color: #fff; font-size: 12px; font-weight: 700; line-height: 1.25;
+  white-space: normal; overflow: visible; overflow-wrap: break-word;
+}
+.invest-card .lp-metric-area .lp-metric-ico { color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.14); }
+.invest-card .lp-metric-cover .lp-metric-ico { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); }
+.invest-card .lp-metric-floors .lp-metric-ico { color: var(--accent-purple); background: rgba(var(--purple-rgb), 0.14); }
+.invest-card .lp-metric-far .lp-metric-ico { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); }
+.invest-card .lp-landuse,
+.invest-card .invest-place {
+  display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; padding: 4px 7px;
+  border-radius: 6px; background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(var(--cyan-rgb), 0.22);
+}
+.invest-card .lp-landuse-text {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+}
+.invest-card .lp-landuse-text small {
+  flex: none; color: var(--text-muted); font-size: 9px; font-weight: 600; white-space: nowrap;
+}
+.invest-card .lp-landuse-text b {
+  width: 100%; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3;
+  white-space: normal; overflow: visible; overflow-wrap: break-word;
+}
+.invest-card .lp-landuse-ico {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px; color: var(--accent-cyan);
+  background: rgba(var(--cyan-rgb), 0.12);
+}
+.invest-card .lp-landuse-ico .ico { width: 11px; height: 11px; margin: 0; }
 .invest-switch {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
   margin-top: 6px; padding-right: 0;
@@ -8920,6 +8966,7 @@ body.project-review.la-page #projectReviewHost {
 .leaflet-div-icon.htkt-pin,
 .leaflet-marker-icon.htkt-pin { background: transparent; border: 0; outline: none; }
 .leaflet-marker-icon.htkt-pin:focus { outline: none; }
+.htkt-pin .htkt-tt16 { width: 100%; height: 100%; display: block; }
 .htkt-pin .htkt-drop {
   display: block; width: 100%; height: 100%;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));

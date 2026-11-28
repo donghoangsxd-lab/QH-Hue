@@ -10,13 +10,11 @@
 //      không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung. Bấm ngoài vùng lõi tạm thu lô về đường bao;
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
-//    - QHPK 1/2.000: nhìn rộng chỉ ranh; bấm ranh / tick mới tải lô. Zoom ≥ PLACE_DETAIL_ZOOM (hoặc đang
-//      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn; bấm lại ranh đồ án đang mở giữ khung.
-//      Đang chọn A: bấm ranh / nền trong B cùng cấp → chọn B và fitBounds toàn ranh (không cần Esc).
-//      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
-//      Esc / × / bấm ngoài ranh khi đang info: về xem ranh (bỏ lô). Bấm lô: sang chế độ lô phẳng.
+//    - QHPK 1/2.000: mở tab chỉ ranh; bấm ranh / tên → info; tick → lô phẳng. Không tự mở đồ án tại tâm.
+//      Đang info: bấm ranh / nền trong B cùng cấp → chọn B (trySwitch); Esc / × / bấm ngoài → chỉ ranh.
+//      Bấm lô: sang chế độ lô phẳng. Quay lại info: bấm tên trong list (không tự mở từ nền).
 //      Bỏ chọn đồ án (bỏ tick, tắt cả cấp): giữ tâm và mức phóng, không centerOnCity.
-//    - QHCT 1/500: nhìn rộng ranh + tên; tick / bấm → chi tiết. Zoom lớn: mở lô tại khung như QHPK.
+//    - QHCT 1/500: mở tab chỉ ranh + tên; tick / bấm ranh·tên như QHPK (không tự mở lô theo zoom).
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới. Thoát về lớp gốc nếu có, giữ nguyên khung nhìn.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
@@ -26,7 +24,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, exitProjectToBoundary, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt, tryEnterProjectInfoAt } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, exitProjectToBoundary, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
@@ -113,12 +111,10 @@ function onLevelChange({ level, prev, keepView }) {
   }
   // Tab kiểm tra (thửa / vùng đo / ranh dự án F): applyInspectLevel tự hiện lô; không openLotsAtView
   // (shareOpenProject → revealInList bấm trục B, đóng thẻ dự án đang xem).
+  // QHPK / QHCT: chỉ ranh khi mở tab — không openLotsAtView (tránh tự chọn đồ án giữa khung + treo click).
   if (level === 'qhpk') {
     setQhcPlaceMode(false);
-    if (!inspectSync) {
-      if (!state.focusedProject) revealWardProjects(ward);
-      if (viewingPlace()) openLotsAtView('QHPK');
-    }
+    if (!inspectSync && !state.focusedProject) revealWardProjects(ward);
     syncEscHint();
     return;
   }
@@ -130,7 +126,7 @@ function onLevelChange({ level, prev, keepView }) {
     setCoreOpen(true);
     if (place && !inspectSync) openLotsAtView('QHC');
   }
-  if (level === 'qhct' && viewingPlace() && !inspectSync) openLotsAtView('QHCT');
+  // level === 'qhct': không openLotsAtView — cùng luật QHPK (tick / bấm ranh·tên).
   // keepView (bấm QHC 1/25.000 hoặc 1/10.000): giữ nguyên khung nhìn, không phóng ra toàn thành phố.
   // Địa điểm cụ thể: giữ khung. Bấm đô thị trung tâm (không keepView) vẫn phóng tới vùng trung tâm.
   if (place || level !== 'qhc10' || state.focusedProject || keepView || inspectSync) {
@@ -314,7 +310,8 @@ function leaveProject() {
   syncEscHint();
 }
 
-// Bấm nền: info mode → chuyển đồ án lân cận (kể cả chồng/lồng) hoặc thoát info; lot mode → vào info nếu trúng ranh.
+// Bấm nền: info mode → chuyển đồ án lân cận (kể cả chồng/lồng) hoặc thoát info.
+// Chế độ lô phẳng / chỉ ranh: không tự mở info từ nền (ui-spec: quay lại info bằng bấm tên trong list).
 function leaveScopeFocus(latlng) {
   if (state.focusedProject) {
     // Thử switch trước (đồ án nhỏ nhất tại điểm) — không chờ «ngoài» focused, tránh kẹt khi ranh chồng.
@@ -323,10 +320,6 @@ function leaveScopeFocus(latlng) {
       return;
     }
     if (!projectContains(state.focusedProject, latlng)) leaveProject();
-    syncEscHint();
-    return;
-  }
-  if (tryEnterProjectInfoAt(latlng)) {
     syncEscHint();
     return;
   }

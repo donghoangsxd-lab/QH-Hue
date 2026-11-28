@@ -1987,6 +1987,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     if (m) showCityOutline(m, false);
   };
 
+  /** @returns {boolean} true khi đã vẽ ít nhất một pie (mới gắn ward-pie-mode; pie rỗng không được ẩn tem Aa). */
   function renderPies(m) {
     const cityPie = m.getZoom() <= CITY_PIE_MAX_ZOOM;
     showCityOutline(m, cityPie);
@@ -1994,7 +1995,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const label = scenarioLabel();
     const key = `${listSeq}|${activeTypes.join(',')}|${state.wardLabelsList.length}|${label}|${cityPie}`;
     if (!m.hasLayer(pieGroup)) pieGroup.addTo(m);
-    if (key === pieKey) return;
+    if (key === pieKey) return pieGroup.getLayers().length > 0;
     pieKey = key;
     pieGroup.clearLayers();
 
@@ -2014,10 +2015,10 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       const cityCounts = {};
       byWard.forEach(counts => Object.entries(counts).forEach(([t, n]) => { cityCounts[t] = (cityCounts[t] || 0) + n; }));
       const total = Object.values(cityCounts).reduce((s, n) => s + n, 0);
-      if (!total) return;
+      if (!total) return false;
       const { center } = cityShapeOf(state.wardLabelsList);
       pieGroup.addLayer(createWardPie({ name: CITY_NAME, ...center }, orderedOf(cityCounts), total, CITY_PIE_PX, m, label, true));
-      return;
+      return true;
     }
     const totals = new Map([...byWard].map(([name, counts]) => [name, Object.values(counts).reduce((s, n) => s + n, 0)]));
     const maxTotal = Math.max(1, ...totals.values());
@@ -2028,6 +2029,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       const size = Math.round(PIE_MIN_PX + (PIE_MAX_PX - PIE_MIN_PX) * Math.sqrt(total / maxTotal));
       pieGroup.addLayer(createWardPie(ward, orderedOf(counts), total, size, m, label));
     });
+    return pieGroup.getLayers().length > 0;
   }
 
   const removeEntry = (entry) => {
@@ -2054,17 +2056,22 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     };
     const zoom = m.getZoom();
     const pieZoom = zoom <= PIE_MAX_ZOOM || (zoom < PIE_CLICK_ZOOM && tooMany());
+    // Chỉ gắn ward-pie-mode khi có pie thật. Zoom thành phố trên trục A (không lớp HTXH) từng để
+    // pie rỗng + class này → CSS ẩn .ward-label-text trong khi nền tô ĐVHC/đô thị vẫn hiện.
     if (pieZoom && !wardSelected && state.wardLabelsList.some(w => w.geometry)) {
-      if (mode !== 'pie') {
-        clearPoints();
-        mode = 'pie';
-        parcelsOn = false;
+      if (renderPies(m)) {
+        if (mode !== 'pie') {
+          clearPoints();
+          mode = 'pie';
+          parcelsOn = false;
+        }
         m.getContainer().classList.add('ward-pie-mode');
+        return;
       }
-      renderPies(m);
-      return;
-    }
-    if (mode === 'pie') {
+      // renderPies có thể đã add pieGroup / outline rồi trả false — gỡ sạch.
+      clearPies();
+      m.getContainer().classList.remove('ward-pie-mode');
+    } else if (mode === 'pie') {
       clearPies();
       m.getContainer().classList.remove('ward-pie-mode');
     }

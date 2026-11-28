@@ -1,4 +1,4 @@
-// Ký hiệu điểm HTKT: giọt nước cùng mô típ HTXH / đầu tư (thân màu ngành + vòng trắng + glyph).
+// Ký hiệu điểm HTKT: giọt nước (ngành khác) + ký hiệu điểm GT theo TT16/2025/TT-BXD Phụ lục HTKT_GT_*.
 import { foldName, isHydrantLayer } from './htktModel.js';
 
 export const DROP_PATH = 'M35 2C16.8 2 2 16.8 2 35c0 21 24 41 31 57a2.2 2.2 0 004 0c7-16 31-36 31-57C68 16.8 53.2 2 35 2z';
@@ -8,10 +8,7 @@ const GLYPH = {
   water: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5s5.2 5.4 5.2 9.1a5.2 5.2 0 0 1-10.4 0C6.8 8.9 12 3.5 12 3.5z"/><path d="M9.2 13.2c.8 1.4 2.2 2.1 2.8 2.1"/></g>',
   bolt: '<path fill="C" stroke="E" stroke-width="0.8" stroke-linejoin="round" d="M13.2 2.2 5.2 13.4h6L10.4 21.8 19 10.4h-6.2z"/>',
   road: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M9 3.2 5.6 20.8M15 3.2l3.4 17.6"/><path d="M12 5.2v2.4M12 11v2.4M12 16.8v2.4"/></g>',
-  // Đồng bộ chữ P với icons/Parking.png (HTXH 2-BDX).
   parking: '<text x="12" y="17.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="C">P</text>',
-  // Thuyền buồm (thân + hai cánh) — rõ hơn glyph đường khi điểm là bến thuyền / bến đò.
-  boat: '<g fill="C" stroke="E" stroke-width="0.7" stroke-linejoin="round"><path d="M5 17.6h14l-1.1 2.2H6.1z"/><path d="M11.2 4.2v13"/><path d="M11.2 5.2 18.4 15.4H11.2z"/><path d="M11.2 8.2 6.2 15.4h5z"/></g>',
   drain: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.2h16M6.2 7.2c0 5.2 1.8 7.2 5.8 7.2s5.8-2 5.8-7.2"/><path d="M12 14.4v5.2M9.2 17.2 12 20.2l2.8-3"/></g>',
   wastewater: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><rect x="5" y="8" width="14" height="10" rx="1.4"/><path d="M8 8V6.2h8V8M8 13h3.2M12.8 13H16"/><circle cx="12" cy="18.6" r="1.1" fill="C" stroke="none"/></g>',
   waste: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M8.2 8.2h7.6l-.8 11.2H9z"/><path d="M7 8.2h10M10 8.2V6.4h4v1.8M10.8 11.2v5.2M13.2 11.2v5.2"/></g>',
@@ -46,6 +43,32 @@ const WATER_STATUS = {
   giu: { fill: '#0369a1', edge: '#0c4a6e' }
 };
 
+// ACI phụ lục TT16: 7 = đen trên nền sáng; 5 = xanh; 12 = đỏ (đường sắt).
+const TT16_ACI = {
+  7: '#1a1a1a',
+  5: '#0000ff',
+  12: '#dc2626'
+};
+
+/** Pictogram trong khung TT16 (viewBox 32×32). Không tự chế — theo bảng HTKT_GT_Benxe / Tramxang / Tuynen / Bencang / Duongsat. */
+const TT16_PIC = {
+  // HTKT_GT_Benxe — bến xe khách (xe bus nghiêng cạnh)
+  benxe: '<g fill="none" stroke="C" stroke-width="1.6" stroke-linejoin="round"><rect x="7" y="11" width="18" height="9" rx="2.2"/><path d="M9 11V9.2h10.5c1.2 0 2.2.7 2.6 1.8"/><circle cx="11.2" cy="20.4" r="1.7"/><circle cx="20.8" cy="20.4" r="1.7"/><path d="M10 14h4.5M16.2 14h5"/></g>',
+  // HTKT_GT_Benxe — bến xe tải
+  benxe_tai: '<g fill="none" stroke="C" stroke-width="1.6" stroke-linejoin="round"><rect x="6.5" y="11.5" width="12" height="8" rx="1"/><path d="M18.5 13.5h4.2l2.3 3.2v3h-6.5z"/><circle cx="10.2" cy="21.2" r="1.7"/><circle cx="21.5" cy="21.2" r="1.7"/><path d="M8.2 14.2h7"/></g>',
+  // HTKT_GT_Benxe — bãi đỗ xe
+  parking: '<text x="16" y="21.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="C">P</text>',
+  // HTKT_GT_Tramxang
+  tramxang: '<g fill="none" stroke="C" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="9" y="8.5" width="9.5" height="14" rx="1.2"/><path d="M12 8.5V7h3.5v1.5"/><path d="M18.5 12h2.2c1.1 0 2 .9 2 2v4.5"/><circle cx="22.7" cy="19.2" r="1.3"/><path d="M11.2 12.2h5.2M11.2 15.2h5.2"/></g>',
+  // HTKT_GT_Tuynen
+  tuynen: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M8 12h16M8 20h16M8 12v8M24 12v8"/></g>',
+  // Neo dùng chung HTKT_GT_Bencang
+  _anchor: '<g fill="none" stroke="C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="10.2" r="1.6"/><path d="M16 11.8v9.2"/><path d="M16 17.2c-3.2 0-5.2 2-5.2 4.2M16 17.2c3.2 0 5.2 2 5.2 4.2"/><path d="M12.2 14.5h7.6"/></g>',
+  // Nhà ga / bến đỗ đường sắt — ghi chú «G»; ga ngầm «M»
+  ga: '<text x="16" y="21.5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="C">G</text>',
+  ga_ngam: '<text x="16" y="21.5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="C">M</text>'
+};
+
 function darken(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
   if (!m) return '#334155';
@@ -56,17 +79,110 @@ function darken(hex) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-function facilityGlyph(layer, props) {
-  const t = foldName([
-    props && props.tencongtrinh,
+function propBlob(layer, props) {
+  return foldName([
     props && props.loaicongtrinh,
+    props && props.tencongtrinh,
     props && props.tendoituong,
     props && props.ghichu,
     props && props.loai,
+    props && props.trinhbaydulieu,
     layer && layer.name
   ].filter(Boolean).join(' '));
+}
+
+/**
+ * Phân loại điểm GT theo TT16 Phụ lục 1 (HTKT_GT_*).
+ * Chỉ trả loại có ký hiệu điểm trong bảng; nút giao / sân bay / cửa khẩu không có → ''.
+ * Mã loaicongtrinh: schema gisHue QHC/QHPK Huế.
+ */
+export function gtTt16Kind(layer, props = {}) {
+  if (!layer || layer.sector !== 'giao-thong') return '';
+  const code = String(props.loaicongtrinh || '').trim();
+  const t = propBlob(layer, props);
+
+  if (code === '18' || /tram[-_ ]?xang|cay[-_ ]?xang|xang[-_ ]?dau|petrol|gas[-_ ]?station/.test(t)) {
+    return 'tramxang';
+  }
+  if (/tuy[-_ ]?nen|ham[-_ ]?duong|\btunnel\b/.test(t)) return 'tuynen';
+
+  if (code === '4' || /bai[-_ ]?do[-_ ]?xe|do[-_ ]?xe|parking|\bbdx\b/.test(t)) return 'parking';
+
+  if (code === '2' || code === '5' || /ben[-_ ]?xe|\bbus\b/.test(t)) {
+    if (/tai|hang|container|truck/.test(t) && !/khach/.test(t)) return 'benxe_tai';
+    return 'benxe';
+  }
+
+  if (code === '1' || (/\bga\b|nha[-_ ]?ga|\bdepot\b/.test(t) && !/cang|ben[-_ ]?xe|bai[-_ ]?do/.test(t))) {
+    if (/ngam|metro|subway|tau[-_ ]?dien[-_ ]?ngam/.test(t)) return 'ga_ngam';
+    return 'ga';
+  }
+
+  if (code === '13' || /cang[-_ ]?can|dry[-_ ]?port/.test(t)) return 'bencang_cangcan';
+  if (code === '11' || /cang[-_ ]?hanh[-_ ]?khach|ben[-_ ]?hanh[-_ ]?khach/.test(t)) return 'bencang_2';
+  if (/cang[-_ ]?hang[-_ ]?hoa|ben[-_ ]?hang[-_ ]?hoa/.test(t)) return 'bencang_3';
+  if (/chuyen[-_ ]?dung/.test(t) && /cang|ben/.test(t)) return 'bencang_4';
+  if (code === '15' || /ben[-_ ]?pha|ben[-_ ]?thuyen|ben[-_ ]?do|\bthuyen\b|thuy[-_ ]?noi[-_ ]?dia|ferry|wharf|jetty/.test(t)) {
+    return 'bencang_pha';
+  }
+  if (code === '10' || (/cang/.test(t) && !/hang[-_ ]?khong|san[-_ ]?bay/.test(t))) return 'bencang_1';
+
+  return '';
+}
+
+function tt16Frame(kind, color, { dashed = false } = {}) {
+  const stroke = dashed ? `stroke="${color}" stroke-width="1.8" stroke-dasharray="3.5 2.2" fill="#fff"` : `stroke="${color}" stroke-width="1.8" fill="#fff"`;
+  if (kind === 'bencang_3' || kind === 'bencang_cangcan') {
+    return `<rect x="3.5" y="3.5" width="25" height="25" rx="1" ${stroke}/>`;
+  }
+  if (kind === 'bencang_4') {
+    return `<path d="M16 3.2 28.5 27.5H3.5Z" ${stroke}/>`;
+  }
+  if (kind === 'bencang_pha') {
+    return `<path d="M16 3.5 28.5 16 16 28.5 3.5 16Z" ${stroke}/>`;
+  }
+  return `<circle cx="16" cy="16" r="13.2" ${stroke}/>`;
+}
+
+function tt16Inner(kind, color) {
+  if (kind.startsWith('bencang')) {
+    const num =
+      kind === 'bencang_1' ? '1'
+        : kind === 'bencang_2' ? '2'
+          : kind === 'bencang_3' ? '3'
+            : kind === 'bencang_4' ? '4'
+              : '';
+    const anchor = TT16_PIC._anchor.replaceAll('C', color);
+    const hatch = kind === 'bencang_cangcan'
+      ? `<path d="M3.5 16h25" stroke="${color}" stroke-width="1.4"/>`
+      : '';
+    const label = num
+      ? `<text x="24.2" y="11.2" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7.5" font-weight="700" fill="${color}">${num}</text>`
+      : '';
+    return `${hatch}${anchor}${label}`;
+  }
+  const pic = TT16_PIC[kind];
+  return pic ? pic.replaceAll('C', color) : '';
+}
+
+function tt16Color(kind) {
+  if (kind === 'ga' || kind === 'ga_ngam') return TT16_ACI[12];
+  if (kind.startsWith('bencang')) return TT16_ACI[5];
+  return TT16_ACI[7];
+}
+
+/** SVG ký hiệu điểm TT16 (tâm = tọa độ). */
+export function htktTt16Svg(kind, { dashed = false, className = 'htkt-tt16' } = {}) {
+  if (!kind) return '';
+  const color = tt16Color(kind);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" class="${className}" aria-hidden="true">${tt16Frame(kind, color, { dashed })}${tt16Inner(kind, color)}</svg>`;
+}
+
+function facilityGlyph(layer, props) {
+  // Điểm GT có ký hiệu TT16 → không dùng glyph giọt nước tự chế.
+  if (gtTt16Kind(layer, props)) return '';
+  const t = propBlob(layer, props);
   if (/bai[-_ ]?do[-_ ]?xe|do[-_ ]?xe|parking|\bbdx\b/.test(t)) return 'parking';
-  if (/ben[-_ ]?thuyen|ben[-_ ]?do|\bthuyen\b|cang[-_ ]?thuyen|wharf|jetty/.test(t)) return 'boat';
   return '';
 }
 
@@ -85,6 +201,19 @@ function subtypeGlyph(layer) {
 
 /** Màu / glyph cho một điểm HTKT (có thể gắn style cấp nước từ capNuocPointStyle). */
 export function htktPointLook(layer, props = {}, styled = null) {
+  const tt16 = gtTt16Kind(layer, props);
+  if (tt16) {
+    const radius = styled && styled.radius;
+    const scale = radius != null && radius <= 4 ? 0.82 : radius != null && radius >= 7 ? 1.05 : 1;
+    return {
+      fill: tt16Color(tt16),
+      edge: tt16Color(tt16),
+      glyph: `tt16:${tt16}`,
+      tt16,
+      dashed: !!(layer && layer.kind === 'quy-hoach'),
+      scale
+    };
+  }
   const sector = layer && layer.sector;
   const base = SECTOR_LOOK[sector] || { fill: '#64748b', edge: '#334155', glyph: 'pin' };
   const nhom = NHOM_LOOK[props && props.nhom];
@@ -93,12 +222,8 @@ export function htktPointLook(layer, props = {}, styled = null) {
   const facility = facilityGlyph(layer, props);
   let glyph = facility || (nhom && nhom.glyph) || subtypeGlyph(layer) || base.glyph;
   if (facility === 'parking') {
-    // Cùng tông xanh pin Parking.png (HTXH).
     fill = '#0284c7';
     edge = '#0c4a6e';
-  } else if (facility === 'boat') {
-    fill = '#0e7490';
-    edge = '#155e75';
   }
   if (isHydrantLayer(layer)) {
     fill = '#dc2626';
@@ -123,10 +248,21 @@ export function htktDropSvg(look, className = 'htkt-drop') {
   </svg>`;
 }
 
-/** Leaflet divIcon giọt nước; tip chạm tọa độ công trình. Bãi đỗ xe dùng cùng Parking.png với HTXH. */
+/** Leaflet divIcon; điểm GT có loại TT16 → vòng/khung chuẩn, còn lại giọt nước. */
 export function htktPointIcon(layer, props, styled) {
   const look = htktPointLook(layer, props, styled);
   const scale = look.scale || 1;
+  if (look.tt16) {
+    const s = Math.round(30 * scale);
+    const html = htktTt16Svg(look.tt16, { dashed: look.dashed, className: 'htkt-tt16' });
+    return L.divIcon({
+      className: 'htkt-pin htkt-pin-tt16',
+      html: `<div style="width:${s}px;height:${s}px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">${html}</div>`,
+      iconSize: [s, s],
+      iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
+      popupAnchor: [0, -Math.round(s / 2)]
+    });
+  }
   const w = Math.round(26 * scale);
   const h = Math.round(36 * scale);
   const html = look.glyph === 'parking'

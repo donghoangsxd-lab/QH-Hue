@@ -279,7 +279,7 @@ async function showFile(layer, frame) {
     pointToLayer: (f, latlng) => {
       const props = f.properties || {};
       const styled = capNuocPointStyle(layer, props);
-      // Giọt nước đồng bộ HTXH / đầu tư (điểm công trình dễ đọc trên nền vệ tinh / nét QH).
+      // Điểm GT: ký hiệu TT16 khi có loại; ngành khác: giọt nước.
       return L.marker(latlng, {
         icon: htktPointIcon(layer, props, styled),
         keyboard: false,

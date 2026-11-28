@@ -74,6 +74,10 @@ assert.doesNotMatch(css, /\.admin-multi-hint\s*\{/);
 const mapJs = read('public/js/mapEngine.js');
 assert.match(mapJs, /wardLabelPane/);
 assert.match(mapJs, /zIndex = '650'/);
+// pie rỗng không gắn ward-pie-mode (tránh ẩn tem Aa trên trục A khi tô ĐVHC/đô thị).
+assert.match(mapJs, /renderPies\(m\)[\s\S]*ward-pie-mode/);
+assert.match(mapJs, /return pieGroup\.getLayers\(\)\.length > 0/);
+assert.match(spec, /ward-pie-mode.*rỗng|pie rỗng|không bị `ward-pie-mode`/);
 const planJs = read('public/js/planMap.js');
 assert.match(planJs, /wardLabelPane/);
 assert.match(planJs, /zIndex = '650'/);

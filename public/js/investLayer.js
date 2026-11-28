@@ -29,7 +29,7 @@ import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 import { WARD_NAMES } from './facetStore.js';
-import { metricCellsHtml, landUseBannerHtml } from './lotPopup.js';
+import { metricCellsHtml } from './lotPopup.js';
 
 const INVEST_SHEET_URL = './data/invest-sheet.json';
 const INVEST_BOUND_URL = './data/invest-boundary.geojson';
@@ -57,22 +57,25 @@ const GROUP_STORE = 'qh_invest_groups';
 const DROP_PATH = 'M35 2C16.8 2 2 16.8 2 35c0 21 24 41 31 57a2.2 2.2 0 004 0c7-16 31-36 31-57C68 16.8 53.2 2 35 2z';
 // [re, icon, fill, edge]
 const SECTORS = [
-  [/y tế|bệnh viện/i, 'cross', '#ef4444', '#991b1b'],
+  // Y tế: dấu + đỏ đặc (cùng ý HTXH Yte.png) — trước văn hóa.
+  [/y tế|bệnh viện|trạm y tế|phòng khám/i, 'cross', '#ef4444', '#7f1d1d'],
   [/giáo dục|đào tạo|trường học/i, 'book', '#3b82f6', '#1e40af'],
   [/nông nghiệp|trồng trọt|nông lâm/i, 'leaf', '#22c55e', '#166534'],
   [/năng lượng|điện|mặt trời/i, 'bolt', '#f59e0b', '#b45309'],
   [/công nghiệp/i, 'factory', '#a855f7', '#6b21a8'],
   [/công nghệ|thông tin/i, 'cpu', '#06b6d4', '#0e7490'],
-  // Thương mại trước du lịch — chuỗi «Thương mại … Du lịch» không bị vali.
+  // Bãi đỗ / sân gôn trước giao thông & du lịch (tránh lĩnh vực «giao thông» che P).
+  [/bãi đỗ|đỗ xe|parking|\bbdx\b/i, 'parking', '#0284c7', '#0c4a6e'],
+  [/sân gôn|san gon|\bgolf\b/i, 'golf', '#16a34a', '#14532d'],
+  // Thương mại (xe đẩy) tách khỏi du lịch (vali).
   [/thương mại|dịch vụ|chợ|siêu thị|mua sắm/i, 'cart', '#ec4899', '#9d174d'],
-  [/du lịch|nghỉ dưỡng|sân gôn|golf/i, 'tour', '#f97316', '#c2410c'],
+  [/du lịch|nghỉ dưỡng|khách sạn|resort/i, 'tour', '#f97316', '#c2410c'],
   [/văn h[oó]a|thể thao|công viên văn hóa/i, 'culture', '#e11d48', '#9f1239'],
-  [/bãi đỗ|đỗ xe|parking/i, 'parking', '#94a3b8', '#475569'],
   [/cảng|bến xe|giao thông|hạ tầng/i, 'road', '#64748b', '#334155'],
   [/bất động sản|đô thị|dân cư|nhà ở|chung cư/i, 'home', '#0ea5e9', '#0369a1']
 ];
 const GROUP_LOOK = {
-  sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
+  sangon: { icon: 'golf', color: '#16a34a', edge: '#14532d', label: 'Sân gôn' },
   dulich_tm: { icon: 'tour', color: '#f97316', edge: '#c2410c', label: 'Khu du lịch và thương mại' },
   khu_cn: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Khu công nghiệp' },
   cum_cn: { icon: 'factory', color: '#9333ea', edge: '#6b21a8', label: 'Cụm công nghiệp' },
@@ -84,28 +87,32 @@ const GROUP_LOOK = {
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
   vanhoaxahoi: { icon: 'culture', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
   benxe: { icon: 'road', color: '#64748b', edge: '#334155', label: 'Bến xe - Cảng biển' },
-  baido: { icon: 'parking', color: '#94a3b8', edge: '#475569', label: 'Bãi đỗ xe' },
+  // Cùng chữ P với HTXH Parking.png / HTKT parking.
+  baido: { icon: 'parking', color: '#0284c7', edge: '#0c4a6e', label: 'Bãi đỗ xe' },
   congvien: { icon: 'leaf', color: '#16a34a', edge: '#166534', label: 'Công viên' },
   khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' },
   dangnghien: { icon: 'pin', color: '#f59e0b', edge: '#b45309', label: 'Đang nghiên cứu' }
 };
+/** Nhóm tab luôn dùng ký hiệu riêng (không bị lĩnh vực «giao thông» / chung đè). */
+const GROUP_ICON_LOCK = new Set(['baido', 'sangon']);
 // Glyph viewBox 24×24; vẽ trong vòng trắng rồi scale 1.5 tại tâm giọt.
 const DROP_GLYPH = {
-  cross: '<g fill="none" stroke="C" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.5v9M7.5 12h9"/></g>',
+  // Dấu + đỏ đặc như Yte.png (trục D).
+  cross: '<path fill="#ef4444" stroke="#7f1d1d" stroke-width="0.9" stroke-linejoin="round" d="M9.6 4.2h4.8v5.4h5.4v4.8h-5.4v5.4H9.6v-5.4H4.2V9.6h5.4z"/>',
   book: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 5h11v13H6.2A1.2 1.2 0 0 0 5 19.2z"/><path d="M5 19.2A1.2 1.2 0 0 0 6.2 20.5H16M8.5 8h6"/></g>',
-  // Hai lá + thân — tránh còn một nét chéo giống dấu phẩy.
   leaf: '<g fill="none" stroke="C" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M12 20.5V10"/><path d="M12 11c-5-1.2-7.5-5-6.5-9.2 5.2.6 8 4.2 6.5 9.2z" fill="C" fill-opacity=".35"/><path d="M12 13c5-1.2 7.5-5 6.5-9.2C13.3 4.4 10.5 8 12 13z" fill="C" fill-opacity=".35"/></g>',
   bolt: '<path fill="C" stroke="E" stroke-width="1" stroke-linejoin="round" d="M13 2.5 5 13.5h6.2L10.2 21.5 19 10.2h-6.2z"/>',
   factory: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M4 19.5V10l4.5 2.8V10L14 13.5V8h2l1.4 2.4H20v9.1z"/><path d="M16 8V5"/></g>',
   cpu: '<g fill="none" stroke="C" stroke-width="1.8" stroke-linejoin="round"><rect x="7.5" y="7.5" width="9" height="9" rx="1.2"/><path d="M9.5 4.5v3M12 4.5v3M14.5 4.5v3M9.5 16.5v3M12 16.5v3M14.5 16.5v3M4.5 9.5h3M4.5 12h3M4.5 14.5h3M16.5 9.5h3M16.5 12h3M16.5 14.5h3"/></g>',
   tour: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><rect x="4" y="9" width="16" height="10" rx="1.2"/><path d="M9 9V7.2A1.2 1.2 0 0 1 10.2 6h3.6A1.2 1.2 0 0 1 15 7.2V9M4 13.5h16"/></g>',
-  // Xe đẩy mua hàng (thương mại).
   cart: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="19.2" r="1.7"/><circle cx="17" cy="19.2" r="1.7"/><path d="M3.5 4.5h2.2l1.1 2.2h12.2l-1.6 7.2H7.6z"/><path d="M7.6 9.2h10.2"/></g>',
   shop: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="19.2" r="1.7"/><circle cx="17" cy="19.2" r="1.7"/><path d="M3.5 4.5h2.2l1.1 2.2h12.2l-1.6 7.2H7.6z"/><path d="M7.6 9.2h10.2"/></g>',
-  // Nhà văn hóa / sân khấu — không dùng cờ (trông như chữ P).
   culture: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 19.5h16"/><path d="M5.5 19.5V11L12 5.5l6.5 5.5v8"/><path d="M9.2 19.5v-5h5.6v5"/><path d="M12 5.8V8"/></g>',
   flag: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 19.5h16"/><path d="M5.5 19.5V11L12 5.5l6.5 5.5v8"/><path d="M9.2 19.5v-5h5.6v5"/><path d="M12 5.8V8"/></g>',
-  parking: '<g fill="none" stroke="C" stroke-width="2.2" stroke-linejoin="round"><rect x="4.5" y="4.5" width="15" height="15" rx="2"/><path d="M9.2 16.5V7.5h4.2a3.2 3.2 0 0 1 0 6.4H9.2" fill="C" fill-opacity=".2"/></g>',
+  // Chữ P như HTXH Parking / HTKT parking.
+  parking: '<text x="12" y="17.4" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="C">P</text>',
+  // Cờ trên green + lỗ + bóng (tham chiếu ký hiệu sân gôn).
+  golf: '<g stroke-linejoin="round"><ellipse cx="12" cy="16.2" rx="9.2" ry="4.6" fill="C" fill-opacity=".9" stroke="E" stroke-width="1"/><rect x="7" y="3.8" width="1.7" height="12.2" rx="0.4" fill="#1a1a1a"/><path d="M8.7 3.8 15.4 6.2 8.7 8.6z" fill="C" stroke="E" stroke-width="0.7"/><ellipse cx="13.8" cy="15.4" rx="1.5" ry="1" fill="#1a1a1a"/><circle cx="17.6" cy="15.6" r="1.55" fill="#fff" stroke="#1a1a1a" stroke-width="0.85"/></g>',
   road: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M9 3.5 5.5 20.5M15 3.5l3.5 17"/><path d="M12 5v2.5M12 11v2.5M12 17v2"/></g>',
   home: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 12 12 5.5 19 12"/><path d="M7 10.8V19h10v-8.2"/><path d="M10.2 19v-4.2h3.6V19"/></g>',
   terrain: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="m3.5 19 6.2-10.5 3.6 5.6 2.2-3L20.5 19z"/></g>',
@@ -295,10 +302,16 @@ function lookOf(icon, color, edge, label) {
   return { icon, color, edge, label: label || 'Dự án' };
 }
 
-function sectorOf(text, groupId) {
+function sectorOf(text, groupId, title = '') {
   const label = String(text || '').replace(/\s+/g, ' ').trim().replace(/^lĩnh vực\s+/i, '');
+  // Bãi đỗ / sân gôn: khóa theo nhóm tab — lĩnh vực sheet thường ghi «giao thông».
+  if (GROUP_ICON_LOCK.has(groupId) && GROUP_LOOK[groupId]) {
+    const g = GROUP_LOOK[groupId];
+    return lookOf(g.icon, g.color, g.edge, label || g.label);
+  }
+  const hay = `${label} ${String(title || '').replace(/\s+/g, ' ')}`.trim();
   for (const [re, icon, color, edge] of SECTORS) {
-    if (re.test(label)) return lookOf(icon, color, edge, label || 'Dự án');
+    if (re.test(hay)) return lookOf(icon, color, edge, label || 'Dự án');
   }
   if (GROUP_LOOK[groupId]) {
     const g = GROUP_LOOK[groupId];
@@ -331,6 +344,11 @@ export function investLegendHtml() {
   for (const g of INVEST_GROUPS) {
     const look = GROUP_LOOK[g.id] || lookOf('layers', '#64748b', '#334155', g.label);
     html += row(look, g.label || g.title || g.id);
+    // Du lịch / thương mại: hai glyph tách (vali · xe đẩy) dù cùng tab nhóm.
+    if (g.id === 'dulich_tm') {
+      html += row(lookOf('tour', '#f97316', '#c2410c', 'Du lịch'), 'Du lịch (vali)');
+      html += row(lookOf('cart', '#ec4899', '#9d174d', 'Thương mại'), 'Thương mại (xe đẩy)');
+    }
   }
   html += '</div>';
   return html;
@@ -454,7 +472,7 @@ function projectList(features) {
       dtGroup: rowGroupId(sheet, title)
     });
     const last = out[out.length - 1];
-    last.sector = sectorOf(sectorText, last.dtGroup);
+    last.sector = sectorOf(sectorText, last.dtGroup, title);
   });
   sheetOnly.forEach(p => {
     if (sheetIsUsed(matchedSheets, p.sheet)) return;
@@ -462,7 +480,7 @@ function projectList(features) {
     if (!id || seen.has(id)) return;
     markProjectIds(seen, id);
     if (!p.areaText) p.areaText = areaTextOf(p.sheet, p.geom || null);
-    if (!p.sector) p.sector = sectorOf(entry(p.sheet, /lĩnh vực/i), p.dtGroup);
+    if (!p.sector) p.sector = sectorOf(entry(p.sheet, /lĩnh vực/i), p.dtGroup, p.title);
     out.push(p);
   });
   if (useCache) projectCache = out;
@@ -768,7 +786,7 @@ function investHeadHtml(st, props) {
   const row = props.sheet;
   const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
   const groupId = st.dtGroup || rowGroupId(row, titleOf(props));
-  const sector = sectorOf(sectorText, groupId);
+  const sector = sectorOf(sectorText, groupId, titleOf(props));
   const groupName = investGroupLabel(groupId);
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
   const chip = investChipHtml(st, props);
@@ -784,14 +802,29 @@ function investHeadHtml(st, props) {
     </div>`;
 }
 
-/** Tab Thông tin: lưới chỉ tiêu + lĩnh vực + mục tiêu (không nhét khối đăng nhập ranh). */
+/** Diện tích thẻ F: có ranh → đo polygon (ha); không ranh → cột sheet hoặc —. */
+function investCardAreaText(st, row) {
+  if (st?.geom) {
+    let m2 = 0;
+    (st.members || []).forEach(m => {
+      if (!m?.geometry) return;
+      try { m2 += turf.area(m); } catch { /* bỏ mảnh hỏng */ }
+    });
+    if (m2 <= 0) {
+      try { m2 = turf.area(st.geom); } catch { m2 = 0; }
+    }
+    if (m2 > 0) return `${fmtNum(m2 / 10000)} ha`;
+  }
+  return listedArea(row) || '—';
+}
+
+/** Tab Thông tin: lưới 2×2 kiểu lô B + địa điểm full hàng. */
 function overviewHtml(st, props) {
   const row = props.sheet;
   const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
   const goal = entry(row, /mục tiêu/i);
   const place = entry(row, /địa điểm/i);
   const priority = entry(row, /ưu tiên/i);
-  const listed = listedArea(row);
   const noBound = !st.geom;
   const groupId = st.dtGroup || rowGroupId(row, titleOf(props));
   const scale = pickInvestScale({
@@ -800,6 +833,9 @@ function overviewHtml(st, props) {
     title: titleOf(props),
     kml: props.kml
   });
+  const scaleLabel = scale?.label || 'Công suất';
+  const scaleValue = formatInvestScale(scale);
+  const areaValue = investCardAreaText(st, row);
   const ambiguous = !row && !!props._ambiguous;
   const matchNote = noBound || row
     ? ''
@@ -809,18 +845,18 @@ function overviewHtml(st, props) {
   const goalHtml = goal
     ? `<details class="invest-goal"><summary>Mục tiêu và nhu cầu đầu tư</summary><p>${escapeHtml(goal)}</p></details>`
     : '';
-  const metricList = [
-    { tone: 'area', icon: 'ruler', label: 'Diện tích ranh', value: st.areaText || (noBound ? '—' : '—') },
-    { tone: 'cover', icon: 'layers', label: 'Diện tích DS', value: listed || '—' },
-    { tone: 'floors', icon: 'flag', label: 'Ưu tiên', value: priority || '—' },
-    { tone: 'far', icon: 'pin', label: 'Địa điểm', value: place || '—' }
-  ];
-  if (scale) {
-    metricList[2] = { tone: 'floors', icon: 'flag', label: scale.label, value: formatInvestScale(scale) };
-  }
-  const metrics = metricCellsHtml(metricList);
-  const landuse = landUseBannerHtml(sectorText || 'Chưa rõ lĩnh vực');
-  return `${metrics}${landuse}${goalHtml}${matchNote}${adminToolsHtml(st)}${groupHtml(st)}`;
+  // Diện tích | Công suất / Tính chất | Ưu tiên — cùng lưới lp-metrics với thẻ lô B.
+  const metrics = metricCellsHtml([
+    { tone: 'area', icon: 'ruler', label: 'Diện tích', value: areaValue },
+    { tone: 'cover', icon: 'layers', label: scaleLabel, value: scaleValue },
+    { tone: 'floors', icon: 'home', label: 'Tính chất', value: sectorText || '—' },
+    { tone: 'far', icon: 'flag', label: 'Ưu tiên', value: priority || '—' }
+  ]);
+  const placeBanner = `<div class="lp-landuse invest-place">
+    <span class="lp-landuse-ico" aria-hidden="true">${ico('pin')}</span>
+    <span class="lp-landuse-text"><small>Địa điểm</small><b title="${escapeHtml(place || '')}">${escapeHtml(place || '—')}</b></span>
+  </div>`;
+  return `${metrics}${placeBanner}${goalHtml}${matchNote}${adminToolsHtml(st)}${groupHtml(st)}`;
 }
 
 function detailHtml(props) {
@@ -1023,7 +1059,7 @@ function rebuildSheetOnly(features, rows) {
       dtGroup: rowGroupId(row, title)
     });
     const last = sheetOnly[sheetOnly.length - 1];
-    last.sector = sectorOf(entry(row, /lĩnh vực/i), last.dtGroup);
+    last.sector = sectorOf(entry(row, /lĩnh vực/i), last.dtGroup, title);
   });
 }
 
@@ -2383,9 +2419,8 @@ function openCard(feature, layer, targetMap) {
   const tab = isPlanLevel(getLevel()) ? getLevel() : 'qhpk';
   let area = 0;
   members.forEach(m => { if (!m.geometry) return; try { area += turf.area(m); } catch { /* mảnh hỏng thì bỏ qua */ } });
-  const areaText = area > 0
-    ? (area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`)
-    : '';
+  // Thẻ thông tin: diện tích luôn theo ranh, đơn vị ha.
+  const areaText = area > 0 ? `${fmtNum(area / 10000)} ha` : '';
   investPicked = feature.properties?.groupId || feature.properties?._key || investPicked;
   card = {
     seq, tab, infoTab: 'overview', cache: new Map(), map: targetMap || map, feature, members, geom, sheet,

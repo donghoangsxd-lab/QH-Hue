@@ -7,7 +7,7 @@
 // × / Esc / bấm ngoài ranh → exitProjectToBoundary (bỏ mask + bỏ lô đồ án đang xem → chỉ còn ranh).
 // (2) Lô phẳng — tick hộp hoặc sau khi bấm lô từ info; không mask/brief; quay lại info chỉ bằng bấm tên
 // trong list. Đã mở lô: outline-lots-open tắt PE ranh; chuyển đồ án qua trySwitchProjectAt.
-// Zoom ≥ PLACE_DETAIL_ZOOM: openLotsAtView. Ranh từ schemeVisibility.enabledSchemes.
+// QHPK/QHCT: không openLotsAtView theo zoom/tab (chỉ ranh đến khi tick hoặc bấm ranh·tên).
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -757,8 +757,8 @@ function atPlaceDetail(m = viewHost()) {
 }
 
 /**
- * Zoom lớn: mở lô phẳng đồ án nhỏ nhất cấp kind tại tâm khung (tick tương đương) — không vào chế độ info/brief.
- * Không có đồ án tại tâm → null (giữ ranh).
+ * Mở lô phẳng đồ án nhỏ nhất cấp kind tại tâm khung (tick tương đương) — không info/brief.
+ * Gọi từ QHC (tab / zoom). QHPK/QHCT không gọi theo tab hay zoom.
  */
 export function openLotsAtView(kind) {
   const m = viewHost();
@@ -824,17 +824,11 @@ export function trySwitchProjectAt(latlng) {
 }
 
 /**
- * Chế độ xem lô (không info): bấm nền tại đồ án cùng cấp → vào chế độ xem thông tin đồ án đó.
+ * Giữ export cho kiểm thử / chỗ gọi cũ. Quay lại info từ lô phẳng: bấm tên trong list (ui-spec),
+ * không tự mở từ bấm nền (tránh treo khi PE ranh tắt nhầm).
  */
-export function tryEnterProjectInfoAt(latlng) {
-  if (!latlng || state.focusedProject) return false;
-  const kind = levelScope();
-  if (!kind) return false;
-  const best = smallestProjectAt(latlng, kind);
-  if (!best) return false;
-  openProject(best);
-  revealInList(best);
-  return true;
+export function tryEnterProjectInfoAt() {
+  return false;
 }
 
 /**
@@ -2929,9 +2923,10 @@ function drawOutlinesOn(m, rawList, below) {
   performance.mark?.('qhpk-outlines-start');
   const list = cullOutlinesForView(rawList || [], m);
   const lotsOpen = lotsOpenOf;
-  // Đã mở lô (kể cả info): tắt PE pane+canvas — nếu giữ PE khi info, canvas z 405 nuốt click lô và map,
-  // sau trySwitchProjectAt bị kẹt. Chuyển đồ án lân cận: leaveScopeFocus → trySwitchProjectAt.
-  const lotsDrawn = list.some(lotsOpen);
+  // Info: luôn tắt PE (trySwitch qua map click). Lô phẳng: chỉ tắt PE khi zoom đủ vẽ lô —
+  // tránh lotProjects sớm (openLotsAtView cũ) khóa ranh trong khi chưa thấy lô.
+  const lotsDrawn = !!state.focusedProject
+    || (m.getZoom() >= PARCEL_MIN_ZOOM && list.some(lotsOpen));
   // Tạo renderer sớm; sync lại cuối hàm sau khi Leaflet gắn _container canvas.
   outlineRenderer(m);
   syncOutlinePointer(m, lotsDrawn);
@@ -3767,16 +3762,13 @@ export function initProjectLayer(opts = {}) {
     if (!crossedParcel && !crossedPlace) return;
     belowZoom = below;
     placeZoom = place;
-    // Zoom lớn trên QHC / QHPK / QHCT: mở lô tại tâm — defer để không chặn nấc bánh xe.
-    if (place && crossedPlace) {
-      const kind = levelKeyOf(getLevel());
-      if (kind) {
-        clearTimeout(openLotsTimer);
-        openLotsTimer = setTimeout(() => {
-          openLotsTimer = 0;
-          openLotsAtView(kind);
-        }, 150);
-      }
+    // Chỉ QHC 1/10.000: zoom lớn mở lô tại tâm. QHPK/QHCT giữ chỉ-ranh đến khi tick / bấm ranh·tên.
+    if (place && crossedPlace && levelKeyOf(getLevel()) === 'QHC') {
+      clearTimeout(openLotsTimer);
+      openLotsTimer = setTimeout(() => {
+        openLotsTimer = 0;
+        openLotsAtView('QHC');
+      }, 150);
     }
     // QHC / QHCT tắt lớp QHPK (showProjects = false) nhưng ranh cấp đang chọn vẫn phải vẽ lại khi qua ngưỡng lô
     redrawOutlines();
