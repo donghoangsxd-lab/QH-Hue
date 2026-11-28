@@ -826,7 +826,9 @@ assert.doesNotMatch(read('public/js/mapEngine.js'), /phoneInfoSlot/);
 assert.match(read('docs/ui-spec.md'), /không đè droplist B hay năm tab cấp/);
 assert.match(plan, /id="chk_qh756"/);
 assert.match(read('public/js/mapLevel.js'), /PLAN_TABS = \['qh756'/);
-assert.match(read('public/js/urbanAreaLayer.js'), /syncQh756Level/);
+assert.match(read('public/js/qh756SddLayer.js'), /data\/qh756\/sdd\.json/);
+assert.match(read('public/js/app.js'), /initQh756SddLayer/);
+assert.match(read('scripts/build-qh756-sdd.mjs'), /build-qh756-sdd/);
 assert.match(read('docs/ui-spec.md'), /QHC 1\/25\.000 hoặc 1\/10\.000/);
 assert.match(read('docs/ui-spec.md'), /không xổ droplist sáu trục/);
 assert.match(read('docs/ui-spec.md'), /Thông tin quy hoạch:/);
@@ -882,6 +884,8 @@ const levelJs = read('public/js/mapLevel.js');
 assert.match(levelJs, /data-level-pick/);
 assert.match(levelJs, /function togglePlanTab/);
 assert.match(levelJs, /setLevel\(id, \{ keepView: true \}\)/);
+// QHPK phải có scope — không thì trySwitch/leaveScopeFocus im lặng sau khi tắt PE ranh.
+assert.match(levelJs, /id: 'qhpk'[\s\S]*?scope: 'QHPK'/);
 assert.doesNotMatch(read('public/js/viewFlow.js'), /frameVisibleSchemes/);
 assert.doesNotMatch(read('public/js/projectLayer.js'), /frameVisibleSchemes/);
 {
@@ -928,7 +932,7 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   assert.match(read('public/css/style.css'), /leaflet-projectOutline-pane\.outline-lots-open/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
-  assert.doesNotMatch(flow, /tryEnterProjectInfoAt/);
+  assert.match(flow, /tryEnterProjectInfoAt\(latlng\)/);
   assert.match(flow, /exitProjectToBoundary/);
   const leaveProjectFn = flow.slice(flow.indexOf('function leaveProject'), flow.indexOf('function leaveScopeFocus'));
   assert.match(leaveProjectFn, /exitProjectToBoundary/);
@@ -936,8 +940,12 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   // Switch thử trước khi kiểm tra «ngoài» focused (ranh chồng QHPK).
   const leaveFn = flow.slice(flow.indexOf('function leaveScopeFocus'), flow.indexOf('function onProjectExit'));
   assert.match(leaveFn, /trySwitchProjectAt\(latlng\)/);
-  assert.doesNotMatch(leaveFn, /tryEnterProjectInfoAt/);
+  assert.match(leaveFn, /tryEnterProjectInfoAt\(latlng\)/);
   assert.ok(leaveFn.indexOf('trySwitchProjectAt') < leaveFn.indexOf('projectContains'), 'trySwitch trước projectContains');
+  // tryEnter chỉ khi đã có lotProjects (không mở info từ chỉ-ranh qua nền).
+  const enterFn = pl.slice(pl.indexOf('export function tryEnterProjectInfoAt'), pl.indexOf('export function openProjectAt'));
+  assert.match(enterFn, /lotProjects\.size/);
+  assert.match(enterFn, /openProject\(best\)/);
   assert.match(read('public/js/projectBrief.js'), /exitProjectToBoundary/);
   assert.match(read('docs/ui-spec.md'), /exitProjectToBoundary|Hai luồng tách biệt/);
   assert.match(read('docs/ui-spec.md'), /PROJECT_TO_LOTS_EVENT|chế độ xem lô phẳng/);

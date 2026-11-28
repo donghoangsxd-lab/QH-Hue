@@ -24,7 +24,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, exitProjectToBoundary, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, exitProjectToBoundary, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt, tryEnterProjectInfoAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
@@ -315,8 +315,7 @@ function leaveProject() {
   syncEscHint();
 }
 
-// Bấm nền: info mode → chuyển đồ án lân cận (kể cả chồng/lồng) hoặc thoát info.
-// Chế độ lô phẳng / chỉ ranh: không tự mở info từ nền (ui-spec: quay lại info bằng bấm tên trong list).
+// Bấm nền: info → chuyển đồ án lân cận hoặc thoát; lô phẳng (PE ranh tắt) → vào info nếu trúng ranh.
 function leaveScopeFocus(latlng) {
   if (state.focusedProject) {
     // Thử switch trước (đồ án nhỏ nhất tại điểm) — không chờ «ngoài» focused, tránh kẹt khi ranh chồng.
@@ -325,6 +324,10 @@ function leaveScopeFocus(latlng) {
       return;
     }
     if (!projectContains(state.focusedProject, latlng)) leaveProject();
+    syncEscHint();
+    return;
+  }
+  if (tryEnterProjectInfoAt(latlng)) {
     syncEscHint();
     return;
   }
@@ -375,7 +378,8 @@ export function wardFromMapClick(latlng, m) {
   }
   const planSide = !!planMap && m === planMap;
   if (browseState().axis === 'quyhoach') {
-    if (planSide && levelScope()) leaveScopeFocus(latlng);
+    // Mọi bản đồ đang xem cấp có scope (QHPK/QHCT/QHC): PE ranh tắt → chuyển/thoát qua map click.
+    if (levelScope()) leaveScopeFocus(latlng);
     return null;
   }
   if (!planSide) return wardToPick(latlng, m);

@@ -67,8 +67,8 @@ const BADGE_SMALL_ZOOM = 10;
 
 const $ = (id) => document.getElementById(id);
 const $chk = () => $('chk_urban');
-/** Lớp đô thị bật khi ô trục A hoặc tab QH756 (trục B) tick. */
-const urbanWanted = () => !!$chk()?.checked || !!$('chk_qh756')?.checked || getLevel() === 'qh756';
+/** Lớp đô thị (QĐ 614/756 phân loại) — tách khỏi lớp SDĐ mã tỉnh trên tab QH756. */
+const urbanWanted = () => !!$chk()?.checked;
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 const muted = (text) => `<span class="ua-tip-muted">${escapeHtml(text)}</span>`;
 const clsTag = (cls) => `<b class="uc-${cls}">loại ${cls}</b>`;
@@ -460,16 +460,16 @@ async function syncUrbanPair() {
   await visionLeft.setVisible(sideOf(map) === 'urban');
 }
 
-/** Tab B → QH756: luôn vẽ QĐ 756 trên nền; rời tab thì trả lại chế độ cặp HT/QH. */
+/** Tab B → QH756: lớp SDĐ tỉnh ở qh756SddLayer; không chồng phân loại đô thị trên nền. */
 function syncQh756Level(level, prev) {
   if (level === 'qh756') {
-    planOnBase = true;
-    document.body.classList.add('urban-plan-on-base');
-    return applyUrbanVisible(true);
+    if (planOnBase) {
+      planOnBase = false;
+      document.body.classList.remove('urban-plan-on-base');
+    }
+    return applyUrbanVisible(false);
   }
   if (prev === 'qh756') {
-    planOnBase = false;
-    document.body.classList.remove('urban-plan-on-base');
     return applyUrbanVisible(urbanWanted());
   }
   return Promise.resolve();
@@ -513,18 +513,10 @@ export function initUrbanAreaLayer() {
   statusLayer.init(map);
   visionLeft.init(map);
   if (planMap) visionLayer.init(planMap);
-  const onUrbanChk = () => {
+  $chk()?.addEventListener('change', (e) => {
     if (isLevelPair()) { syncUrbanPair(); return; }
-    if (getLevel() === 'qh756') {
-      planOnBase = true;
-      document.body.classList.add('urban-plan-on-base');
-      setVisible(urbanWanted(), { fit: true });
-      return;
-    }
-    setVisible(urbanWanted(), { fit: true });
-  };
-  $chk()?.addEventListener('change', onUrbanChk);
-  $('chk_qh756')?.addEventListener('change', onUrbanChk);
+    setVisible(e.target.checked, { fit: true });
+  });
   document.addEventListener(LEVEL_EVENT, (e) => {
     const { level, prev } = e.detail || {};
     syncQh756Level(level, prev);

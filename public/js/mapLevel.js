@@ -2,7 +2,7 @@
 // bản đồ quy hoạch theo lớp đang chọn (không lớp nào chọn phường từ bản đồ; chọn phường ở droplist bảng tổng hợp):
 //  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
 //                                        đồ án → chi tiết (trục A; không nằm trong hàng tab B)
-//  qh756  QH756 (chk_qh756)             hệ thống đô thị theo QĐ 756 trên nền (urbanVision); tạm thời trước khi có lớp QH riêng
+//  qh756  QH756 (chk_qh756)             QH sử dụng đất mã tỉnh (public/data/qh756/sdd.json), kiểu lớp tĩnh QHC108
 //  qhc25  QHC108 (chk_qhc25)            QHC theo QĐ 108 (tỷ lệ 1/25.000): bấm vùng → chức năng khu vực
 //  qhc10  QHC 1/10.000 (chk_qhc10)       lô sử dụng đất trung tâm + ranh/tên đồ án QHC khác; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi. Bấm ngoài vùng lõi tạm thu lô về đường bao.
@@ -16,7 +16,8 @@ export const LEVELS = [
   { id: 'qh756', chk: 'chk_qh756', label: 'QH756' },
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC108' },
   { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC10K', scope: 'QHC' },
-  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK' },
+  // scope bắt buộc: leaveScopeFocus / trySwitchProjectAt khi PE ranh tắt (đã mở lô·info).
+  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK', scope: 'QHPK' },
   { id: 'qhct', chk: 'chk_qhct', label: 'QHCT', scope: 'QHCT' }
 ];
 export const DEFAULT_LEVEL = 'qhc25';

@@ -54,6 +54,7 @@ import { initViewFlow, wardFromMapClick, detailClickLocked, consumeDothiMapClick
 import { initMapLevel, getLevel, setLevel, DEFAULT_LEVEL } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
+import { initQh756SddLayer } from './qh756SddLayer.js';
 import { initQhc25Scale } from './qhc25Scale.js';
 import { initChuyenNganh, consumeDvhcMapClick } from './chuyenNganh.js';
 import { consumeAdminHybridClick } from './adminMapPick.js';
@@ -643,6 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initInvestLayer();
   initCatalogTable();
   initUrbanAreaLayer();
+  initQh756SddLayer();
   initDvhcClassLayer();
   initLayerDecisions();
   initQhc2045Layer();

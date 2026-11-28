@@ -5,9 +5,9 @@
 // Hai luồng: (1) Info — bấm tên / ranh → focusedProject + mask + #projectBrief giữa màn; bấm ranh đồ án
 // khác → openProject (vẫn info); bấm lô → PROJECT_TO_LOTS_EVENT / exitProjectInfo (lô phẳng, bỏ mask);
 // × / Esc / bấm ngoài ranh → exitProjectToBoundary (bỏ mask + bỏ lô đồ án đang xem → chỉ còn ranh).
-// (2) Lô phẳng — tick hộp hoặc sau khi bấm lô từ info; không mask/brief; quay lại info chỉ bằng bấm tên
-// trong list. Đã mở lô: outline-lots-open tắt PE ranh; chuyển đồ án qua trySwitchProjectAt.
-// QHPK/QHCT: không openLotsAtView theo zoom/tab (chỉ ranh đến khi tick hoặc bấm ranh·tên).
+// (2) Lô phẳng — tick hộp hoặc sau khi bấm lô từ info; không mask/brief. Đã mở lô: outline-lots-open
+// tắt PE ranh; chuyển/vào info qua map click → trySwitchProjectAt / tryEnterProjectInfoAt (cần levelScope,
+// QHPK phải có scope:'QHPK'). QHPK/QHCT: không openLotsAtView theo zoom/tab.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -824,11 +824,19 @@ export function trySwitchProjectAt(latlng) {
 }
 
 /**
- * Giữ export cho kiểm thử / chỗ gọi cũ. Quay lại info từ lô phẳng: bấm tên trong list (ui-spec),
- * không tự mở từ bấm nền (tránh treo khi PE ranh tắt nhầm).
+ * Chế độ lô phẳng (PE ranh tắt): bấm nền tại đồ án cùng cấp → vào info đồ án đó.
+ * Chỉ-ranh (chưa tick / chưa focus): không gọi — bấm ranh vẫn qua openOutlineProject.
  */
-export function tryEnterProjectInfoAt() {
-  return false;
+export function tryEnterProjectInfoAt(latlng) {
+  if (!latlng || state.focusedProject) return false;
+  if (!state.lotProjects.size) return false;
+  const kind = levelScope();
+  if (!kind) return false;
+  const best = smallestProjectAt(latlng, kind);
+  if (!best) return false;
+  openProject(best);
+  revealInList(best);
+  return true;
 }
 
 /**
