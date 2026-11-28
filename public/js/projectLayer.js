@@ -4,7 +4,8 @@
 // đô thị / xã / tổ dân phố. QHC liệt kê thẳng.
 // Hai luồng: (1) Info — bấm tên / ranh → focusedProject + mask + #projectBrief giữa màn; đóng × / Esc =
 // exitProjectInfo (giữ lotProjects). (2) Lô phẳng — tick hộp → chỉ lotProjects, không mask/brief; nhiều đồ án
-// cùng cấp; khác cấp dùng chia đôi. Info: giữ hit ranh. Lot: outline-lots-open tắt pane+canvas.
+// cùng cấp; khác cấp dùng chia đôi. Đã mở lô (info hoặc lot): outline-lots-open tắt pane+canvas;
+// chuyển đồ án lân cận qua map click → leaveScopeFocus / trySwitchProjectAt (không giữ PE canvas ranh).
 // Admin xóa / chuyển đồ án cũ. Nút file mở PDF quyết định. Mũi tên xổ cây a/b HT/QH. Hồ sơ ở brief (?).
 // Zoom ≥ PLACE_DETAIL_ZOOM: openLotsAtView. Đang info A: bấm ranh B → openProject(B). Esc / exitProjectInfo
 // trả đủ danh sách cấp. Ranh từ schemeVisibility.enabledSchemes. Nút #btnAxisAll bật/tắt cả cấp đang xem.
@@ -2858,9 +2859,9 @@ function drawOutlinesOn(m, rawList, below) {
   performance.mark?.('qhpk-outlines-start');
   const list = cullOutlinesForView(rawList || [], m);
   const lotsOpen = lotsOpenOf;
-  // Info mode: giữ hit ranh để chuyển đồ án lân cận. Lot mode (không focus): tắt pane+canvas để click/hover xuống lô.
-  const infoMode = !!state.focusedProject;
-  const lotsDrawn = !infoMode && list.some(lotsOpen);
+  // Đã mở lô (kể cả info): tắt PE pane+canvas — nếu giữ PE khi info, canvas z 405 nuốt click lô và map,
+  // sau trySwitchProjectAt bị kẹt. Chuyển đồ án lân cận: leaveScopeFocus → trySwitchProjectAt.
+  const lotsDrawn = list.some(lotsOpen);
   // Tạo renderer sớm; sync lại cuối hàm sau khi Leaflet gắn _container canvas.
   outlineRenderer(m);
   syncOutlinePointer(m, lotsDrawn);

@@ -313,16 +313,15 @@ function leaveProject() {
   syncEscHint();
 }
 
-// Bấm nền: info mode → chuyển đồ án lân cận hoặc thoát info; lot mode → vào info nếu trúng ranh đồ án.
+// Bấm nền: info mode → chuyển đồ án lân cận (kể cả chồng/lồng) hoặc thoát info; lot mode → vào info nếu trúng ranh.
 function leaveScopeFocus(latlng) {
   if (state.focusedProject) {
-    if (!projectContains(state.focusedProject, latlng)) {
-      if (trySwitchProjectAt(latlng)) {
-        syncEscHint();
-        return;
-      }
-      leaveProject();
+    // Thử switch trước (đồ án nhỏ nhất tại điểm) — không chờ «ngoài» focused, tránh kẹt khi ranh chồng.
+    if (trySwitchProjectAt(latlng)) {
+      syncEscHint();
+      return;
     }
+    if (!projectContains(state.focusedProject, latlng)) leaveProject();
     syncEscHint();
     return;
   }

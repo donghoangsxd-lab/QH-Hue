@@ -857,19 +857,23 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   const drawOut = pl.slice(pl.indexOf('function drawOutlinesOn'), pl.indexOf('function schemeRecords'));
   assert.doesNotMatch(drawOut, /open \|\| !below/);
   assert.match(drawOut, /open \|\| \(!state\.showProjects && p\.name === state\.focusedProject\)/);
-  // Info: giữ hit ranh. Lot mode (không focus): tắt pointer-events pane + canvas.
+  // Đã mở lô (info + lot): tắt PE ranh; chuyển đồ án qua trySwitch (không !infoMode giữ PE — gây kẹt sau switch).
   assert.match(pl, /projectOutlinePane/);
   assert.match(pl, /OUTLINE_Z = 405/);
   assert.match(pl, /function syncOutlinePointer/);
   assert.match(pl, /outline-lots-open/);
   assert.match(drawOut, /syncOutlinePointer\(m, lotsDrawn\)/);
-  assert.match(drawOut, /infoMode/);
-  assert.match(drawOut, /lotsDrawn = !infoMode && list\.some\(lotsOpen\)/);
+  assert.match(drawOut, /lotsDrawn = list\.some\(lotsOpen\)/);
+  assert.doesNotMatch(drawOut, /lotsDrawn = !infoMode/);
   assert.match(read('public/css/style.css'), /leaflet-projectOutline-pane\.outline-lots-open/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
   assert.match(flow, /tryEnterProjectInfoAt\(latlng\)/);
   assert.match(flow, /exitProjectInfo/);
+  // Switch thử trước khi kiểm tra «ngoài» focused (ranh chồng QHPK).
+  const leaveFn = flow.slice(flow.indexOf('function leaveScopeFocus'), flow.indexOf('function onProjectExit'));
+  assert.match(leaveFn, /trySwitchProjectAt\(latlng\)/);
+  assert.ok(leaveFn.indexOf('trySwitchProjectAt') < leaveFn.indexOf('projectContains'), 'trySwitch trước projectContains');
   assert.match(read('public/js/projectBrief.js'), /exitProjectInfo/);
   assert.match(read('docs/ui-spec.md'), /exitProjectInfo|Hai luồng tách biệt/);
   assert.match(read('public/js/projectCover.js'), /computeProjectCover/);
