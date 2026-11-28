@@ -540,7 +540,20 @@ assert.match(read('public/js/investLayer.js'), /investHeadHtml|boundToolsHtml|da
 assert.match(read('public/js/investLayer.js'), /metricCellsHtml|investCardAreaText|Tính chất|Địa điểm/);
 assert.match(read('public/js/investLayer.js'), /investCardAreaText|\/ 10000\} ha/);
 assert.doesNotMatch(read('public/js/investLayer.js'), /Diện tích DS|Diện tích ranh/);
+{
+  const inv = read('public/js/investLayer.js');
+  assert.match(inv, /cardToolsHtml|invest-share-btn|invest-route-btn|invest-tools/);
+  assert.doesNotMatch(inv, /invest-badge/);
+  assert.doesNotMatch(inv, /<details class="invest-goal">/);
+  assert.match(inv, /<section class="invest-goal">/);
+  const head = inv.match(/function investHeadHtml[\s\S]*?\n\}/);
+  assert.ok(head, 'investHeadHtml');
+  assert.doesNotMatch(head[0], /sectorDropSvg|invest-badge/);
+}
+assert.match(read('public/css/style.css'), /\.invest-card \.invest-tools/);
+assert.match(read('public/css/style.css'), /\.invest-goal p, \.invest-copy[\s\S]*max-height:\s*none/);
 assert.match(read('docs/ui-spec.md'), /Diện tích \| Công suất|đo polygon \(ha\)/);
+assert.match(read('docs/ui-spec.md'), /không icon giọt nước|Hàng icon góc phải|hiện đủ/);
 assert.match(read('public/js/investLayer.js'), /Đề xuất ranh KML\/DXF|Đề xuất thay ranh|Đồng ý|submitInvestProposal/);
 assert.match(read('public/js/investLayer.js'), /invest_bound_pending|loadPendingBoundIndex|Chờ duyệt ranh|Chờ thay ranh/);
 assert.match(read('public/css/style.css'), /\.invest-bound|\.invest-pending|is-pending|\.pls-type-group/);

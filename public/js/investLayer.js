@@ -781,7 +781,18 @@ function investChipHtml(st, props) {
   return '';
 }
 
-/** Đầu thẻ kiểu lô B: eyebrow nhóm + tiêu đề; chip trạng thái ranh gọn. */
+/** Tâm dự án để chia sẻ / chỉ đường (ranh hoặc tọa độ sheet). */
+function investCardPoint(st) {
+  const fromGeom = geometryPoint(st?.geom, st?.bounds);
+  if (fromGeom && Number.isFinite(fromGeom.lat) && Number.isFinite(fromGeom.lng)) return fromGeom;
+  const pin = sheetMapPoint(st?.sheet);
+  if (Array.isArray(pin) && Number.isFinite(pin[0]) && Number.isFinite(pin[1])) {
+    return L.latLng(pin[1], pin[0]);
+  }
+  return null;
+}
+
+/** Đầu thẻ: eyebrow nhóm + tên đủ (không icon giọt nước). */
 function investHeadHtml(st, props) {
   const row = props.sheet;
   const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
@@ -791,7 +802,6 @@ function investHeadHtml(st, props) {
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
   const chip = investChipHtml(st, props);
   return `<div class="pp-title lp-head invest-head">
-      <span class="invest-badge" title="${escapeHtml(sector.label)}">${sectorDropSvg(sector)}</span>
       <div class="lp-head-main invest-head-main">
         <div class="lp-eyebrow invest-kicker">
           <span class="lp-eyebrow-label" style="color:${sector.color}">${escapeHtml(groupName)}</span>
@@ -842,8 +852,9 @@ function overviewHtml(st, props) {
     : ambiguous
       ? '<p class="invest-bound-note">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</p>'
       : '<p class="invest-bound-note">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</p>';
+  // Mục tiêu hiện đủ, không gập details / cắt max-height.
   const goalHtml = goal
-    ? `<details class="invest-goal"><summary>Mục tiêu và nhu cầu đầu tư</summary><p>${escapeHtml(goal)}</p></details>`
+    ? `<section class="invest-goal"><h4>Mục tiêu và nhu cầu đầu tư</h4><p>${escapeHtml(goal)}</p></section>`
     : '';
   // Diện tích | Công suất / Tính chất | Ưu tiên — cùng lưới lp-metrics với thẻ lô B.
   const metrics = metricCellsHtml([
@@ -914,8 +925,70 @@ function editRowHtml(key, value, fresh, label) {
 
 function editButtonHtml() {
   return isAdmin()
-    ? `<button type="button" class="invest-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án">${ico('pen')}</button>`
+    ? `<button type="button" class="invest-tool invest-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án">${ico('pen')}</button>`
     : '';
+}
+
+/** Hàng icon góc phải (kiểu thẻ lô): KTQH · chia sẻ · chỉ đường · sửa · đóng. */
+function cardToolsHtml(st, planOpen) {
+  const pt = investCardPoint(st);
+  const hasPt = !!(pt && Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
+  const plan = st.geom
+    ? `<button type="button" class="invest-tool invest-plan-btn${planOpen ? ' is-on' : ''}" title="${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}" aria-label="${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}" aria-pressed="${planOpen ? 'true' : 'false'}">${ico('area')}</button>`
+    : '';
+  const share = hasPt
+    ? `<button type="button" class="invest-tool invest-share-btn" title="Chia sẻ vị trí" aria-label="Chia sẻ vị trí">${ico('send')}</button>`
+    : '';
+  const route = hasPt
+    ? `<button type="button" class="invest-tool invest-route-btn" title="Chỉ đường" aria-label="Chỉ đường">${ico('road')}</button>`
+    : '';
+  return `<div class="invest-tools" role="toolbar" aria-label="Công cụ dự án">${plan}${share}${route}${editButtonHtml()}<button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng dự án">${ico('close')}</button></div>`;
+}
+
+async function copyInvestLink(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fallback */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+async function shareInvestCard() {
+  const st = card;
+  if (!st) return;
+  const pt = investCardPoint(st);
+  if (!pt) return;
+  const title = titleOf(viewOf(st));
+  const url = new URL(location.href);
+  url.searchParams.set('ll', `${Number(pt.lat).toFixed(6)},${Number(pt.lng).toFixed(6)}`);
+  url.searchParams.set('iv', '1');
+  const link = url.toString();
+  const data = { title: 'Quy hoạch Huế', text: title || 'Vị trí dự án đầu tư', url: link };
+  if (navigator.share) {
+    try { await navigator.share(data); return; }
+    catch (err) { if (err && err.name === 'AbortError') return; }
+  }
+  const ok = await copyInvestLink(link);
+  showToast(ok ? 'Đã chép liên kết tới dự án' : 'Không chép được liên kết', ok ? 'success' : 'error');
+}
+
+function routeInvestCard() {
+  const pt = investCardPoint(card);
+  if (!pt) return;
+  const dest = `${Number(pt.lat).toFixed(6)},${Number(pt.lng).toFixed(6)}`;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank', 'noopener');
 }
 
 function groupCounts() {
@@ -1571,6 +1644,8 @@ function ensureCard() {
     const tab = e.target.closest('[data-invest-tab]');
     if (tab) { showTab(tab.dataset.investTab); return; }
     if (e.target.closest('.invest-plan-btn')) { togglePlan(); return; }
+    if (e.target.closest('.invest-share-btn')) { shareInvestCard(); return; }
+    if (e.target.closest('.invest-route-btn')) { routeInvestCard(); return; }
     if (e.target.closest('.invest-group-save')) { saveGroup(); return; }
     if (e.target.closest('.invest-group-cancel')) { cancelGroup(); return; }
     if (e.target.closest('.invest-ungroup-all')) { ungroup(true); return; }
@@ -1729,7 +1804,11 @@ async function togglePlan() {
   if (!st || !box || !btn) return;
   const open = box.hidden;
   box.hidden = !open;
-  btn.innerHTML = `${ico('area')}${open ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}`;
+  btn.classList.toggle('is-on', open);
+  btn.setAttribute('aria-pressed', open ? 'true' : 'false');
+  const tip = open ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án';
+  btn.title = tip;
+  btn.setAttribute('aria-label', tip);
   syncSelectionStyle();
   if (!open) {
     landFill?.remove();
@@ -1769,7 +1848,7 @@ function paintCard() {
   const planOpen = !!el.querySelector('.invest-plan') && !el.querySelector('.invest-plan').hidden;
   st.editing = false;
   st.saving = false;
-  el.innerHTML = `${editButtonHtml()}<button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng dự án">${ico('close')}</button>
+  el.innerHTML = `${cardToolsHtml(st, planOpen)}
     <div class="invest-body">
       ${investHeadHtml(st, props)}
       <div class="invest-switch lp-tabs" role="tablist" aria-label="Thông tin dự án">
@@ -1780,8 +1859,7 @@ function paintCard() {
       <div class="invest-pages">
         <div data-info-page="overview" role="tabpanel"${info === 'overview' ? '' : ' hidden'}>
           ${overviewHtml(st, props)}
-          ${st.geom ? `<button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}</button>
-          <div class="invest-plan"${planOpen ? '' : ' hidden'}>
+          ${st.geom ? `<div class="invest-plan"${planOpen ? '' : ' hidden'}>
             ${tabsBar(st.tab)}
             <div class="cad-page" role="tabpanel"></div>
           </div>` : ''}

@@ -6102,15 +6102,24 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   width: min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: none;
 }
-.invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
-.invest-card .lp-title { padding-right: 40px; }
-.invest-edit {
-  position: absolute; top: 4px; right: 24px;
-  display: inline-flex; padding: 3px; color: var(--text-muted);
+.invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; padding: 4px 8px 8px; }
+/* Hàng icon góc phải: KTQH · chia sẻ · chỉ đường · sửa · đóng. */
+.invest-card .invest-tools {
+  position: absolute; top: 2px; right: 2px; z-index: 2;
+  display: flex; align-items: center; gap: 0;
+}
+.invest-card .invest-tools .cad-card-x {
+  position: static; top: auto; right: auto;
+}
+.invest-card .invest-tool {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0; color: var(--text-muted);
   background: none; border: 0; border-radius: 50%; cursor: pointer;
 }
-.invest-edit:hover { color: var(--accent-yellow); background: rgba(255, 255, 255, 0.08); }
-.invest-edit .ico { width: 12px; height: 12px; margin: 0; }
+.invest-card .invest-tool:hover { color: var(--accent-cyan); background: rgba(255, 255, 255, 0.08); }
+.invest-card .invest-tool.is-on { color: var(--accent-cyan); }
+.invest-card .invest-edit:hover { color: var(--accent-yellow); }
+.invest-card .invest-tool .ico { width: 14px; height: 14px; margin: 0; }
 .invest-edit-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .invest-edit-row { display: flex; flex-direction: column; gap: 1px; }
 .invest-edit-key { color: var(--text-muted); font-size: 10px; line-height: 1.25; }
@@ -6138,20 +6147,11 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-card .invest-field b {
   font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; min-width: 0;
 }
-.invest-plan-btn { margin-top: 8px; }
 .invest-note { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 4px; }
-.invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
+.invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; padding-top: 4px; }
 .invest-head {
-  display: flex; gap: 8px; align-items: flex-start; min-width: 0;
-  padding: 2px 46px 0 0; margin: 0;
-}
-.invest-badge {
-  flex: none; width: 32px; height: 44px; display: flex; align-items: flex-start; justify-content: center;
-  padding: 0; background: transparent; border: 0;
-}
-.invest-badge .invest-drop {
-  width: 32px; height: 44px; display: block;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  display: flex; gap: 0; align-items: flex-start; min-width: 0;
+  padding: 2px 118px 0 0; margin: 0;
 }
 .invest-head-main { min-width: 0; flex: 1; }
 .invest-kicker {
@@ -6167,20 +6167,27 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-chip.is-pending {
   background: rgba(245, 158, 11, 0.2); color: #fde68a;
 }
-.invest-card .invest-head .lp-title { padding-right: 0; margin-top: 2px; }
+/* Tên dự án đủ chữ, xuống dòng — không ellipsis. */
+.invest-card .invest-head .lp-title {
+  padding-right: 0; margin-top: 1px;
+  white-space: normal; overflow: visible; text-overflow: clip;
+  display: block; -webkit-line-clamp: unset; line-clamp: unset;
+  overflow-wrap: anywhere; word-break: break-word;
+}
+.invest-card .lp-title { padding-right: 0; }
 /* Lưới 2×2 cùng kiểu thẻ lô trục B. */
 .invest-card .lp-metrics {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 6px;
 }
 .invest-card .lp-metric {
-  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 6px;
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 4px 5px;
   border-radius: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft);
 }
 .invest-card .lp-metric-ico {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 5px;
+  width: 20px; height: 20px; border-radius: 5px;
 }
-.invest-card .lp-metric-ico .ico { width: 12px; height: 12px; margin: 0; }
+.invest-card .lp-metric-ico .ico { width: 11px; height: 11px; margin: 0; }
 .invest-card .lp-metric-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
 .invest-card .lp-metric-body small {
   color: var(--text-muted); font-size: 9px; font-weight: 600; line-height: 1.15;
@@ -6196,7 +6203,7 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-card .lp-metric-far .lp-metric-ico { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); }
 .invest-card .lp-landuse,
 .invest-card .invest-place {
-  display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; padding: 4px 7px;
+  display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; padding: 3px 6px;
   border-radius: 6px; background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(var(--cyan-rgb), 0.22);
 }
@@ -6217,12 +6224,12 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 }
 .invest-card .lp-landuse-ico .ico { width: 11px; height: 11px; margin: 0; }
 .invest-switch {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
-  margin-top: 6px; padding-right: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px;
+  margin-top: 4px; padding-right: 0;
 }
 .invest-switch .lp-tab,
 .invest-switch button {
-  padding: 5px 6px; border-radius: var(--r-md); border: 1px solid var(--border-color);
+  padding: 4px 5px; border-radius: var(--r-md); border: 1px solid var(--border-color);
   background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-sm); font-weight: 700;
   letter-spacing: 0.04em; cursor: pointer;
 }
@@ -6231,18 +6238,17 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   background: rgba(var(--cyan-rgb), 0.18); border-color: var(--accent-cyan); color: var(--text-main);
 }
 .invest-goal, .invest-block {
-  margin-top: 8px; padding: 6px 8px; border-radius: var(--r-md);
+  margin-top: 6px; padding: 5px 7px; border-radius: var(--r-md);
   background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);
 }
-.invest-goal summary, .invest-block h4 {
+.invest-goal h4, .invest-block h4 {
   margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; list-style: none;
+  letter-spacing: 0.04em; text-transform: uppercase; cursor: default; list-style: none;
 }
-.invest-goal summary::-webkit-details-marker { display: none; }
 .invest-goal p, .invest-copy {
-  margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; font-size: var(--fs-sm);
+  margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; font-size: var(--fs-sm);
+  max-height: none; overflow: visible;
 }
-.invest-goal p { max-height: 5.6em; overflow: auto; }
 .invest-bound {
   margin-top: 8px; padding: 6px 8px; border-radius: var(--r-md);
   border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.28);
