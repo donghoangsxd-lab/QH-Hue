@@ -45,8 +45,10 @@ assert.equal(classifyInvestGroup(row('Thương mại, Dịch vụ', 'Khách sạ
 assert.equal(classifyInvestGroup(row('Dịch vụ', 'Bãi đỗ xe')), 'baido');
 assert.equal(classifyInvestGroup(row('Dịch vụ đô thị', 'Công viên nghĩa trang sinh thái')), 'congvien');
 assert.equal(classifyInvestGroup(row('', 'Bến xe phía Nam')), 'benxe');
+assert.equal(classifyInvestGroup(row('Cảng biển', 'Bến số 7, 8')), 'benxe');
+assert.equal(classifyInvestGroup(row('Hạ tầng kỹ thuật', 'Dự án Trung tâm dịch vụ ô tô Hương Trà')), 'dulich_tm');
+assert.equal(classifyInvestGroup(row('Hạ tầng kỹ thuật', 'Dịch vụ tổng hợp, kho bãi Kim Trà')), 'dulich_tm');
 
-assert.equal(classifyInvestGroup(row('Cảng biển', 'Bến số 7, 8')), 'khac');
 assert.equal(classifyInvestGroup(row('Hạ tầng kỹ thuật', 'HTKT mẫu')), 'khac');
 assert.equal(classifyInvestGroup(row('Công nghệ thông tin', 'Trung tâm CNTT')), 'cnc_dien');
 assert.equal(classifyInvestGroup(row('Thương mại, Dịch vụ và Du lịch; BĐS', 'Hỗn hợp')), 'khac');

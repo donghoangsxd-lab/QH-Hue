@@ -345,7 +345,7 @@ for (const [id, label] of [
   ['chungcu_tm', 'Chung cư thương mại'],
   ['nongnghiep', 'Nông nghiệp'],
   ['vanhoaxahoi', 'Văn hóa - Y tế - Giáo dục'],
-  ['benxe', 'Bến xe'],
+  ['benxe', 'Bến xe - Cảng biển'],
   ['baido', 'Bãi đỗ xe'],
   ['congvien', 'Công viên'],
   ['khac', 'Dự án khác'],

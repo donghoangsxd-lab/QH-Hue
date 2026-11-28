@@ -17,7 +17,7 @@ export const INVEST_GROUPS = [
   { id: 'chungcu_tm', label: 'Chung cư thương mại', title: 'Chung cư thương mại' },
   { id: 'nongnghiep', label: 'Nông nghiệp', title: 'Nông nghiệp' },
   { id: 'vanhoaxahoi', label: 'Văn hóa - Y tế - Giáo dục', title: 'Văn hóa - Y tế - Giáo dục' },
-  { id: 'benxe', label: 'Bến xe', title: 'Bến xe' },
+  { id: 'benxe', label: 'Bến xe - Cảng biển', title: 'Bến xe - Cảng biển' },
   { id: 'baido', label: 'Bãi đỗ xe', title: 'Bãi đỗ xe' },
   { id: 'congvien', label: 'Công viên', title: 'Công viên' },
   { id: 'khac', label: 'Dự án khác', title: 'Dự án khác' },
@@ -77,9 +77,13 @@ export function classifyInvestGroup(row, name, override) {
   // Tên cụ thể trước lĩnh vực (ưu tiên tách từ «Dự án khác» / nhóm thô cũ).
   // Không dùng \\b quanh chữ có dấu (JS coi «ư/ộ» là non-word).
   if (/sân\s*gôn|sân\s*golf|golf/.test(ten)) return 'sangon';
-  if (/bến\s*xe/.test(ten)) return 'benxe';
+  if (/bến\s*xe|cảng\s*biển|bến\s*số/.test(ten)) return 'benxe';
   if (/bãi\s*đỗ|bãi\s*đậu|đỗ\s*xe|đậu\s*xe|bãi\s*xe/.test(ten)) return 'baido';
   if (/công\s*viên/.test(ten)) return 'congvien';
+  // Trung tâm / dịch vụ tổng hợp (HTKT hoặc tên) → thương mại.
+  if (/trung\s*tâm\s*dịch\s*vụ|dịch\s*vụ\s*tổng\s*hợp|dịch\s*vụ\s*ô\s*tô|kho\s*bãi/.test(ten)) {
+    return 'dulich_tm';
+  }
 
   if (/nhà\s*máy\s*điện|điện\s*mặt\s*trời|điện\s*gió|nhiệt\s*điện/.test(ten)) return 'cnc_dien';
   if (/cụm\s*công\s*nghiệp|ccn\b/.test(ten)) return 'cum_cn';
@@ -113,7 +117,8 @@ export function classifyInvestGroup(row, name, override) {
   if (/bất động sản|^đô thị$/.test(lv) || /đô thị/.test(lv)) return 'khu_dt';
   if (/thương mại|du lịch|dịch vụ/.test(lv) && !/dịch vụ đô thị/.test(lv)) return 'dulich_tm';
 
-  if (/cảng biển|hạ tầng kỹ thuật|dịch vụ đô thị/.test(lv)) return 'khac';
+  if (/cảng biển/.test(lv)) return 'benxe';
+  if (/hạ tầng kỹ thuật|dịch vụ đô thị/.test(lv)) return 'khac';
 
   return 'khac';
 }

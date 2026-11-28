@@ -78,7 +78,7 @@ const GROUP_LOOK = {
   chungcu_tm: { icon: 'home', color: '#0369a1', edge: '#075985', label: 'Chung cư thương mại' },
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
   vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
-  benxe: { icon: 'road', color: '#64748b', edge: '#334155', label: 'Bến xe' },
+  benxe: { icon: 'road', color: '#64748b', edge: '#334155', label: 'Bến xe - Cảng biển' },
   baido: { icon: 'pin', color: '#94a3b8', edge: '#475569', label: 'Bãi đỗ xe' },
   congvien: { icon: 'leaf', color: '#16a34a', edge: '#166534', label: 'Công viên' },
   khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' },
