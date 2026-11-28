@@ -27,10 +27,14 @@ const TOOLS = {
   circle: { label: 'Vòng tròn', hint: 'Click tâm, rồi click 1 điểm trên đường tròn', points: 2 },
   text: { label: 'Chữ', hint: 'Click chỗ đặt chữ rồi gõ · Enter: ghi · Shift+Enter: xuống dòng · Esc: hủy' }
 };
-const COLORS = ['#f43f5e', '#facc15', '#22d3ee', '#a3e635', '#ffffff'];
+const COLORS = [
+  '#f43f5e', '#fb923c', '#facc15', '#a3e635', '#22c55e', '#14b8a6', '#22d3ee',
+  '#3b82f6', '#a78bfa', '#ec4899', '#ffffff', '#94a3b8', '#64748b', '#0f172a'
+];
 const CLOSE_PX = 10;        // click gần đỉnh đầu (px) → khép đa giác
 const DUP_PX = 4;           // click trùng đỉnh cuối (nháy đúp) → bỏ qua
 const VERTEX_HIT_PX = 16;   // đỉnh gần con trỏ trong bán kính này (px, theo mức phóng) sáng lên; chuột phải xóa đỉnh đó
+const HISTORY_MAX = 20;     // tối đa 20 snapshot trong ngăn xếp undo/redo
 
 const $ = (id) => document.getElementById(id);
 const hosts = new Map();    // bản đồ Leaflet → { group, draft, snap, edit }
@@ -42,6 +46,12 @@ let snapAt = -1;
 let snapHost = null;
 let snapMark = null;
 let color = COLORS[0];
+let textBold = false;
+let textItalic = false;
+let textUnderline = false;
+let history = [[]];         // snapshot mảng sketch đã serialize
+let historyIndex = 0;
+let suppressHistory = false;
 let dashed = false;
 const STROKE_DASH = '10,6';
 const STROKE_WEIGHTS = [
@@ -166,7 +176,7 @@ function setTextMarkerIcon(fg, displayPx) {
     if (!l.setIcon) return;
     l.setIcon(L.divIcon({
       className: 'sketch-text',
-      html: textHtml(s.text, s.color, px),
+      html: textHtml(s.text, s.color, px, s),
       iconSize: null,
       iconAnchor: [0, 0]
     }));
@@ -306,9 +316,11 @@ function applySketchSize() {
       );
     }
     paintShape(pickFg);
+    recordHistory();
   } else if (pickFg?.sketch?.tool === 'arrow' && pickFg.sketch.pts?.length >= 2) {
     pickFg.sketch.head = arrowHead(pickFg.sketch.pts[0], pickFg.sketch.pts[1]);
     paintShape(pickFg);
+    recordHistory();
   }
   syncSizeBtn();
 }
@@ -652,7 +664,7 @@ function buildTextView(sketch, host) {
   const marker = L.marker(sketch.pts[0], {
     icon: L.divIcon({
       className: 'sketch-text',
-      html: textHtml(sketch.text, sketch.color, px),
+      html: textHtml(sketch.text, sketch.color, px, sketch),
       iconSize: null,
       iconAnchor: [0, 0]
     }),
@@ -665,6 +677,134 @@ function buildTextView(sketch, host) {
   fg.sketch = sketch;
   fg.sketchHost = host;
   return fg;
+}
+
+function serializeSketch(s) {
+  if (!s) return null;
+  const out = {
+    tool: s.tool,
+    pts: plainPts(s.pts),
+    color: s.color,
+    dash: !!s.dash,
+    weight: strokeWeightOf(s.weight)
+  };
+  if (s.tool === 'text') {
+    out.text = s.text || '';
+    out.sizePx = s.sizePx || textSize();
+    out.heightM = s.heightM || 0;
+    out.mapLock = !!s.mapLock;
+    out.bold = !!s.bold;
+    out.italic = !!s.italic;
+    out.underline = !!s.underline;
+  }
+  if (s.tool === 'arrow' && s.head) out.head = plainPts(s.head);
+  return out;
+}
+
+function deserializeSketch(raw, host) {
+  const pts = asLatLngs(raw.pts || []);
+  if (raw.tool === 'text') {
+    return {
+      tool: 'text',
+      pts,
+      color: raw.color || color,
+      text: raw.text || '',
+      sizePx: raw.sizePx || textSize(),
+      heightM: raw.heightM || ((raw.sizePx || textSize()) * metersPerPixel(pts[0]?.lat || 16.46, host || map)),
+      mapLock: !!raw.mapLock,
+      bold: !!raw.bold,
+      italic: !!raw.italic,
+      underline: !!raw.underline
+    };
+  }
+  const sketch = {
+    tool: raw.tool,
+    pts,
+    color: raw.color || color,
+    dash: !!raw.dash,
+    weight: strokeWeightOf(raw.weight)
+  };
+  if (raw.tool === 'arrow' && raw.head?.length) sketch.head = asLatLngs(raw.head);
+  else if (raw.tool === 'arrow' && pts.length >= 2) sketch.head = arrowHead(pts[0], pts[1]);
+  return sketch;
+}
+
+function snapshotShapes() {
+  return shapes.map(item => serializeSketch(item.sketch)).filter(Boolean);
+}
+
+function recordHistory() {
+  if (suppressHistory) return;
+  const snap = snapshotShapes();
+  const cur = history[historyIndex];
+  if (cur && JSON.stringify(cur) === JSON.stringify(snap)) return;
+  history = history.slice(0, historyIndex + 1);
+  history.push(snap);
+  while (history.length > HISTORY_MAX) {
+    history.shift();
+  }
+  historyIndex = history.length - 1;
+}
+
+function restoreShapes(snap) {
+  suppressHistory = true;
+  try {
+    if (moveSession) endMove(false);
+    dropAdjust();
+    if (editor) {
+      const ed = editor;
+      editor = null;
+      ed.map.off('move zoom', placeEditor);
+      ed.el.remove();
+    }
+    hosts.forEach(h => h.group.clearLayers());
+    shapes = [];
+    pts = [];
+    clearSnap();
+    cursor = null;
+    hoverFg = null;
+    pickFg = null;
+    live = null;
+    const host = shownMaps()[0] || map;
+    (snap || []).forEach((raw) => {
+      const sketch = deserializeSketch(raw, host);
+      if (sketch) mountShape(sketch, host);
+    });
+  } finally {
+    suppressHistory = false;
+  }
+  syncButtons();
+}
+
+function canHistoryUndo() {
+  return historyIndex > 0;
+}
+
+function canHistoryRedo() {
+  return historyIndex < history.length - 1;
+}
+
+function sketchUndo() {
+  if (pts.length) {
+    pts.pop();
+    setSnap(cursor && drawMap && pts.length ? nearestSketchIndex(drawMap, cursor) : -1, drawMap);
+    renderDraft();
+    syncButtons();
+    return;
+  }
+  if (!canHistoryUndo()) return;
+  historyIndex -= 1;
+  restoreShapes(history[historyIndex]);
+}
+
+function sketchRedo() {
+  if (pts.length) {
+    showToast('Hãy kết thúc hoặc hủy nét đang vẽ trước khi làm lại.', 'info');
+    return;
+  }
+  if (!canHistoryRedo()) return;
+  historyIndex += 1;
+  restoreShapes(history[historyIndex]);
 }
 
 /** Gắn một hình phiên lên mọi bản đồ HT/QH; trả item + view trên preferMap (nếu có). */
@@ -697,6 +837,9 @@ function selectShape(fg) {
     strokeWeight = strokeWeightOf(fg.sketch.weight);
   } else {
     if (fg.sketch.color) color = fg.sketch.color;
+    textBold = !!fg.sketch.bold;
+    textItalic = !!fg.sketch.italic;
+    textUnderline = !!fg.sketch.underline;
     syncTextMapLockUi(!!fg.sketch.mapLock);
     const sizeSel = $('sketchTextSize');
     if (sizeSel && fg.sketch.sizePx) {
@@ -880,6 +1023,7 @@ function finishAdjust() {
   clearHandles();
   setEditChrome(false, m);
   m.closePopup();
+  recordHistory();
 }
 
 function cancelAdjust() {
@@ -953,6 +1097,7 @@ function endMove(keep) {
     placeMoved(session.fg);
     return;
   }
+  recordHistory();
 }
 
 function startMove(fg) {
@@ -1034,6 +1179,7 @@ function finish() {
   clearSnap();
   renderDraft();
   if (fg) selectShape(fg);
+  recordHistory();
 }
 
 function selectedWardSketchSource() {
@@ -1166,6 +1312,7 @@ export function cloneSelectionToSketch() {
     return null;
   }
   selectShape(created[created.length - 1]);
+  recordHistory();
   const bounds = L.featureGroup(created).getBounds?.();
   if (bounds?.isValid?.()) host.fitBounds(bounds, { padding: [36, 36], maxZoom: 18 });
   showToast(
@@ -1211,12 +1358,14 @@ function removeShape(fgOrItem) {
     hosts.get(host)?.group.removeLayer(fg);
   });
   shapes = shapes.filter(s => s !== item);
+  recordHistory();
   syncButtons();
 }
 
 function clearAllShapes() {
+  suppressHistory = true;
   dropAdjust();
-  closeEditor(true);
+  closeEditor(false);
   hosts.forEach(h => h.group.clearLayers());
   shapes = [];
   pts = [];
@@ -1224,6 +1373,8 @@ function clearAllShapes() {
   pickFg = null;
   const investRow = $('sketchInvestRow');
   if (investRow) investRow.hidden = true;
+  suppressHistory = false;
+  recordHistory();
   syncButtons();
 }
 
@@ -1298,11 +1449,20 @@ async function saveSketchAsInvest() {
 }
 
 // ================== CHỮ (MTEXT) ==================
-function textHtml(text, c, sizePx) {
-  return `<div class="sketch-text-body" style="color:${c};font-size:${sizePx}px;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+function textStyleCss(style = {}) {
+  const parts = [];
+  if (style.bold) parts.push('font-weight:700');
+  else parts.push('font-weight:400');
+  if (style.italic) parts.push('font-style:italic');
+  if (style.underline) parts.push('text-decoration:underline');
+  return parts.length ? `;${parts.join(';')}` : '';
 }
 
-function makeTextSketch(latlng, text, c, sizePx, m, mapLock) {
+function textHtml(text, c, sizePx, style = {}) {
+  return `<div class="sketch-text-body" style="color:${c};font-size:${sizePx}px${textStyleCss(style)}">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+}
+
+function makeTextSketch(latlng, text, c, sizePx, m, mapLock, style = {}) {
   const lock = !!mapLock;
   // heightM: cỡ thực địa lúc ghi (DXF + khi khóa theo bản đồ thì scale theo zoom)
   return {
@@ -1312,7 +1472,10 @@ function makeTextSketch(latlng, text, c, sizePx, m, mapLock) {
     text,
     sizePx,
     heightM: sizePx * metersPerPixel(latlng.lat, m),
-    mapLock: lock
+    mapLock: lock,
+    bold: !!(style.bold ?? textBold),
+    italic: !!(style.italic ?? textItalic),
+    underline: !!(style.underline ?? textUnderline)
   };
 }
 
@@ -1341,6 +1504,9 @@ function styleEditor() {
   if (!editor) return;
   editor.el.style.color = editor.color;
   editor.el.style.fontSize = `${editor.sizePx}px`;
+  editor.el.style.fontWeight = editor.bold ? '700' : '400';
+  editor.el.style.fontStyle = editor.italic ? 'italic' : 'normal';
+  editor.el.style.textDecoration = editor.underline ? 'underline' : 'none';
   fitEditor();
 }
 
@@ -1352,8 +1518,11 @@ function closeEditor(commit) {
   ed.el.remove();
   const text = ed.el.value.replace(/\s+$/, '');
   if (commit && text.trim()) {
-    const fg = mountShape(makeTextSketch(ed.latlng, text, ed.color, ed.sizePx, ed.map, ed.mapLock), ed.map);
+    const fg = mountShape(makeTextSketch(ed.latlng, text, ed.color, ed.sizePx, ed.map, ed.mapLock, {
+      bold: ed.bold, italic: ed.italic, underline: ed.underline
+    }), ed.map);
     if (fg) selectShape(fg);
+    recordHistory();
   } else if (!commit && ed.restoreSketch) {
     const fg = mountShape(ed.restoreSketch, ed.map);
     if (fg) selectShape(fg);
@@ -1377,7 +1546,10 @@ function openTextEditor(latlng, opts = {}, m) {
   const heightM = opts.heightM > 0 ? opts.heightM : sizePx * metersPerPixel(latlng.lat, host);
   editor = {
     el, latlng: L.latLng(latlng), color: opts.color || color, sizePx,
-    mapLock, heightM, restoreSketch: opts.restoreSketch || null, map: host
+    mapLock, heightM, restoreSketch: opts.restoreSketch || null, map: host,
+    bold: opts.bold != null ? !!opts.bold : textBold,
+    italic: opts.italic != null ? !!opts.italic : textItalic,
+    underline: opts.underline != null ? !!opts.underline : textUnderline
   };
   syncTextMapLockUi(mapLock);
   attachTelex(el, () => telexOn);
@@ -1458,25 +1630,119 @@ function onDblClick(e) {
   finish();
 }
 
+function closeSketchPops(exceptId) {
+  ['sketchColorPop', 'sketchWeightPop', 'sketchTextStylePop'].forEach((id) => {
+    const pop = $(id);
+    if (!pop || (exceptId && id === exceptId)) return;
+    pop.hidden = true;
+  });
+  const colorBtn = $('btnSketchColor');
+  if (colorBtn && exceptId !== 'sketchColorPop') colorBtn.setAttribute('aria-expanded', 'false');
+  const weightBtn = $('btnSketchWeight');
+  if (weightBtn && exceptId !== 'sketchWeightPop') weightBtn.setAttribute('aria-expanded', 'false');
+  const styleBtn = $('btnSketchTextStyle');
+  if (styleBtn && exceptId !== 'sketchTextStylePop') styleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSketchPop(id) {
+  const pop = $(id);
+  if (!pop) return;
+  const openPop = pop.hidden;
+  closeSketchPops(openPop ? id : null);
+  pop.hidden = !openPop;
+  const btn = id === 'sketchColorPop'
+    ? $('btnSketchColor')
+    : id === 'sketchWeightPop'
+      ? $('btnSketchWeight')
+      : $('btnSketchTextStyle');
+  if (btn) btn.setAttribute('aria-expanded', String(openPop));
+}
+
+function applyStrokeWeight(next) {
+  strokeWeight = strokeWeightOf(next);
+  const weightSel = $('sketchStrokeWeight');
+  if (weightSel && String(weightSel.value) !== String(strokeWeight)) weightSel.value = String(strokeWeight);
+  if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
+    pickFg.sketch.weight = strokeWeight;
+    paintShape(pickFg);
+    applyChrome(pickFg);
+    recordHistory();
+  }
+  if (pts.length) renderDraft();
+  syncButtons();
+}
+
+function applyTextStyleFlag(flag) {
+  if (flag === 'bold') textBold = !textBold;
+  else if (flag === 'italic') textItalic = !textItalic;
+  else if (flag === 'underline') textUnderline = !textUnderline;
+  else return;
+  if (editor) {
+    editor.bold = textBold;
+    editor.italic = textItalic;
+    editor.underline = textUnderline;
+    refocusEditor();
+  }
+  if (pickFg?.sketch?.tool === 'text') {
+    pickFg.sketch.bold = textBold;
+    pickFg.sketch.italic = textItalic;
+    pickFg.sketch.underline = textUnderline;
+    paintShape(pickFg);
+    recordHistory();
+  }
+  syncButtons();
+}
+
 function syncButtons() {
   document.querySelectorAll('#sketchPalette [data-tool]').forEach(b => {
     const on = b.dataset.tool === state.sketchTool;
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   });
-  document.querySelectorAll('#sketchPalette [data-color]').forEach(b => b.classList.toggle('active', b.dataset.color === color));
-  document.querySelectorAll('#sketchPalette [data-dash]').forEach(b => {
-    const on = (b.dataset.dash === '1') === dashed;
+  document.querySelectorAll('#sketchPalette [data-color]').forEach(b => {
+    const on = b.dataset.color === color;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  const dashBtn = $('btnSketchDash');
+  if (dashBtn) {
+    dashBtn.classList.toggle('active', dashed);
+    dashBtn.setAttribute('aria-pressed', String(dashed));
+    dashBtn.title = dashed ? 'Nét đứt (bật)' : 'Nét đứt (tắt = nét liền)';
+    const use = $('sketchDashUse');
+    if (use) use.setAttribute('href', dashed ? '#i-sk-dash' : '#i-sk-solid');
+  }
+  const swatch = $('sketchColorSwatch');
+  if (swatch) swatch.style.setProperty('--c', color);
+  const w = strokeWeightOf(strokeWeight);
+  const weightSel = $('sketchStrokeWeight');
+  if (weightSel && String(weightSel.value) !== String(w)) weightSel.value = String(w);
+  const weightMeta = STROKE_WEIGHTS.find(o => o.v === w) || STROKE_WEIGHTS[1];
+  const weightBtn = $('btnSketchWeight');
+  if (weightBtn) {
+    const tip = `Độ dày nét: ${weightMeta.label}`;
+    weightBtn.title = tip;
+    weightBtn.setAttribute('aria-label', tip);
+  }
+  const weightUse = document.querySelector('#sketchWeightIcon use');
+  if (weightUse) weightUse.setAttribute('href', `#i-sk-weight-${w}`);
+  document.querySelectorAll('#sketchWeightPop [data-weight]').forEach(b => {
+    const on = Number(b.dataset.weight) === w;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  const styleMap = { bold: textBold, italic: textItalic, underline: textUnderline };
+  document.querySelectorAll('#sketchTextStylePop [data-text-style]').forEach((b) => {
+    const on = !!styleMap[b.dataset.textStyle];
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   });
-  const weightSel = $('sketchStrokeWeight');
-  if (weightSel) {
-    const w = strokeWeightOf(strokeWeight);
-    if (String(weightSel.value) !== String(w)) weightSel.value = String(w);
-  }
-  const undo = $('btnSketchUndo'), clear = $('btnSketchClear'), save = $('btnSketchSave');
-  if (undo) undo.disabled = !pts.length && !shapes.length;
+  const styleBtn = $('btnSketchTextStyle');
+  if (styleBtn) styleBtn.classList.toggle('active', textBold || textItalic || textUnderline);
+  const undo = $('btnSketchUndo'), redo = $('btnSketchRedo');
+  const clear = $('btnSketchClear'), save = $('btnSketchSave');
+  if (undo) undo.disabled = !pts.length && !canHistoryUndo();
+  if (redo) redo.disabled = !!pts.length || !canHistoryRedo();
   if (clear) clear.disabled = !shapes.length;
   if (save) save.disabled = !shapes.length;
   const saveRow = $('sketchSaveRow');
@@ -1600,6 +1866,7 @@ function setOpen(on) {
   open = on;
   if (!on) {
     collapsed = false;
+    closeSketchPops();
     setTool(null);
   }
   syncButtons();
@@ -1640,6 +1907,7 @@ async function importSketchFile(file) {
   if (bounds.isValid()) host.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
   if (!open) setOpen(true);
   if (last) selectShape(last);
+  recordHistory();
   const extra = pack.dropped ? ` · bỏ qua ${pack.dropped}` : '';
   showToast(`✓ Đã nhập ${pack.shapes.length} hình ${kind}${extra}`, 'success');
 }
@@ -1682,6 +1950,9 @@ export function initSketchLayer() {
   const sketchBtn = $('btnSketch');
   sketchBtnTitle = sketchBtn?.title || '';
   pal?.querySelectorAll('[data-color]').forEach(b => { b.style.setProperty('--c', b.dataset.color); });
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest?.('#sketchPalette .sketch-pop-wrap')) closeSketchPops();
+  });
   sketchBtn?.addEventListener('click', () => setOpen(!open));
   $('btnSketchPin')?.addEventListener('click', () => {
     collapsed = false;
@@ -1702,18 +1973,32 @@ export function initSketchLayer() {
   $('sketchTextSize')?.addEventListener('change', applySketchSize);
   $('sketchTextMapLock')?.addEventListener('change', applyTextMapLock);
   $('sketchStrokeWeight')?.addEventListener('change', (e) => {
-    strokeWeight = strokeWeightOf(e.target.value);
-    if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
-      pickFg.sketch.weight = strokeWeight;
-      paintShape(pickFg);
-      applyChrome(pickFg);
-    }
-    if (pts.length) renderDraft();
-    syncButtons();
+    applyStrokeWeight(e.target.value);
   });
   pal?.addEventListener('click', (e) => {
     const t = e.target.closest('[data-tool]');
-    if (t) { setTool(state.sketchTool === t.dataset.tool ? null : t.dataset.tool); return; }
+    if (t) {
+      closeSketchPops();
+      setTool(state.sketchTool === t.dataset.tool ? null : t.dataset.tool);
+      return;
+    }
+    if (e.target.closest('#btnSketchColor')) {
+      toggleSketchPop('sketchColorPop');
+      return;
+    }
+    if (e.target.closest('#btnSketchWeight')) {
+      toggleSketchPop('sketchWeightPop');
+      return;
+    }
+    if (e.target.closest('#btnSketchTextStyle')) {
+      toggleSketchPop('sketchTextStylePop');
+      return;
+    }
+    const styleFlag = e.target.closest('[data-text-style]');
+    if (styleFlag) {
+      applyTextStyleFlag(styleFlag.dataset.textStyle);
+      return;
+    }
     const c = e.target.closest('[data-color]');
     if (c) {
       color = c.dataset.color;
@@ -1721,16 +2006,26 @@ export function initSketchLayer() {
       if (pickFg?.sketch) {
         pickFg.sketch.color = color;
         paintShape(pickFg);
+        recordHistory();
       }
-      renderDraft(); syncButtons(); return;
+      renderDraft();
+      closeSketchPops();
+      syncButtons();
+      return;
     }
-    const dashBtn = e.target.closest('[data-dash]');
-    if (dashBtn) {
-      dashed = dashBtn.dataset.dash === '1';
+    const weightBtn = e.target.closest('[data-weight]');
+    if (weightBtn) {
+      applyStrokeWeight(weightBtn.dataset.weight);
+      closeSketchPops();
+      return;
+    }
+    if (e.target.closest('#btnSketchDash')) {
+      dashed = !dashed;
       if (pickFg?.sketch && pickFg.sketch.tool !== 'text') {
         pickFg.sketch.dash = dashed;
         paintShape(pickFg);
         applyChrome(pickFg);
+        recordHistory();
       }
       if (pts.length) renderDraft();
       syncButtons();
@@ -1772,12 +2067,11 @@ export function initSketchLayer() {
       return;
     }
     if (e.target.closest('#btnSketchUndo')) {
-      if (pts.length) {
-        pts.pop();
-        setSnap(cursor && drawMap && pts.length ? nearestSketchIndex(drawMap, cursor) : -1, drawMap);
-        renderDraft();
-        syncButtons();
-      } else if (shapes.length) removeShape(shapes[shapes.length - 1]);
+      sketchUndo();
+      return;
+    }
+    if (e.target.closest('#btnSketchRedo')) {
+      sketchRedo();
       return;
     }
     if (e.target.closest('#btnSketchClear')) {
