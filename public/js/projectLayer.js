@@ -35,7 +35,7 @@ import { dossierAdjustments, adjustmentSiteCount, refreshAdjustLayer, ADJUST_LAY
 import { pickDecisionCite } from './decisionCite.js';
 import { namesOfProject } from './projectNames.js';
 import { consumeCatalogLinkPick } from './catalogLinkPick.js';
-import { displayNameForTenQH, SOTAY_DISPLAY_EVENT } from './soTayDisplay.js';
+import { displayNameForTenQH, decisionYearForTenQH, SOTAY_DISPLAY_EVENT } from './soTayDisplay.js';
 import { isSchemeArchived, SOTAY_VALIDITY_EVENT } from './schemeValidity.js';
 import {
   dossierMenuHtml, closeAllDossierMenus, toggleDossierMenu, latestDocOf
@@ -1040,11 +1040,36 @@ function scrollWithin(el) {
 
 const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
-function decisionLine(p) {
+function schemeCatalogHit(p) {
   const rows = catalogSchemeRecords();
-  const hit = rows.find(r => r && (
+  return rows.find(r => r && (
     r.slug === p.slug || r.catalogScheme === p.slug || r.name === p.name || r.name === p.short || r.name === p.full
-  ));
+  )) || null;
+}
+
+/** Năm từ chuỗi ngày quyết định (ISO / dd-mm-yyyy / YYYY-DD-MM lệch trong schemes.json). */
+function yearFromDecisionDate(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/(19\d{2}|20\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  return (y >= 1990 && y <= 2035) ? y : null;
+}
+
+/** Ưu tiên năm bảng tổng hợp (sổ tay); thiếu thì schemes.json.decisionDate. */
+function decisionYearOfProject(p) {
+  if (!p) return null;
+  const fromSheet = decisionYearForTenQH(p.name)
+    || decisionYearForTenQH(p.full)
+    || decisionYearForTenQH(p.short)
+    || decisionYearForTenQH(p.slug);
+  if (fromSheet) return fromSheet;
+  const hit = schemeCatalogHit(p);
+  return yearFromDecisionDate(hit && hit.decisionDate);
+}
+
+function decisionLine(p) {
+  const hit = schemeCatalogHit(p);
   return pickDecisionCite({
     fileName: (p.decision && p.decision.name) || '',
     schemeDecision: (hit && hit.decision) || '',
@@ -1148,6 +1173,31 @@ export function planLevelAllTip() {
  *  Không tính riêng ô đường sắt: chk_gt*rail mặc định checked chỉ là tùy chọn kèm GT, không phải lớp đang mở. */
 export function anyPlanLayerOn() {
   return LIST_LEVELS.some(l => eyeState(l.key).on);
+}
+
+/** Cấp quy hoạch (QHC25 | QHC | QHPK | QHCT) còn lớp / đồ án / GT trên bản đồ. */
+export function planLevelHasLayers(key) {
+  return !!(key && eyeState(key).on);
+}
+
+/** Tắt lớp + đồ án + GT một cấp; không đổi tab / trục đang chọn. */
+export function clearPlanLevelLayers(key) {
+  if (!key || !LIST_LEVELS.some(l => l.key === key)) return;
+  setLevelShown(key, false);
+  if (key === 'QHC25') {
+    const rail = document.getElementById('chk_gt25rail');
+    if (rail?.checked) {
+      rail.checked = false;
+      rail.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+  if (key === 'QHC') {
+    const rail = document.getElementById('chk_gt10rail');
+    if (rail?.checked) {
+      rail.checked = false;
+      rail.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
 }
 
 /** Tắt hết lớp và đồ án mọi cấp quy hoạch (kèm GT và đường sắt). Không đổi trục đang chọn. */
@@ -2629,7 +2679,6 @@ function overlapsForFocus(m, name) {
       rows = sameLevelOverlaps(schemes, {
         intersect: memoIntersect,
         area: geomArea,
-        focusedName: name,
         onlyName: name
       });
     } catch (err) {
@@ -2750,7 +2799,13 @@ function paintQhpkOverlaps(m, list) {
     if (!p || p.level !== 'QHPK') return;
     const geom = shownOutline(p);
     if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
-    schemes.push({ name: p.name, label: p.full || p.short || p.name, level: 'QHPK', geom });
+    schemes.push({
+      name: p.name,
+      label: p.full || p.short || p.name,
+      level: 'QHPK',
+      geom,
+      year: decisionYearOfProject(p)
+    });
   });
   overlapSchemeLists.set(m, schemes);
   overlapRowsForName.delete(m);

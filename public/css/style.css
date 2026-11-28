@@ -303,7 +303,8 @@ body.admin-urban-split .swipe-label { pointer-events: none; cursor: default; }
 }
 .map-title[data-view="HT"] { --tone: var(--cyan-rgb); }
 
-/* Chip tắt lớp trục khác: dưới tiêu đề, cùng mép trái với thẻ thông tin / #mapTitle. */
+/* Chip tắt lớp trục/tab khác: dưới tiêu đề, cùng mép trái với thẻ thông tin / #mapTitle.
+   Chữ cái A…F hoặc tab con A.1 / B.2… */
 .axis-foreign-strip {
   position: absolute;
   z-index: 1095;
@@ -312,16 +313,17 @@ body.admin-urban-split .swipe-label { pointer-events: none; cursor: default; }
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  max-width: min(220px, calc(100vw - var(--info-left) - var(--tb-btn) - 48px));
+  max-width: min(280px, calc(100vw - var(--info-left) - var(--tb-btn) - 48px));
   pointer-events: auto;
 }
 .axis-foreign-strip[hidden] { display: none !important; }
 .axis-foreign-chip {
   box-sizing: border-box;
-  width: 24px;
+  min-width: 24px;
+  width: auto;
   height: 24px;
   margin: 0;
-  padding: 0;
+  padding: 0 5px;
   border: 1px solid var(--axis-chip-border);
   border-radius: var(--r-sm);
   background: var(--bg-dark);
@@ -9225,25 +9227,52 @@ body.project-review.la-page #projectReviewHost {
 }
 .axis-arch-list .arch-doc-open { display: block; width: 100%; }
 #axisKienTruc .pl-head { text-transform: none; letter-spacing: 0; }
-#axisKienTruc .project-row,
-#dtList .project-row { align-items: flex-start; }
-#axisKienTruc .project-name,
-#dtList .project-name { align-items: flex-start; }
-#axisKienTruc .project-name input,
-#dtList .project-name input { margin-top: 3px; }
-#axisKienTruc .project-name span,
-#dtList .project-name span { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-#axisKienTruc .project-tools,
-#dtList .dt-area { align-self: center; min-width: 4.5em; text-align: right; }
-#dtList .dt-area.is-miss { color: var(--axis-color-muted); }
-#dtList .project-tools { margin-top: 1px; }
-#dtList .dt-dvtm-sub { margin: 0 0 4px; }
-#dtList .dt-dvtm-sub > .pl-hrow { position: sticky; top: 0; z-index: 1; }
-#dtList .dt-dvtm-sub > .pl-hrow .pl-head {
-  text-transform: none; letter-spacing: 0; font-size: var(--axis-fs-row); cursor: default;
+#axisKienTruc .project-row { align-items: flex-start; }
+#axisKienTruc .project-name { align-items: flex-start; }
+#axisKienTruc .project-name input { margin-top: 3px; }
+#axisKienTruc .project-name span { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+#axisKienTruc .project-tools { align-self: center; }
+#dtList .dt-table {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+  font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color);
 }
-#dtList .dt-dvtm-sub > .pl-hrow .pl-head .ico { transform: none; }
-#dtList .dt-dvtm-sub > .pl-body { padding-left: 4px; }
+#dtList .dt-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 4px 3px; text-align: left; font-weight: 700; font-size: var(--axis-fs-chip);
+  color: var(--axis-color-muted); background: var(--axis-bg, #fff);
+  border-bottom: 1px solid var(--axis-chip-border, rgba(0,0,0,.12));
+  white-space: nowrap;
+}
+#dtList .dt-table .dt-th-stt,
+#dtList .dt-table .dt-td-stt { width: 2.2em; text-align: right; color: var(--axis-color-muted); }
+#dtList .dt-table .dt-th-area,
+#dtList .dt-table .dt-td-area,
+#dtList .dt-table .dt-th-scale,
+#dtList .dt-table .dt-td-scale { width: 5.2em; text-align: right; }
+#dtList .dt-table .dt-th-bound,
+#dtList .dt-table .dt-td-bound { width: 4.2em; text-align: center; }
+#dtList .dt-table .dt-th-act,
+#dtList .dt-table .dt-td-act { width: 2em; text-align: center; }
+#dtList .dt-table td { padding: 3px 3px; vertical-align: middle; border-bottom: 1px solid rgba(0,0,0,.06); }
+#dtList .dt-table .dt-td-name { min-width: 0; }
+#dtList .dt-name-btn {
+  display: block; width: 100%; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; font-weight: 600; color: inherit; text-align: left; cursor: pointer;
+  overflow-wrap: anywhere; white-space: normal;
+}
+#dtList .dt-name-btn:hover { color: var(--text-strong); text-decoration: underline; text-underline-offset: 2px; }
+#dtList .dt-table .dt-td-area.is-miss,
+#dtList .dt-table .dt-td-scale.is-miss { color: var(--axis-color-muted); }
+#dtList .dt-bound { font-size: var(--axis-fs-chip); font-weight: 700; }
+#dtList .dt-bound.is-yes { color: #15803d; }
+#dtList .dt-bound.is-no,
+#dtList .dt-bound.is-pending { color: var(--axis-color-muted); }
+#dtList .dt-bound.is-pending { color: #b45309; }
+#dtList .dt-tr.is-picked { background: rgba(var(--cyan-rgb), 0.12); box-shadow: inset 3px 0 0 var(--accent-cyan); }
+#dtList .dt-tr.is-picked .dt-name-btn { color: var(--text-strong); font-weight: 700; }
+#dtList .dt-tr.is-sum td { font-weight: 700; border-bottom: 0; background: rgba(0,0,0,.03); }
+#dtList .dt-sum-note { display: block; font-weight: 500; font-size: var(--axis-fs-chip); color: var(--axis-color-muted); }
+#dtList .pl-group > .pl-body { padding: 0 2px 6px; }
 #axisKienTruc .project-dossier-row,
 #dtList .project-dossier-row { align-items: flex-start; }
 #axisKienTruc .project-dossier-meta,

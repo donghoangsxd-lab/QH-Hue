@@ -133,11 +133,14 @@ assert.ok(filterCatalogRows(merged, { status: 'chi_so_tay' }).length >= 1);
 assert.equal(missingMap.status, 'chi_so_tay');
 
 const invest = investRowsFromItems([
-  { id: 'a', title: 'Dự án X', sheet: { 'Địa điểm': 'Phường Đúc', 'Lĩnh vực': 'Du lịch' }, hasBoundary: true, areaText: '12 ha', dtGroup: 'dvtm' },
+  { id: 'a', title: 'NMĐ 50MW Phong Điền', sheet: { 'Địa điểm': 'Phường Đúc', 'Lĩnh vực': 'Du lịch' }, hasBoundary: true, areaText: '12 ha', dtGroup: 'cnc_dien' },
   { id: 'b', title: 'Dự án Y', sheet: null, hasBoundary: false, sheetOnly: true, areaText: '', dtGroup: 'khac' }
 ]);
 assert.equal(invest.length, 2);
-assert.equal(filterCatalogRows(invest, { level: 'dvtm' }).length, 1);
+assert.equal(filterCatalogRows(invest, { level: 'cnc_dien' }).length, 1);
+assert.equal(invest.find(r => r.id === 'a')?.scale, '50 MW');
+assert.equal(invest.find(r => r.id === 'a')?.areaText, '12 ha');
+assert.equal(invest.find(r => r.id === 'b')?.scale, '—');
 
 const csv = rowsToCsv(filterCatalogRows(merged, {}), 'plan');
 assert.match(csv, /Tên quy hoạch/);
@@ -196,7 +199,7 @@ assert.ok(wardStats.qhpk[iThuan] >= 1);
 assert.ok(wardStats.qhpk[iAnCuu] + wardStats.qhct[iAnCuu] + wardStats.qhc[iAnCuu] >= 1);
 
 assert.ok(catalogFilterOptions('plan').some(o => o.value === 'QHPK'));
-assert.ok(catalogFilterOptions('invest').some(o => o.value === 'dvtm'));
+assert.ok(catalogFilterOptions('invest').some(o => o.value === 'cnc_dien'));
 assert.equal(planYearOf('18/11/2013'), 2013);
 assert.equal(nam.year, 2013);
 assert.equal(nam.quyetDinh, '23/QĐ-UBND');
@@ -330,14 +333,22 @@ assert.equal(patch.ten, 'Dieu chinh QHPK Khu A');
 assert.equal(patch.dienTichHa, 400);
 assert.equal(patch.danSo, '18.000');
 
-const { displayNameForTenQH, rebuildSoTayDisplayFromPlanRows } = await import('../public/js/soTayDisplay.js');
+const { displayNameForTenQH, decisionYearForTenQH, rebuildSoTayDisplayFromPlanRows } = await import('../public/js/soTayDisplay.js');
 rebuildSoTayDisplayFromPlanRows([
-  { hasBoundary: true, zoomKey: 'QHPK Khu A An Van Duong', name: 'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương' }
+  {
+    hasBoundary: true,
+    zoomKey: 'QHPK Khu A An Van Duong',
+    name: 'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương',
+    year: 2017,
+    slug: 'qhpk-khu-a'
+  }
 ]);
 assert.equal(
   displayNameForTenQH('QHPK Khu A An Van Duong'),
   'Điều chỉnh QHPK Khu A - Đô thị mới An Vân Dương'
 );
+assert.equal(decisionYearForTenQH('QHPK Khu A An Van Duong'), 2017);
+assert.equal(decisionYearForTenQH('qhpk-khu-a'), 2017);
 
 // Hết hiệu lực: patch hieuLuc false → hàng archived; schemeValidity nhận diện theo zoomKey/slug.
 const expiredEdits = mergeSoTayEdits(sheet, {

@@ -58,6 +58,86 @@ export function investGroupLabel(id) {
   return INVEST_GROUPS.find(g => g.id === key)?.label || 'Dự án khác';
 }
 
+/**
+ * Chỉ tiêu quy mô theo nhóm (cột bảng F). Nhóm không liệt kê → chỉ diện tích.
+ * valueKey Admin: sheet._quyMo (số); _quyMoUnit đồng bộ đơn vị khi lưu.
+ */
+export const INVEST_SCALE = {
+  cnc_dien: { label: 'Công suất', unit: 'MW', parse: /(\d+(?:[.,]\d+)?)\s*MW/i },
+  chungcu_tm: { label: 'Căn hộ', unit: 'căn', parse: /(\d+(?:[.,]\d+)?)\s*căn/i },
+  noxh: { label: 'Căn hộ', unit: 'căn', parse: /(\d+(?:[.,]\d+)?)\s*căn/i },
+  khu_dt: { label: 'Dân số', unit: 'người', parse: /(\d+(?:[.,]\d+)?)\s*(?:người|dân(?:\s*số)?)/i },
+  kdc_nt: { label: 'Dân số', unit: 'người', parse: /(\d+(?:[.,]\d+)?)\s*(?:người|dân(?:\s*số)?)/i },
+  baido: { label: 'Số chỗ', unit: 'chỗ', parse: /(\d+(?:[.,]\d+)?)\s*chỗ/i },
+  sangon: { label: 'Quy mô', unit: 'lỗ', parse: /(\d+)\s*lỗ/i }
+};
+
+const KML_SCALE_KEY = /công\s*suất|\bmw\b|căn|dân\s*số|chỗ|quy\s*mô|công\s*suat/i;
+
+export function investScaleOf(groupId) {
+  const id = normalizeInvestGroupId(groupId);
+  return id && INVEST_SCALE[id] ? INVEST_SCALE[id] : null;
+}
+
+function parseScaleNumber(raw) {
+  let s = String(raw || '').replace(/\s/g, '');
+  if (!s) return null;
+  // 12.000 / 1.234.567,5 (VN) hoặc 12,000.5 (US)
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+  else s = s.replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Lấy số từ chuỗi theo regex nhóm (tên / KML / ô Admin). */
+export function parseInvestScaleText(text, groupId) {
+  const spec = investScaleOf(groupId);
+  if (!spec || !text) return null;
+  const m = String(text).match(spec.parse);
+  if (!m) return null;
+  return parseScaleNumber(m[1]);
+}
+
+/**
+ * Ưu tiên: Admin `_quyMo` → ExtendedData KML → parse tên.
+ * Trả về { value, unit, label, source } hoặc null nếu nhóm không có cột / thiếu số.
+ */
+export function pickInvestScale({ groupId, sheet, title, kml } = {}) {
+  const spec = investScaleOf(groupId);
+  if (!spec) return null;
+  const adminRaw = sheet && sheet._quyMo != null ? String(sheet._quyMo).trim() : '';
+  if (adminRaw) {
+    const n = parseScaleNumber(adminRaw) ?? parseInvestScaleText(adminRaw, groupId);
+    if (n != null) {
+      return {
+        value: n,
+        unit: String(sheet._quyMoUnit || spec.unit),
+        label: spec.label,
+        source: 'admin'
+      };
+    }
+  }
+  if (kml && typeof kml === 'object') {
+    for (const [key, val] of Object.entries(kml)) {
+      if (!KML_SCALE_KEY.test(key) && !spec.parse.test(String(val))) continue;
+      const n = parseInvestScaleText(`${key} ${val}`, groupId) ?? parseScaleNumber(val);
+      if (n != null) return { value: n, unit: spec.unit, label: spec.label, source: 'kml' };
+    }
+  }
+  const fromName = parseInvestScaleText(title || '', groupId);
+  if (fromName != null) return { value: fromName, unit: spec.unit, label: spec.label, source: 'name' };
+  return { value: null, unit: spec.unit, label: spec.label, source: '' };
+}
+
+export function formatInvestScale(scale) {
+  if (!scale) return '—';
+  if (scale.value == null || !Number.isFinite(scale.value)) return '—';
+  const n = scale.value;
+  const text = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+  return scale.unit ? `${text} ${scale.unit}` : text;
+}
+
 function field(row, re) {
   if (!row) return '';
   const key = Object.keys(row).find(k => re.test(k) && !String(k).startsWith('_'));

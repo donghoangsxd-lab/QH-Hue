@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { sameLevelOverlaps, overlapTip, pickPlanningLot } from '../public/js/qhpkOverlap.js';
+import { sameLevelOverlaps, overlapTip, pickPlanningLot, formatOverlapHa } from '../public/js/qhpkOverlap.js';
 
 const box = (x0, y0, x1, y1) => ({
   type: 'Polygon',
@@ -29,47 +29,56 @@ function area(geom) {
   return (b[2] - b[0]) * (b[3] - b[1]) * 1e6;
 }
 
+assert.equal(formatOverlapHa(500000), '50ha');
+assert.equal(formatOverlapHa(12000), '1,2ha');
+
 const west = box(0, 0, 1, 1);
 const east = box(0.5, 0, 1.5, 1);
 const far = box(3, 3, 4, 4);
 
 const rows = sameLevelOverlaps([
-  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west },
-  { name: 'pk-b', label: 'QHPK Thuận Hòa', level: 'QHPK', geom: east },
+  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west, year: 2017 },
+  { name: 'pk-b', label: 'QHPK Thuận Hòa', level: 'QHPK', geom: east, year: 2020 },
   { name: 'pk-c', label: 'QHPK xa', level: 'QHPK', geom: far },
   { name: 'ct', label: 'QHCT nội đô', level: 'QHCT', geom: east }
-], { intersect, area, focusedName: '' });
+], { intersect, area });
 
 assert.equal(rows.length, 1);
 assert.deepEqual(rows[0].names, ['pk-a', 'pk-b']);
-assert.match(rows[0].tip, /TT phía Tây và Thuận Hòa/);
-assert.match(rows[0].tip, /cần kiểm tra pháp lý theo đồ án được phê duyệt sau/);
+assert.match(rows[0].tip, /TT phía Tây \(2017\)/);
+assert.match(rows[0].tip, /Thuận Hòa \(2020\)/);
+assert.match(rows[0].tip, /chồng lấn ranh giới/);
+assert.match(rows[0].tip, /Thực hiện theo đồ án được phê duyệt sau và có hiệu lực thay thế/);
 assert.doesNotMatch(rows[0].tip, /QHPK QHPK/);
 assert.ok(rows[0].m2 > 200);
 
 const focused = sameLevelOverlaps([
-  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west },
-  { name: 'pk-b', label: 'Quy hoạch phân khu Thuận Hòa', level: 'QHPK', geom: east }
-], { intersect, area, focusedName: 'pk-a' });
+  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west, year: 2017 },
+  { name: 'pk-b', label: 'Quy hoạch phân khu Thuận Hòa', level: 'QHPK', geom: east, year: 2020 }
+], { intersect, area, onlyName: 'pk-a' });
 assert.equal(focused.length, 1);
-assert.match(focused[0].tip, /đồ án QHPK Thuận Hòa/);
-assert.doesNotMatch(focused[0].tip, /phía Tây/);
+assert.match(focused[0].tip, /TT phía Tây \(2017\)/);
+assert.match(focused[0].tip, /Thuận Hòa \(2020\)/);
 assert.equal(
-  overlapTip('QHPK A', 'QHPK B', { nameA: 'a', nameB: 'b', focusedName: 'b' }),
-  'Phạm vi thuộc đồ án QHPK A, cần kiểm tra pháp lý theo đồ án được phê duyệt sau'
+  overlapTip('QHPK A', 'QHPK B', { areaM2: 500000, yearA: 2017, yearB: 2020 }),
+  'Phạm vi 50ha chồng lấn ranh giới QHPK A (2017) và QHPK B (2020). Thực hiện theo đồ án được phê duyệt sau và có hiệu lực thay thế'
+);
+assert.equal(
+  overlapTip('QHPK B', 'QHPK A', { areaM2: 500000, yearA: 2020, yearB: 2017 }),
+  'Phạm vi 50ha chồng lấn ranh giới QHPK A (2017) và QHPK B (2020). Thực hiện theo đồ án được phê duyệt sau và có hiệu lực thay thế'
 );
 
 const sliver = sameLevelOverlaps([
   { name: 'pk-a', label: 'A', geom: west },
   { name: 'pk-b', label: 'B', geom: east }
-], { intersect, area: () => 10, focusedName: '' });
+], { intersect, area: () => 10 });
 assert.equal(sliver.length, 0);
 
 const onlyA = sameLevelOverlaps([
-  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west },
-  { name: 'pk-b', label: 'QHPK Thuận Hòa', level: 'QHPK', geom: east },
+  { name: 'pk-a', label: 'QHPK TT phía Tây', level: 'QHPK', geom: west, year: 2017 },
+  { name: 'pk-b', label: 'QHPK Thuận Hòa', level: 'QHPK', geom: east, year: 2020 },
   { name: 'pk-c', label: 'QHPK xa', level: 'QHPK', geom: far }
-], { intersect, area, focusedName: 'pk-a', onlyName: 'pk-a' });
+], { intersect, area, onlyName: 'pk-a' });
 assert.equal(onlyA.length, 1);
 assert.deepEqual(onlyA[0].names, ['pk-a', 'pk-b']);
 assert.match(onlyA[0].tip, /Thuận Hòa/);

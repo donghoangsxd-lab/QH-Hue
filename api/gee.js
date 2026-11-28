@@ -196,10 +196,16 @@ function investProjectName(row) {
 function parseInvestFields(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const out = {};
-  Object.keys(raw).slice(0, 40).forEach(k => {
+  Object.keys(raw).slice(0, 42).forEach(k => {
     const key = cleanInvestText(k, 80);
-    if (!key || key.startsWith('_')) return;
+    if (!key) return;
+    // _quyMo / _quyMoUnit: chỉ tiêu quy mô Admin (trục F); các khóa _ khác vẫn bỏ.
+    if (key.startsWith('_') && key !== '_quyMo' && key !== '_quyMoUnit') return;
     const val = cleanInvestText(raw[k], 2000);
+    if (key === '_quyMo' || key === '_quyMoUnit') {
+      out[key] = val || '';
+      return;
+    }
     if (val) out[key] = val;
   });
   return investProjectName(out) ? out : null;

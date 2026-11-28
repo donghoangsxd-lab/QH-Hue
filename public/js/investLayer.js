@@ -14,7 +14,8 @@ import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatc
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import {
   classifyInvestGroup, INVEST_GROUPS,
-  INVEST_TAB_ALL, isInvestGroupId, investGroupLabel
+  INVEST_TAB_ALL, isInvestGroupId, investGroupLabel,
+  investScaleOf, pickInvestScale, formatInvestScale
 } from './investClassify.js';
 import {
   sheetSig, parseInvestEditsStore, applyInvestEditsClient, editsWorthApplying
@@ -137,7 +138,6 @@ let pack = null;
 let sheetRows = [];
 let sheetOnly = [];
 const investOpen = new Set();
-const investHidden = new Set();
 let investPicked = '';
 let investDrawRaf = 0;
 let leftGroup = null;
@@ -246,15 +246,9 @@ function rowGroupId(row, title) {
   return classifyInvestGroup(row, title, row?._groupId);
 }
 
-/** Nút #btnAxisAll trên F: cả dự án thuộc tab đang chọn. */
+/** Nút #btnAxisAll trên F: bật/tắt cả lớp (chk_invest), không tick từng dự án. */
 export function investAxisAllOn() {
-  if (!$('chk_invest')?.checked) return false;
-  const items = projectsForTab();
-  if (!items.length) return true;
-  return items.every(p => {
-    const id = projectKey(p);
-    return id && !investHidden.has(id);
-  });
+  return !!$('chk_invest')?.checked;
 }
 
 export function investAxisAllTip() {
@@ -265,29 +259,10 @@ export function investAxisAllTip() {
 }
 
 export function toggleInvestAxisAll() {
-  const tab = activeDtTab();
-  const items = projectsForTab(tab);
-  const turnOn = !investAxisAllOn();
-  if (turnOn) {
-    items.forEach(p => {
-      const id = projectKey(p);
-      if (id) investHidden.delete(id);
-    });
-    const box = $('chk_invest');
-    if (box && !box.checked) {
-      box.checked = true;
-      box.dispatchEvent(new Event('change', { bubbles: true }));
-    } else {
-      queueInvestDraw();
-    }
-  } else {
-    items.forEach(p => {
-      const id = projectKey(p);
-      if (id) investHidden.add(id);
-    });
-    queueInvestDraw();
-  }
-  paintInvestList({ tab, counts: false });
+  const box = $('chk_invest');
+  if (!box) return;
+  box.checked = !box.checked;
+  box.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function toolBusy() {
@@ -806,6 +781,13 @@ function overviewHtml(st, props) {
   const priority = entry(row, /ưu tiên/i);
   const listed = listedArea(row);
   const noBound = !st.geom;
+  const groupId = st.dtGroup || rowGroupId(row, titleOf(props));
+  const scale = pickInvestScale({
+    groupId,
+    sheet: row,
+    title: titleOf(props),
+    kml: props.kml
+  });
   const ambiguous = !row && !!props._ambiguous;
   const matchNote = noBound || row
     ? ''
@@ -815,12 +797,16 @@ function overviewHtml(st, props) {
   const goalHtml = goal
     ? `<details class="invest-goal"><summary>Mục tiêu và nhu cầu đầu tư</summary><p>${escapeHtml(goal)}</p></details>`
     : '';
-  const metrics = metricCellsHtml([
+  const metricList = [
     { tone: 'area', icon: 'ruler', label: 'Diện tích ranh', value: st.areaText || (noBound ? '—' : '—') },
     { tone: 'cover', icon: 'layers', label: 'Diện tích DS', value: listed || '—' },
     { tone: 'floors', icon: 'flag', label: 'Ưu tiên', value: priority || '—' },
     { tone: 'far', icon: 'pin', label: 'Địa điểm', value: place || '—' }
-  ]);
+  ];
+  if (scale) {
+    metricList[2] = { tone: 'floors', icon: 'flag', label: scale.label, value: formatInvestScale(scale) };
+  }
+  const metrics = metricCellsHtml(metricList);
   const landuse = landUseBannerHtml(sectorText || 'Chưa rõ lĩnh vực');
   return `${metrics}${landuse}${goalHtml}${matchNote}${adminToolsHtml(st)}${groupHtml(st)}`;
 }
@@ -866,10 +852,11 @@ function editPairs(props) {
   return pairs;
 }
 
-function editRowHtml(key, value, fresh) {
+function editRowHtml(key, value, fresh, label) {
+  const shown = label || key;
   const keyHtml = fresh
     ? '<input class="invest-edit-key" maxlength="80" placeholder="Tên trường">'
-    : `<span class="invest-edit-key" data-key="${escapeHtml(key)}">${escapeHtml(key)}</span>`;
+    : `<span class="invest-edit-key" data-key="${escapeHtml(key)}">${escapeHtml(shown)}</span>`;
   return `<label class="invest-edit-row">${keyHtml}<textarea class="invest-edit-val" maxlength="2000" rows="2">${escapeHtml(value || '')}</textarea></label>`;
 }
 
@@ -1231,8 +1218,7 @@ function investDrawSig(drawFeatures) {
     activeDtTab(),
     activeDtScope(),
     card?.feature?.properties?._key || '',
-    investPicked || '',
-    investHidden.size
+    investPicked || ''
   ].join('|');
 }
 
@@ -1262,7 +1248,7 @@ function shownPack(features) {
   const drop = new Set();
   projectList(features).forEach(p => {
     const wrongGroup = !isAllTab(tab) && p.dtGroup !== tab;
-    if (wrongGroup || !placeMatchesScope(p, ward) || investHidden.has(projectKey(p))) {
+    if (wrongGroup || !placeMatchesScope(p, ward)) {
       p.members.forEach(f => drop.add(f));
     }
   });
@@ -1301,7 +1287,7 @@ function drawOn(m, features) {
     }
   });
   group.addTo(m);
-  tabProjects.filter(p => !investHidden.has(projectKey(p))).forEach(p => {
+  tabProjects.forEach(p => {
     const keep = p.members.some(f => drawn.has(f)) || projectKey(p) === investPicked
       || (card && (card.feature === p.feature || card.members?.includes(p.feature)));
     if (!keep) return;
@@ -1766,7 +1752,13 @@ function beginEdit() {
   if (card.grouping) { card.grouping = false; paintPicks(); }
   card.editing = true;
   if (sw) sw.hidden = true;
-  pages.innerHTML = `<div class="invest-edit-form">${editPairs(props).map(([k, v]) => editRowHtml(k, v, false)).join('')}
+  const groupId = card.dtGroup || rowGroupId(props.sheet, titleOf(props));
+  const scaleSpec = investScaleOf(groupId);
+  const quyMo = props.sheet && props.sheet._quyMo != null ? String(props.sheet._quyMo) : '';
+  const scaleRow = scaleSpec
+    ? editRowHtml('_quyMo', quyMo, false, `${scaleSpec.label} (${scaleSpec.unit})`)
+    : '';
+  pages.innerHTML = `<div class="invest-edit-form">${editPairs(props).map(([k, v]) => editRowHtml(k, v, false)).join('')}${scaleRow}
     <button type="button" class="invest-add">Thêm trường</button>
     <div class="invest-edit-actions"><button type="button" class="proof-btn invest-save">Lưu</button><button type="button" class="invest-cancel">Hủy</button></div>
     </div>`;
@@ -1885,7 +1877,8 @@ async function saveEdit() {
     const keyEl = row.querySelector('.invest-edit-key');
     const key = String(keyEl?.dataset?.key || keyEl?.value || '').trim();
     const val = String(row.querySelector('.invest-edit-val')?.value || '').trim();
-    if (key && val) fields[key] = val;
+    if (!key || key === '_quyMo' || key === '_quyMoUnit') return;
+    if (val) fields[key] = val;
   });
   if (!sheetProjectName(fields)) {
     showToast('Cần giữ tên dự án', 'error');
@@ -1908,6 +1901,19 @@ async function saveEdit() {
       moved = true;
     } else if (isInvestGroupId(next)) {
       groupId = next;
+    }
+  }
+  const scaleSpec = investScaleOf(groupId);
+  const quyEl = el.querySelector('.invest-edit-key[data-key="_quyMo"]');
+  if (scaleSpec && quyEl) {
+    const raw = String(quyEl.closest('.invest-edit-row')?.querySelector('.invest-edit-val')?.value || '').trim();
+    if (raw) {
+      const picked = pickInvestScale({ groupId, sheet: { _quyMo: raw }, title: '' });
+      fields._quyMo = picked?.value != null ? String(picked.value) : raw;
+      fields._quyMoUnit = scaleSpec.unit;
+    } else {
+      fields._quyMo = '';
+      fields._quyMoUnit = '';
     }
   }
   st.saving = true;
@@ -2418,26 +2424,118 @@ function investDossierRows(p) {
   return rows;
 }
 
-function investRow(p, n) {
+function scaleOfProject(p) {
+  return pickInvestScale({
+    groupId: p.dtGroup,
+    sheet: p.sheet,
+    title: p.title,
+    kml: p.feature?.properties?.kml
+  });
+}
+
+/** Diện tích ha để cộng tổng nhóm; m² / thiếu → null. */
+function areaHaOfText(text) {
+  const s = String(text || '').trim();
+  if (!s || s === '-' || s === '—') return null;
+  const m = s.match(/([\d.,]+)\s*ha\b/i);
+  if (!m) return null;
+  let raw = m[1].replace(/\s/g, '');
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) raw = raw.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) raw = raw.replace(/,/g, '');
+  else raw = raw.replace(',', '.');
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function investTableHead(groupId) {
+  const spec = investScaleOf(groupId);
+  const scaleTh = spec
+    ? `<th class="dt-th-scale">${escapeHtml(spec.label)}</th>`
+    : '';
+  return `<thead><tr>
+    <th class="dt-th-stt">STT</th>
+    <th class="dt-th-name">Tên dự án</th>
+    <th class="dt-th-area">Diện tích</th>
+    ${scaleTh}
+    <th class="dt-th-bound">Ranh</th>
+    <th class="dt-th-act" aria-label="Thông tin"></th>
+  </tr></thead>`;
+}
+
+function investRow(p, n, groupId) {
   const id = projectKey(p);
   const safe = escapeHtml(id);
   const open = investOpen.has(id);
-  const shown = !investHidden.has(id);
-  const rows = investDossierRows(p);
   const pending = pendingForProject(p);
-  const badge = pending.length
-    ? ` <small class="layer-hint is-pending">${pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh'}</small>`
-    : (p.hasBoundary ? '' : ' <small class="layer-hint">Chưa có ranh</small>');
   const area = p.areaText || areaTextOf(p.sheet, p.geom) || '-';
-  const blob = [p.title, area, ...rows.map(([, v]) => v)].filter(Boolean).join(' ');
-  return `<div class="project-row${shown ? '' : ' is-off'}${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
-      <label class="project-name" title="${escapeHtml(p.title || '')}">
-        <input type="checkbox" data-invest="${safe}"${shown ? ' checked' : ''} title="Hiện công trình trên bản đồ"><span data-invest-focus="${safe}">${n}. ${escapeHtml(p.title || id)}${badge}</span></label>
-      <span class="project-meta dt-area${area === '-' ? ' is-miss' : ''}">${escapeHtml(area)}</span>
-      <span class="project-tools">
+  const scale = scaleOfProject(p);
+  const spec = investScaleOf(groupId || p.dtGroup);
+  const scaleCell = spec
+    ? `<td class="dt-td-scale${scale?.value == null ? ' is-miss' : ''}">${escapeHtml(formatInvestScale(scale))}</td>`
+    : '';
+  const bound = pending.length
+    ? `<span class="dt-bound is-pending">${pending[0].replace ? 'Chờ thay' : 'Chờ duyệt'}</span>`
+    : (p.hasBoundary
+      ? '<span class="dt-bound is-yes">Có</span>'
+      : '<span class="dt-bound is-no">Chưa</span>');
+  const blob = [p.title, area, formatInvestScale(scale)].filter(Boolean).join(' ');
+  return `<tr class="dt-tr${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
+      <td class="dt-td-stt">${n}</td>
+      <td class="dt-td-name"><button type="button" class="dt-name-btn" data-invest-focus="${safe}" title="${escapeHtml(p.title || '')}">${escapeHtml(p.title || id)}</button></td>
+      <td class="dt-td-area${area === '-' ? ' is-miss' : ''}">${escapeHtml(area)}</td>
+      ${scaleCell}
+      <td class="dt-td-bound">${bound}</td>
+      <td class="dt-td-act">
         <button type="button" class="project-btn project-expand${open || id === investPicked ? ' open' : ''}" data-invest-expand="${safe}" title="Xem thông tin dự án" aria-label="Thông tin dự án" aria-expanded="${open || id === investPicked}">${ico('info')}</button>
-      </span>
-    </div>`;
+      </td>
+    </tr>`;
+}
+
+function investSumRow(items, groupId) {
+  const spec = investScaleOf(groupId);
+  let areaSum = 0;
+  let areaN = 0;
+  let scaleSum = 0;
+  let scaleN = 0;
+  items.forEach(p => {
+    const ha = areaHaOfText(p.areaText || areaTextOf(p.sheet, p.geom));
+    if (ha != null) { areaSum += ha; areaN += 1; }
+    if (!spec) return;
+    const scale = scaleOfProject(p);
+    if (scale?.value != null && Number.isFinite(scale.value)) {
+      scaleSum += scale.value;
+      scaleN += 1;
+    }
+  });
+  const areaText = areaN
+    ? `${fmtNum(Math.round(areaSum * 100) / 100)} ha`
+    : '—';
+  const scaleText = spec
+    ? (scaleN
+      ? `${Number.isInteger(scaleSum) ? scaleSum : Math.round(scaleSum * 100) / 100} ${spec.unit}`
+      : '—')
+    : '';
+  const note = spec
+    ? ` (${scaleN}/${items.length} có số)`
+    : ` (${areaN}/${items.length} có DT)`;
+  const scaleTd = spec
+    ? `<td class="dt-td-scale">${escapeHtml(scaleText)}<small class="dt-sum-note">${escapeHtml(note)}</small></td>`
+    : '';
+  return `<tr class="dt-tr is-sum">
+      <td class="dt-td-stt"></td>
+      <td class="dt-td-name"><b>Tổng</b>${spec ? '' : `<small class="dt-sum-note">${escapeHtml(note)}</small>`}</td>
+      <td class="dt-td-area">${escapeHtml(areaText)}</td>
+      ${scaleTd}
+      <td class="dt-td-bound"></td>
+      <td class="dt-td-act"></td>
+    </tr>`;
+}
+
+function investTableHtml(items, groupId, startN = 1) {
+  if (!items.length) return '';
+  let n = startN - 1;
+  const rows = items.map(p => investRow(p, ++n, groupId)).join('') + investSumRow(items, groupId);
+  return `<table class="dt-table">${investTableHead(groupId)}<tbody>${rows}</tbody></table>`;
 }
 
 function paintAllList(host) {
@@ -2456,10 +2554,11 @@ function paintAllList(host) {
       .filter(p => p.dtGroup === g.id)
       .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
     if (!items.length) return '';
-    const rows = items.map(p => investRow(p, ++n)).join('');
+    const start = n + 1;
+    n += items.length;
     return `<div class="pl-group open" data-dt-all-group="${escapeHtml(g.id)}">
       <div class="pl-hrow"><span class="pl-head"><span>${escapeHtml(g.label)}</span><small>${items.length}</small></span></div>
-      <div class="pl-body">${rows}</div>
+      <div class="pl-body">${investTableHtml(items, g.id, start)}</div>
     </div>`;
   }).filter(Boolean).join('');
   host.innerHTML = parts || empty;
@@ -2486,7 +2585,7 @@ function paintInvestList(opts = {}) {
       .filter(p => p.dtGroup === g.id && placeMatchesScope(p, ward))
       .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
     host.innerHTML = items.length
-      ? items.map((p, i) => investRow(p, i + 1)).join('')
+      ? investTableHtml(items, g.id, 1)
       : (pack || sheetRows.length
         ? `<div class="project-empty">${ward ? `Không có dự án tại ${escapeHtml(ward)}.` : 'Chưa có đồ án.'}</div>`
         : '');
@@ -2598,7 +2697,6 @@ export async function createInvestFromSketch({ name, geometry, fields = {} } = {
 }
 
 export async function focusInvest(id) {
-  investHidden.delete(id);
   investOpen.add(id);
   investPicked = id;
   let features;
@@ -2715,20 +2813,6 @@ export function initInvestLayer() {
       e.preventDefault();
       focusInvest(focus.dataset.investFocus);
     }
-  });
-  listHost?.addEventListener('change', (e) => {
-    const box = e.target.closest('[data-invest]');
-    if (!box) return;
-    const id = box.dataset.invest;
-    if (box.checked) investHidden.delete(id);
-    else investHidden.add(id);
-    box.closest('.project-row')?.classList.toggle('is-off', !box.checked);
-    if (box.checked && !$('chk_invest')?.checked) {
-      $('chk_invest').checked = true;
-      $('chk_invest').dispatchEvent(new Event('change', { bubbles: true }));
-      return;
-    }
-    queueInvestDraw();
   });
   document.addEventListener('qh:dt-tab', () => {
     ensureInvestOn();

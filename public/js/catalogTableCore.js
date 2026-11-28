@@ -1,7 +1,7 @@
 // Thu thập / lọc / CSV cho bảng danh mục đồ án (B) và dự án đầu tư (F).
 import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
-import { INVEST_GROUPS, investGroupLabel } from './investClassify.js';
+import { INVEST_GROUPS, investGroupLabel, pickInvestScale, formatInvestScale } from './investClassify.js';
 import {
   matchSoTayToCatalog, classifyPlanStatus, missingLabel, STATUS
 } from './soTayMatch.js';
@@ -56,7 +56,8 @@ export const CATALOG_HEADERS_PLAN = [
   'STT', 'Mã', 'Tên quy hoạch', 'Cấp độ', 'Phường / xã', 'Quyết định', 'Ngày ban hành', 'Cấp phê duyệt',
   'Diện tích (ha)', 'Dân số', 'Văn bản', 'Dữ liệu'
 ];
-export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Quy mô', 'Ranh giới', 'Ghi chú'];
+export const CATALOG_HEADERS_INVEST = ['STT', 'Tên dự án', 'Phường / xã', 'Diện tích', 'Chỉ tiêu', 'Ranh giới', 'Ghi chú'];
+export const INVEST_TABLE_COLS = CATALOG_HEADERS_INVEST.length;
 export const CATALOG_HEADERS = CATALOG_HEADERS_PLAN;
 /** Cột bảng plan gồm thêm cột hành động «+» cuối hàng (không xuất CSV). */
 export const PLAN_TABLE_COLS = CATALOG_HEADERS_PLAN.length + 1;
@@ -569,6 +570,12 @@ export function investRowsFromItems(items) {
     const place = sheetEntry(sheet, /địa điểm/i);
     const field = sheetEntry(sheet, /lĩnh vực/i) || p.sector?.label || '';
     const priority = sheetEntry(sheet, /ưu tiên/i);
+    const scale = pickInvestScale({
+      groupId: p.dtGroup,
+      sheet,
+      title: p.title,
+      kml: p.feature?.properties?.kml || p.kml
+    });
     const notes = [];
     if (field) notes.push(field);
     if (priority) notes.push(`Ưu tiên: ${priority}`);
@@ -580,9 +587,11 @@ export function investRowsFromItems(items) {
       name: p.title || '',
       fullName: p.title || '',
       ward: place || '',
-      scale: p.areaText || investGroupLabel(p.dtGroup) || '',
+      scale: formatInvestScale(scale),
+      scaleLabel: scale?.label || '',
       level: p.dtGroup || 'khac',
       areaText: p.areaText || '',
+      groupLabel: investGroupLabel(p.dtGroup) || '',
       status: '',
       statusLabel: '',
       hasBoundary: !!p.hasBoundary,
@@ -757,7 +766,7 @@ export function rowsToCsv(rows, source = 'plan') {
     const lines = [CATALOG_HEADERS_INVEST.join(',')];
     (rows || []).forEach((r, i) => {
       lines.push([
-        i + 1, r.name, r.ward, r.scale,
+        i + 1, r.name, r.ward, r.areaText || '', r.scale || '—',
         r.hasBoundary ? 'Có' : 'Chưa', r.note
       ].map(escape).join(','));
     });

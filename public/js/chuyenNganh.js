@@ -13,7 +13,7 @@ import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { setClassicSplitSides, refreshSplitPair } from './splitPair.js';
 import {
   planLevelAllOn, planLevelAllTip, toggleActivePlanLevel, anyPlanLayerOn, clearAllPlanLayers,
-  editProjectNetForSector
+  planLevelHasLayers, clearPlanLevelLayers, editProjectNetForSector
 } from './projectLayer.js';
 import { investAxisAllOn, investAxisAllTip, toggleInvestAxisAll, ensureDauTuAxis } from './investLayer.js';
 import { clearChamDiemMap } from './chamDiemMap.js';
@@ -1863,6 +1863,27 @@ function paintViewSwitch() {
 const AXIS_LETTER = {
   hanhchinh: 'A', quyhoach: 'B', hatang: 'C', xahoi: 'D', kientruc: 'E', dautu: 'F'
 };
+/** Tab con theo trục → chip A.1 / B.2… trên #axisForeignStrip (tắt nhanh lớp tab khác đang mở). */
+const AXIS_SUBTABS = {
+  hanhchinh: [
+    { id: 'dvhc', n: 1, label: 'Hành chính' },
+    { id: 'dothi', n: 2, label: 'Đô thị' },
+    { id: 'chamdiem', n: 3, label: 'Chấm điểm' }
+  ],
+  quyhoach: [
+    { id: 'qhc25', n: 1, label: 'QHC 1/25.000', planKey: 'QHC25' },
+    { id: 'qhc10', n: 2, label: 'QHC 1/10.000', planKey: 'QHC' },
+    { id: 'qhpk', n: 3, label: 'QHPK 1/2.000', planKey: 'QHPK' },
+    { id: 'qhct', n: 4, label: 'QHCT 1/500', planKey: 'QHCT' }
+  ],
+  hatang: FACET_LEVELS.map((lv, i) => ({
+    id: lv.id, n: i + 1, label: lv.label, facetLevel: lv.id
+  })),
+  kientruc: [
+    { id: 'quyche', n: 1, label: 'Quy chế kiến trúc' },
+    { id: 'congtrinh', n: 2, label: 'Công trình có giá trị' }
+  ]
+};
 const XAHOI_LAYER_CHKS = [
   'chk_c1', 'chk_c2', 'chk_c3', 'chk_c4', 'chk_c5', 'chk_c6', 'chk_c7', 'chk_c8', 'chk_c9',
   'chk_c10', 'chk_c11', 'chk_c12', 'chk_c13', 'chk_nt_funeral', 'chk_nt_grave', 'chk_edu', 'chk_heat'
@@ -1917,7 +1938,7 @@ function isHatangLayerOn(l) {
 
 function axisHasOpenLayers(axisId) {
   if (axisId === 'hanhchinh') return chkOn('chk_urban') || chkOn('chk_dvhc');
-  if (axisId === 'quyhoach') return anyPlanLayerOn();
+  if (axisId === 'quyhoach') return anyPlanLayerOn() || qhc25GisLayersOn();
   if (axisId === 'hatang') return getLayers().some(isHatangLayerOn);
   if (axisId === 'xahoi') {
     if (XAHOI_LAYER_CHKS.some(chkOn)) return true;
@@ -1931,6 +1952,83 @@ function axisHasOpenLayers(axisId) {
   return false;
 }
 
+function qhc25GisLayersOn() {
+  return [...qhc25PhaseLayers('hien-trang'), ...qhc25PhaseLayers('quy-hoach')]
+    .some(l => isLayerDrawn(l.id) || isLayerOn(l.id));
+}
+
+function clearQhc25GisLayers() {
+  [...qhc25PhaseLayers('hien-trang'), ...qhc25PhaseLayers('quy-hoach')]
+    .forEach(l => setLayerOn(l, false));
+}
+
+/** Tab đang xem trên một trục (để không hiện chip của chính tab đó). */
+function currentSubTabId(axisId) {
+  if (browseState().axis !== axisId) return '';
+  if (axisId === 'hanhchinh') return adminTabId();
+  if (axisId === 'quyhoach') {
+    const lv = getLevel();
+    return ['qhc25', 'qhc10', 'qhpk', 'qhct'].includes(lv) ? lv : '';
+  }
+  if (axisId === 'hatang') return browseState().level || '';
+  if (axisId === 'kientruc') return archTab || '';
+  return '';
+}
+
+function subTabHasLayers(axisId, tab) {
+  if (!tab) return false;
+  if (axisId === 'hanhchinh') {
+    if (tab.id === 'dvhc') return chkOn('chk_dvhc');
+    if (tab.id === 'dothi') return chkOn('chk_urban');
+    // Chấm điểm chỉ tô khi đang mở tab; không để chip A.3 «ảo» sau khi đổi tab.
+    return false;
+  }
+  if (axisId === 'quyhoach') {
+    if (tab.planKey === 'QHC25') return planLevelHasLayers('QHC25') || qhc25GisLayersOn();
+    return planLevelHasLayers(tab.planKey);
+  }
+  if (axisId === 'hatang') {
+    return getLayers().some(l => l.level === tab.facetLevel && isHatangLayerOn(l));
+  }
+  if (axisId === 'kientruc') {
+    if (tab.id === 'congtrinh') {
+      return browseState().axis === 'kientruc' && archItems().some(it => !archHidden.has(it.id));
+    }
+    return false;
+  }
+  return false;
+}
+
+function clearAxisSubTab(axisId, tabId) {
+  const tab = (AXIS_SUBTABS[axisId] || []).find(t => t.id === tabId);
+  if (!tab) return;
+  if (axisId === 'hanhchinh') {
+    if (tab.id === 'dvhc') setChk('chk_dvhc', false);
+    if (tab.id === 'dothi') setChk('chk_urban', false);
+    if (tab.id === 'chamdiem') clearChamDiemMap();
+    return;
+  }
+  if (axisId === 'quyhoach') {
+    if (tab.planKey) clearPlanLevelLayers(tab.planKey);
+    if (tab.planKey === 'QHC25') clearQhc25GisLayers();
+    return;
+  }
+  if (axisId === 'hatang') {
+    getLayers()
+      .filter(l => !l.base && !l.bind && l.sector !== 'sdd' && l.level === tab.facetLevel
+        && (isLayerDrawn(l.id) || isLayerOn(l.id)))
+      .forEach(l => setLayerOn(l, false));
+    publishSectorLegend(false);
+    return;
+  }
+  if (axisId === 'kientruc' && tab.id === 'congtrinh') {
+    archHidden.clear();
+    archItems().forEach(it => archHidden.add(it.id));
+    clearArchLayers();
+    if (browseState().axis === 'kientruc') paintKienTruc();
+  }
+}
+
 /** Tắt hết lớp của một trục trên bản đồ. Không đổi browseState().axis / droplist. */
 function clearAxisLayers(axisId) {
   if (axisId === 'hanhchinh') {
@@ -1941,6 +2039,7 @@ function clearAxisLayers(axisId) {
   }
   if (axisId === 'quyhoach') {
     clearAllPlanLayers();
+    clearQhc25GisLayers();
     return;
   }
   if (axisId === 'hatang') {
@@ -1971,28 +2070,74 @@ function clearAxisLayers(axisId) {
   }
 }
 
+/** Chip tắt nhanh: tab con A.1/B.2… (kể cả trên trục đang xem) hoặc chữ cái trục khác. */
+function collectForeignChips() {
+  const current = browseState().axis;
+  const chips = [];
+  MAG_ORDER.forEach(axisId => {
+    const letter = AXIS_LETTER[axisId] || '?';
+    const axis = AXES.find(a => a.id === axisId);
+    const axisName = axis?.label || letter;
+    const tabs = AXIS_SUBTABS[axisId];
+    if (tabs?.length) {
+      const viewing = currentSubTabId(axisId);
+      let any = false;
+      tabs.forEach(tab => {
+        if (axisId === current && tab.id === viewing) return;
+        if (!subTabHasLayers(axisId, tab)) return;
+        any = true;
+        chips.push({
+          axisId,
+          tabId: tab.id,
+          text: `${letter}.${tab.n}`,
+          title: `Tắt lớp đang mở · ${axisName} · ${tab.label}`,
+          aria: `Tắt lớp ${axisName}, ${tab.label}`
+        });
+      });
+      // Trục khác còn lớp nhưng không khớp tab con → chip chữ cái (D/F hoặc fallback).
+      if (!any && axisId !== current && axisHasOpenLayers(axisId)) {
+        chips.push({
+          axisId,
+          tabId: '',
+          text: letter,
+          title: `Tắt lớp đang mở · ${axisName}`,
+          aria: `Tắt lớp ${axisName}`
+        });
+      }
+      return;
+    }
+    if (axisId !== current && axisHasOpenLayers(axisId)) {
+      chips.push({
+        axisId,
+        tabId: '',
+        text: letter,
+        title: `Tắt lớp đang mở · ${axisName}`,
+        aria: `Tắt lớp ${axisName}`
+      });
+    }
+  });
+  return chips;
+}
+
 function paintForeignAxes() {
   const strip = document.getElementById('axisForeignStrip');
   if (!strip) return;
-  const current = browseState().axis;
-  const open = MAG_ORDER.filter(id => id !== current && axisHasOpenLayers(id));
-  if (!open.length) {
+  const chips = collectForeignChips();
+  if (!chips.length) {
     strip.hidden = true;
     strip.replaceChildren();
     return;
   }
   strip.hidden = false;
-  const next = open.map(id => {
-    const axis = AXES.find(a => a.id === id);
-    const letter = AXIS_LETTER[id] || '?';
-    const name = axis?.label || letter;
+  const next = chips.map(chip => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'axis-foreign-chip';
-    btn.dataset.axisForeign = id;
-    btn.textContent = letter;
-    btn.title = `Tắt lớp đang mở · ${name}`;
-    btn.setAttribute('aria-label', `Tắt lớp ${name}`);
+    btn.dataset.axisForeign = chip.axisId;
+    if (chip.tabId) btn.dataset.axisForeignTab = chip.tabId;
+    btn.textContent = chip.text;
+    btn.title = chip.title;
+    btn.setAttribute('aria-label', chip.aria);
     return btn;
   });
   strip.replaceChildren(...next);
@@ -2337,8 +2482,14 @@ export function initChuyenNganh() {
     const btn = e.target.closest('[data-axis-foreign]');
     if (!btn) return;
     const id = btn.dataset.axisForeign;
-    if (!AXIS_LETTER[id] || id === browseState().axis) return;
-    clearAxisLayers(id);
+    const tabId = btn.dataset.axisForeignTab || '';
+    if (!AXIS_LETTER[id]) return;
+    if (tabId) clearAxisSubTab(id, tabId);
+    else {
+      // Chip cả trục chỉ tắt trục khác; tab con mới được tắt trên trục đang xem.
+      if (id === browseState().axis) return;
+      clearAxisLayers(id);
+    }
     paintForeignAxes();
     paintAxisAll();
   });
@@ -2399,6 +2550,7 @@ export function initChuyenNganh() {
       if (next !== archTab) {
         archTab = next;
         paintKienTruc();
+        paintForeignAxes();
       }
       return;
     }
@@ -2459,6 +2611,7 @@ export function initChuyenNganh() {
       if (id !== 'dvhc') clearDvhcMulti({ paint: true });
       syncAdminBrowseClass();
       syncAdminClassMaps();
+      paintForeignAxes();
       return;
     }
     const waterPlant = e.target.closest('[data-cnu-plant]');

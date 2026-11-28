@@ -25,7 +25,7 @@ import {
   catalogFilterOptions, catalogStatusOptions, catalogWardFilterOptions,
   catalogStatusStats, catalogWardLevelStats, catalogYearLevelStats,
   groupPlanRowsByLevel, sortPlanRowsByKeys, levelLabelOf, rowsToCsv, downloadCsv,
-  STATUS, PLAN_TABLE_COLS, PLAN_SORT_COLUMNS, formatPhaseLayerLabel,
+  STATUS, PLAN_TABLE_COLS, INVEST_TABLE_COLS, PLAN_SORT_COLUMNS, formatPhaseLayerLabel,
   mergeSoTayEdits, emptySoTayEdits, nextDccbId, planYearOf,
   newAdjustId, soTayMaForTenQH, tenQHOfSoTayItem
 } from './catalogTableCore.js';
@@ -137,7 +137,7 @@ function paintChrome() {
   if (source === 'invest') {
     if (title) title.textContent = 'DANH MỤC DỰ ÁN ĐẦU TƯ';
     if (colName) colName.textContent = 'Tên dự án';
-    if (colScale) colScale.textContent = 'Quy mô';
+    if (colScale) colScale.textContent = 'Chỉ tiêu';
   } else {
     if (title) title.textContent = 'DANH MỤC ĐỒ ÁN QUY HOẠCH';
     if (colName) colName.textContent = 'Tên quy hoạch';
@@ -1111,7 +1111,8 @@ function syncPlanColumns(planOnly) {
     head.innerHTML = `<th>STT</th>
       <th id="catalogColName">Tên dự án</th>
       <th>Phường / xã</th>
-      <th id="catalogColScale">Quy mô</th>
+      <th>Diện tích</th>
+      <th id="catalogColScale">Chỉ tiêu</th>
       <th>Ranh giới</th>
       <th>Ghi chú</th>`;
   }
@@ -1414,7 +1415,7 @@ function paintTable() {
   if (count) count.textContent = `${visibleRows.length} / ${rowsCache.length} ${unit}`;
   if (!body) return;
   if (!visibleRows.length) {
-    const cols = source === 'plan' ? PLAN_TABLE_COLS : 6;
+    const cols = source === 'plan' ? PLAN_TABLE_COLS : INVEST_TABLE_COLS;
     const emptyMsg = source === 'plan'
       ? (validityOn ? 'Không có đồ án đang hiệu lực khớp bộ lọc.' : 'Không có đồ án hết hiệu lực khớp bộ lọc.')
       : 'Không có dòng khớp bộ lọc.';
@@ -1446,11 +1447,13 @@ function paintTable() {
       const bound = r.hasBoundary
         ? `<button type="button" class="catalog-bound-yes" data-catalog-zoom="${escapeHtml(r.zoomKey)}" title="Phóng tới ranh giới">Có</button>`
         : `<span class="catalog-bound-no">Chưa</span>`;
+      const scaleTitle = r.scaleLabel ? `${r.scaleLabel}: ${r.scale || '—'}` : (r.scale || '—');
       return `<tr data-catalog-id="${escapeHtml(r.id)}">
         <td class="st-num">${i + 1}</td>
         <td class="st-name" title="${escapeHtml(name)}">${escapeHtml(name)}</td>
         <td class="st-name">${escapeHtml(r.ward || '—')}</td>
-        <td class="catalog-scale">${escapeHtml(r.scale || '—')}</td>
+        <td class="catalog-scale">${escapeHtml(r.areaText || '—')}</td>
+        <td class="catalog-scale" title="${escapeHtml(scaleTitle)}">${escapeHtml(r.scale || '—')}</td>
         <td>${bound}</td>
         <td class="catalog-note" title="${escapeHtml(r.note || '')}">${escapeHtml(r.note || '')}</td>
       </tr>`;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   classifyInvestGroup, isInvestGroupId, normalizeInvestGroupId,
-  INVEST_GROUPS
+  INVEST_GROUPS, investScaleOf, parseInvestScaleText, pickInvestScale, formatInvestScale
 } from '../public/js/investClassify.js';
 
 assert.equal(INVEST_GROUPS.length, 16);
@@ -81,5 +81,19 @@ assert.equal(
   classifyInvestGroup(row('Giáo dục - đào tạo', 'Các dự án đầu tư cơ sở đào tạo và phát triển nguồn nhân lực chất lượng cao')),
   'vanhoaxahoi'
 );
+
+assert.equal(investScaleOf('cnc_dien')?.unit, 'MW');
+assert.equal(investScaleOf('chungcu_tm')?.label, 'Căn hộ');
+assert.equal(investScaleOf('baido')?.unit, 'chỗ');
+assert.equal(investScaleOf('khac'), null);
+assert.equal(parseInvestScaleText('Nhà máy điện mặt trời 50MW Phong Điền', 'cnc_dien'), 50);
+assert.equal(parseInvestScaleText('Chung cư 320 căn Lê Lợi', 'chungcu_tm'), 320);
+assert.equal(parseInvestScaleText('Khu đô thị 12.000 người', 'khu_dt'), 12000);
+assert.equal(parseInvestScaleText('Bãi đỗ 500 chỗ', 'baido'), 500);
+assert.equal(parseInvestScaleText('Sân gôn 18 lỗ', 'sangon'), 18);
+assert.equal(pickInvestScale({ groupId: 'cnc_dien', sheet: { _quyMo: '75' }, title: 'X 50MW' })?.value, 75);
+assert.equal(pickInvestScale({ groupId: 'cnc_dien', sheet: null, title: 'NMĐ 50MW' })?.source, 'name');
+assert.equal(formatInvestScale(pickInvestScale({ groupId: 'cnc_dien', title: 'A 50MW' })), '50 MW');
+assert.equal(formatInvestScale(pickInvestScale({ groupId: 'cnc_dien', title: 'Không số' })), '—');
 
 console.log('test-invest-classify: ok');
