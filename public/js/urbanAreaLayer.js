@@ -12,6 +12,7 @@ import { STATUS_REF, URBANS_614, RURAL_RULE, wardLevel614, urbans614Of } from '.
 import { VISION_REF, VISION_STAGE, VISION_CLAUSE, URBANS_VISION, visionLevel, visionUrbansOf } from './urbanVision.js';
 import { planUrbanOf } from './urbanClass.js';
 import { DVHC_CITY, dvhcOf } from './dvhcStats.js';
+import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 
 // Bấm ký hiệu / nét ranh đô thị: detail = { id, side } — id trong urbanStatus.js (side 'HT') hoặc urbanVision.js (side 'QH');
 // viewFlow.js quyết định chọn đô thị hay mở view riêng
@@ -66,6 +67,8 @@ const BADGE_SMALL_ZOOM = 10;
 
 const $ = (id) => document.getElementById(id);
 const $chk = () => $('chk_urban');
+/** Lớp đô thị bật khi ô trục A hoặc tab QH756 (trục B) tick. */
+const urbanWanted = () => !!$chk()?.checked || !!$('chk_qh756')?.checked || getLevel() === 'qh756';
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 const muted = (text) => `<span class="ua-tip-muted">${escapeHtml(text)}</span>`;
 const clsTag = (cls) => `<b class="uc-${cls}">loại ${cls}</b>`;
@@ -443,18 +446,33 @@ async function setVisible(on, { fit = false } = {}) {
 export function showUrbanPlanOnBase(on) {
   planOnBase = !!on;
   document.body.classList.toggle('urban-plan-on-base', planOnBase);
-  return applyUrbanVisible(!!$chk()?.checked);
+  return applyUrbanVisible(urbanWanted());
 }
 
 async function syncUrbanPair() {
   if (!isLevelPair()) {
     await visionLeft.setVisible(false);
-    await setVisible(!!$chk()?.checked);
+    await setVisible(urbanWanted());
     return;
   }
   await statusLayer.setVisible(false);
   await visionLayer.setVisible(sideOf(planMap) === 'urban');
   await visionLeft.setVisible(sideOf(map) === 'urban');
+}
+
+/** Tab B → QH756: luôn vẽ QĐ 756 trên nền; rời tab thì trả lại chế độ cặp HT/QH. */
+function syncQh756Level(level, prev) {
+  if (level === 'qh756') {
+    planOnBase = true;
+    document.body.classList.add('urban-plan-on-base');
+    return applyUrbanVisible(true);
+  }
+  if (prev === 'qh756') {
+    planOnBase = false;
+    document.body.classList.remove('urban-plan-on-base');
+    return applyUrbanVisible(urbanWanted());
+  }
+  return Promise.resolve();
 }
 
 /** Gọi lại khi ranh 40 phường xã tải xong (lớp có thể đã bật trước đó). */
@@ -495,10 +513,23 @@ export function initUrbanAreaLayer() {
   statusLayer.init(map);
   visionLeft.init(map);
   if (planMap) visionLayer.init(planMap);
-  $chk()?.addEventListener('change', (e) => {
+  const onUrbanChk = () => {
     if (isLevelPair()) { syncUrbanPair(); return; }
-    setVisible(e.target.checked, { fit: true });
+    if (getLevel() === 'qh756') {
+      planOnBase = true;
+      document.body.classList.add('urban-plan-on-base');
+      setVisible(urbanWanted(), { fit: true });
+      return;
+    }
+    setVisible(urbanWanted(), { fit: true });
+  };
+  $chk()?.addEventListener('change', onUrbanChk);
+  $('chk_qh756')?.addEventListener('change', onUrbanChk);
+  document.addEventListener(LEVEL_EVENT, (e) => {
+    const { level, prev } = e.detail || {};
+    syncQh756Level(level, prev);
   });
   onSplitPair(() => { syncUrbanPair(); });
-  if ($chk()?.checked) initialDraw = setVisible(true);
+  if (urbanWanted()) initialDraw = setVisible(true);
+  if (getLevel() === 'qh756') initialDraw = syncQh756Level('qh756', null);
 }

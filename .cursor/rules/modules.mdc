@@ -143,7 +143,7 @@ Panel chung `#layerMain` / `#layerMag` / `#layerTools` (`#layerSearch`, `#btnOpe
 
 ### B — Hệ thống bản đồ quy hoạch (`quyhoach`)
 
-`#levelPickQh` bốn cấp radio (mặc định QHC 1/25.000). `#planBriefSlot` / `#planListPane` / `#planInfoSlot` / `#projectList` / `#planStaticRows`; `#qhc25Layers` (a HT giao thông, `#gt25Children` GIS QH, `#qhc25HtktHt` / `#qhc25HtktQh`). Chia đôi: `#splitSideLeft` / `#splitSideRight` trên `.swipe-label` (không `#levelSplit` trong panel). Catalog sổ tay: `#btnOpenCatalogPlan` → MOD-07 (`catalogTable.js`, `#catalogValidityTabs`, `schemeValidity.js`, `soTayMatch.js`, `public/data/qh-so-tay.json`; nhóm Lưu trữ `#projectList`). Lớp/đồ án/raster/so sánh/compliance: MOD-07. Giao thông canvas `chk_gt25`/`chk_gt10`: MOD-18.
+`#levelPickQh` năm cấp radio (QH756 → QHC108 → QHC10K → QHPK → QHCT; mặc định QHC108/`qhc25`). `#planBriefSlot` / `#planListPane` / `#planInfoSlot` / `#projectList` / `#planStaticRows`; `#qhc25Layers` (a HT giao thông, `#gt25Children` GIS QH, `#qhc25HtktHt` / `#qhc25HtktQh`). Chia đôi: `#splitSideLeft` / `#splitSideRight` trên `.swipe-label` (không `#levelSplit` trong panel). Catalog sổ tay: `#btnOpenCatalogPlan` → MOD-07 (`catalogTable.js`, `#catalogValidityTabs`, `schemeValidity.js`, `soTayMatch.js`, `public/data/qh-so-tay.json`; nhóm Lưu trữ `#projectList`). Lớp/đồ án/raster/so sánh/compliance: MOD-07. Giao thông canvas `chk_gt25`/`chk_gt10`: MOD-18.
 
 ### C — Hệ thống hạ tầng kỹ thuật (`hatang`)
 

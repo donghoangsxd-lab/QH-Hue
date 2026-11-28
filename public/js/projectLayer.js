@@ -1111,7 +1111,7 @@ function renderHead() {
 
 /** Số đồ án trên từng tab cấp: «QHPK 1/2.000 (78)». Cấp không có đồ án nhập giữ nhãn gốc. */
 function paintLevelCounts() {
-  const counts = { qhc25: 0, qhc10: 0, qhpk: 0, qhct: 0 };
+  const counts = { qh756: 0, qhc25: 0, qhc10: 0, qhpk: 0, qhct: 0 };
   projects.forEach(p => {
     const id = GROUP_LEVEL[p.level];
     if (id in counts) counts[id] += 1;
@@ -1128,13 +1128,14 @@ function paintLevelCounts() {
 
 // Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js); Hệ thống đô thị nằm ở mục Đô thị riêng
 const LIST_LEVELS = [
-  { key: 'QHC25', label: 'QHC 1/25.000', title: 'quy hoạch chung tỷ lệ 1/25.000' },
+  { key: 'QH756', label: 'QH756', title: 'hệ thống đô thị theo Quyết định 756/QĐ-UBND' },
+  { key: 'QHC25', label: 'QHC108', title: 'quy hoạch chung theo QĐ 108 (tỷ lệ 1/25.000)' },
   ...['QHC', 'QHPK', 'QHCT'].map(k => PLAN_LEVELS.find(l => l.key === k))
 ];
 const levelLabel = (key) => LIST_LEVELS.find(l => l.key === key)?.label || key;
-// Lớp droplist (mapLevel.js) → nhóm cấp trong danh sách; Hệ thống đô thị không ứng nhóm nào
-const LEVEL_GROUP = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
-const GROUP_LEVEL = { QHC25: 'qhc25', QHC: 'qhc10', QHPK: 'qhpk', QHCT: 'qhct' };
+// Lớp droplist (mapLevel.js) → nhóm cấp trong danh sách; Hệ thống đô thị (trục A) không ứng nhóm nào
+const LEVEL_GROUP = { qh756: 'QH756', qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+const GROUP_LEVEL = { QH756: 'qh756', QHC25: 'qhc25', QHC: 'qhc10', QHPK: 'qhpk', QHCT: 'qhct' };
 const activeGroup = () => LEVEL_GROUP[getLevel()] || null;
 
 // Khi mở một cấp: bỏ ẩn ranh mọi đồ án của cấp đó (chỉ phiên hiện tại; không ghi máy).
@@ -1163,7 +1164,7 @@ function focusLevelGroup() {
 }
 
 // Ô lớp riêng của cấp (#planStaticRows) bật / tắt cùng nút mắt của nhóm
-const LEVEL_CHK = { QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
+const LEVEL_CHK = { QH756: 'chk_qh756', QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
 // Lớp giao thông QHC 2045 (qhc2045Layer.js) cùng nhóm cấp: nút mắt bật / tắt kèm
 const LEVEL_EXTRA_CHK = { QHC25: 'chk_gt25', QHC: 'chk_gt10' };
 
@@ -1264,7 +1265,7 @@ function setLevelShown(key, on) {
 }
 
 // Cấp QHC ít đồ án: liệt kê thẳng dưới nhóm cấp, không gom theo phường, xã
-const FLAT_LEVELS = new Set(['QHC25', 'QHC']);
+const FLAT_LEVELS = new Set(['QH756', 'QHC25', 'QHC']);
 
 const staticOf = (key) => document.querySelector(`[data-plan-static="${key}"]`);
 
@@ -2357,7 +2358,7 @@ let viewStash = null;
 // Bảng dự án kêu gọi đầu tư đang mở: bỏ viền đồ án (hay thành khung chữ nhật) để còn thấy lô bên trong.
 let quietOutline = false;
 
-const INSPECT_BOXES = ['chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct', 'chk_projectInfra'];
+const INSPECT_BOXES = ['chk_urban', 'chk_qh756', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct', 'chk_projectInfra'];
 
 function takeInspectSnap() {
   const boxes = {};

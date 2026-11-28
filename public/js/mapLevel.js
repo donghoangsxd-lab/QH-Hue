@@ -1,21 +1,23 @@
 // Lớp quy hoạch đang xem (nút trong panel Hành chính và Quy hoạch). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
 // bản đồ quy hoạch theo lớp đang chọn (không lớp nào chọn phường từ bản đồ; chọn phường ở droplist bảng tổng hợp):
 //  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
-//                                        đồ án → chi tiết
-//  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
+//                                        đồ án → chi tiết (trục A; không nằm trong hàng tab B)
+//  qh756  QH756 (chk_qh756)             hệ thống đô thị theo QĐ 756 trên nền (urbanVision); tạm thời trước khi có lớp QH riêng
+//  qhc25  QHC108 (chk_qhc25)            QHC theo QĐ 108 (tỷ lệ 1/25.000): bấm vùng → chức năng khu vực
 //  qhc10  QHC 1/10.000 (chk_qhc10)       lô sử dụng đất trung tâm + ranh/tên đồ án QHC khác; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi. Bấm ngoài vùng lõi tạm thu lô về đường bao.
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; tick hoặc bấm một đồ án mới hiện lô.
 //                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường vẫn chỉ ranh.
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, tick hoặc bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
-// Bốn cấp quy hoạch là một nhóm radio: bật một cấp thì tắt ba cấp kia. Nền cam là cấp đang bật.
+// Năm cấp quy hoạch là một nhóm radio: bật một cấp thì tắt các cấp kia. Nền cam là cấp đang bật.
 // Muốn xem đồ án cấp khác thì chuyển cấp, rồi bật từng đồ án trong danh sách của cấp đó.
 export const LEVELS = [
   { id: 'urban', chk: 'chk_urban', label: 'HỆ THỐNG ĐÔ THỊ' },
-  { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
-  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000', scope: 'QHC' },
-  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
-  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', scope: 'QHCT' }
+  { id: 'qh756', chk: 'chk_qh756', label: 'QH756' },
+  { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC108' },
+  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC10K', scope: 'QHC' },
+  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK' },
+  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT', scope: 'QHCT' }
 ];
 export const DEFAULT_LEVEL = 'qhc25';
 /** detail: { level, prev, origin } */
@@ -23,7 +25,7 @@ export const LEVEL_EVENT = 'qh:level';
 
 const byId = new Map(LEVELS.map(l => [l.id, l]));
 const byChk = new Map(LEVELS.map(l => [l.chk, l]));
-const PLAN_TABS = ['qhc25', 'qhc10', 'qhpk', 'qhct'];
+const PLAN_TABS = ['qh756', 'qhc25', 'qhc10', 'qhpk', 'qhct'];
 // Đúng một cấp quy hoạch trong tập này. Danh sách đồ án chỉ hiện cấp đó.
 const listed = new Set(['qhc25']);
 let level = DEFAULT_LEVEL;
@@ -142,10 +144,10 @@ export function initMapLevel() {
     if (!item?.closest('[data-level-pick]')) return;
     const id = item.dataset.level;
     if (item.closest('#levelPickQh')) { togglePlanTab(id); return; }
-    setLevel(id, { keepView: id === 'qhc10' || id === 'qhc25' });
+    setLevel(id, { keepView: id === 'qhc10' || id === 'qhc25' || id === 'qh756' });
   });
   document.addEventListener('change', onLayerChange);
-  // Mở trang luôn về QHC 1/25.000. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
+  // Mở trang luôn về QHC108 (qhc25). Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
   // keepView: khung do centerOnCity (vừa cả thành phố) không bị lớp mặc định kéo đi.
   // Link chia sẻ (có lv hoặc ly) do viewLink áp sau bước này.
   const shared = new URLSearchParams(location.search);

@@ -1943,10 +1943,11 @@ const AXIS_SUBTABS = {
     { id: 'chamdiem', n: 3, label: 'Chấm điểm' }
   ],
   quyhoach: [
-    { id: 'qhc25', n: 1, label: 'QHC 1/25.000', planKey: 'QHC25' },
-    { id: 'qhc10', n: 2, label: 'QHC 1/10.000', planKey: 'QHC' },
-    { id: 'qhpk', n: 3, label: 'QHPK 1/2.000', planKey: 'QHPK' },
-    { id: 'qhct', n: 4, label: 'QHCT 1/500', planKey: 'QHCT' }
+    { id: 'qh756', n: 1, label: 'QH756', planKey: 'QH756' },
+    { id: 'qhc25', n: 2, label: 'QHC108', planKey: 'QHC25' },
+    { id: 'qhc10', n: 3, label: 'QHC10K', planKey: 'QHC' },
+    { id: 'qhpk', n: 4, label: 'QHPK', planKey: 'QHPK' },
+    { id: 'qhct', n: 5, label: 'QHCT', planKey: 'QHCT' }
   ],
   hatang: FACET_LEVELS.map((lv, i) => ({
     id: lv.id, n: i + 1, label: lv.label, facetLevel: lv.id

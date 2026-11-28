@@ -2545,10 +2545,11 @@ let shiftKeyHeld = false;
 let shiftKeyTrackBound = false;
 
 const PICK_LEVEL_LABEL = {
-  qhc25: 'QHC 1/25.000',
-  qhc10: 'QHC 1/10.000',
-  qhpk: 'QHPK 1/2.000',
-  qhct: 'QHCT 1/500'
+  qh756: 'QH756',
+  qhc25: 'QHC108',
+  qhc10: 'QHC10K',
+  qhpk: 'QHPK',
+  qhct: 'QHCT'
 };
 
 function lotPickLevel(p) {

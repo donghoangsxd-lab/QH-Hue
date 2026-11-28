@@ -17,9 +17,9 @@ import { bareName, wardLevel614, URBANS_614 } from './urbanStatus.js';
 // tên bắt đầu bằng "QHC" (không phải QHCT / QHCPK) hoặc "Quy hoạch chung" → QHC 1/10.000; "QHCT" hoặc "Quy hoạch chi tiết"
 // (có thể kèm số thứ tự, "Điều chỉnh", "cục bộ") → QHCT 1/500, trừ tên ghi tỷ lệ 1/2000 (QHCT 1/2.000 theo luật cũ, tương đương QHPK)
 export const PLAN_LEVELS = [
-  { key: 'QHPK', label: 'QHPK 1/2.000', title: 'Quy hoạch phân khu tỷ lệ 1/2.000' },
-  { key: 'QHC', label: 'QHC 1/10.000', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' },
-  { key: 'QHCT', label: 'QHCT 1/500', title: 'Quy hoạch chi tiết tỷ lệ 1/500' }
+  { key: 'QHPK', label: 'QHPK', title: 'Quy hoạch phân khu tỷ lệ 1/2.000' },
+  { key: 'QHC', label: 'QHC10K', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' },
+  { key: 'QHCT', label: 'QHCT', title: 'Quy hoạch chi tiết tỷ lệ 1/500' }
 ];
 const QHC_NAME_RE = /^\s*(QHC(?![A-Z])|quy hoạch chung(\s|$))/i;
 const QHCT_NAME_RE = /^\s*(\d+[.)]?\s+)?(điều chỉnh\s+)?(cục bộ\s+)?(QHCT(?![A-Z])|quy hoạch chi tiết)/i;

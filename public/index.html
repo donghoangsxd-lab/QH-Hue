@@ -599,10 +599,11 @@
         <div class="level-host" id="levelHostQh">
           <div class="level-host-label" id="levelHostQhLabel">Cấp quy hoạch</div>
           <div class="level-pick" id="levelPickQh" data-level-pick role="listbox" aria-label="Cấp quy hoạch">
-            <button type="button" class="level-pick-btn" role="option" data-level="qhc25"><span>QHC 1/25.000</span></button>
-            <button type="button" class="level-pick-btn" role="option" data-level="qhc10"><span>QHC 1/10.000</span></button>
-            <button type="button" class="level-pick-btn" role="option" data-level="qhpk"><span>QHPK 1/2.000</span></button>
-            <button type="button" class="level-pick-btn" role="option" data-level="qhct"><span>QHCT 1/500</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qh756"><span>QH756</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhc25"><span>QHC108</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhc10"><span>QHC10K</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhpk"><span>QHPK</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhct"><span>QHCT</span></button>
           </div>
         </div>
         <!-- Thông tin đồ án (projectBrief): gắn vào đây trên máy tính, danh sách đồ án phía dưới dịch xuống -->
@@ -619,6 +620,15 @@
         <div id="projectList" class="project-list"></div>
         <!-- Dòng lớp của từng cấp quy hoạch: projectLayer.js gắn vào nhóm cấp tương ứng (data-plan-static = khóa nhóm) -->
         <div id="planStaticRows" hidden>
+          <div class="plan-static" data-plan-static="QH756">
+            <div class="project-row" id="qh756Row">
+              <label class="project-name" title="Hệ thống đô thị theo quy hoạch — Quyết định 756/QĐ-UBND (sau 2030). Bật để xem phân loại đô thị trên bản đồ.">
+                <input type="checkbox" id="chk_qh756"><span>Hệ thống đô thị theo QĐ 756</span></label>
+              <span class="project-tools">
+                <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756" title="Xem Quyết định 756"></button>
+              </span>
+            </div>
+          </div>
           <div class="plan-static" data-plan-static="QHC25">
             <div class="project-row" id="qhc25Row">
               <label class="project-name" title="Bật cả sơ đồ phát triển không gian và quy hoạch giao thông tỷ lệ 1/25.000. Mở mũi tên để bật từng lớp.">

@@ -152,10 +152,11 @@ const plan = innerById(html, 'layerPaneQuyHoach');
 const pick = innerById(html, 'levelPickQh');
 let levelAt = 0;
 for (const [id, label] of [
-  ['qhc25', 'QHC 1/25.000'],
-  ['qhc10', 'QHC 1/10.000'],
-  ['qhpk', 'QHPK 1/2.000'],
-  ['qhct', 'QHCT 1/500']
+  ['qh756', 'QH756'],
+  ['qhc25', 'QHC108'],
+  ['qhc10', 'QHC10K'],
+  ['qhpk', 'QHPK'],
+  ['qhct', 'QHCT']
 ]) {
   const at = pick.indexOf(`data-level="${id}"`);
   assert.ok(at > levelAt, `sai thứ tự cấp ${label}`);
@@ -822,7 +823,10 @@ assert.match(read('docs/ui-spec.md'), /không ô Khu \/ Giai đoạn/);
 assert.match(read('docs/ui-spec.md'), /ký hiệu lô.*gộp vào ô Chức năng SDĐ|không dòng «Đồ án» ở chân thẻ/);
 assert.match(read('public/js/lotPopup.js'), /export function lotSymbol|export function landUseWithSymbol/);
 assert.doesNotMatch(read('public/js/mapEngine.js'), /phoneInfoSlot/);
-assert.match(read('docs/ui-spec.md'), /không đè droplist B hay bốn tab cấp/);
+assert.match(read('docs/ui-spec.md'), /không đè droplist B hay năm tab cấp/);
+assert.match(plan, /id="chk_qh756"/);
+assert.match(read('public/js/mapLevel.js'), /PLAN_TABS = \['qh756'/);
+assert.match(read('public/js/urbanAreaLayer.js'), /syncQh756Level/);
 assert.match(read('docs/ui-spec.md'), /QHC 1\/25\.000 hoặc 1\/10\.000/);
 assert.match(read('docs/ui-spec.md'), /không xổ droplist sáu trục/);
 assert.match(read('docs/ui-spec.md'), /Thông tin quy hoạch:/);
@@ -946,7 +950,7 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
 }
 assert.match(read('public/js/urbanFocus.js'), /current && !keepView\) fitFocus/);
 assert.match(read('public/js/chuyenNganh.js'), /keepCamera: !!e\.detail\?\.keepView/);
-assert.match(read('docs/ui-spec.md'), /Bấm QHC 1\/10\.000 khi đang xem QHC 1\/25\.000 giữ nguyên khung nhìn/);
+assert.match(read('docs/ui-spec.md'), /Bấm QHC10K khi đang xem QHC108 giữ nguyên khung nhìn/);
 assert.match(levelJs, /listed\.clear\(\);\s*listed\.add\(id\)/);
 assert.doesNotMatch(levelJs, /keepOthers/);
 assert.match(levelJs, /ensurePlanTab/);

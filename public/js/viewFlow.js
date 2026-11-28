@@ -60,8 +60,13 @@ function toolBlocksDetailLock() {
 }
 
 /** Lớp Hệ thống đô thị đang xem rộng: click chi tiết (tem, lô, giao thông) nhường cho ranh và ký hiệu đô thị */
+function isUrbanBrowseLevel() {
+  const lv = getLevel();
+  return lv === 'urban' || lv === 'qh756';
+}
+
 export function detailClickLocked(m) {
-  if (!m || getLevel() !== 'urban' || toolBlocksDetailLock()) return false;
+  if (!m || !isUrbanBrowseLevel() || toolBlocksDetailLock()) return false;
   return m.getZoom() < URBAN_DETAIL_ZOOM;
 }
 
@@ -72,7 +77,7 @@ function paintDetailLock() {
   const hint = document.getElementById('urbanLockHint');
   if (!hint) return;
   const shown = [map, planMap].filter(m => m && m.getContainer()?.offsetParent);
-  const locked = getLevel() === 'urban' && !toolBlocksDetailLock()
+  const locked = isUrbanBrowseLevel() && !toolBlocksDetailLock()
     && shown.some(m => m.getZoom() < URBAN_DETAIL_ZOOM);
   hint.textContent = locked ? '(phóng tới mức 13 để bấm công trình)' : '';
 }
@@ -202,14 +207,14 @@ function enterCore({ openLots = false } = {}) {
 const focusOf = (u) => u && focusUrban({ key: `u:${u.id}`, name: u.name, geometry: u.geometry, city: u.city });
 
 function urbanBrowse() {
-  return document.body.classList.contains('dothi-browse') || getLevel() === 'urban';
+  return document.body.classList.contains('dothi-browse') || isUrbanBrowseLevel();
 }
 
 function onUrbanPick({ id, side } = {}) {
   // Tab ĐVHC: chỉ chọn xã/phường — bỏ qua ký hiệu đô thị (đã chuyển sang qh:dvhc-at).
   if (document.body.classList.contains('dvhc-browse')) return;
-  // Tab Đô thị / lớp Hệ thống đô thị: chọn đúng đô thị theo ranh, không nhảy QHC 1/10.000.
-  if (document.body.classList.contains('dothi-browse') || getLevel() === 'urban') {
+  // Tab Đô thị / lớp Hệ thống đô thị / QH756: chọn đúng đô thị theo ranh, không nhảy QHC 1/10.000.
+  if (document.body.classList.contains('dothi-browse') || isUrbanBrowseLevel()) {
     const load = side === 'QH' || document.body.classList.contains('urban-plan-on-base')
       ? urbanVisionFeature(id)
       : urbanStatusFeature(id);
@@ -375,7 +380,7 @@ export function wardFromMapClick(latlng, m) {
   }
   if (!planSide) return wardToPick(latlng, m);
   if (levelScope()) leaveScopeFocus(latlng);
-  if (getLevel() === 'urban') pickUrbanAt(latlng, m);
+  if (isUrbanBrowseLevel()) pickUrbanAt(latlng, m);
   return null;
 }
 

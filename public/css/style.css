@@ -1453,7 +1453,7 @@ body.right-collapsed .right-panel {
   overflow-x: hidden;
   overflow-y: auto;
 }
-/* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief / bốn tab cấp / droplist B. */
+/* Bảng thửa / lô quy hoạch phủ vùng danh sách (#planListPane), không đè brief / năm tab cấp / droplist B. */
 #planInfoSlot { display: none; }
 #planInfoSlot[hidden] { display: none !important; }
 /* Bảng dự án đầu tư phủ vùng danh sách (#dtListPane), không đè tám tab nhóm / droplist F. */
