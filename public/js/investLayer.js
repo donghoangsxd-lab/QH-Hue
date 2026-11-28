@@ -11,7 +11,9 @@ import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatch.js';
-import { editInvestGroups, settleInvestSync } from './investGroups.js';
+import {
+  editInvestGroups, settleInvestSync, stampNameInvestGroups, isAutoNameInvestGroup
+} from './investGroups.js';
 import {
   classifyInvestGroup, INVEST_GROUPS,
   INVEST_TAB_ALL, isInvestGroupId, investGroupLabel,
@@ -57,19 +59,21 @@ const DROP_PATH = 'M35 2C16.8 2 2 16.8 2 35c0 21 24 41 31 57a2.2 2.2 0 004 0c7-1
 const SECTORS = [
   [/y tế|bệnh viện/i, 'cross', '#ef4444', '#991b1b'],
   [/giáo dục|đào tạo|trường học/i, 'book', '#3b82f6', '#1e40af'],
-  [/nông nghiệp|trồng trọt/i, 'leaf', '#22c55e', '#166534'],
+  [/nông nghiệp|trồng trọt|nông lâm/i, 'leaf', '#22c55e', '#166534'],
   [/năng lượng|điện|mặt trời/i, 'bolt', '#f59e0b', '#b45309'],
   [/công nghiệp/i, 'factory', '#a855f7', '#6b21a8'],
   [/công nghệ|thông tin/i, 'cpu', '#06b6d4', '#0e7490'],
-  [/du lịch|nghỉ dưỡng/i, 'tour', '#f97316', '#c2410c'],
-  [/thương mại|dịch vụ|chợ|cảng/i, 'shop', '#ec4899', '#9d174d'],
-  [/văn h[oó]a|thể thao/i, 'flag', '#e11d48', '#9f1239'],
-  [/hạ tầng|giao thông/i, 'road', '#64748b', '#334155'],
+  // Thương mại trước du lịch — chuỗi «Thương mại … Du lịch» không bị vali.
+  [/thương mại|dịch vụ|chợ|siêu thị|mua sắm/i, 'cart', '#ec4899', '#9d174d'],
+  [/du lịch|nghỉ dưỡng|sân gôn|golf/i, 'tour', '#f97316', '#c2410c'],
+  [/văn h[oó]a|thể thao|công viên văn hóa/i, 'culture', '#e11d48', '#9f1239'],
+  [/bãi đỗ|đỗ xe|parking/i, 'parking', '#94a3b8', '#475569'],
+  [/cảng|bến xe|giao thông|hạ tầng/i, 'road', '#64748b', '#334155'],
   [/bất động sản|đô thị|dân cư|nhà ở|chung cư/i, 'home', '#0ea5e9', '#0369a1']
 ];
 const GROUP_LOOK = {
   sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
-  dulich_tm: { icon: 'tour', color: '#ec4899', edge: '#9d174d', label: 'Khu du lịch và thương mại' },
+  dulich_tm: { icon: 'tour', color: '#f97316', edge: '#c2410c', label: 'Khu du lịch và thương mại' },
   khu_cn: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Khu công nghiệp' },
   cum_cn: { icon: 'factory', color: '#9333ea', edge: '#6b21a8', label: 'Cụm công nghiệp' },
   cnc_dien: { icon: 'bolt', color: '#f59e0b', edge: '#b45309', label: 'Công nghệ cao và Nhà máy điện' },
@@ -78,24 +82,30 @@ const GROUP_LOOK = {
   noxh: { icon: 'home', color: '#144677', edge: '#0d2f52', label: 'Nhà ở xã hội' },
   chungcu_tm: { icon: 'home', color: '#0369a1', edge: '#075985', label: 'Chung cư thương mại' },
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
-  vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
+  vanhoaxahoi: { icon: 'culture', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
   benxe: { icon: 'road', color: '#64748b', edge: '#334155', label: 'Bến xe - Cảng biển' },
-  baido: { icon: 'pin', color: '#94a3b8', edge: '#475569', label: 'Bãi đỗ xe' },
+  baido: { icon: 'parking', color: '#94a3b8', edge: '#475569', label: 'Bãi đỗ xe' },
   congvien: { icon: 'leaf', color: '#16a34a', edge: '#166534', label: 'Công viên' },
   khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' },
   dangnghien: { icon: 'pin', color: '#f59e0b', edge: '#b45309', label: 'Đang nghiên cứu' }
 };
-// Glyph trong vòng trắng (viewBox 24×24, đặt tâm giọt): nét màu fill của ngành.
+// Glyph viewBox 24×24; vẽ trong vòng trắng rồi scale 1.5 tại tâm giọt.
 const DROP_GLYPH = {
   cross: '<g fill="none" stroke="C" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.5v9M7.5 12h9"/></g>',
   book: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 5h11v13H6.2A1.2 1.2 0 0 0 5 19.2z"/><path d="M5 19.2A1.2 1.2 0 0 0 6.2 20.5H16M8.5 8h6"/></g>',
-  leaf: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M6 18C6 10 10.5 6 19 5c-1 9-5.5 13.5-13 13z"/><path d="M6 18l7-7"/></g>',
+  // Hai lá + thân — tránh còn một nét chéo giống dấu phẩy.
+  leaf: '<g fill="none" stroke="C" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M12 20.5V10"/><path d="M12 11c-5-1.2-7.5-5-6.5-9.2 5.2.6 8 4.2 6.5 9.2z" fill="C" fill-opacity=".35"/><path d="M12 13c5-1.2 7.5-5 6.5-9.2C13.3 4.4 10.5 8 12 13z" fill="C" fill-opacity=".35"/></g>',
   bolt: '<path fill="C" stroke="E" stroke-width="1" stroke-linejoin="round" d="M13 2.5 5 13.5h6.2L10.2 21.5 19 10.2h-6.2z"/>',
   factory: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M4 19.5V10l4.5 2.8V10L14 13.5V8h2l1.4 2.4H20v9.1z"/><path d="M16 8V5"/></g>',
   cpu: '<g fill="none" stroke="C" stroke-width="1.8" stroke-linejoin="round"><rect x="7.5" y="7.5" width="9" height="9" rx="1.2"/><path d="M9.5 4.5v3M12 4.5v3M14.5 4.5v3M9.5 16.5v3M12 16.5v3M14.5 16.5v3M4.5 9.5h3M4.5 12h3M4.5 14.5h3M16.5 9.5h3M16.5 12h3M16.5 14.5h3"/></g>',
   tour: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><rect x="4" y="9" width="16" height="10" rx="1.2"/><path d="M9 9V7.2A1.2 1.2 0 0 1 10.2 6h3.6A1.2 1.2 0 0 1 15 7.2V9M4 13.5h16"/></g>',
-  shop: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 10.5 6.8 5.5h10.4L19 10.5"/><path d="M5 10.5h14v8.5H5z"/><path d="M10 19v-4.5h4V19"/><path d="M5 10.5c1 1.1 2 1.1 3 0s2-1.1 3 0 2 1.1 3 0 2-1.1 3 0 1.9-1.1 2.9 0"/></g>',
-  flag: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20.5V5M6 5h10.5l-1.8 3.5 1.8 3.5H6"/></g>',
+  // Xe đẩy mua hàng (thương mại).
+  cart: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="19.2" r="1.7"/><circle cx="17" cy="19.2" r="1.7"/><path d="M3.5 4.5h2.2l1.1 2.2h12.2l-1.6 7.2H7.6z"/><path d="M7.6 9.2h10.2"/></g>',
+  shop: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="19.2" r="1.7"/><circle cx="17" cy="19.2" r="1.7"/><path d="M3.5 4.5h2.2l1.1 2.2h12.2l-1.6 7.2H7.6z"/><path d="M7.6 9.2h10.2"/></g>',
+  // Nhà văn hóa / sân khấu — không dùng cờ (trông như chữ P).
+  culture: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 19.5h16"/><path d="M5.5 19.5V11L12 5.5l6.5 5.5v8"/><path d="M9.2 19.5v-5h5.6v5"/><path d="M12 5.8V8"/></g>',
+  flag: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 19.5h16"/><path d="M5.5 19.5V11L12 5.5l6.5 5.5v8"/><path d="M9.2 19.5v-5h5.6v5"/><path d="M12 5.8V8"/></g>',
+  parking: '<g fill="none" stroke="C" stroke-width="2.2" stroke-linejoin="round"><rect x="4.5" y="4.5" width="15" height="15" rx="2"/><path d="M9.2 16.5V7.5h4.2a3.2 3.2 0 0 1 0 6.4H9.2" fill="C" fill-opacity=".2"/></g>',
   road: '<g fill="none" stroke="C" stroke-width="2" stroke-linecap="round"><path d="M9 3.5 5.5 20.5M15 3.5l3.5 17"/><path d="M12 5v2.5M12 11v2.5M12 17v2"/></g>',
   home: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="M5 12 12 5.5 19 12"/><path d="M7 10.8V19h10v-8.2"/><path d="M10.2 19v-4.2h3.6V19"/></g>',
   terrain: '<g fill="none" stroke="C" stroke-width="2" stroke-linejoin="round"><path d="m3.5 19 6.2-10.5 3.6 5.6 2.2-3L20.5 19z"/></g>',
@@ -297,7 +307,7 @@ function sectorOf(text, groupId) {
   return lookOf('layers', '#64748b', '#334155', label || 'Dự án');
 }
 
-/** Giọt nước SVG: thân màu ngành, vòng trắng + glyph (cùng mô típ Noxh / HTXH). */
+/** Giọt nước SVG: thân màu ngành, vòng trắng + glyph ×1.5 (cùng mô típ Noxh / HTXH). */
 function sectorDropSvg(sector, className = 'invest-drop') {
   const fill = sector?.color || '#64748b';
   const edge = sector?.edge || '#334155';
@@ -306,7 +316,7 @@ function sectorDropSvg(sector, className = 'invest-drop') {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 96" class="${className}" aria-hidden="true">
     <path d="${DROP_PATH}" fill="${fill}" stroke="${edge}" stroke-width="1.5"/>
     <circle cx="35" cy="35" r="26" fill="#fff"/>
-    <g transform="translate(23 23)">${glyph}</g>
+    <g transform="translate(35 35) scale(1.5) translate(-12 -12)">${glyph}</g>
   </svg>`;
 }
 
@@ -500,6 +510,8 @@ function stampGroups() {
   (pack || []).forEach(f => {
     f.properties.groupId = mapKey.get(f.properties._key) || '';
   });
+  // Ranh KML trùng tên (nhiều mảnh không liền) → một dự án; không ghi đè nhóm Admin.
+  stampNameInvestGroups(pack);
   invalidateProjects();
 }
 
@@ -836,10 +848,14 @@ function groupHtml(st) {
     return `<div class="invest-group-bar"><b>Gộp ranh thành một dự án</b><span>Bấm ranh trên bản đồ để thêm hoặc bỏ. Đang chọn ${st.picks.size} mảnh.</span>
       <div class="invest-edit-actions"><button type="button" class="proof-btn invest-group-save">Lưu thành một dự án</button><button type="button" class="invest-group-cancel">Hủy</button></div></div>`;
   }
-  const grouped = (st.members || []).length > 1;
+  const members = st.members || [];
+  const grouped = members.length > 1;
+  const autoName = isAutoNameInvestGroup(st.feature?.properties?.groupId);
+  // Nhóm trùng tên tự động: không «Tách» (stamp lại sẽ gộp); vẫn cho gộp thêm ranh tên khác.
   return `<div class="invest-group-actions">
     <button type="button" class="invest-group">${ico('layers')}Gộp thêm ranh vào dự án này</button>
-    ${grouped ? '<button type="button" class="invest-ungroup">Tách ranh khỏi dự án</button><button type="button" class="invest-ungroup-all">Bỏ gộp cả nhóm</button>' : ''}
+    ${grouped && !autoName ? '<button type="button" class="invest-ungroup">Tách ranh khỏi dự án</button><button type="button" class="invest-ungroup-all">Bỏ gộp cả nhóm</button>' : ''}
+    ${grouped && autoName ? `<span class="invest-bound-note">${members.length} mảnh trùng tên — đã gộp một dự án.</span>` : ''}
   </div>`;
 }
 
@@ -1233,8 +1249,8 @@ function sectorMarker(sector) {
   return L.divIcon({
     className: 'invest-pin',
     html: sectorDropSvg(sector),
-    iconSize: [26, 36],
-    iconAnchor: [13, 36]
+    iconSize: [32, 44],
+    iconAnchor: [16, 44]
   });
 }
 
@@ -1303,7 +1319,7 @@ function drawOn(m, features) {
         zIndexOffset: 140,
         icon: sectorMarker(p.sector)
       });
-      mark.bindTooltip(`${p.sector.label} · ${p.title} · chưa có ranh`, { className: 'invest-tip', direction: 'top', offset: [0, -36] });
+      mark.bindTooltip(`${p.sector.label} · ${p.title} · chưa có ranh`, { className: 'invest-tip', direction: 'top', offset: [0, -44] });
       mark.on('click', (e) => openFromMark(p.feature, layer || mark, m, e));
       mark.addTo(group);
       return;
@@ -1326,7 +1342,7 @@ function drawOn(m, features) {
       zIndexOffset: p.matched ? 120 : 160,
       icon: sectorMarker(p.sector)
     });
-    mark.bindTooltip(`${p.sector.label} · ${p.title}`, { className: 'invest-tip', direction: 'top', offset: [0, -36] });
+    mark.bindTooltip(`${p.sector.label} · ${p.title}`, { className: 'invest-tip', direction: 'top', offset: [0, -44] });
     mark.on('click', (e) => openFromMark(p.feature, layer, m, e));
     mark.addTo(group);
   });
@@ -2447,18 +2463,30 @@ function areaHaOfText(text) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function investBoundIcon(p) {
+  const pending = pendingForProject(p);
+  if (pending.length) {
+    const tip = pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh';
+    return `<span class="dt-bound-ico is-pending" title="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}">${ico('clock')}</span>`;
+  }
+  if (p.hasBoundary) {
+    return `<span class="dt-bound-ico is-yes" title="Có ranh giới" aria-label="Có ranh giới">${ico('layers')}</span>`;
+  }
+  return `<span class="dt-bound-ico is-no" title="Chưa có ranh" aria-label="Chưa có ranh">${ico('pin')}</span>`;
+}
+
 function investTableHead(groupId) {
   const spec = investScaleOf(groupId);
   const scaleTh = spec
     ? `<th class="dt-th-scale">${escapeHtml(spec.label)}</th>`
     : '';
+  // STT không ghi chữ tiêu đề — chỉ số hàng; ranh = icon trong cột thao tác.
   return `<thead><tr>
-    <th class="dt-th-stt">STT</th>
+    <th class="dt-th-stt" aria-label="STT"></th>
     <th class="dt-th-name">Tên dự án</th>
-    <th class="dt-th-area">Diện tích</th>
+    <th class="dt-th-area">DT</th>
     ${scaleTh}
-    <th class="dt-th-bound">Ranh</th>
-    <th class="dt-th-act" aria-label="Thông tin"></th>
+    <th class="dt-th-act" aria-label="Ranh và thông tin"></th>
   </tr></thead>`;
 }
 
@@ -2466,27 +2494,20 @@ function investRow(p, n, groupId) {
   const id = projectKey(p);
   const safe = escapeHtml(id);
   const open = investOpen.has(id);
-  const pending = pendingForProject(p);
   const area = p.areaText || areaTextOf(p.sheet, p.geom) || '-';
   const scale = scaleOfProject(p);
   const spec = investScaleOf(groupId || p.dtGroup);
   const scaleCell = spec
     ? `<td class="dt-td-scale${scale?.value == null ? ' is-miss' : ''}">${escapeHtml(formatInvestScale(scale))}</td>`
     : '';
-  const bound = pending.length
-    ? `<span class="dt-bound is-pending">${pending[0].replace ? 'Chờ thay' : 'Chờ duyệt'}</span>`
-    : (p.hasBoundary
-      ? '<span class="dt-bound is-yes">Có</span>'
-      : '<span class="dt-bound is-no">Chưa</span>');
   const blob = [p.title, area, formatInvestScale(scale)].filter(Boolean).join(' ');
   return `<tr class="dt-tr${id === investPicked ? ' is-picked' : ''}" data-dt-text="${escapeHtml(blob)}">
       <td class="dt-td-stt">${n}</td>
       <td class="dt-td-name"><button type="button" class="dt-name-btn" data-invest-focus="${safe}" title="${escapeHtml(p.title || '')}">${escapeHtml(p.title || id)}</button></td>
       <td class="dt-td-area${area === '-' ? ' is-miss' : ''}">${escapeHtml(area)}</td>
       ${scaleCell}
-      <td class="dt-td-bound">${bound}</td>
-      <td class="dt-td-act">
-        <button type="button" class="project-btn project-expand${open || id === investPicked ? ' open' : ''}" data-invest-expand="${safe}" title="Xem thông tin dự án" aria-label="Thông tin dự án" aria-expanded="${open || id === investPicked}">${ico('info')}</button>
+      <td class="dt-td-act"><span class="dt-act-row">${investBoundIcon(p)}
+        <button type="button" class="project-btn project-expand${open || id === investPicked ? ' open' : ''}" data-invest-expand="${safe}" title="Xem thông tin dự án" aria-label="Thông tin dự án" aria-expanded="${open || id === investPicked}">${ico('info')}</button></span>
       </td>
     </tr>`;
 }
@@ -2526,7 +2547,6 @@ function investSumRow(items, groupId) {
       <td class="dt-td-name"><b>Tổng</b>${spec ? '' : `<small class="dt-sum-note">${escapeHtml(note)}</small>`}</td>
       <td class="dt-td-area">${escapeHtml(areaText)}</td>
       ${scaleTd}
-      <td class="dt-td-bound"></td>
       <td class="dt-td-act"></td>
     </tr>`;
 }

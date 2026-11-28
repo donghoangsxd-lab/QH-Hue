@@ -158,14 +158,44 @@ function readBoundary(kmlPath) {
       });
     }
   }
-  features.sort((a, b) => {
+  // Gộp Placemark trùng tên → MultiPolygon (một feature = một dự án, kể cả mảnh không liền).
+  const byName = new Map();
+  const merged = [];
+  features.forEach(f => {
+    const key = String(f.properties?.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!key) {
+      merged.push(f);
+      return;
+    }
+    const prev = byName.get(key);
+    if (!prev) {
+      byName.set(key, f);
+      merged.push(f);
+      return;
+    }
+    const polys = [];
+    const push = (g) => {
+      if (!g) return;
+      if (g.type === 'Polygon') polys.push(g.coordinates);
+      else if (g.type === 'MultiPolygon') polys.push(...g.coordinates);
+    };
+    push(prev.geometry);
+    push(f.geometry);
+    if (polys.length) prev.geometry = { type: 'MultiPolygon', coordinates: polys };
+    const pk = prev.properties.kml || {};
+    Object.entries(f.properties.kml || {}).forEach(([k, v]) => {
+      if (v && !pk[k]) pk[k] = v;
+    });
+    prev.properties.kml = pk;
+  });
+  merged.sort((a, b) => {
     let aa = 0;
     let bb = 0;
     try { aa = turf.area(a); } catch { aa = 0; }
     try { bb = turf.area(b); } catch { bb = 0; }
     return bb - aa;
   });
-  return { type: 'FeatureCollection', features };
+  return { type: 'FeatureCollection', features: merged };
 }
 
 const xlsx = fs.readdirSync(root).find(f => f.endsWith('.xlsx') && !f.startsWith('~') && /đầu tư/i.test(f));

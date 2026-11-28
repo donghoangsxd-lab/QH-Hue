@@ -1,6 +1,7 @@
 // Gộp ranh dự án kêu gọi đầu tư. Sau một lần tải server thành công, danh sách nhóm trên server là chuẩn.
 // Chỉ nhóm local pending (máy này vừa sửa và còn lệnh chưa ghi) được giữ. Nhóm không pending mà server đã xóa thì bỏ.
 // server không phải mảng: bản đóng gói hoặc mất mạng, giữ nguyên bản local.
+// Ngoài nhóm Admin: stampNameInvestGroups gộp mọi ranh trùng tên (KML nhiều polygon) thành một dự án.
 
 function keyList(keys) {
   const out = [];
@@ -95,4 +96,43 @@ export function settleInvestSync(server, local, ops) {
   });
   const kept = queued.filter(op => (op.clear ? op.keys.some(k => used.has(k)) : !serverSigs.has(sigOf(op.keys))));
   return { groups, ops: kept };
+}
+
+/** Khóa gộp theo tên ranh: bỏ dấu, gộp khoảng trắng; bỏ hậu tố (mảnh N). */
+export function investBoundGroupKey(name) {
+  return String(name || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'd')
+    .toLowerCase()
+    .replace(/\s*\((?:mảnh|manh|phần|phan)\s*\d+\)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isAutoNameInvestGroup(groupId) {
+  return String(groupId || '').startsWith('name:');
+}
+
+/**
+ * Gán groupId `name:…` cho các feature cùng tên chưa thuộc nhóm Admin.
+ * Một dự án = nhiều polygon không liền kề khi KML tách Placemark trùng tên.
+ */
+export function stampNameInvestGroups(features) {
+  const buckets = new Map();
+  (Array.isArray(features) ? features : []).forEach(f => {
+    if (!f?.properties || f.properties.groupId) return;
+    const key = investBoundGroupKey(f.properties.name);
+    if (!key) return;
+    let list = buckets.get(key);
+    if (!list) buckets.set(key, list = []);
+    list.push(f);
+  });
+  let n = 0;
+  buckets.forEach((list, key) => {
+    if (list.length < 2) return;
+    const gid = `name:${key}`;
+    list.forEach(f => { f.properties.groupId = gid; });
+    n += 1;
+  });
+  return n;
 }

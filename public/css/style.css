@@ -6129,11 +6129,11 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   padding: 2px 46px 0 0; margin: 0;
 }
 .invest-badge {
-  flex: none; width: 28px; height: 38px; display: flex; align-items: flex-start; justify-content: center;
+  flex: none; width: 32px; height: 44px; display: flex; align-items: flex-start; justify-content: center;
   padding: 0; background: transparent; border: 0;
 }
 .invest-badge .invest-drop {
-  width: 28px; height: 38px; display: block;
+  width: 32px; height: 44px; display: block;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 .invest-head-main { min-width: 0; flex: 1; }
@@ -6234,7 +6234,7 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .leaflet-container .leaflet-investHighlight-pane path:focus,
 .leaflet-marker-icon.invest-pin:focus { outline: none; }
 .invest-pin .invest-drop {
-  display: block; width: 26px; height: 36px;
+  display: block; width: 32px; height: 44px;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
   cursor: pointer;
 }
@@ -9238,39 +9238,46 @@ body.project-review.la-page #projectReviewHost {
 }
 #dtList .dt-table thead th {
   position: sticky; top: 0; z-index: 1;
-  padding: 4px 3px; text-align: left; font-weight: 700; font-size: var(--axis-fs-chip);
+  padding: 4px 2px; text-align: left; font-weight: 700; font-size: var(--axis-fs-chip);
   color: var(--axis-color-muted); background: var(--axis-bg, #fff);
   border-bottom: 1px solid var(--axis-chip-border, rgba(0,0,0,.12));
   white-space: nowrap;
 }
 #dtList .dt-table .dt-th-stt,
-#dtList .dt-table .dt-td-stt { width: 2.2em; text-align: right; color: var(--axis-color-muted); }
+#dtList .dt-table .dt-td-stt {
+  width: 1.35em; padding-right: 2px; text-align: right;
+  color: var(--axis-color-muted); font-variant-numeric: tabular-nums;
+}
 #dtList .dt-table .dt-th-area,
-#dtList .dt-table .dt-td-area,
+#dtList .dt-table .dt-td-area { width: 4.4em; text-align: right; white-space: nowrap; }
 #dtList .dt-table .dt-th-scale,
-#dtList .dt-table .dt-td-scale { width: 5.2em; text-align: right; }
-#dtList .dt-table .dt-th-bound,
-#dtList .dt-table .dt-td-bound { width: 4.2em; text-align: center; }
+#dtList .dt-table .dt-td-scale { width: 4.6em; text-align: right; white-space: nowrap; }
 #dtList .dt-table .dt-th-act,
-#dtList .dt-table .dt-td-act { width: 2em; text-align: center; }
-#dtList .dt-table td { padding: 3px 3px; vertical-align: middle; border-bottom: 1px solid rgba(0,0,0,.06); }
-#dtList .dt-table .dt-td-name { min-width: 0; }
+#dtList .dt-table .dt-td-act { width: 2.75em; text-align: right; white-space: nowrap; vertical-align: middle; }
+#dtList .dt-act-row {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 1px;
+}
+#dtList .dt-table td { padding: 3px 2px; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,.06); }
+#dtList .dt-table .dt-td-name { min-width: 0; width: auto; }
 #dtList .dt-name-btn {
   display: block; width: 100%; margin: 0; padding: 0; border: 0; background: none;
-  font: inherit; font-weight: 600; color: inherit; text-align: left; cursor: pointer;
-  overflow-wrap: anywhere; white-space: normal;
+  font: inherit; font-weight: 600; line-height: 1.25; color: inherit; text-align: left; cursor: pointer;
+  overflow-wrap: break-word; word-break: break-word; white-space: normal;
 }
 #dtList .dt-name-btn:hover { color: var(--text-strong); text-decoration: underline; text-underline-offset: 2px; }
 #dtList .dt-table .dt-td-area.is-miss,
 #dtList .dt-table .dt-td-scale.is-miss { color: var(--axis-color-muted); }
-#dtList .dt-bound { font-size: var(--axis-fs-chip); font-weight: 700; }
-#dtList .dt-bound.is-yes { color: #15803d; }
-#dtList .dt-bound.is-no,
-#dtList .dt-bound.is-pending { color: var(--axis-color-muted); }
-#dtList .dt-bound.is-pending { color: #b45309; }
+#dtList .dt-bound-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.15em; height: 1.15em; flex: 0 0 auto; opacity: .9;
+}
+#dtList .dt-bound-ico .ico { width: 12px; height: 12px; }
+#dtList .dt-bound-ico.is-yes { color: #4ade80; }
+#dtList .dt-bound-ico.is-no { color: var(--axis-color-muted); opacity: .55; }
+#dtList .dt-bound-ico.is-pending { color: #fbbf24; }
 #dtList .dt-tr.is-picked { background: rgba(var(--cyan-rgb), 0.12); box-shadow: inset 3px 0 0 var(--accent-cyan); }
 #dtList .dt-tr.is-picked .dt-name-btn { color: var(--text-strong); font-weight: 700; }
-#dtList .dt-tr.is-sum td { font-weight: 700; border-bottom: 0; background: rgba(0,0,0,.03); }
+#dtList .dt-tr.is-sum td { font-weight: 700; border-bottom: 0; background: rgba(0,0,0,.03); vertical-align: middle; }
 #dtList .dt-sum-note { display: block; font-weight: 500; font-size: var(--axis-fs-chip); color: var(--axis-color-muted); }
 #dtList .pl-group > .pl-body { padding: 0 2px 6px; }
 #axisKienTruc .project-dossier-row,

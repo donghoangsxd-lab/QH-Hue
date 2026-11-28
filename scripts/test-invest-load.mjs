@@ -54,4 +54,24 @@ assert.ok(fs.existsSync(path.join(root, 'scripts/pull-invest-sheet.mjs')));
 assert.ok(fs.existsSync(path.join(root, 'public/data/invest-sheet.json')));
 assert.ok(fs.existsSync(path.join(root, 'public/data/invest-boundary.geojson')));
 
+assert.match(layer, /stampNameInvestGroups|isAutoNameInvestGroup/);
+
+const {
+  investBoundGroupKey, stampNameInvestGroups, isAutoNameInvestGroup
+} = await import('../public/js/investGroups.js');
+assert.equal(
+  investBoundGroupKey('Khu du lịch sinh thái cộng đồng Suối Máu'),
+  investBoundGroupKey('Khu du lịch sinh thái cộng đồng Suối Máu ')
+);
+assert.equal(investBoundGroupKey('Dự án X (mảnh 2)'), investBoundGroupKey('Dự án X'));
+const twin = [
+  { type: 'Feature', properties: { name: 'Khu du lịch sinh thái cộng đồng Suối Máu', _key: 'a' }, geometry: { type: 'Polygon', coordinates: [] } },
+  { type: 'Feature', properties: { name: 'Khu du lịch sinh thái cộng đồng Suối Máu', _key: 'b' }, geometry: { type: 'Polygon', coordinates: [] } },
+  { type: 'Feature', properties: { name: 'Khác', _key: 'c', groupId: '' }, geometry: null }
+];
+assert.equal(stampNameInvestGroups(twin), 1);
+assert.ok(isAutoNameInvestGroup(twin[0].properties.groupId));
+assert.equal(twin[0].properties.groupId, twin[1].properties.groupId);
+assert.equal(twin[2].properties.groupId, '');
+
 console.log('test-invest-load: ok');
