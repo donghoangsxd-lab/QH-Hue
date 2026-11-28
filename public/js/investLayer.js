@@ -214,6 +214,34 @@ function rowAlias(row) {
   return String(row._alias || sheetProjectName(row) || '').replace(/\s+/g, ' ').trim();
 }
 
+/** Khóa ghép sheet ↔ ranh admin: không dựa identity object (applySaved hay tạo bản sheet mới). */
+function sheetAliasKey(sheet) {
+  return rowAlias(sheet) || sheetProjectName(sheet) || '';
+}
+
+function markSheetUsed(set, sheet) {
+  if (!sheet || !set) return;
+  set.add(sheet);
+  const k = sheetAliasKey(sheet);
+  if (k) set.add(`alias:${k}`);
+}
+
+function sheetIsUsed(set, sheet) {
+  if (!sheet || !set) return false;
+  if (set.has(sheet)) return true;
+  const k = sheetAliasKey(sheet);
+  return !!(k && set.has(`alias:${k}`));
+}
+
+function markProjectIds(seen, id) {
+  if (!id || !seen) return;
+  seen.add(id);
+  const m = String(id).match(/^(?:admin|sheet):(.+)$/);
+  if (!m) return;
+  seen.add(`admin:${m[1]}`);
+  seen.add(`sheet:${m[1]}`);
+}
+
 function rowGroupId(row, title) {
   return classifyInvestGroup(row, title, row?._groupId);
 }
@@ -401,7 +429,7 @@ function projectList(features) {
   const useCache = !features || features === pack;
   if (useCache && projectCache) return projectCache;
   const seen = new Set();
-  const matchedRows = new Set();
+  const matchedSheets = new Set();
   const out = [];
   const byGroup = new Map();
   src.forEach(f => {
@@ -414,13 +442,16 @@ function projectList(features) {
   src.forEach(feature => {
     const id = feature.properties?.groupId || feature.properties?._key;
     if (!id || seen.has(id)) return;
-    seen.add(id);
+    markProjectIds(seen, id);
     const members = feature.properties?.groupId
       ? (byGroup.get(feature.properties.groupId) || [feature])
       : [feature];
     const sheet = sheetOf(members, feature);
-    if (sheet) matchedRows.add(sheet);
+    markSheetUsed(matchedSheets, sheet);
+    const admin = String(feature.properties?._adminKey || '').trim();
+    if (admin) matchedSheets.add(`alias:${admin}`);
     const title = sheetProjectName(sheet) || feature.properties?.name || 'Ranh dự án';
+    if (title) matchedSheets.add(`alias:${String(title).replace(/\s+/g, ' ').trim()}`);
     const sectorText = entry(sheet, /lĩnh vực/i) || members.map(m => m.properties?.folder).find(Boolean) || '';
     const geom = unionGeom(members);
     const pin = !geom && sheet ? sheetMapPoint(sheet) : null;
@@ -441,10 +472,10 @@ function projectList(features) {
     last.sector = sectorOf(sectorText, last.dtGroup);
   });
   sheetOnly.forEach(p => {
-    if (p.sheet && matchedRows.has(p.sheet)) return;
+    if (sheetIsUsed(matchedSheets, p.sheet)) return;
     const id = projectKey(p);
     if (!id || seen.has(id)) return;
-    seen.add(id);
+    markProjectIds(seen, id);
     if (!p.areaText) p.areaText = areaTextOf(p.sheet, p.geom || null);
     if (!p.sector) p.sector = sectorOf(entry(p.sheet, /lĩnh vực/i), p.dtGroup);
     out.push(p);
@@ -947,12 +978,18 @@ function rebuildSheetOnly(features, rows) {
   invalidateProjects();
   const used = new Set();
   (features || []).forEach(f => {
-    const sheet = f.properties?.sheet;
-    if (sheet) used.add(sheet);
+    markSheetUsed(used, f.properties?.sheet);
+    const admin = String(f.properties?._adminKey || '').trim();
+    if (admin) used.add(`alias:${admin}`);
+    // Có geometry = đã gắn ranh — không còn dòng sheetOnly cùng tên/alias.
+    if (f.geometry) {
+      const n = sheetProjectName(f.properties?.sheet) || f.properties?.name;
+      if (n) used.add(`alias:${String(n).replace(/\s+/g, ' ').trim()}`);
+    }
   });
   sheetOnly = [];
   (rows || []).forEach(row => {
-    if (!row || used.has(row)) return;
+    if (!row || sheetIsUsed(used, row)) return;
     const title = sheetProjectName(row);
     if (!title) return;
     const alias = rowAlias(row) || title;
@@ -1089,6 +1126,7 @@ async function softRefreshInvest() {
     const features = bindPack(cloneBoundBase(), rows, { groups, boundaries });
     paintInvestList();
     if (visible) redrawMaps();
+    document.dispatchEvent(new CustomEvent('qh:invest-data'));
     if (isAdmin()) {
       try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu */ }
     }
@@ -1392,7 +1430,10 @@ function frameProject(targetMap, bounds) {
   const padBR = L.point(40, 40);
   const fitZ = targetMap.getBoundsZoom(bounds, false, padTL.add(padBR));
   const zoom = Math.min(17, targetMap.getMaxZoom(), fitZ);
-  if (targetMap.getZoom() < zoom - 0.2) {
+  // Đã zoom đủ nhưng dự án ngoài khung (bảng catalog «Có») → vẫn phải fly, không chỉ nudge.
+  let centerInView = false;
+  try { centerInView = targetMap.getBounds().pad(-0.08).contains(bounds.getCenter()); } catch { /* */ }
+  if (!centerInView || targetMap.getZoom() < zoom - 0.2) {
     targetMap.once('moveend', () => nudge(targetMap, bounds));
     targetMap.flyToBounds(bounds, { paddingTopLeft: padTL, paddingBottomRight: padBR, maxZoom: zoom, duration: 0.55 });
     return;
@@ -1807,8 +1848,12 @@ function applySaved(feature, fields, extra = {}) {
       card.members = membersOf(feature);
     }
   }
+  // Bust sig vẽ — tránh giữ layer cũ khi vừa gắn/thay geometry.
+  if (map) drawSigByMap.delete(map);
+  if (planMap) drawSigByMap.delete(planMap);
   redrawMaps();
   paintInvestList();
+  document.dispatchEvent(new CustomEvent('qh:invest-data'));
 }
 
 async function postInvestSave({ key, match, fields, groupId, geometry }) {
@@ -2545,6 +2590,7 @@ export async function createInvestFromSketch({ name, geometry, fields = {} } = {
   rebuildSheetOnly(pack, sheetRows);
   paintInvestList();
   if (visible) redrawMaps();
+  document.dispatchEvent(new CustomEvent('qh:invest-data'));
   const feature = pack.find(f => f.properties?._adminKey === key || f.properties?._key === `admin:${key}`);
   const id = feature?.properties?._key || `admin:${key}`;
   await focusInvest(id);

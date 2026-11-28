@@ -544,6 +544,13 @@ assert.match(read('config/constants.js'), /AXIS_ADMIN_EMAILS[\s\S]*dautu[\s\S]*n
 assert.match(read('services/authService.js'), /requireAxisAdmin|requireAnyAdmin|axesOf|canAdminAxis/);
 assert.match(read('public/js/authRole.js'), /canAdminAxis|isFullAdmin|AXIS_ADMIN/);
 assert.match(read('public/js/investLayer.js'), /canAdminAxis\('dautu'\)/);
+// Gắn ranh Admin: không để sheetOnly trùng admin (ký hiệu đôi); catalog lắng nghe qh:invest-data; fly khi ngoài khung.
+assert.match(read('public/js/investLayer.js'), /function sheetIsUsed|function markSheetUsed/);
+assert.match(read('public/js/investLayer.js'), /markProjectIds\(seen/);
+assert.match(read('public/js/investLayer.js'), /qh:invest-data/);
+assert.match(read('public/js/investLayer.js'), /centerInView/);
+assert.match(read('public/js/catalogTable.js'), /qh:invest-data/);
+assert.match(read('docs/ui-spec.md'), /qh:invest-data|sheetOnly|focusInvest/);
 assert.match(read('api/gee.js'), /requireAxisAdmin\(req, 'dautu'\)/);
 assert.match(read('docs/ui-spec.md'), /AXIS_ADMIN_EMAILS|ncthanhttkt@gmail\.com|Admin cấp 2/);
 assert.match(read('public/js/investLayer.js'), /SELECTED|#fde047/);
@@ -807,7 +814,9 @@ assert.match(read('public/js/projectLayer.js'), /paintQhpkOverlaps/);
 assert.match(read('public/js/projectLayer.js'), /OUTLINE_FILL = \{ QHC: 0\.2, QHPK: 0\.14, QHCT: 0\.14 \}/);
 assert.match(read('public/js/projectLayer.js'), /#22c55e/);
 assert.match(read('public/js/qhc2045Layer.js'), /WASH_FILL = 0\.2/);
-assert.match(read('public/js/qhpkOverlap.js'), /cần kiểm tra pháp lý theo đồ án được phê duyệt sau/);
+assert.match(read('public/js/qhpkOverlap.js'), /Thực hiện theo đồ án được phê duyệt sau và có hiệu lực thay thế/);
+assert.match(read('public/js/soTayDisplay.js'), /decisionYearForTenQH/);
+assert.match(read('public/js/projectLayer.js'), /decisionYearOfProject/);
 assert.match(read('docs/ui-spec.md'), /plan-info-open/);
 assert.match(read('docs/ui-spec.md'), /plan-brief-open/);
 assert.match(read('docs/ui-spec.md'), /planBriefSlot/);

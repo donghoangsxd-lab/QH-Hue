@@ -2007,6 +2007,12 @@ export function initCatalogTable() {
     paintChrome();
     if (source === 'plan') paintTable();
   });
+  // Admin gắn/sửa ranh trục F → làm mới cột «Có/Chưa» khi bảng danh mục đang mở.
+  document.addEventListener('qh:invest-data', () => {
+    if (source !== 'invest' || !document.body.classList.contains('catalog-table-on')) return;
+    rowsCache = investRowsFromItems(listInvestCatalogItems());
+    paintTable();
+  });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => {
     if (document.body.classList.contains('catalog-table-on')) closeCatalogTable();
   });
