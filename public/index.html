@@ -621,13 +621,9 @@
                   <div id="gt25Park" hidden>
                     <div class="project-gt25">
                       <div class="project-layer">
-                        <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đã ký hiệu (GT25). Nằm trong nhóm Giao thông cùng raster và lớp GIS thành phần; chỉ tải GIS khi tick từng lớp con.">
-                          <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
-                        <label class="project-rail" title="Đường sắt">
-                          <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked aria-label="Đường sắt">
-                          <svg class="ico" aria-hidden="true"><use href="#i-rail"/></svg>
-                        </label>
-                        <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem lớp GIS quy hoạch thành phần" aria-label="Lớp GIS quy hoạch thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                        <label class="project-layer-name" title="Nhóm quy hoạch giao thông toàn TP: tick cha bật/tắt đủ lớp con. Đường bộ và đường sắt vẽ bằng mạng ký hiệu QHC (giaothong25); cầu, đầu mối, đường thủy là lớp GIS.">
+                          <input type="checkbox" id="chk_gt25" data-qhc-child="25" data-gt25-head><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>Quy hoạch giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
+                        <button type="button" class="project-btn project-expand" data-gt25-fold aria-expanded="false" aria-controls="gt25Children" title="Xem các lớp thành phần" aria-label="Các lớp thành phần"><svg class="ico"><use href="#i-chev-down"/></svg></button>
                       </div>
                       <div id="gt25Children" class="gt25-children" hidden></div>
                     </div>

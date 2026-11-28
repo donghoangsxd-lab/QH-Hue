@@ -276,6 +276,8 @@ const LOT_LAYER = { HT: 'hien-trang', QH: 'su-dung-dat' };
 
 // Danh sách đồ án (projectLayer) → bảng thông tin 1 đồ án (projectReview), detail = tenQH
 export const PROJECT_INFO_EVENT = 'qh:project-info';
+/** Bấm lô khi đang info → thoát mask/brief, giữ lô (chế độ phẳng). detail = tenQH của lô. */
+export const PROJECT_TO_LOTS_EVENT = 'qh:project-to-lots';
 
 export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));

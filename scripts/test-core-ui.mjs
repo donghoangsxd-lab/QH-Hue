@@ -229,28 +229,29 @@ function projectLayerAround(src, id) {
   assert.fail(`dòng lớp ${id} không đóng`);
 }
 
-for (const [roadId, railId, label] of [
-  ['chk_gt25', 'chk_gt25rail', 'Quy hoạch giao thông (toàn TP)'],
-  ['chk_gt10', 'chk_gt10rail', 'Quy hoạch giao thông (trung tâm)']
-]) {
-  const row = projectLayerAround(plan, roadId);
-  assert.match(row, new RegExp(label.replace(/[()]/g, '\\$&')));
-  assert.match(row, new RegExp(`id="${railId}"[^>]*\\bchecked\\b`));
+{
+  const row = projectLayerAround(plan, 'chk_gt25');
+  assert.match(row, /Quy hoạch giao thông \(toàn TP\)/);
+  assert.match(row, /data-gt25-head/);
+  assert.match(row, /data-gt25-fold/);
+  assert.match(row, /aria-controls="gt25Children"/);
+  assert.doesNotMatch(row, /chk_gt25rail|data-qhc-rail|project-rail/);
+  assert.ok(row.indexOf('project-layer-name') < row.indexOf('data-gt25-fold'), 'nút xổ lớp con đứng sau tên group GT25');
+}
+{
+  const row = projectLayerAround(plan, 'chk_gt10');
+  assert.match(row, /Quy hoạch giao thông \(trung tâm\)/);
+  assert.match(row, /id="chk_gt10rail"[^>]*\bchecked\b/);
   assert.match(row, /data-qhc-rail=/);
   assert.match(row, /class="project-rail"/);
   assert.match(row, /title="Đường sắt"/);
   assert.match(row, /aria-label="Đường sắt"/);
   assert.match(row, /href="#i-rail"/);
-  assert.ok(row.indexOf('project-layer-name') < row.indexOf('project-rail'), `icon đường sắt phải đứng sau tên ${label}`);
-  if (roadId === 'chk_gt25') {
-    assert.match(row, /data-gt25-fold/);
-    assert.match(row, /aria-controls="gt25Children"/);
-    assert.ok(row.indexOf('project-rail') < row.indexOf('data-gt25-fold'), 'nút xổ lớp con đứng sau icon đường sắt');
-  } else {
-    assert.doesNotMatch(row, /project-layer-sub|<button/);
-    assert.match(row, /class="project-rail"[\s\S]*<\/label>\s*<\/div>\s*$/, `icon đường sắt phải là phần cuối dòng ${label}`);
-  }
+  assert.ok(row.indexOf('project-layer-name') < row.indexOf('project-rail'), 'icon đường sắt phải đứng sau tên GT10');
+  assert.doesNotMatch(row, /project-layer-sub|<button/);
+  assert.match(row, /class="project-rail"[\s\S]*<\/label>\s*<\/div>\s*$/, 'icon đường sắt phải là phần cuối dòng GT10');
 }
+assert.doesNotMatch(plan, /id="chk_gt25rail"/);
 assert.match(plan, /id="gt25Children"/);
 assert.match(plan, /class="project-gt25"/);
 assert.match(plan, /id="gt25Park"/);
@@ -286,8 +287,12 @@ assert.match(read('docs/bon-truc.md'), /#gt25Children/);
 assert.match(read('docs/bon-truc.md'), /project-htkt|data-scheme-htkt/);
 assert.match(read('public/js/chuyenNganh.js'), /function paintGt25Children\(/);
 assert.match(read('public/js/chuyenNganh.js'), /gt25ChildrenOpen/);
+assert.match(read('public/js/chuyenNganh.js'), /syncGt25Head|setGt25Head|gt25CanvasKind|data-gt25-canvas/);
+assert.match(read('public/js/chuyenNganh.js'), /refreshGt25Roads/);
+assert.match(read('public/js/qhc2045Layer.js'), /gt25CanvasParts|refreshGt25Roads/);
 assert.match(read('public/js/chuyenNganh.js'), /Hiện trạng giao thông/);
 assert.match(read('public/js/chuyenNganh.js'), /qhc25GtChildLayers\('quy-hoach'\)/);
+assert.match(read('docs/ui-spec.md'), /data-gt25-canvas|group «Quy hoạch giao thông/);
 assert.match(read('public/js/chuyenNganh.js'), /level === 'qhc25'\) openQhc25Layers/);
 assert.match(read('public/js/chuyenNganh.js'), /const qhc25OpenSectors = new Set\(\[QHC25_SPACE\]\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /qhc25OpenSectors = new Set\(QHC25_SECTORS/);
@@ -721,10 +726,12 @@ assert.doesNotMatch(read('public/js/projectLayer.js'), /\[data-main-tab="quyhoac
 // Bấm ô đất: chỉ đồng bộ brief khi đang chế độ info (focusedProject); tick = lô phẳng không mở brief.
 assert.match(read('public/js/mapEngine.js'), /syncFocusedProjectToLot/);
 assert.match(read('public/js/mapEngine.js'), /!state\.focusedProject/);
-assert.match(read('public/js/mapEngine.js'), /keepView:\s*true/);
-assert.match(read('public/js/mapEngine.js'), /PROJECT_INFO_EVENT/);
+assert.match(read('public/js/mapEngine.js'), /PROJECT_TO_LOTS_EVENT/);
+assert.match(read('public/js/projectFiles.js'), /PROJECT_TO_LOTS_EVENT/);
 assert.match(read('public/js/projectLayer.js'), /keepView/);
 assert.match(read('public/js/projectLayer.js'), /export function exitProjectInfo/);
+assert.match(read('public/js/projectLayer.js'), /export function exitProjectToBoundary/);
+assert.match(read('public/js/projectLayer.js'), /PROJECT_TO_LOTS_EVENT/);
 {
   const pl = read('public/js/projectLayer.js');
   const tickFn = pl.slice(pl.indexOf('function openSchemeDetail'), pl.indexOf('function closeSchemeDetail'));
@@ -889,13 +896,17 @@ assert.match(read('public/js/projectLayer.js'), /function zoomTo\(p\)/);
   const flow = read('public/js/viewFlow.js');
   assert.match(flow, /trySwitchProjectAt\(latlng\)/);
   assert.match(flow, /tryEnterProjectInfoAt\(latlng\)/);
-  assert.match(flow, /exitProjectInfo/);
+  assert.match(flow, /exitProjectToBoundary/);
+  const leaveProjectFn = flow.slice(flow.indexOf('function leaveProject'), flow.indexOf('function leaveScopeFocus'));
+  assert.match(leaveProjectFn, /exitProjectToBoundary/);
+  assert.doesNotMatch(leaveProjectFn, /exitProjectInfo/);
   // Switch thử trước khi kiểm tra «ngoài» focused (ranh chồng QHPK).
   const leaveFn = flow.slice(flow.indexOf('function leaveScopeFocus'), flow.indexOf('function onProjectExit'));
   assert.match(leaveFn, /trySwitchProjectAt\(latlng\)/);
   assert.ok(leaveFn.indexOf('trySwitchProjectAt') < leaveFn.indexOf('projectContains'), 'trySwitch trước projectContains');
-  assert.match(read('public/js/projectBrief.js'), /exitProjectInfo/);
-  assert.match(read('docs/ui-spec.md'), /exitProjectInfo|Hai luồng tách biệt/);
+  assert.match(read('public/js/projectBrief.js'), /exitProjectToBoundary/);
+  assert.match(read('docs/ui-spec.md'), /exitProjectToBoundary|Hai luồng tách biệt/);
+  assert.match(read('docs/ui-spec.md'), /PROJECT_TO_LOTS_EVENT|chế độ xem lô phẳng/);
   assert.match(read('public/js/projectCover.js'), /computeProjectCover/);
   assert.match(read('public/js/projectCover.js'), /clearProjectCover/);
   assert.match(read('public/js/projectBrief.js'), /data-brief-cover/);

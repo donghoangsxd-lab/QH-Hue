@@ -50,11 +50,12 @@ import {
 } from './capNuocQhc.js';
 import { htktPointIcon, htktDropSvg, htktSectorLook } from './htktMarkers.js';
 import { rasterRowsHtml, rasterSectorHas, refreshQhcRasterPaint } from './qhcRasterLayer.js';
+import { refreshGt25Roads } from './qhc2045Layer.js';
 
 const STORE_KEY = 'qh_axes_v1';
 // Không còn lưu / khôi phục lớp trên máy. Xóa khóa cũ khi mở trang.
 try { localStorage.removeItem(STORE_KEY); } catch (e) { /* chế độ riêng tư */ }
-const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_dvhc', 'chk_projects', 'chk_qhct'];
+const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_dvhc', 'chk_projects', 'chk_qhct'];
 const SHARE_KEYS = ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'];
 const KIND_LABEL = { 'hien-trang': 'Hiện trạng khi lập đồ án', 'quy-hoach': 'Quy hoạch' };
 const QHC25_SCHEME = 'qhc-hue-2045';
@@ -63,10 +64,11 @@ const QHC25_PHASE_TITLE = {
   'hien-trang': 'Bản đồ hiện trạng tỷ lệ 1/25.000',
   'quy-hoach': 'Bản đồ quy hoạch tỷ lệ 1/25.000'
 };
-// Trên B → QHC 1/25.000: không gian + đủ ngành HTKT cùng cấp. QH giao thông: chk_gt25 + lớp GIS con trong nhóm Giao thông.
+// Trên B → QHC 1/25.000: không gian + đủ ngành HTKT. QH giao thông: #chk_gt25 = group = 5 lớp con (#gt25Children).
 const QHC25_SECTORS = HTKT_GROUPS.filter(g => !g.pipe);
 const QHC25_GT_SECTOR = 'giao-thong';
 const QHC25_SPACE = 'khong-gian';
+let gt25HeadApplying = false;
 
 const ICONS = {
   'khong-gian': '<path d="M4 6h16v12H4z"/><path d="m4 14 4-3 3 2 4-4 5 5"/>',
@@ -315,10 +317,25 @@ function reflectBind(bind, on) {
   applying = false;
 }
 
+/** Lớp con GT25 vẽ bằng canvas ký hiệu (không tải raw GeoJSON). */
+function gt25CanvasKind(layer) {
+  if (!layer || layer.sector !== QHC25_GT_SECTOR || layer.kind !== 'quy-hoach') return '';
+  if (layer.scheme && layer.scheme !== QHC25_SCHEME) return '';
+  const name = String(layer.name || '');
+  if (/đường bộ/i.test(name)) return 'roads';
+  if (/đường sắt/i.test(name)) return 'rails';
+  return '';
+}
+
 async function setLayerOn(layer, on, { frame = false } = {}) {
   setLayerFlag(layer.id, on);
   if (layer.bind) reflectBind(layer.bind, on);
-  if (!layer.bind) {
+  const canvasKind = gt25CanvasKind(layer);
+  if (canvasKind) {
+    // Bộ / sắt: chỉ cờ + canvas giaothong25 — không vẽ raw GIS chồng nguồn.
+    clearDrawn(layer.id);
+    await refreshGt25Roads();
+  } else if (!layer.bind) {
     if (!on) clearDrawn(layer.id);
     else {
       try { await showFile(layer, frame); }
@@ -569,13 +586,12 @@ function qhc25SectorBlock(sec, kind, labelOverride) {
   const rasters = rasterRowsHtml('qhc25', qhc25RasterPhase(kind), sec.id);
   const hasRaster = rasterSectorHas('qhc25', qhc25RasterPhase(kind), sec.id);
   const isGtQh = kind === 'quy-hoach' && sec.id === QHC25_GT_SECTOR;
-  // QH giao thông luôn hiện (chk_gt25 + lớp GIS con); ngành khác cần GIS hoặc raster.
+  // QH giao thông luôn hiện (group chk_gt25 + lớp con); ngành khác cần GIS hoặc raster.
   if (!rows.length && !hasRaster && !isGtQh) return '';
-  const gtOn = isGtQh && !!document.getElementById('chk_gt25')?.checked;
   const layersOn = rows.length ? rows.every(layer => isLayerOn(layer.id)) : true;
   const layersSome = rows.some(layer => isLayerOn(layer.id));
-  const on = isGtQh ? (gtOn && layersOn) : layersOn;
-  const some = isGtQh ? (gtOn || layersSome) : layersSome;
+  const on = layersOn;
+  const some = layersSome;
   const open = qhc25OpenSectors.has(sec.id);
   const label = labelOverride
     || (kind === 'hien-trang' && sec.id === QHC25_GT_SECTOR ? 'Hiện trạng giao thông' : sec.label);
@@ -617,6 +633,49 @@ function paintQhc25HtktBox(boxId, kind) {
   if (kind === 'quy-hoach') remountGt25Block();
 }
 
+function gt25ChildLayerRow(layer) {
+  const kind = gt25CanvasKind(layer);
+  const html = layerRow(layer, false);
+  if (!kind) return html;
+  return html.replace('<input type="checkbox"', `<input type="checkbox" data-gt25-canvas="${kind}"`);
+}
+
+function syncGt25Head() {
+  const head = document.getElementById('chk_gt25');
+  const box = document.getElementById('gt25Children');
+  if (!head || !box) return;
+  const kids = [...box.querySelectorAll('[data-cn-layer]')];
+  if (!kids.length) {
+    head.checked = false;
+    head.indeterminate = false;
+    head.closest('.project-layer')?.classList.toggle('is-off', true);
+    return;
+  }
+  const on = kids.filter(k => k.checked).length;
+  if (gt25HeadApplying) return;
+  head.checked = on === kids.length;
+  head.indeterminate = on > 0 && on < kids.length;
+  head.closest('.project-layer')?.classList.toggle('is-off', on === 0);
+}
+
+function setGt25Head(on) {
+  const head = document.getElementById('chk_gt25');
+  const box = document.getElementById('gt25Children');
+  if (!head || !box) return;
+  gt25HeadApplying = true;
+  head.checked = on;
+  head.indeterminate = false;
+  const kids = [...box.querySelectorAll('[data-cn-layer]')];
+  kids.forEach((el) => {
+    if (el.checked === on) return;
+    el.checked = on;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  gt25HeadApplying = false;
+  syncGt25Head();
+  void refreshGt25Roads();
+}
+
 function paintGt25Children() {
   const box = document.getElementById('gt25Children');
   const btn = document.querySelector('[data-gt25-fold]');
@@ -630,17 +689,25 @@ function paintGt25Children() {
     }
     return;
   }
-  // Chỉ lớp GIS quy hoạch; lớp hiện trạng nằm ở nhóm a → Hiện trạng giao thông.
+  // Đủ lớp con QH; bộ/sắt gắn data-gt25-canvas → canvas ký hiệu, không raw GIS.
   const rows = qhc25GtChildLayers('quy-hoach');
   box.innerHTML = rows.length
-    ? rows.map(layer => layerRow(layer, false)).join('')
-    : '<p class="cn-empty">Chưa có lớp GIS quy hoạch thành phần.</p>';
+    ? rows.map(layer => gt25ChildLayerRow(layer)).join('')
+    : '<p class="cn-empty">Chưa có lớp quy hoạch thành phần.</p>';
   box.hidden = !gt25ChildrenOpen;
   if (btn) {
     btn.classList.toggle('open', gt25ChildrenOpen);
     btn.setAttribute('aria-expanded', String(gt25ChildrenOpen));
-    btn.title = gt25ChildrenOpen ? 'Ẩn lớp GIS quy hoạch thành phần' : 'Xem lớp GIS quy hoạch thành phần';
+    btn.title = gt25ChildrenOpen ? 'Ẩn các lớp thành phần' : 'Xem các lớp thành phần';
   }
+  // Head đã bật (cả cấp / URL) trước khi có DOM con → gắn lại đủ lớp con.
+  const head = document.getElementById('chk_gt25');
+  const kids = [...box.querySelectorAll('[data-cn-layer]')];
+  if (head?.checked && kids.length && kids.every((k) => !k.checked)) {
+    setGt25Head(true);
+    return;
+  }
+  syncGt25Head();
 }
 
 function paintQhc25Htkt() {
@@ -2769,6 +2836,15 @@ export function initChuyenNganh() {
       paintAxisAll();
       return;
     }
+    if (e.target.id === 'chk_gt25' || e.target.hasAttribute?.('data-gt25-head')) {
+      if (!gt25HeadApplying) setGt25Head(!!e.target.checked);
+      if (e.target.checked) {
+        gt25ChildrenOpen = true;
+        paintGt25Children();
+        publishSectorLegend(true, QHC25_GT_SECTOR);
+      }
+      return;
+    }
     const layerId = e.target.closest('[data-cn-layer]')?.dataset.cnLayer;
     if (layerId) {
       const layer = getLayers().find(l => l.id === layerId);
@@ -2776,8 +2852,9 @@ export function initChuyenNganh() {
       const gtQhc25Child = layer?.sector === QHC25_GT_SECTOR
         && !!e.target.closest('#gt25Children, #qhc25HtktHt, #qhc25HtktQh');
       if (layer) setLayerOn(layer, e.target.checked, {
-        frame: e.target.checked && !layer.bind && !gtQhc25Child
+        frame: e.target.checked && !layer.bind && !gtQhc25Child && !gt25CanvasKind(layer)
       });
+      if (e.target.closest('#gt25Children')) syncGt25Head();
       if (e.target.checked && layer) publishSectorLegend(true, layer.sector);
       return;
     }
@@ -2806,13 +2883,17 @@ export function initChuyenNganh() {
       const rows = qhc25SectorLayers(id, kind);
       const turnOn = e.target.checked;
       if (turnOn) qhc25OpenSectors.add(id);
-      // Tick ngành chỉ bật/tắt vector (GIS / chk_gt25). Raster độc lập — không ép theo ngành.
+      // Tick ngành chỉ bật/tắt vector. QH giao thông: cascade qua group #chk_gt25. Raster độc lập.
       if (id === QHC25_GT_SECTOR && kind === 'quy-hoach') {
-        const gt = document.getElementById('chk_gt25');
-        if (gt && gt.checked !== turnOn) {
-          gt.checked = turnOn;
-          gt.dispatchEvent(new Event('change', { bubbles: true }));
+        if (turnOn) {
+          gt25ChildrenOpen = true;
+          qhc25OpenSectors.add(id);
+          paintQhc25Htkt();
         }
+        setGt25Head(turnOn);
+        paintQhc25Htkt();
+        if (turnOn) publishSectorLegend(true, QHC25_GT_SECTOR);
+        return;
       }
       rows.forEach(l => setLayerOn(l, turnOn));
       paintQhc25Htkt();

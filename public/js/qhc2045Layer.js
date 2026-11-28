@@ -9,8 +9,9 @@
 //    (projectLayer), rê chuột sáng nền, bấm ranh lõi mở lại lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần):
 //    mở thẳng lô, không vẽ ranh lõi. Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm
 //    (hợp 4 tiểu vùng) luôn có nền và viền xanh nhạt.
-//  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp trong cùng dòng QHC, không phụ thuộc vùng / lô;
-//    1/10.000 lọc theo nút giai đoạn như lô. Bấm ký hiệu ở chú giải: phóng tới cả loại tuyến và làm nổi, các loại khác mờ.
+//  - chk_gt10: mạng lưới GT ký hiệu (qhcRoads.js) + #chk_gt10rail. chk_gt25 là group head; canvas 1/25.000 tách theo
+//    hai lớp con data-gt25-canvas=roads|rails trong #gt25Children (L 'b' / 's'). 1/10.000 lọc giai đoạn như lô.
+//    Bấm ký hiệu chú giải: phóng tới loại tuyến và làm nổi.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
@@ -260,7 +261,7 @@ function dropLand() {
   layers.land = null;
 }
 
-// ---------- Mạng lưới giao thông (qhcRoads.js): ô lớp riêng chk_gt10 / chk_gt25, không phụ thuộc lô và vùng ----------
+// ---------- Mạng lưới giao thông (qhcRoads.js): chk_gt10 lá; GT25 = 2 lớp con roads/rails ----------
 const ROAD_CHK = { 10: 'chk_gt10', 25: 'chk_gt25' };
 // Loại tuyến đang làm nổi (trafficKey) mỗi tỷ lệ; các loại khác mờ đi
 const roadFocus = { 10: null, 25: null };
@@ -270,6 +271,29 @@ const FOCUS_DIM = 0.22;
 const FOCUS_HALO = [[16, 0.22, null], [9, 0.45, null], [3.5, 1, '#ffffff']];
 const fcOf = (features) => ({ type: 'FeatureCollection', features });
 
+/** GT25: nửa canvas đường bộ / đường sắt theo checkbox con data-gt25-canvas. */
+export function gt25CanvasParts() {
+  const box = document.getElementById('gt25Children');
+  if (!box) return { roads: false, rails: false };
+  return {
+    roads: !!box.querySelector('[data-gt25-canvas="roads"]:checked'),
+    rails: !!box.querySelector('[data-gt25-canvas="rails"]:checked')
+  };
+}
+
+function roadPartsOn(scale) {
+  if (scale === '25') return gt25CanvasParts();
+  return {
+    roads: !!$(ROAD_CHK[10])?.checked,
+    rails: !!$(ROAD_CHK[10])?.checked && $(`chk_gt10rail`)?.checked !== false
+  };
+}
+
+function roadsWanted(scale) {
+  const p = roadPartsOn(scale);
+  return p.roads || p.rails;
+}
+
 function dropRoads(scale) {
   layers[`road${scale}`]?.remove();
   layers[`road${scale}`] = null;
@@ -277,17 +301,19 @@ function dropRoads(scale) {
 
 // So sánh 2 cấp (khung chia đôi): vẽ ở bên đang xem đúng tỷ lệ đó, không có thì ở bản đồ quy hoạch
 function roadHosts(scale) {
-  if (!$(ROAD_CHK[scale])?.checked) return [];
+  if (!roadsWanted(scale)) return [];
   const pair = isLevelPair() ? (mapsForLevel(`qhc${scale}`) || []) : [];
   return pair.length ? pair : [target()].filter(Boolean);
 }
 
-/** Vẽ giao thông tỷ lệ scale lên bản đồ đang chọn (use). 1/10.000 lọc theo nút giai đoạn như lô; đường sắt 1/10.000 không ghi giai đoạn */
+/** Vẽ giao thông tỷ lệ scale. GT25 tách L=b / L=s theo lớp con; GT10 dùng chk_gt10 + rail. */
 function drawRoads(scale) {
   dropRoads(scale);
   const fc = roadData[scale];
   const m = active?.m;
   if (!fc || !m) return;
+  const parts = roadPartsOn(scale);
+  if (!parts.roads && !parts.rails) return;
   const focus = roadFocus[scale];
   const feats = fc.features
     .filter(f => scale !== '10' || f.properties.t == null || shownStages.has(f.properties.t))
@@ -300,12 +326,12 @@ function drawRoads(scale) {
       return focus && trafficKey(f) !== focus ? { ...st, opacity: st.opacity * FOCUS_DIM } : st;
     }
   });
-  const roads = feats.filter(f => !isRail(f));
-  const railOn = $(`chk_gt${scale}rail`)?.checked !== false;
-  const rails = railOn ? feats.filter(isRail) : [];
+  const roads = parts.roads ? feats.filter(f => !isRail(f)) : [];
+  const rails = parts.rails ? feats.filter(isRail) : [];
   const passes = [pass(roads, 0), pass(roads, 1), pass(rails, 0), pass(rails, 1)];
   if (focus) {
-    const hit = feats.filter(f => trafficKey(f) === focus);
+    const hit = feats.filter(f => trafficKey(f) === focus)
+      .filter(f => (isRail(f) ? parts.rails : parts.roads));
     FOCUS_HALO.forEach(([extra, opacity, color]) => passes.push(L.geoJSON(fcOf(hit), {
       pane: ROAD_PANE[0], renderer: r, interactive: false,
       style: (f) => ({
@@ -316,7 +342,7 @@ function drawRoads(scale) {
     passes.push(pass(hit, 0), pass(hit, 1));
   }
   const group = L.featureGroup(passes);
-  group.feats = feats;
+  group.feats = feats.filter(f => (isRail(f) ? parts.rails : parts.roads));
   layers[`road${scale}`] = group.addTo(m);
   paintRoadShields(scale);
 }
@@ -372,18 +398,43 @@ async function setRoads(scale) {
   hosts.forEach(m => { use(m); drawRoads(scale); });
 }
 
+/** Gọi từ chuyenNganh khi tick lớp con đường bộ / đường sắt GT25. */
+export function refreshGt25Roads() {
+  if (roadsWanted('25')) ensurePlanView();
+  return setRoads('25');
+}
+
+function ensureGt25CanvasPart(part) {
+  const box = document.getElementById('gt25Children');
+  const el = box?.querySelector(`[data-gt25-canvas="${part}"]`);
+  if (!el || el.checked) return;
+  el.checked = true;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 /** Bấm ký hiệu ở chú giải: bật lớp nếu đang tắt, phóng tới toàn bộ loại tuyến key và làm nổi; bấm lại loại đang nổi thì bỏ */
 async function focusRoads(scale, key) {
   roadFocus[scale] = roadFocus[scale] === key ? null : key;
   emitRoadFocus(scale);
-  const chk = $(ROAD_CHK[scale]);
-  if (roadFocus[scale] && chk && !chk.checked) {
-    chk.checked = true;
-    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  if (roadFocus[scale]) {
+    if (scale === '25') {
+      const wantRail = String(key || '').startsWith('s:');
+      ensureGt25CanvasPart(wantRail ? 'rails' : 'roads');
+    } else {
+      const chk = $(ROAD_CHK[scale]);
+      if (chk && !chk.checked) {
+        chk.checked = true;
+        chk.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
   }
   await setRoads(scale);
   const focus = roadFocus[scale];
-  const hit = focus && roadData[scale] ? roadData[scale].features.filter(f => trafficKey(f) === focus) : [];
+  const parts = roadPartsOn(scale);
+  const hit = focus && roadData[scale]
+    ? roadData[scale].features.filter(f => trafficKey(f) === focus)
+      .filter(f => (isRail(f) ? parts.rails : parts.roads))
+    : [];
   const m = roadHosts(scale)[0];
   if (!hit.length || !m) return;
   const [w, s, e, n] = turf.bbox(fcOf(hit));
@@ -1514,13 +1565,14 @@ export function initQhc2045Layer() {
     if (e.target.checked) ensurePlanView();
     setVision(e.target.checked);
   });
-  ['10', '25'].forEach(scale => $(ROAD_CHK[scale])?.addEventListener('change', (e) => {
+  // GT10: ô lá chk_gt10 vẽ canvas. GT25: group head không vẽ — lớp con roads/rails gọi refreshGt25Roads.
+  $('chk_gt10')?.addEventListener('change', (e) => {
     if (e.target.checked) ensurePlanView();
-    setRoads(scale);
+    setRoads('10');
     syncStages();
-  }));
-  document.querySelectorAll('[data-qhc-rail]').forEach(el => {
-    el.addEventListener('change', () => setRoads(el.dataset.qhcRail));
+  });
+  document.querySelectorAll('[data-qhc-rail="10"]').forEach(el => {
+    el.addEventListener('change', () => setRoads('10'));
   });
   document.addEventListener(ROAD_FOCUS_EVENT, (e) => { if (e.detail) focusRoads(String(e.detail.scale), e.detail.key); });
   const onZoom = (host) => {
@@ -1537,7 +1589,7 @@ export function initQhc2045Layer() {
     // Tem CT/QL/ĐT theo zoom — chỉ đổi shield, không rebuild mạng đường mỗi nấc bánh xe.
     if (!host._animatingZoom) {
       ['10', '25'].forEach(scale => {
-        if (layers[`road${scale}`] && $(ROAD_CHK[scale])?.checked) paintRoadShields(scale);
+        if (layers[`road${scale}`] && roadsWanted(scale)) paintRoadShields(scale);
       });
     }
   };

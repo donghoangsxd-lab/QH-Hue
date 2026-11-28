@@ -14,7 +14,8 @@
 //      tra cứu địa điểm): mở thẳng lô đồ án tại khung nhìn; bấm lại ranh đồ án đang mở giữ khung.
 //      Đang chọn A: bấm ranh / nền trong B cùng cấp → chọn B và fitBounds toàn ranh (không cần Esc).
 //      Ranh điều chỉnh cục bộ và khu vực đã có QHCT chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó.
-//      Bỏ chọn đồ án (bỏ tick, đóng hồ sơ, Esc, tắt cả cấp): giữ tâm và mức phóng, không centerOnCity.
+//      Esc / × / bấm ngoài ranh khi đang info: về xem ranh (bỏ lô). Bấm lô: sang chế độ lô phẳng.
+//      Bỏ chọn đồ án (bỏ tick, tắt cả cấp): giữ tâm và mức phóng, không centerOnCity.
 //    - QHCT 1/500: nhìn rộng ranh + tên; tick / bấm → chi tiết. Zoom lớn: mở lô tại khung như QHPK.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới. Thoát về lớp gốc nếu có, giữ nguyên khung nhìn.
@@ -25,7 +26,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, exitProjectInfo, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt, tryEnterProjectInfoAt } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, exitProjectToBoundary, projectContains, openInspectProjects, stashInspectView, revealLotsCovering, openLotsAtView, trySwitchProjectAt, tryEnterProjectInfoAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT, PLACE_DETAIL_ZOOM } from './projectFiles.js';
 import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import {
@@ -305,10 +306,10 @@ function onProjectOpened(e) {
   syncEscHint();
 }
 
-// Esc / thoát info: bỏ mask+brief, giữ lô đã tick (chế độ xem lô phẳng).
+// Esc / × / bấm ngoài ranh: bỏ mask+brief và bỏ lô đồ án đang xem → chế độ xem ranh ban đầu.
 function leaveProject() {
   closeProjectView();
-  exitProjectInfo();
+  exitProjectToBoundary();
   revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
   syncEscHint();
 }
@@ -459,7 +460,7 @@ function onEscape(e) {
   }
   if (state.focusedProject) {
     e.preventDefault();
-    // Mọi cấp: thoát info → chế độ xem lô phẳng (giữ tick), giữ khung nhìn.
+    // Thoát info → xem ranh (bỏ lô đồ án đang chọn), giữ khung nhìn.
     leaveProject();
     return;
   }

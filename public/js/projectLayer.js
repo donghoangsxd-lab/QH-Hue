@@ -2,13 +2,12 @@
 // QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập. Toàn thành phố: QHPK và QHCT
 // liệt kê phẳng, mỗi đồ án một dòng, xếp theo tên. Chỉ gom theo phường khi đang chọn phường hoặc phạm vi
 // đô thị / xã / tổ dân phố. QHC liệt kê thẳng.
-// Hai luồng: (1) Info — bấm tên / ranh → focusedProject + mask + #projectBrief giữa màn; đóng × / Esc =
-// exitProjectInfo (giữ lotProjects). (2) Lô phẳng — tick hộp → chỉ lotProjects, không mask/brief; nhiều đồ án
-// cùng cấp; khác cấp dùng chia đôi. Đã mở lô (info hoặc lot): outline-lots-open tắt pane+canvas;
-// chuyển đồ án lân cận qua map click → leaveScopeFocus / trySwitchProjectAt (không giữ PE canvas ranh).
-// Admin xóa / chuyển đồ án cũ. Nút file mở PDF quyết định. Mũi tên xổ cây a/b HT/QH. Hồ sơ ở brief (?).
-// Zoom ≥ PLACE_DETAIL_ZOOM: openLotsAtView. Đang info A: bấm ranh B → openProject(B). Esc / exitProjectInfo
-// trả đủ danh sách cấp. Ranh từ schemeVisibility.enabledSchemes. Nút #btnAxisAll bật/tắt cả cấp đang xem.
+// Hai luồng: (1) Info — bấm tên / ranh → focusedProject + mask + #projectBrief giữa màn; bấm ranh đồ án
+// khác → openProject (vẫn info); bấm lô → PROJECT_TO_LOTS_EVENT / exitProjectInfo (lô phẳng, bỏ mask);
+// × / Esc / bấm ngoài ranh → exitProjectToBoundary (bỏ mask + bỏ lô đồ án đang xem → chỉ còn ranh).
+// (2) Lô phẳng — tick hộp hoặc sau khi bấm lô từ info; không mask/brief; quay lại info chỉ bằng bấm tên
+// trong list. Đã mở lô: outline-lots-open tắt PE ranh; chuyển đồ án qua trySwitchProjectAt.
+// Zoom ≥ PLACE_DETAIL_ZOOM: openLotsAtView. Ranh từ schemeVisibility.enabledSchemes.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -17,7 +16,7 @@ import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
   wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, PLACE_DETAIL_ZOOM, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog,
-  PROJECT_LAYERS
+  PROJECT_LAYERS, PROJECT_TO_LOTS_EVENT
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -458,17 +457,20 @@ function zoomTo(p) {
 }
 
 // Chế độ xem thông tin đồ án (tên trong list hoặc ranh trên bản đồ): phóng tới, mask, brief giữa màn hình.
-// Cũng đưa đồ án vào lotProjects để khi đóng brief vẫn còn chế độ xem lô phẳng.
+// QHPK/QHCT info: chỉ lô của đồ án đang xem (tránh chồng lô đồ án trước khi switch ranh).
 function openProject(p) {
   inspectSnap = null;
   viewStash = null;
   focusExtra = null;
   levelPeers = [];
   inspectHostM2 = 0;
-  // Giữ các đồ án đã tick cùng cấp; chỉ đảm bảo đồ án đang xem có trong lotProjects.
+  if (p.level === 'QHPK' || p.level === 'QHCT') {
+    projects.forEach(x => {
+      if (x.level === p.level && x.name !== p.name) state.lotProjects.delete(x.name);
+    });
+  }
   if (!state.lotProjects.has(p.name)) state.lotProjects.add(p.name);
   if (p.level === 'QHC') {
-    // Không soleQhcLots — cho phép nhiều QHC tick song song ở chế độ lô.
     if (state.hiddenProjects.delete(p.name)) saveHidden();
   }
   zoomTo(p);
@@ -919,8 +921,8 @@ export function projectContains(name, latlng) {
 export const PROJECT_UNFOCUS_EVENT = 'qh:project-unfocus';
 
 /**
- * Thoát chế độ xem thông tin đồ án: bỏ highlight/mask/brief, giữ lô đã tick (chế độ xem lô phẳng).
- * Đóng nút × trên brief hoặc Esc khi đang info.
+ * Thoát info → chế độ xem lô phẳng: bỏ highlight/mask/brief, giữ lotProjects.
+ * Dùng khi bấm lô quy hoạch trong lúc đang xem thông tin đồ án.
  */
 export function exitProjectInfo() {
   const was = state.focusedProject || focusName;
@@ -936,6 +938,27 @@ export function exitProjectInfo() {
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
   renderList();
   if (was) refreshAll();
+}
+
+/**
+ * Thoát info → chế độ xem ranh ban đầu (QHPK/QHCT): bỏ mask/brief và bỏ lô đồ án đang xem.
+ * × trên brief, Esc, hoặc bấm nền ngoài ranh đồ án đang chọn.
+ */
+export function exitProjectToBoundary() {
+  const was = state.focusedProject || focusName;
+  state.focusedProject = null;
+  focusName = null;
+  focusExtra = null;
+  levelPeers = [];
+  inspectHostM2 = 0;
+  outsideMask = null;
+  if (was) state.lotProjects.delete(was);
+  drawFocus();
+  markPicked(null);
+  clearProjectCover();
+  document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+  renderList();
+  refreshAll();
 }
 
 /** Bỏ focus info; QHC còn xóa lô đã mở. Dùng khi đổi cấp / thoát hẳn — không dùng cho đóng brief. */
@@ -1170,7 +1193,7 @@ export function planLevelAllTip() {
 }
 
 /** Còn lớp / đồ án / GT của trục Quy hoạch đang hiện trên bản đồ (mọi cấp).
- *  Không tính riêng ô đường sắt: chk_gt*rail mặc định checked chỉ là tùy chọn kèm GT, không phải lớp đang mở. */
+ *  Không tính riêng ô đường sắt GT10 (chk_gt10rail): tùy chọn kèm GT, không phải lớp đang mở. */
 export function anyPlanLayerOn() {
   return LIST_LEVELS.some(l => eyeState(l.key).on);
 }
@@ -1184,13 +1207,6 @@ export function planLevelHasLayers(key) {
 export function clearPlanLevelLayers(key) {
   if (!key || !LIST_LEVELS.some(l => l.key === key)) return;
   setLevelShown(key, false);
-  if (key === 'QHC25') {
-    const rail = document.getElementById('chk_gt25rail');
-    if (rail?.checked) {
-      rail.checked = false;
-      rail.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }
   if (key === 'QHC') {
     const rail = document.getElementById('chk_gt10rail');
     if (rail?.checked) {
@@ -1200,15 +1216,14 @@ export function clearPlanLevelLayers(key) {
   }
 }
 
-/** Tắt hết lớp và đồ án mọi cấp quy hoạch (kèm GT và đường sắt). Không đổi trục đang chọn. */
+/** Tắt hết lớp và đồ án mọi cấp quy hoạch (kèm GT; GT10 kèm đường sắt). Không đổi trục đang chọn. */
 export function clearAllPlanLayers() {
   LIST_LEVELS.forEach(l => setLevelShown(l.key, false));
-  ['chk_gt25rail', 'chk_gt10rail'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el || !el.checked) return;
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  const rail = document.getElementById('chk_gt10rail');
+  if (rail?.checked) {
+    rail.checked = false;
+    rail.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 }
 
 /** Bật / tắt cả lớp và đồ án của cấp đang xem. Không đổi cấp, không phóng khung nhìn. */
@@ -3713,10 +3728,25 @@ export function initProjectLayer(opts = {}) {
     const keepView = !!(raw && typeof raw === 'object' && raw.keepView);
     const p = projects.find(x => x.name === name);
     if (!p) return;
-    // keepView: bấm ô đất đồ án khác — đổi brief/hồ sơ theo lô, không zoomTo cả đồ án.
+    // keepView: mở info tại chỗ (không fitBounds lại cả ranh).
     if (keepView) shareOpenProject(p.name);
     else openProject(p);
     revealInList(p);
+  });
+  // Bấm lô khi đang info → chế độ lô phẳng (giữ lotProjects, bỏ mask/brief).
+  document.addEventListener(PROJECT_TO_LOTS_EVENT, (e) => {
+    const name = String(e.detail || '').trim();
+    if (!state.focusedProject) return;
+    if (name) {
+      // Lô thuộc đồ án khác: chuyển lotProjects sang đồ án đó trước khi thoát info.
+      if (name !== state.focusedProject) {
+        state.lotProjects.delete(state.focusedProject);
+        state.lotProjects.add(name);
+      } else if (!state.lotProjects.has(name)) {
+        state.lotProjects.add(name);
+      }
+    }
+    exitProjectInfo();
   });
   document.addEventListener('auth:change', renderList);
   document.addEventListener(ADJUST_CHANGE_EVENT, renderList);

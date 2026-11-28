@@ -26,10 +26,10 @@ import {
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, onViewChange, onPlanBoundariesPainted,
   getViewMode, setViewMode, passToolClick, shownMaps, alignPlanView
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown, PROJECT_INFO_EVENT } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, schemeInteriorOn, infraLotOf, byProjectAreaDesc, lotShown, PROJECT_TO_LOTS_EVENT } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { lotMissingStampAttrs } from './landStamp.js';
-import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
+import { planLevelOf } from './generalPlan.js';
 import { touchPrimary } from './touchGroups.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -2882,18 +2882,14 @@ function decisionFile(d, fallbackName) {
 }
 
 /**
- * Bấm ô đất: chỉ đồng bộ brief khi đang chế độ xem thông tin đồ án.
- * Chế độ xem lô phẳng (tick, không focus) → không mở / chuyển brief (tránh xung đột với thẻ lô).
+ * Bấm ô đất khi đang info: thoát mask/brief → chế độ xem lô phẳng (giữ lotProjects).
+ * Không còn chuyển brief theo lô — muốn xem info lại thì bấm tên đồ án trên panel.
+ * Chế độ lô phẳng (không focus) → không đụng brief.
  */
 export function syncFocusedProjectToLot(projectName) {
   const name = String(projectName || '').trim();
   if (!name || !state.focusedProject) return;
-  if (state.focusedProject === name) {
-    document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
-    return;
-  }
-  // Đang info A mà bấm lô B: chuyển info sang B, giữ khung nhìn.
-  document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: { name, keepView: true } }));
+  document.dispatchEvent(new CustomEvent(PROJECT_TO_LOTS_EVENT, { detail: name }));
 }
 
 function bindDossier(popup, projectName) {

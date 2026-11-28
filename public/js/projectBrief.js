@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT, focusProject } from './projectFiles.js';
-import { PROJECT_UNFOCUS_EVENT, exitProjectInfo, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
+import { PROJECT_UNFOCUS_EVENT, exitProjectToBoundary, inspectPeers, inspectHostArea, openInspectDecision, projectDossierSummaryHtmlByName } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT, openProjectInfo } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, adjustmentSiteCount, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { splitProjectName } from './projectNames.js';
@@ -536,7 +536,7 @@ export function initProjectBrief() {
   });
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-brief-close]')) {
-      exitProjectInfo();
+      exitProjectToBoundary();
       return;
     }
     if (e.target.closest('[data-brief-help]')) { toggleDetail(); return; }
