@@ -49,7 +49,7 @@ import {
   setCapNuocZoneOn, capNuocPlantLayer
 } from './capNuocQhc.js';
 import { htktPointIcon, htktDropSvg, htktSectorLook } from './htktMarkers.js';
-import { rasterRowsHtml, rasterSectorHas } from './qhcRasterLayer.js';
+import { rasterRowsHtml, rasterSectorHas, refreshQhcRasterPaint } from './qhcRasterLayer.js';
 
 const STORE_KEY = 'qh_axes_v1';
 // Không còn lưu / khôi phục lớp trên máy. Xóa khóa cũ khi mở trang.
@@ -656,6 +656,8 @@ function paintQhc25Htkt() {
     legacy.hidden = true;
     legacy.innerHTML = '';
   }
+  // Raster độc lập tick ngành: khôi phục ô đã chọn sau khi sơn lại DOM.
+  refreshQhcRasterPaint();
 }
 
 /** Lớp HTKT một đồ án (catalog), một phase; không cột đèn. */
@@ -2651,8 +2653,7 @@ export function initChuyenNganh() {
       const rows = qhc25SectorLayers(id, kind);
       const turnOn = e.target.checked;
       if (turnOn) qhc25OpenSectors.add(id);
-      // Đọc ô raster trước khi sơn lại DOM (mở nhóm nếu đang thu).
-      const rasterChks = [...(host?.querySelectorAll(`[data-qhc25-sector-row="${CSS.escape(id)}"] [data-qhc-raster-id]`) || [])];
+      // Tick ngành chỉ bật/tắt vector (GIS / chk_gt25). Raster độc lập — không ép theo ngành.
       if (id === QHC25_GT_SECTOR && kind === 'quy-hoach') {
         const gt = document.getElementById('chk_gt25');
         if (gt && gt.checked !== turnOn) {
@@ -2662,13 +2663,6 @@ export function initChuyenNganh() {
       }
       rows.forEach(l => setLayerOn(l, turnOn));
       paintQhc25Htkt();
-      const hostAfter = document.getElementById(host?.id || 'qhc25HtktQh');
-      const rasterAfter = hostAfter?.querySelectorAll(`[data-qhc25-sector-row="${CSS.escape(id)}"] [data-qhc-raster-id]`) || [];
-      (rasterAfter.length ? rasterAfter : rasterChks).forEach((chk) => {
-        if (chk.checked === turnOn) return;
-        chk.checked = turnOn;
-        chk.dispatchEvent(new Event('change', { bubbles: true }));
-      });
       if (turnOn) publishSectorLegend(true, rows[0]?.sector || id);
       return;
     }

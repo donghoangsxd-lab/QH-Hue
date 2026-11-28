@@ -453,6 +453,14 @@ export function countApartments() {
   return popItems().length + planItems.length;
 }
 
+/** Đếm theo loại để gắn vào nhóm F: noxh | thuongmai | (tất cả nếu bỏ trống). */
+export function countApartmentsByKind(kind) {
+  const all = [...popItems(), ...planItems];
+  if (kind === 'thuongmai') return all.filter(it => it.kind === 'thuongmai').length;
+  if (kind === 'noxh') return all.filter(it => it.kind !== 'thuongmai').length;
+  return all.length;
+}
+
 export function initApartmentLayer() {
   if (!map) return;
   paintAptLegendMarks();

@@ -319,7 +319,7 @@ const SECTIONS = [
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên trái › <b>F. Dự án đầu tư</b> › chọn nhóm (DVTM, Công nghiệp…). Bật <b>Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên trái › <b>F. Dự án đầu tư</b> › chọn nhóm (Sân gôn, Khu đô thị…).',
           'Bấm ranh dự án trên bản đồ hoặc tên trong danh sách. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b> (khi đã có ranh). Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'

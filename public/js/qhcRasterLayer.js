@@ -22,6 +22,8 @@ let catalog = null;
 // map → Map(layerId → L.TileLayer)
 const layersByMap = new WeakMap();
 const opacityById = new Map();
+/** Ô raster đã bật — giữ qua lần sơn lại DOM (cây a/b QHC 1/25.000). Không gắn với tick ngành. */
+const onById = new Set();
 let uiBound = false;
 
 function ensurePane(m) {
@@ -77,7 +79,7 @@ function layerList() {
 function wantedIds() {
   const level = getLevel();
   return layerList()
-    .filter((row) => row.level === level && $(chkId(row.id))?.checked)
+    .filter((row) => row.level === level && onById.has(row.id))
     .map((row) => row.id);
 }
 
@@ -140,8 +142,18 @@ function applyOpacity(id) {
 function syncOpBoxes() {
   layerList().forEach((row) => {
     const box = $(opBoxId(row.id));
-    if (box) box.style.display = $(chkId(row.id))?.checked ? '' : 'none';
+    if (box) box.style.display = onById.has(row.id) ? '' : 'none';
   });
+}
+
+function syncCheckboxes() {
+  layerList().forEach((row) => {
+    const el = $(chkId(row.id));
+    if (!el) return;
+    const on = onById.has(row.id);
+    if (el.checked !== on) el.checked = on;
+  });
+  syncOpBoxes();
 }
 
 function escapeHtml(s) {
@@ -166,16 +178,17 @@ function rowSector(row) {
 
 function rowHtml(row) {
   const label = `${row.short || row.name} (raster)`;
-  const tip = `${row.name}. Tile XYZ gisHue (mapid 21817), trên vệ tinh, dưới lớp vector QHC.`;
+  const tip = `${row.name}. Tile XYZ gisHue (mapid 21817), trên vệ tinh, dưới lớp vector QHC. Chỉ hiện khi tích ô này — không theo tick ngành.`;
   const op = Math.round(opacityOf(row.id) * 100);
-  // Không gắn data-qhc-child: ô đầu dòng QHC không được bật hết raster.
+  const on = onById.has(row.id);
+  // Không gắn data-qhc-child: ô đầu dòng / tick ngành QHC không được bật hết raster.
   return `<div class="project-layer" data-qhc-raster="${escapeHtml(row.level === 'qhc25' ? '25' : '10')}">
     <label class="project-layer-name" title="${escapeHtml(tip)}">
-      <input type="checkbox" id="${escapeHtml(chkId(row.id))}" data-qhc-raster-id="${escapeHtml(row.id)}">
+      <input type="checkbox" id="${escapeHtml(chkId(row.id))}" data-qhc-raster-id="${escapeHtml(row.id)}"${on ? ' checked' : ''}>
       <i class="project-layer-dot" style="--dot:#f59e0b"></i>
       <span>${escapeHtml(label)}</span>
     </label>
-    <span id="${escapeHtml(opBoxId(row.id))}" class="layer-slider" style="display:none;">
+    <span id="${escapeHtml(opBoxId(row.id))}" class="layer-slider" style="${on ? '' : 'display:none;'}">
       <input type="range" id="${escapeHtml(opId(row.id))}" class="opacity-slider" min="0" max="100" value="${op}" title="Độ trong suốt ${escapeHtml(label)}" aria-label="Độ trong suốt ${escapeHtml(label)}">
     </span>
   </div>`;
@@ -221,6 +234,8 @@ function bindUi() {
   document.addEventListener('change', (e) => {
     const id = e.target?.dataset?.qhcRasterId;
     if (!id) return;
+    if (e.target.checked) onById.add(id);
+    else onById.delete(id);
     paintAll();
   });
   document.addEventListener('input', (e) => {
@@ -232,6 +247,12 @@ function bindUi() {
     applyOpacity(id);
     syncOpBoxes();
   });
+}
+
+/** Sau khi cây a/b sơn lại DOM: khôi phục ô đã tick và đồng bộ tile trên bản đồ. */
+export function refreshQhcRasterPaint() {
+  syncCheckboxes();
+  paintAll();
 }
 
 async function loadCatalog() {

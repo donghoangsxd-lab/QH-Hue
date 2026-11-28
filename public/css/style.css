@@ -5997,6 +5997,40 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .pls-table tr.pls-tr { cursor: pointer; }
 .pls-table tr.pls-tr:hover td { background: rgba(255, 255, 255, 0.04); }
 .pls-table tr.pls-tr.is-on td { background: rgba(var(--cyan-rgb), 0.14); }
+/* Gom loại đất (ranh dự án F): hàng tổng → xổ bảng lô chi tiết. */
+.pls-type-groups { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.pls-type-group {
+  border: 1px solid var(--border-color); border-radius: var(--r-md);
+  background: rgba(15, 23, 42, 0.28); overflow: hidden;
+}
+.pls-type-sum {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center;
+  padding: 6px 8px; cursor: pointer; list-style: none;
+}
+.pls-type-sum::-webkit-details-marker { display: none; }
+.pls-type-pick {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer;
+}
+.pls-type-pick .pls-swatch, .pls-type-pick .pls-mark {
+  width: 14px; height: 11px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.35);
+}
+.pls-type-label {
+  min-width: 0; font-weight: 700; font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pls-type-meta {
+  color: var(--text-muted); font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.pls-type-meta b { color: var(--text-main); font-weight: 700; }
+.pls-type-group[open] > .pls-type-sum {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(var(--cyan-rgb), 0.08);
+}
+.pls-type-group .pls-table-wrap { margin: 0; padding: 0 4px 4px; }
+.pls-type-pick.is-on .pls-swatch, .pls-type-pick.is-on .pls-mark {
+  outline: 2px solid var(--accent-cyan); outline-offset: 1px;
+}
 .pls-list { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 4px; max-height: 300px; overflow-y: auto; padding-right: 2px; }
 .pls-row {
   display: grid;
@@ -6088,7 +6122,10 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 .invest-plan-btn { margin-top: 8px; }
 .invest-note { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 4px; }
 .invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
-.invest-head { display: flex; gap: 8px; align-items: flex-start; min-width: 0; padding-right: 46px; }
+.invest-head {
+  display: flex; gap: 8px; align-items: flex-start; min-width: 0;
+  padding: 2px 46px 0 0; margin: 0;
+}
 .invest-badge {
   flex: none; width: 28px; height: 38px; display: flex; align-items: flex-start; justify-content: center;
   padding: 0; background: transparent; border: 0;
@@ -6099,10 +6136,10 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
 }
 .invest-head-main { min-width: 0; flex: 1; }
 .invest-kicker {
-  display: flex; align-items: center; gap: 6px; min-width: 0;
+  display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap;
   color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
 }
-.invest-kicker b { min-width: 0; overflow-wrap: anywhere; color: var(--accent-cyan); font-weight: 700; }
+.invest-kicker .lp-eyebrow-label { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
 .invest-pieces { text-transform: none; letter-spacing: 0; color: var(--text-muted); font-weight: 600; }
 .invest-chip {
   flex: none; margin-left: auto; padding: 1px 6px; border-radius: 99px;
@@ -6112,30 +6149,21 @@ body.plan-info-open #planInfoSlot > .land-lot-popup.pp-located.pp-editable.pp-ha
   background: rgba(245, 158, 11, 0.2); color: #fde68a;
 }
 .invest-card .invest-head .lp-title { padding-right: 0; margin-top: 2px; }
-.invest-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; padding-right: 22px; }
+.invest-card .lp-metrics { margin-top: 8px; }
+.invest-card .lp-landuse { margin-top: 6px; }
+.invest-switch {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+  margin-top: 6px; padding-right: 0;
+}
+.invest-switch .lp-tab,
 .invest-switch button {
   padding: 5px 6px; border-radius: var(--r-md); border: 1px solid var(--border-color);
   background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-sm); font-weight: 700;
-  letter-spacing: 0.06em; cursor: pointer;
+  letter-spacing: 0.04em; cursor: pointer;
 }
-.invest-switch button.is-on { background: rgba(var(--cyan-rgb), 0.18); border-color: var(--accent-cyan); color: var(--text-main); }
-.invest-meta {
-  display: grid; margin: 8px 0 0; padding: 0;
-  border: 1px solid var(--border-color); border-radius: var(--r-md);
-  background: rgba(15, 23, 42, 0.35); overflow: hidden;
-}
-.invest-meta-row {
-  display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 8px; align-items: baseline;
-  margin: 0; padding: 5px 8px; border-top: 1px solid rgba(148, 163, 184, 0.18);
-}
-.invest-meta-row:first-child { border-top: 0; }
-.invest-meta-row dt {
-  margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700;
-  letter-spacing: 0.03em; text-transform: uppercase;
-}
-.invest-meta-row dd {
-  margin: 0; color: var(--text-main); font-size: var(--fs-sm); font-weight: 600;
-  overflow-wrap: anywhere;
+.invest-switch .lp-tab.is-on,
+.invest-switch button.is-on {
+  background: rgba(var(--cyan-rgb), 0.18); border-color: var(--accent-cyan); color: var(--text-main);
 }
 .invest-goal, .invest-block {
   margin-top: 8px; padding: 6px 8px; border-radius: var(--r-md);

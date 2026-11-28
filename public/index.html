@@ -752,11 +752,20 @@
                 <label><span>Nhóm dự án</span>
                   <select id="dtGroupPick" data-dt-group-pick aria-label="Nhóm dự án">
                     <option value="all" selected>Toàn bộ dự án</option>
-                    <option value="dvtm">Dịch vụ, thương mại</option>
-                    <option value="congnghiep">Công nghiệp, năng lượng</option>
-                    <option value="khudothi">Đô thị, nhà ở</option>
+                    <option value="sangon">Sân gôn</option>
+                    <option value="dulich_tm">Khu du lịch và thương mại</option>
+                    <option value="khu_cn">Khu công nghiệp</option>
+                    <option value="cum_cn">Cụm công nghiệp</option>
+                    <option value="cnc_dien">Công nghệ cao và Nhà máy điện</option>
+                    <option value="khu_dt">Khu đô thị</option>
+                    <option value="kdc_nt">Khu dân cư nông thôn</option>
+                    <option value="noxh">Nhà ở xã hội</option>
+                    <option value="chungcu_tm">Chung cư thương mại</option>
                     <option value="nongnghiep">Nông nghiệp</option>
                     <option value="vanhoaxahoi">Văn hóa - Y tế - Giáo dục</option>
+                    <option value="benxe">Bến xe</option>
+                    <option value="baido">Bãi đỗ xe</option>
+                    <option value="congvien">Công viên</option>
                     <option value="khac">Dự án khác</option>
                     <option value="dangnghien">Đang nghiên cứu</option>
                   </select>
@@ -773,9 +782,14 @@
                 <div id="investInfoSlot" class="invest-info-slot" hidden></div>
                 <div id="dtList" class="project-list">
                   <div data-dt-pane="all"><div id="investList-all" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="dvtm" hidden><div id="investList-dvtm" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="congnghiep" hidden><div id="investList-congnghiep" class="project-list invest-tab-list"></div></div>
-                  <div data-dt-pane="khudothi" hidden>
+                  <div data-dt-pane="sangon" hidden><div id="investList-sangon" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="dulich_tm" hidden><div id="investList-dulich_tm" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="khu_cn" hidden><div id="investList-khu_cn" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="cum_cn" hidden><div id="investList-cum_cn" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="cnc_dien" hidden><div id="investList-cnc_dien" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="khu_dt" hidden><div id="investList-khu_dt" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="kdc_nt" hidden><div id="investList-kdc_nt" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="noxh" hidden>
                     <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
                     <div class="flood-box" id="aptBox" style="display:none;">
                       <div class="apt-legend" aria-label="Chú giải chung cư">
@@ -795,10 +809,14 @@
                       <p id="aptStatus" class="apt-status"></p>
                     </div>
                     <div id="aptList" class="project-list"></div>
-                    <div id="investList-khudothi" class="project-list invest-tab-list"></div>
+                    <div id="investList-noxh" class="project-list invest-tab-list"></div>
                   </div>
+                  <div data-dt-pane="chungcu_tm" hidden><div id="investList-chungcu_tm" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="nongnghiep" hidden><div id="investList-nongnghiep" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="vanhoaxahoi" hidden><div id="investList-vanhoaxahoi" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="benxe" hidden><div id="investList-benxe" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="baido" hidden><div id="investList-baido" class="project-list invest-tab-list"></div></div>
+                  <div data-dt-pane="congvien" hidden><div id="investList-congvien" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="khac" hidden><div id="investList-khac" class="project-list invest-tab-list"></div></div>
                   <div data-dt-pane="dangnghien" hidden><div id="investList-dangnghien" class="project-list invest-tab-list"></div></div>
                 </div>

@@ -581,28 +581,79 @@ function audibleParts(parts, totalArea) {
   return kept.length ? kept : list;
 }
 
-/** Bảng gọn Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (bỏ Stt để đủ chỗ cột HSSDĐ). */
-function planLotsTable(parts, totalArea) {
-  const list = audibleParts(parts, totalArea);
-  if (!list.length) return '';
-  const body = list.map((p) => {
-    const plan = p.lot && p.lot.plan;
-    const pct = p.pct;
-    const pick = p.pickKey || p.label;
-    return `<tr class="pls-tr" data-land="${escapeHtml(pick)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(p.name || p.label)} · ${escapeHtml(fmtPct(pct))} · bấm để tô sáng ranh lô">
-      <td class="pls-type">${landMarksHtml(p.color, p.key)}<span class="pls-lot-name">${escapeHtml(p.label)}</span></td>
+/** Một dòng lô trong bảng thành phần đất. */
+function planLotRowHtml(p, totalArea) {
+  const plan = p.lot && p.lot.plan;
+  const pct = totalArea > 0 ? (p.area / totalArea) * 100 : Number(p.pct) || 0;
+  const pick = p.pickKey || p.label;
+  const name = p.name && p.name !== p.label ? p.name : p.label;
+  return `<tr class="pls-tr" data-land="${escapeHtml(pick)}" data-color="${escapeHtml(p.color || '')}" title="${escapeHtml(name)} · ${escapeHtml(fmtPct(pct))} · bấm để tô sáng ranh lô">
+      <td class="pls-type">${landMarksHtml(p.color, p.key)}<span class="pls-lot-name">${escapeHtml(name)}</span></td>
       <td class="pls-num">${fmtM2(p.area)}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'coverage'))}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'floors'))}</td>
       <td class="pls-num">${escapeHtml(planFieldText(plan, 'far'))}</td>
     </tr>`;
-  }).join('');
+}
+
+/** Bảng gọn Loại đất / Diện tích / MĐXD / Tầng cao / HSSDĐ (bỏ Stt để đủ chỗ cột HSSDĐ). */
+function planLotsTable(parts, totalArea) {
+  const list = audibleParts(parts, totalArea);
+  if (!list.length) return '';
+  const body = list.map((p) => planLotRowHtml(p, totalArea)).join('');
   return `<div class="pls-table-wrap"><table class="pls-table">
     <thead><tr>
       <th>Loại đất</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
     </tr></thead>
     <tbody>${body}</tbody>
   </table></div>`;
+}
+
+/**
+ * Gom theo loại đất (tổng diện tích + % + số lô); xổ mới hiện từng lô.
+ * Dùng cho ranh dự án đầu tư (nhiều lô cùng loại).
+ */
+function planLotsGroupedTable(parts, totalArea) {
+  const list = audibleParts(parts, totalArea);
+  if (!list.length) return '';
+  const by = new Map();
+  list.forEach((p) => {
+    const id = String(p.label || 'Đất khác');
+    let g = by.get(id);
+    if (!g) {
+      g = { label: id, color: p.color || '#94a3b8', key: p.key || '', area: 0, lots: [] };
+      by.set(id, g);
+    }
+    g.area += p.area;
+    g.lots.push(p);
+    if (p.color) g.color = p.color;
+    if (p.key) g.key = p.key;
+  });
+  const groups = [...by.values()].sort((a, b) => b.area - a.area || a.label.localeCompare(b.label, 'vi'));
+  const blocks = groups.map((g) => {
+    const pct = totalArea > 0 ? (g.area / totalArea) * 100 : 0;
+    const n = g.lots.length;
+    const lotWord = n === 1 ? '1 lô' : `${fmtNum(n)} lô`;
+    const body = g.lots
+      .slice()
+      .sort((a, b) => b.area - a.area)
+      .map((p) => planLotRowHtml(p, totalArea))
+      .join('');
+    return `<details class="pls-type-group">
+      <summary class="pls-type-sum" title="${escapeHtml(g.label)} · ${escapeHtml(fmtPct(pct))} · ${escapeHtml(lotWord)} — bấm để xem từng lô">
+        <button type="button" class="pls-type-pick" data-land="${escapeHtml(g.label)}" data-color="${escapeHtml(g.color)}" title="Tô toàn bộ ${escapeHtml(g.label)} trên bản đồ" aria-label="Tô ${escapeHtml(g.label)}">${landMarksHtml(g.color, g.key)}</button>
+        <span class="pls-type-label">${escapeHtml(g.label)}</span>
+        <span class="pls-type-meta"><b>${fmtM2(g.area)}</b> · ${escapeHtml(fmtPct(pct))} · ${escapeHtml(lotWord)}</span>
+      </summary>
+      <div class="pls-table-wrap"><table class="pls-table">
+        <thead><tr>
+          <th>Lô chi tiết</th><th>Diện tích</th><th>MĐXD</th><th>Tầng cao</th><th>HSSDĐ</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table></div>
+    </details>`;
+  }).join('');
+  return `<div class="pls-type-groups" role="list">${blocks}</div>`;
 }
 
 function schemeLots(parts, area) {
@@ -634,7 +685,13 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
     if (!res.parts?.length && !res.rows.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}${pieHtml(res, noneLabel, w.pie)}</div>`;
+    // Ranh dự án: gom theo loại đất rồi xổ từng lô; thửa/vùng đo giữ bảng phẳng.
+    const groupByType = opts.groupByType === true
+      || (opts.groupByType !== false && opts.place === 'invest');
+    const table = groupByType
+      ? planLotsGroupedTable(res.parts, res.area)
+      : planLotsTable(res.parts, res.area);
+    return `<div class="plan-land-stats">${head}${table}${pieHtml(res, noneLabel, w.pie)}</div>`;
   }
   const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
@@ -662,7 +719,12 @@ export function parcelZonesHtml(res, recorded, opts) {
     if (!res.parts.length) {
       return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div></div>`;
     }
-    return `<div class="plan-land-stats">${head}${planLotsTable(res.parts, res.area)}${pieHtml(res, opts.none, w.pie)}</div>`;
+    const groupByType = opts.groupByType === true
+      || (opts.groupByType !== false && opts.place === 'invest');
+    const table = groupByType
+      ? planLotsGroupedTable(res.parts, res.area)
+      : planLotsTable(res.parts, res.area);
+    return `<div class="plan-land-stats">${head}${table}${pieHtml(res, opts.none, w.pie)}</div>`;
   }
   const head = `<div class="pls-head">${escapeHtml(title)}</div>
     <div class="pp-row pls-sheet"><span>${escapeHtml(w.shape)}</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>

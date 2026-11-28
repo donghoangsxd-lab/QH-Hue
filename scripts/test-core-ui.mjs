@@ -291,6 +291,12 @@ assert.match(read('public/js/chuyenNganh.js'), /qhc25GtChildLayers\('quy-hoach'\
 assert.match(read('public/js/chuyenNganh.js'), /level === 'qhc25'\) openQhc25Layers/);
 assert.match(read('public/js/chuyenNganh.js'), /const qhc25OpenSectors = new Set\(\[QHC25_SPACE\]\)/);
 assert.doesNotMatch(read('public/js/chuyenNganh.js'), /qhc25OpenSectors = new Set\(QHC25_SECTORS/);
+// Tick ngành QHC 1/25.000 không ép raster; raster độc lập (onById + refresh sau paint).
+assert.match(read('public/js/qhcRasterLayer.js'), /const onById = new Set\(\)/);
+assert.match(read('public/js/qhcRasterLayer.js'), /export function refreshQhcRasterPaint/);
+assert.match(read('public/js/chuyenNganh.js'), /refreshQhcRasterPaint/);
+assert.doesNotMatch(read('public/js/chuyenNganh.js'), /rasterAfter[\s\S]{0,200}chk\.checked = turnOn/);
+assert.match(read('docs/ui-spec.md'), /không tự bật theo tick ngành/);
 assert.match(read('public/js/chuyenNganh.js'), /QHC25_SPACE = 'khong-gian'/);
 assert.match(read('public/js/chuyenNganh.js'), /export function paintSchemeHtkt\(/);
 assert.match(read('public/js/chuyenNganh.js'), /export function paintProjectHtktHosts\(/);
@@ -328,11 +334,20 @@ assert.match(html, /id="dtScopePick"/);
 let dtAt = 0;
 for (const [id, label] of [
   ['all', 'Toàn bộ dự án'],
-  ['dvtm', 'Dịch vụ, thương mại'],
-  ['congnghiep', 'Công nghiệp, năng lượng'],
-  ['khudothi', 'Đô thị, nhà ở'],
+  ['sangon', 'Sân gôn'],
+  ['dulich_tm', 'Khu du lịch và thương mại'],
+  ['khu_cn', 'Khu công nghiệp'],
+  ['cum_cn', 'Cụm công nghiệp'],
+  ['cnc_dien', 'Công nghệ cao và Nhà máy điện'],
+  ['khu_dt', 'Khu đô thị'],
+  ['kdc_nt', 'Khu dân cư nông thôn'],
+  ['noxh', 'Nhà ở xã hội'],
+  ['chungcu_tm', 'Chung cư thương mại'],
   ['nongnghiep', 'Nông nghiệp'],
   ['vanhoaxahoi', 'Văn hóa - Y tế - Giáo dục'],
+  ['benxe', 'Bến xe'],
+  ['baido', 'Bãi đỗ xe'],
+  ['congvien', 'Công viên'],
   ['khac', 'Dự án khác'],
   ['dangnghien', 'Đang nghiên cứu']
 ]) {
@@ -343,7 +358,7 @@ for (const [id, label] of [
 }
 assert.match(dtPick, /value="all"[^>]*selected|value="all" selected/);
 assert.match(dauTu, /data-dt-pane="all"/);
-assert.doesNotMatch(dtPick, /value="nangluong"|value="chungcu"|data-dt-tab=/);
+assert.doesNotMatch(dtPick, /value="dvtm"|value="congnghiep"|value="khudothi"|value="nangluong"|data-dt-tab=/);
 assert.match(dauTu, /id="chk_c14"/);
 assert.match(dauTu, /id="chk_invest"/);
 assert.match(dauTu, /class="dt-invest-check"/);
@@ -359,11 +374,13 @@ assert.doesNotMatch(dauTu, /Dự án kêu gọi đầu tư/);
 assert.match(html, /id="dtMagLabel"/);
 assert.match(dauTu, /id="aptBox"/);
 assert.match(dauTu, /id="aptList"/);
-assert.match(dauTu, /id="investList-dvtm"/);
+assert.match(dauTu, /id="investList-sangon"/);
+assert.match(dauTu, /id="investList-dulich_tm"/);
+assert.match(dauTu, /id="investList-noxh"/);
 assert.match(dauTu, /id="investList-khac"/);
 assert.match(dauTu, /id="investList-dangnghien"/);
-assert.match(dauTu, /id="investList-khudothi"/);
-assert.doesNotMatch(dauTu, /id="investList-chungcu"|id="investList-nangluong"|data-dt-pane="chungcu"|data-dt-pane="nangluong"/);
+assert.match(dauTu, /data-dt-pane="noxh"/);
+assert.doesNotMatch(dauTu, /id="investList-dvtm"|id="investList-khudothi"|data-dt-pane="dvtm"|data-dt-pane="khudothi"/);
 assert.match(html, /id="btnSketchToInvest"/);
 assert.match(html, /id="sketchInvestRow"/);
 assert.match(read('public/js/sketchLayer.js'), /createInvestFromSketch|saveSketchAsInvest/);
@@ -514,10 +531,12 @@ assert.match(read('public/js/loadProgress.js'), /export function startLoadMeter/
 assert.match(read('public/js/apartmentLayer.js'), /data-apt-expand/);
 assert.match(read('public/js/investLayer.js'), /data-invest-expand/);
 assert.match(read('public/js/investLayer.js'), /invest-info-open|qh-invest-info/);
-assert.match(read('public/js/investLayer.js'), /invest-meta|boundToolsHtml|proposeBoundary|approvePendingBound/);
+assert.match(read('public/js/investLayer.js'), /investHeadHtml|boundToolsHtml|data-info-tab="bound"|proposeBoundary|approvePendingBound/);
+assert.match(read('public/js/investLayer.js'), /metricCellsHtml|landUseBannerHtml/);
 assert.match(read('public/js/investLayer.js'), /Đề xuất ranh KML\/DXF|Đề xuất thay ranh|Đồng ý|submitInvestProposal/);
 assert.match(read('public/js/investLayer.js'), /invest_bound_pending|loadPendingBoundIndex|Chờ duyệt ranh|Chờ thay ranh/);
-assert.match(read('public/css/style.css'), /\.invest-meta|\.invest-bound|\.invest-pending|is-pending/);
+assert.match(read('public/css/style.css'), /\.invest-bound|\.invest-pending|is-pending|\.pls-type-group/);
+assert.match(read('docs/ui-spec.md'), /Thông tin.*Ranh giới.*Chi tiết|gom theo loại đất/);
 assert.match(read('docs/ui-spec.md'), /đề xuất ranh|Đồng ý|invest_bound_pending|Chờ duyệt ranh/);
 assert.match(read('services/investBoundPending.js'), /assertNoPending|upsertPending|removePendingById/);
 assert.match(read('config/constants.js'), /INVEST_BOUND_PENDING_URL/);
@@ -532,12 +551,13 @@ assert.match(read('public/js/app.js'), /syncInvestInfoDock|investInfoSlot/);
 assert.match(read('public/css/style.css'), /body\.invest-info-open #investInfoSlot/);
 assert.match(read('docs/ui-spec.md'), /investInfoSlot|#investCard/);
 assert.match(read('public/js/investLayer.js'), /dt-area|areaTextOf/);
-assert.match(read('public/js/investLayer.js'), /data-dvtm-fold|DVTM_SUBGROUPS/);
 assert.match(read('public/js/investLayer.js'), /toggleInvestAxisAll|investAxisAllOn/);
 assert.match(read('public/js/chuyenNganh.js'), /toggleInvestAxisAll/);
-assert.match(read('public/js/investClassify.js'), /classifyDvtmSub/);
+assert.match(read('public/js/investClassify.js'), /classifyInvestGroup|dulich_tm|cnc_dien|kdc_nt/);
+assert.doesNotMatch(read('public/js/investClassify.js'), /DVTM_SUBGROUPS|classifyDvtmSub/);
+assert.match(read('public/js/investLayer.js'), /if \(!pack\)/);
 assert.match(read('docs/ui-spec.md'), /cuối dòng hiện diện tích/);
-assert.match(read('docs/ui-spec.md'), /Nhóm Dịch vụ, thương mại chia 5 nhóm con/);
+assert.match(read('docs/ui-spec.md'), /Sân gôn|Khu du lịch và thương mại|Cụm công nghiệp|Công nghệ cao và Nhà máy điện/);
 assert.match(read('docs/ui-spec.md'), /cùng kiểu công trình kiến trúc Pháp/);
 assert.match(dauTu, /id="dtPicks"|class="cn-picks dt-picks"/);
 assert.doesNotMatch(dauTu, /Dữ liệu hiện trạng/);
@@ -552,12 +572,12 @@ assert.doesNotMatch(read('public/js/legendPanel.js'), /data-xh-mirror="chk_inves
 assert.doesNotMatch(read('public/js/legendPanel.js'), /\['chk_invest'/);
 assert.match(read('public/js/investLayer.js'), /export function investLegendHtml/);
 assert.match(read('public/js/investLayer.js'), /invest-legend-row|invest-legend-drop/);
-assert.match(read('public/js/investLayer.js'), /DVTM_SUBGROUPS|GROUP_LOOK|dangnghien/);
-assert.doesNotMatch(read('public/js/investLayer.js'), /data-invest-legend-group|applyInvestLegendToggle/);
+assert.match(read('public/js/investLayer.js'), /GROUP_LOOK|dangnghien|dulich_tm/);
+assert.doesNotMatch(read('public/js/investLayer.js'), /data-invest-legend-group|applyInvestLegendToggle|DVTM_SUBGROUPS|data-dvtm-fold/);
 assert.doesNotMatch(read('public/js/legendPanel.js'), /LEGEND_OFF = new Set\(\[[^\]]*dautu/);
 assert.match(read('docs/ui-spec.md'), /F\. Dự án đầu tư/);
 assert.match(read('docs/ui-spec.md'), /Không checkbox «Dự án kêu gọi đầu tư»/);
-assert.match(read('docs/ui-spec.md'), /bảy nhóm dự án|Đang nghiên cứu/);
+assert.match(read('docs/ui-spec.md'), /Đang nghiên cứu|nhóm chi tiết/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
 assert.doesNotMatch(plan, /id="inputIsoRadius"/);
@@ -754,6 +774,7 @@ assert.match(read('docs/ui-spec.md'), /QHC 1\/25\.000 hoặc 1\/10\.000/);
 assert.match(read('docs/ui-spec.md'), /không xổ droplist sáu trục/);
 assert.match(read('docs/ui-spec.md'), /Thông tin quy hoạch:/);
 assert.match(read('public/js/planLandStats.js'), /planLotsTable/);
+assert.match(read('public/js/planLandStats.js'), /planLotsGroupedTable|pls-type-group/);
 assert.match(read('public/js/planLandStats.js'), /HSSDĐ/);
 assert.doesNotMatch(read('public/js/planLandStats.js'), /<th>Stt<\/th>/);
 assert.doesNotMatch(read('public/js/planLandStats.js'), /<th>Tỷ lệ<\/th>/);
@@ -770,7 +791,8 @@ assert.match(read('public/js/viewFlow.js'), /level === 'qhct' && viewingPlace\(\
 assert.match(read('public/js/projectLayer.js'), /invest-plan:not\(\[hidden\]\)/);
 assert.match(read('public/js/investLayer.js'), /ensureDauTuPane\(\)/);
 assert.match(read('public/js/projectLayer.js'), /export function revealLotsCovering/);
-assert.match(read('public/js/planLandStats.js'), /planLotsTable\(res\.parts, res\.area\)\}\$\{pieHtml/);
+assert.match(read('public/js/planLandStats.js'), /const table = groupByType[\s\S]*pieHtml\(res/);
+assert.match(read('public/js/planLandStats.js'), /place === 'invest'/);
 assert.match(read('public/js/planLandStats.js'), /pls-mark-hatch/);
 assert.match(read('docs/ui-spec.md'), /hiện lô đất quy hoạch của đồ án giao thửa/);
 assert.match(read('docs/ui-spec.md'), /ô màu \+ ô hatch/);

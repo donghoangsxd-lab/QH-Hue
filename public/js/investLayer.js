@@ -13,19 +13,20 @@ import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlo
 import { matchInvestDetail, sheetProjectName, sheetMapPoint } from './investMatch.js';
 import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import {
-  classifyInvestGroup, classifyDvtmSub, INVEST_GROUPS, DVTM_SUBGROUPS, DVTM_SUB_DEFAULT,
+  classifyInvestGroup, INVEST_GROUPS,
   INVEST_TAB_ALL, isInvestGroupId, investGroupLabel
 } from './investClassify.js';
 import {
   sheetSig, parseInvestEditsStore, applyInvestEditsClient, editsWorthApplying
 } from './investEdits.js';
 import { readDrawingFile } from './drawingReaders.js';
-import { countApartments } from './apartmentLayer.js';
+import { countApartmentsByKind } from './apartmentLayer.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies, landGeomsOf } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 import { WARD_NAMES } from './facetStore.js';
+import { metricCellsHtml, landUseBannerHtml } from './lotPopup.js';
 
 const INVEST_SHEET_URL = './data/invest-sheet.json';
 const INVEST_BOUND_URL = './data/invest-boundary.geojson';
@@ -66,20 +67,22 @@ const SECTORS = [
   [/bất động sản|đô thị|dân cư|nhà ở|chung cư/i, 'home', '#0ea5e9', '#0369a1']
 ];
 const GROUP_LOOK = {
-  dvtm: { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'Dịch vụ, thương mại' },
-  congnghiep: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Công nghiệp, năng lượng' },
-  khudothi: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Đô thị, nhà ở' },
+  sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
+  dulich_tm: { icon: 'tour', color: '#ec4899', edge: '#9d174d', label: 'Khu du lịch và thương mại' },
+  khu_cn: { icon: 'factory', color: '#a855f7', edge: '#6b21a8', label: 'Khu công nghiệp' },
+  cum_cn: { icon: 'factory', color: '#9333ea', edge: '#6b21a8', label: 'Cụm công nghiệp' },
+  cnc_dien: { icon: 'bolt', color: '#f59e0b', edge: '#b45309', label: 'Công nghệ cao và Nhà máy điện' },
+  khu_dt: { icon: 'home', color: '#0ea5e9', edge: '#0369a1', label: 'Khu đô thị' },
+  kdc_nt: { icon: 'home', color: '#38bdf8', edge: '#0369a1', label: 'Khu dân cư nông thôn' },
+  noxh: { icon: 'home', color: '#144677', edge: '#0d2f52', label: 'Nhà ở xã hội' },
+  chungcu_tm: { icon: 'home', color: '#0369a1', edge: '#075985', label: 'Chung cư thương mại' },
   nongnghiep: { icon: 'leaf', color: '#22c55e', edge: '#166534', label: 'Nông nghiệp' },
   vanhoaxahoi: { icon: 'flag', color: '#e11d48', edge: '#9f1239', label: 'Văn hóa - Y tế - Giáo dục' },
+  benxe: { icon: 'road', color: '#64748b', edge: '#334155', label: 'Bến xe' },
+  baido: { icon: 'pin', color: '#94a3b8', edge: '#475569', label: 'Bãi đỗ xe' },
+  congvien: { icon: 'leaf', color: '#16a34a', edge: '#166534', label: 'Công viên' },
   khac: { icon: 'layers', color: '#64748b', edge: '#334155', label: 'Dự án khác' },
   dangnghien: { icon: 'pin', color: '#f59e0b', edge: '#b45309', label: 'Đang nghiên cứu' }
-};
-const DVTM_LOOK = {
-  sangon: { icon: 'terrain', color: '#10b981', edge: '#047857', label: 'Sân gôn' },
-  khachsan: { icon: 'tour', color: '#f59e0b', edge: '#b45309', label: 'Khách sạn' },
-  dulich: { icon: 'map', color: '#06b6d4', edge: '#0e7490', label: 'Khu du lịch' },
-  xang: { icon: 'bolt', color: '#ef4444', edge: '#991b1b', label: 'Xăng dầu' },
-  'dvtm-khac': { icon: 'shop', color: '#ec4899', edge: '#9d174d', label: 'Thương mại dịch vụ' }
 };
 // Glyph trong vòng trắng (viewBox 24×24, đặt tâm giọt): nét màu fill của ngành.
 const DROP_GLYPH = {
@@ -135,9 +138,6 @@ let sheetRows = [];
 let sheetOnly = [];
 const investOpen = new Set();
 const investHidden = new Set();
-/** Nhóm con DVTM đang mở danh sách (tab DVTM; mặc định xổ sân gôn). */
-const dvtmFoldOpen = new Set([DVTM_SUB_DEFAULT]);
-let dvtmMapDefaultDone = false;
 let investPicked = '';
 let investDrawRaf = 0;
 let leftGroup = null;
@@ -218,31 +218,7 @@ function rowGroupId(row, title) {
   return classifyInvestGroup(row, title, row?._groupId);
 }
 
-function rowDvtmSub(row, title, groupId) {
-  if (groupId !== 'dvtm') return '';
-  return classifyDvtmSub(row, title);
-}
-
-/** Trước đây ẩn DVTM trừ sân gôn; mặc định «Toàn bộ» hiện mọi ranh — không ẩn nữa. */
-function applyDvtmMapDefault() {
-  dvtmMapDefaultDone = true;
-}
-
-function setDvtmSubMap(subId, on) {
-  projectList().forEach(p => {
-    if (p.dtGroup !== 'dvtm' || p.dvtmSub !== subId) return;
-    const id = projectKey(p);
-    if (!id) return;
-    if (on) investHidden.delete(id);
-    else investHidden.add(id);
-  });
-}
-
-function dvtmSubMapOn(subId, items) {
-  return items.some(p => !investHidden.has(projectKey(p)));
-}
-
-/** Nút #btnAxisAll trên F: cả dự án thuộc tab đang chọn (không chỉ nhóm DVTM đang mở danh sách). */
+/** Nút #btnAxisAll trên F: cả dự án thuộc tab đang chọn. */
 export function investAxisAllOn() {
   if (!$('chk_invest')?.checked) return false;
   const items = projectsForTab();
@@ -269,7 +245,6 @@ export function toggleInvestAxisAll() {
       const id = projectKey(p);
       if (id) investHidden.delete(id);
     });
-    if (tab === 'dvtm') DVTM_SUBGROUPS.forEach(s => dvtmFoldOpen.add(s.id));
     const box = $('chk_invest');
     if (box && !box.checked) {
       box.checked = true;
@@ -307,14 +282,10 @@ function lookOf(icon, color, edge, label) {
   return { icon, color, edge, label: label || 'Dự án' };
 }
 
-function sectorOf(text, groupId, dvtmSub) {
+function sectorOf(text, groupId) {
   const label = String(text || '').replace(/\s+/g, ' ').trim().replace(/^lĩnh vực\s+/i, '');
   for (const [re, icon, color, edge] of SECTORS) {
     if (re.test(label)) return lookOf(icon, color, edge, label || 'Dự án');
-  }
-  if (groupId === 'dvtm' && DVTM_LOOK[dvtmSub]) {
-    const d = DVTM_LOOK[dvtmSub];
-    return lookOf(d.icon, d.color, d.edge, label || d.label);
   }
   if (GROUP_LOOK[groupId]) {
     const g = GROUP_LOOK[groupId];
@@ -336,10 +307,10 @@ function sectorDropSvg(sector, className = 'invest-drop') {
   </svg>`;
 }
 
-/** Chú giải trục F: đủ giọt nước từng nhóm (+ nhóm con DVTM) và swatch ranh; không checkbox lớp. */
+/** Chú giải trục F: đủ giọt nước từng nhóm và swatch ranh; không checkbox lớp. */
 export function investLegendHtml() {
-  const row = (look, label, nested = false) =>
-    `<div class="htkt-legend-row invest-legend-row${nested ? ' is-sub' : ''}">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${escapeHtml(label)}</span></div>`;
+  const row = (look, label) =>
+    `<div class="htkt-legend-row invest-legend-row">${sectorDropSvg(look, 'invest-drop invest-legend-drop')}<span>${escapeHtml(label)}</span></div>`;
   const bound = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch" aria-hidden="true"></i><span>Ranh dự án</span></div>`;
   const pending = `<div class="htkt-legend-row invest-legend-row"><i class="invest-bound-swatch is-pending" aria-hidden="true"></i><span>Ranh đề xuất (chờ duyệt)</span></div>`;
   let html = `<div class="invest-legend-block"><b class="invest-legend-h">Ký hiệu chung</b>${bound}${pending}</div>`;
@@ -347,12 +318,6 @@ export function investLegendHtml() {
   for (const g of INVEST_GROUPS) {
     const look = GROUP_LOOK[g.id] || lookOf('layers', '#64748b', '#334155', g.label);
     html += row(look, g.label || g.title || g.id);
-    if (g.id === 'dvtm') {
-      for (const s of DVTM_SUBGROUPS) {
-        const sub = DVTM_LOOK[s.id] || lookOf('shop', '#ec4899', '#9d174d', s.label);
-        html += row(sub, s.label || s.title || s.id, true);
-      }
-    }
   }
   html += '</div>';
   return html;
@@ -473,8 +438,7 @@ function projectList(features) {
       dtGroup: rowGroupId(sheet, title)
     });
     const last = out[out.length - 1];
-    last.dvtmSub = rowDvtmSub(sheet, title, last.dtGroup);
-    last.sector = sectorOf(sectorText, last.dtGroup, last.dvtmSub);
+    last.sector = sectorOf(sectorText, last.dtGroup);
   });
   sheetOnly.forEach(p => {
     if (p.sheet && matchedRows.has(p.sheet)) return;
@@ -482,7 +446,7 @@ function projectList(features) {
     if (!id || seen.has(id)) return;
     seen.add(id);
     if (!p.areaText) p.areaText = areaTextOf(p.sheet, p.geom || null);
-    if (!p.dvtmSub) p.dvtmSub = rowDvtmSub(p.sheet, p.title, p.dtGroup);
+    if (!p.sector) p.sector = sectorOf(entry(p.sheet, /lĩnh vực/i), p.dtGroup);
     out.push(p);
   });
   if (useCache) projectCache = out;
@@ -660,11 +624,6 @@ function areaTextOf(sheet, geom) {
   return '-';
 }
 
-function metaRow(label, value) {
-  if (!value) return '';
-  return `<div class="invest-meta-row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
-}
-
 function isSignedIn() {
   return !!(state.authToken && state.authUser);
 }
@@ -773,24 +732,50 @@ function boundToolsHtml(st) {
   </div>`;
 }
 
-function overviewHtml(st, props) {
+function investChipHtml(st, props) {
+  const row = props.sheet;
+  const ambiguous = !row && !!props._ambiguous;
+  const noBound = !st.geom;
+  const pending = pendingForProject(st);
+  if (pending.length) {
+    return `<span class="invest-chip is-pending">${pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh'}</span>`;
+  }
+  if (noBound) return '<span class="invest-chip">Chưa có ranh</span>';
+  if (!row) return `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`;
+  return '';
+}
+
+/** Đầu thẻ kiểu lô B: eyebrow nhóm + tiêu đề; chip trạng thái ranh gọn. */
+function investHeadHtml(st, props) {
   const row = props.sheet;
   const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
   const groupId = st.dtGroup || rowGroupId(row, titleOf(props));
-  const sector = sectorOf(sectorText, groupId, st.dvtmSub || rowDvtmSub(row, titleOf(props), groupId));
+  const sector = sectorOf(sectorText, groupId);
+  const groupName = investGroupLabel(groupId);
+  const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
+  const chip = investChipHtml(st, props);
+  return `<div class="pp-title lp-head invest-head">
+      <span class="invest-badge" title="${escapeHtml(sector.label)}">${sectorDropSvg(sector)}</span>
+      <div class="lp-head-main invest-head-main">
+        <div class="lp-eyebrow invest-kicker">
+          <span class="lp-eyebrow-label" style="color:${sector.color}">${escapeHtml(groupName)}</span>
+          ${pieces}${chip}
+        </div>
+        <div class="lp-title-row"><span class="lp-title">${escapeHtml(titleOf(props))}</span></div>
+      </div>
+    </div>`;
+}
+
+/** Tab Thông tin: lưới chỉ tiêu + lĩnh vực + mục tiêu (không nhét khối đăng nhập ranh). */
+function overviewHtml(st, props) {
+  const row = props.sheet;
+  const sectorText = entry(row, /lĩnh vực/i) || props.folder || '';
   const goal = entry(row, /mục tiêu/i);
   const place = entry(row, /địa điểm/i);
   const priority = entry(row, /ưu tiên/i);
   const listed = listedArea(row);
-  const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
-  const ambiguous = !row && !!props._ambiguous;
   const noBound = !st.geom;
-  const pending = pendingForProject(st);
-  const chip = pending.length
-    ? `<span class="invest-chip is-pending">${pending[0].replace ? 'Chờ thay ranh' : 'Chờ duyệt ranh'}</span>`
-    : noBound
-      ? '<span class="invest-chip">Chưa có ranh</span>'
-      : (row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`);
+  const ambiguous = !row && !!props._ambiguous;
   const matchNote = noBound || row
     ? ''
     : ambiguous
@@ -799,22 +784,14 @@ function overviewHtml(st, props) {
   const goalHtml = goal
     ? `<details class="invest-goal"><summary>Mục tiêu và nhu cầu đầu tư</summary><p>${escapeHtml(goal)}</p></details>`
     : '';
-  const groupName = investGroupLabel(st.dtGroup || rowGroupId(row, titleOf(props)));
-  const meta = [
-    metaRow('Diện tích ranh', st.areaText || (noBound ? '—' : '')),
-    metaRow('Diện tích DS', listed),
-    metaRow('Địa điểm', place),
-    metaRow('Ưu tiên', priority)
-  ].filter(Boolean).join('');
-  return `<div class="invest-head">
-      <span class="invest-badge">${sectorDropSvg(sector)}</span>
-      <div class="invest-head-main">
-        <div class="invest-kicker"><b style="color:${sector.color}">${escapeHtml(sector.label)}</b><span class="invest-pieces">${escapeHtml(groupName)}</span>${pieces}${chip}</div>
-        <div class="lp-title">${escapeHtml(titleOf(props))}</div>
-      </div>
-    </div>
-    ${meta ? `<dl class="invest-meta">${meta}</dl>` : ''}
-    ${goalHtml}${matchNote}${boundToolsHtml(st)}${adminToolsHtml(st)}${groupHtml(st)}`;
+  const metrics = metricCellsHtml([
+    { tone: 'area', icon: 'ruler', label: 'Diện tích ranh', value: st.areaText || (noBound ? '—' : '—') },
+    { tone: 'cover', icon: 'layers', label: 'Diện tích DS', value: listed || '—' },
+    { tone: 'floors', icon: 'flag', label: 'Ưu tiên', value: priority || '—' },
+    { tone: 'far', icon: 'pin', label: 'Địa điểm', value: place || '—' }
+  ]);
+  const landuse = landUseBannerHtml(sectorText || 'Chưa rõ lĩnh vực');
+  return `${metrics}${landuse}${goalHtml}${matchNote}${adminToolsHtml(st)}${groupHtml(st)}`;
 }
 
 function detailHtml(props) {
@@ -875,11 +852,32 @@ function groupCounts() {
   const all = projectList(pack || []);
   const counts = Object.fromEntries(INVEST_GROUPS.map(g => [g.id, 0]));
   all.forEach(p => { if (counts[p.dtGroup] != null) counts[p.dtGroup] += 1; });
-  counts.khudothi += countApartments();
+  // Chung cư điểm: NOXH → nhóm noxh; thương mại → chungcu_tm (chỉ khi đã có pack đầu tư).
+  if (pack) {
+    counts.noxh += countApartmentsByKind('noxh');
+    counts.chungcu_tm += countApartmentsByKind('thuongmai');
+  }
   return counts;
 }
 
 function paintDtCounts() {
+  const mag = $('dtMagLabel');
+  const magBtn = document.querySelector('#layerMagTrack [data-main-tab="dautu"]');
+  const menuBtn = document.querySelector('#layerMagMenu [data-mag-go="dautu"]');
+  // Chưa tải pack: không gắn số giả (trước đây chỉ đếm chung cư → ~40 rồi nhảy lên đủ sheet).
+  if (!pack) {
+    const bare = 'F. Dự án đầu tư';
+    if (mag) mag.textContent = bare;
+    if (magBtn) magBtn.title = bare;
+    if (menuBtn) menuBtn.textContent = bare;
+    INVEST_GROUPS.forEach(g => {
+      const opt = document.querySelector(`#dtGroupPick option[value="${g.id}"]`);
+      if (opt) opt.textContent = g.label;
+    });
+    const allOpt = document.querySelector(`#dtGroupPick option[value="${INVEST_TAB_ALL}"]`);
+    if (allOpt) allOpt.textContent = 'Toàn bộ dự án';
+    return;
+  }
   const counts = groupCounts();
   let total = 0;
   INVEST_GROUPS.forEach(g => {
@@ -890,12 +888,9 @@ function paintDtCounts() {
   });
   const allOpt = document.querySelector(`#dtGroupPick option[value="${INVEST_TAB_ALL}"]`);
   if (allOpt) allOpt.textContent = total ? `Toàn bộ dự án (${total})` : 'Toàn bộ dự án';
-  const mag = $('dtMagLabel');
-  const magBtn = document.querySelector('#layerMagTrack [data-main-tab="dautu"]');
   const title = total ? `F. Dự án đầu tư (${total} dự án)` : 'F. Dự án đầu tư';
   if (mag) mag.textContent = title;
   if (magBtn) magBtn.title = title;
-  const menuBtn = document.querySelector('#layerMagMenu [data-mag-go="dautu"]');
   if (menuBtn) menuBtn.textContent = title;
 }
 
@@ -988,8 +983,7 @@ function rebuildSheetOnly(features, rows) {
       dtGroup: rowGroupId(row, title)
     });
     const last = sheetOnly[sheetOnly.length - 1];
-    last.dvtmSub = rowDvtmSub(row, title, last.dtGroup);
-    last.sector = sectorOf(entry(row, /lĩnh vực/i), last.dtGroup, last.dvtmSub);
+    last.sector = sectorOf(entry(row, /lĩnh vực/i), last.dtGroup);
   });
 }
 
@@ -1487,7 +1481,12 @@ function ensureCard() {
   el.addEventListener('click', (e) => {
     if (e.target.closest('.pls-comp-fold')) return;
     const land = e.target.closest('[data-land]');
-    if (land) { toggleLand(land.dataset.land, land.dataset.color); return; }
+    if (land) {
+      // Nút tô loại đất nằm trong <summary>: không đóng/mở droplist khi bấm tô.
+      if (land.closest('summary')) e.preventDefault();
+      toggleLand(land.dataset.land, land.dataset.color);
+      return;
+    }
     const info = e.target.closest('[data-info-tab]');
     if (info && card) { showInfo(info.dataset.infoTab); return; }
     const tab = e.target.closest('[data-invest-tab]');
@@ -1669,7 +1668,8 @@ async function togglePlan() {
 function showInfo(id) {
   const st = card;
   const el = $('investCard');
-  if (!st || !el || (id !== 'overview' && id !== 'detail')) return;
+  const ok = id === 'overview' || id === 'bound' || id === 'detail';
+  if (!st || !el || !ok) return;
   st.infoTab = id;
   el.querySelectorAll('[data-info-page]').forEach(p => { p.hidden = p.dataset.infoPage !== id; });
   el.querySelectorAll('[data-info-tab]').forEach(b => {
@@ -1685,19 +1685,21 @@ function paintCard() {
   const el = $('investCard');
   if (!st || !feature || !el) return;
   const props = viewOf(st);
-  const info = st.infoTab === 'detail' ? 'detail' : 'overview';
+  const info = st.infoTab === 'bound' || st.infoTab === 'detail' ? st.infoTab : 'overview';
   st.infoTab = info;
   const planOpen = !!el.querySelector('.invest-plan') && !el.querySelector('.invest-plan').hidden;
   st.editing = false;
   st.saving = false;
   el.innerHTML = `${editButtonHtml()}<button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng dự án">${ico('close')}</button>
     <div class="invest-body">
-      <div class="invest-switch" role="tablist" aria-label="Thông tin dự án">
-        <button type="button" data-info-tab="overview" class="${info === 'overview' ? 'is-on' : ''}" aria-selected="${info === 'overview'}">Tổng quan</button>
-        <button type="button" data-info-tab="detail" class="${info === 'detail' ? 'is-on' : ''}" aria-selected="${info === 'detail'}">Chi tiết</button>
+      ${investHeadHtml(st, props)}
+      <div class="invest-switch lp-tabs" role="tablist" aria-label="Thông tin dự án">
+        <button type="button" class="lp-tab${info === 'overview' ? ' is-on' : ''}" data-info-tab="overview" role="tab" aria-selected="${info === 'overview'}">Thông tin</button>
+        <button type="button" class="lp-tab${info === 'bound' ? ' is-on' : ''}" data-info-tab="bound" role="tab" aria-selected="${info === 'bound'}">Ranh giới</button>
+        <button type="button" class="lp-tab${info === 'detail' ? ' is-on' : ''}" data-info-tab="detail" role="tab" aria-selected="${info === 'detail'}">Chi tiết</button>
       </div>
       <div class="invest-pages">
-        <div data-info-page="overview"${info === 'overview' ? '' : ' hidden'}>
+        <div data-info-page="overview" role="tabpanel"${info === 'overview' ? '' : ' hidden'}>
           ${overviewHtml(st, props)}
           ${st.geom ? `<button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}</button>
           <div class="invest-plan"${planOpen ? '' : ' hidden'}>
@@ -1705,7 +1707,8 @@ function paintCard() {
             <div class="cad-page" role="tabpanel"></div>
           </div>` : ''}
         </div>
-        <div data-info-page="detail"${info === 'detail' ? '' : ' hidden'}>${detailHtml(props)}</div>
+        <div data-info-page="bound" role="tabpanel"${info === 'bound' ? '' : ' hidden'}>${boundToolsHtml(st)}</div>
+        <div data-info-page="detail" role="tabpanel"${info === 'detail' ? '' : ' hidden'}>${detailHtml(props)}</div>
       </div>
     </div>`;
   el.hidden = false;
@@ -2392,31 +2395,6 @@ function investRow(p, n) {
     </div>`;
 }
 
-function paintDvtmList(host, items) {
-  const empty = pack || sheetRows.length ? '<div class="project-empty">Chưa có đồ án.</div>' : '';
-  if (!items.length) {
-    host.innerHTML = empty;
-    return;
-  }
-  host.innerHTML = DVTM_SUBGROUPS.map(sub => {
-    const list = items.filter(p => p.dvtmSub === sub.id)
-      .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
-    const open = dvtmFoldOpen.has(sub.id);
-    const mapOn = dvtmSubMapOn(sub.id, list);
-    const body = list.length
-      ? list.map((p, i) => investRow(p, i + 1)).join('')
-      : '<div class="project-empty">Chưa có dự án trong nhóm này.</div>';
-    return `<div class="pl-group dt-dvtm-sub${open ? ' open' : ''}" data-dvtm-sub="${escapeHtml(sub.id)}">
-      <div class="pl-hrow dt-sub-row">
-        <span class="pl-head" title="${escapeHtml(sub.title)}">${ico(sub.icon)}<span>${escapeHtml(sub.label)}</span><small>${list.length}</small></span>
-        <button type="button" class="project-btn pl-eye" data-dvtm-eye="${escapeHtml(sub.id)}" aria-pressed="${mapOn}" title="${mapOn ? 'Ẩn nhóm trên bản đồ' : 'Hiện nhóm trên bản đồ'}">${ico(mapOn ? 'eye' : 'eye-off')}</button>
-        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-dvtm-fold="${escapeHtml(sub.id)}" title="${open ? 'Thu danh sách' : 'Mở danh sách'}" aria-expanded="${open}" aria-label="${open ? 'Thu' : 'Mở'} ${escapeHtml(sub.label)}">${ico('chev-down')}</button>
-      </div>
-      <div class="pl-body"${open ? '' : ' hidden'}>${body}</div>
-    </div>`;
-  }).join('');
-}
-
 function paintAllList(host) {
   const ward = activeDtScope();
   const empty = pack || sheetRows.length
@@ -2446,7 +2424,6 @@ function paintInvestList(opts = {}) {
   const onlyTab = opts.tab || '';
   const scroller = $('dtList');
   const y = scroller?.scrollTop || 0;
-  applyDvtmMapDefault();
   const all = projectList();
   const ward = activeDtScope();
   if (!onlyTab || onlyTab === INVEST_TAB_ALL) {
@@ -2463,10 +2440,6 @@ function paintInvestList(opts = {}) {
     const items = all
       .filter(p => p.dtGroup === g.id && placeMatchesScope(p, ward))
       .sort((a, b) => String(a.title).localeCompare(String(b.title), 'vi'));
-    if (g.id === 'dvtm') {
-      paintDvtmList(host, items);
-      return;
-    }
     host.innerHTML = items.length
       ? items.map((p, i) => investRow(p, i + 1)).join('')
       : (pack || sheetRows.length
@@ -2595,7 +2568,6 @@ export async function focusInvest(id) {
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
   }
-  if (p.dtGroup === 'dvtm' && p.dvtmSub) dvtmFoldOpen.add(p.dvtmSub);
   const box = $('chk_invest');
   if (box && !box.checked) {
     box.checked = true;
@@ -2686,28 +2658,6 @@ export function initInvestLayer() {
   const listHost = $('dtList');
   listHost?.addEventListener('click', (e) => {
     if (!e.target.closest('.invest-tab-list')) return;
-    const fold = e.target.closest('[data-dvtm-fold]');
-    if (fold) {
-      const id = fold.dataset.dvtmFold;
-      if (dvtmFoldOpen.has(id)) dvtmFoldOpen.delete(id);
-      else dvtmFoldOpen.add(id);
-      paintInvestList({ tab: 'dvtm', counts: false });
-      return;
-    }
-    const eye = e.target.closest('[data-dvtm-eye]');
-    if (eye) {
-      const id = eye.dataset.dvtmEye;
-      const items = projectList().filter(p => p.dtGroup === 'dvtm' && p.dvtmSub === id);
-      const on = !dvtmSubMapOn(id, items);
-      setDvtmSubMap(id, on);
-      if (on) dvtmFoldOpen.add(id);
-      if (on && !$('chk_invest')?.checked) {
-        $('chk_invest').checked = true;
-        $('chk_invest').dispatchEvent(new Event('change', { bubbles: true }));
-      } else queueInvestDraw();
-      paintInvestList({ tab: 'dvtm', counts: false });
-      return;
-    }
     const expand = e.target.closest('[data-invest-expand]');
     if (expand) {
       e.preventDefault();
