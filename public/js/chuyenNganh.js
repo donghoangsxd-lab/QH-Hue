@@ -334,7 +334,7 @@ async function setLayerOn(layer, on, { frame = false } = {}) {
   if (canvasKind) {
     // Bộ / sắt: chỉ cờ + canvas giaothong25 — không vẽ raw GIS chồng nguồn.
     clearDrawn(layer.id);
-    await refreshGt25Roads();
+    if (!gt25HeadApplying) await refreshGt25Roads();
   } else if (!layer.bind) {
     if (!on) clearDrawn(layer.id);
     else {
@@ -346,8 +346,11 @@ async function setLayerOn(layer, on, { frame = false } = {}) {
       }
     }
   }
-  paint();
-  scheduleSave();
+  // Cascade group GT25: không paint giữa chừng (paintGt25Children hủy DOM con còn lại).
+  if (!gt25HeadApplying) {
+    paint();
+    scheduleSave();
+  }
 }
 
 function seedFromDom() {
@@ -674,6 +677,8 @@ function setGt25Head(on) {
   gt25HeadApplying = false;
   syncGt25Head();
   void refreshGt25Roads();
+  paint();
+  scheduleSave();
 }
 
 function paintGt25Children() {

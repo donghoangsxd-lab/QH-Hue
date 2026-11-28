@@ -81,7 +81,9 @@ assert.ok(!/id="chk_osmWater"[^>]*\bchecked\b/.test(html), 'đường thủy t�
 assert.match(html, /class="layer-alert" title="Công trình vi phạm: hành lang sông, đất rừng, quy hoạch mở đường hoặc đất công viên cây xanh"/);
 assert.match(html, /id="chk_violate"/);
 assert.doesNotMatch(html, /<label[^>]*>[\s\S]*?Công trình vi phạm hành lang\/đất rừng<\/label>/);
-assert.ok(html.includes('id="chk_gt25rail"') && html.includes('id="chk_gt10rail"'), 'công tắc đường sắt QHC');
-assert.ok(roads.includes('chk_gt${scale}rail'), 'vẽ đường sắt theo công tắc');
+assert.ok(!html.includes('id="chk_gt25rail"') && html.includes('id="chk_gt10rail"'), 'GT25 bỏ rail riêng; GT10 giữ công tắc đường sắt');
+assert.ok(html.includes('data-gt25-head') && html.includes('id="gt25Children"'), 'GT25 group + lớp con');
+assert.ok(roads.includes('gt25CanvasParts') || roads.includes('data-gt25-canvas'), 'GT25 tách canvas bộ/sắt theo lớp con');
+assert.ok(roads.includes('chk_gt10rail'), 'GT10 vẫn vẽ đường sắt theo công tắc rail');
 
 console.log('osm sports: ok');
